@@ -1,0 +1,225 @@
+= Media Juggler
+Jordan Williams <jordan@jwillikers.com>
+:experimental:
+:icons: font
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:Asciidoctor_: https://asciidoctor.org/[Asciidoctor]
+:just: https://github.com/casey/just[just]
+:Linux: https://www.linuxfoundation.org/[Linux]
+:Nix: https://nixos.org/[Nix]
+:nix-direnv: https://github.com/nix-community/nix-direnv[nix-direnv]
+
+Scripts to tag, convert, and upload my music, audiobooks, ebooks, and comics.
+
+== Usage
+
+This repository provides a collection of scripts to make it easier to add various digital media to my collection.
+This includes things like music, audiobooks, ebooks, and comics.
+When purchasing media, it often needs to be renamed, converted, tagged with _correct_ information, and finally uploaded to the appropriate location in my S3-compatible object storage.
+The utilities here aim to automate this as much as possible.
+Ultimately, the workflow should be as simple as downloading the media to the corresponding import directory on my computer.
+There's quite a bit of initial set up that needs to be completed first, though, so that's where we'll begin.
+
+Use this Nix flake in your Home Manager configuration to incorporate these scripts in your project.
+Here's an example of how to incorporate this repository's flake as part of your project.
+
+// todo link to my Home Manager config
+. Add `media-juggler` to `flake.nix` and the provided Home Manager module to the `modules` of your configuration.
++
+.flake.nix
+[,nix]
+----
+{
+  inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    media-juggler.url = "github:jwillikers/media-juggler";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  };
+  outputs =
+    {
+      self,
+      flake-utils,
+      media-juggler,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+        };
+      in
+      {
+        homeConfigurations.jdoe = home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+
+          modules = [
+            media-juggler.hmModules.media-juggler
+          ];
+        };
+      }
+    );
+}
+----
+
+. Apply the updated Home Manager configuration.
++
+[,sh]
+----
+home-manager --flake .#$(id --name --user)@$(hostname --short) switch
+----
+
+. Create an Adobe account in order to use https://www.adobe.com/solutions/ebook/digital-editions.html[Adobe Digital Editions].
+It is recommended to use a dedicated account for this in the event that the account is banned by Adobe.
+Be sure to read the https://github.com/Leseratte10/acsm-calibre-plugin/tree/v0.0.16?tab=readme-ov-file#setup[Setup section of the README] for the Calibre ACSM Input plugin to understand all of the implications.
+. Sign up for a Comic Vine account https://comicvine.gamespot.com/login-signup/[here].
+. Get your Comic Vine API token from https://comicvine.gamespot.com/api/[here].
+This will be used later to configure some of the tools.
+
+. Create an alias for your MinIO instance.
+This allows you to configure your credentials to access this server.
++
+[,sh]
+----
+mc alias set jwillikers https://minio.jwillikers.io
+----
+
+// todo
+// . Add your Comic Vine API token to ComicTagger.
+// +
+// [,sh]
+// ----
+// comictagger --only-set-cv-key --cv-api-key <Comic Vine API key>
+// ----
+
+. Create the directory `~/.config/calibre/plugins/`.
++
+[,sh]
+----
+mkdir --parents ~/.config/calibre/plugins/
+----
+
+. Add your Comic Vine API key to the Calibre Comic Vine plugin config file.
++
+.~/.config/calibre/plugins/comicvine.json
+[,json]
+----
+{
+  "api_key": "<Comic Vine API key>",
+  "max_volumes": 2,
+  "requests_rate": 1,
+  "worker_threads": 16
+}
+----
+
+. Open Calibre.
++
+[,sh]
+----
+setsid calibre &>/dev/null &
+----
+
+. Activate ADE for the DeACSM plugin.
+To import a previously exported activation, go to menu:Preferences[Plugins > DeACSM > Customize plugin > Import existing activation backup (ZIP)].
+For a new activation, go to menu:Preferences[Plugins > DeACSM > Customize plugin > Link to ADE account].
+After a new activation export the activation using menu:Preferences[Plugins > DeACSM > Customize plugin > Export account activation data] and back up this file.
+
+. Import the key from DeACSM to the DeDRM plugin.
+Open menu:Preferences[Plugins > DeDRM > Customize plugin > Adobe Digital Editions ebooks] and hit the btn:[+] icon.
+The key should automatically be added.
+
+. Currently, requires ComicTagger AppImage to be downloaded.
++
+[,sh]
+----
+curl --location --remote-name --output-dir ~/Downloads https://github.com/comictagger/comictagger/releases/download/1.6.0-beta.2/ComicTagger-x86_64.AppImage
+chmod +x ~/Downloads/ComicTagger-x86_64.AppImage
+----
+
+. Now, the provided scripts can be run like so.
++
+[,sh]
+----
+import-comics.nu ~/Downloads/ComicTagger-x86_64.AppImage file.acsm
+----
+
+== Develop
+
+The `nix develop` command can be used to enter or run commands in an environment with all of the necessary dependencies.
+For convenience, direnv can be used to automatically load this environment when entering the project's directory.
+The https://marketplace.visualstudio.com/items?itemName=mkhl.direnv[mkhl.direnv VSCode extension] integrates this environment in VSCode for development.
+Nix also generates the configuration for https://pre-commit.com/[pre-commit], which automates formatting and various checks when committing changes.
+Follow the instructions here to set up your development environment using Nix.
+
+. Install an implementation of {Nix}, such as https://lix.systems[Lix] used here.
++
+[,sh]
+----
+curl -sSf -L https://install.lix.systems/lix | sh -s -- install
+----
+
+. Clone this project's repository.
++
+[,sh]
+----
+git clone https://github.com/jwillikers/media-juggler.git
+----
+
+. Change into the project directory.
++
+[,sh]
+----
+cd media-juggler
+----
+
+. Install direnv for your system according to the https://direnv.net/docs/installation.html[direnv installation instructions].
++
+[,sh]
+----
+sudo rpm-ostree install direnv
+sudo systemctl reboot
+----
+
+. Integrate direnv with your shell by following the instructions on the https://direnv.net/docs/hook.html[direnv Setup page].
+
+. Permit the direnv configuration for the repository.
++
+[,sh]
+----
+direnv allow
+----
+
+. Use `nix build` to run the appropriate target.
++
+[,sh]
+----
+nix run .#calibrePlugins.acsm
+----
+
+== Contributing
+
+Contributions in the form of issues, feedback, and even pull requests are welcome.
+Make sure to adhere to the project's link:CODE_OF_CONDUCT.adoc[Code of Conduct].
+
+== Code of Conduct
+
+Refer to the project's link:CODE_OF_CONDUCT.adoc[Code of Conduct] for details.
+
+== License
+
+This repository is licensed under the link:LICENSE[MIT license].
+
+© 2024 Jordan Williams
+
+== Authors
+
+mailto:{email}[{author}]
