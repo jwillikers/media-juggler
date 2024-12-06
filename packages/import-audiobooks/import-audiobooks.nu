@@ -84,12 +84,23 @@ export def beet_import [
     --working-directory: directory
 ]: [path -> record] {
     let m4b = $in
-    ^beet --config $config --library $library import --move
-    # todo Print this out?
-    # $audiobook
+    let output_directory = $working_directory | path join beets
+    rm --force --recursive $output_directory
+    (
+        ^beet
+        --config $config
+        --directory $output_directory
+        --library $library
+        import --move
+        $m4b
+    )
+    let author_directory = (ls --full-paths $output_directory | get name | first)
+    let imported_m4b = (glob $"($author_directory)/*.m4b" | first)
+    let directory = ($imported_m4b | path basename)
+    let cover = (glob $"($directory)/*.{jpeg,jpg,jxl,png}" | first)
     {
-        m4b: "",
-        cover: ""
+        m4b: $imported_m4b,
+        cover: $cover
     }
 }
 
@@ -116,6 +127,10 @@ export def embed_cover []: [record -> path] {
     $audiobook
 }
 
+export def sanitize_minio_filename []: [string -> string] {
+    $in | str replace --all "!" ""
+}
+
 # Import an audiobook to my collection.
 #
 # This script performs several steps to process the audiobook file.
@@ -130,7 +145,7 @@ def main [
     --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
     --delete # Delete the original file
     --minio-alias: string = "jwillikers" # The alias of the MinIO server used by the MinIO client application
-    --minio-path: string = "media/Books/Books" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
+    --minio-path: string = "media/Books/Audiobooks" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
     --output-directory: directory # Directory to place files when not being uploaded
     --skip-upload # Don't upload files to the server
 ] {
@@ -155,7 +170,15 @@ def main [
     let temporary_directory = (mktemp --directory)
     log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
-    # todo Support getting audible-activation-bytes from an environment variable.
+    let audible_activation_bytes = (
+        if $audible_activation_bytes != null {
+            $audible_activation_bytes
+        } else if "AUDIBLE_ACTIVATION_BYTES" in $env {
+            $env.AUDIBLE_ACTIVATION_BYTES
+        } else {
+            null
+        }
+    )
 
     try {
 
@@ -175,6 +198,10 @@ def main [
     let audiobook = (
         # Assume AAX files are from Audible and require decryption.
         if $input_format == "aax" {
+            if $audible_activation_bytes == null {
+                log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
+                exit 1
+            }
             $file
             | decrypt_audible $activation_bytes --working-directory $temporary_directory
             | beet_import $beets_config $beets_library
@@ -203,8 +230,6 @@ def main [
         }
     )
 
-    # Optimize cover.
-
     # log debug $"Fetching and writing metadata to '($formats.cbz)' with ComicTagger"
     # log debug $"The ComicTagger result is:\n(ansi green)($tag_result.result)(ansi reset)\n"
     # log debug "Renaming the CBZ according to the updated metadata"
@@ -214,26 +239,30 @@ def main [
     #     $format | update cbz ($format.cbz | comictagger_rename_cbz --comictagger $comictagger)
     # )
 
-    let comic_metadata = ($tag_result.result | get md)
+    # let comic_metadata = ($tag_result.result | get md)
 
     # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
-    let authors = ($comic_metadata | get credits | where role == "Writer" | get person)
-    log debug $"Authors determined to be (ansi purple)'($authors)'(ansi reset)"
+    # let authors = ($comic_metadata | get credits | where role == "Writer" | get person)
+    # log debug $"Authors determined to be (ansi purple)'($authors)'(ansi reset)"
 
-    let authors_subdirectory = ($authors | str join ", ")
-    let minio_destination =  [$minio_alias $minio_path $authors_subdirectory] | path join
+    let authors_subdirectory = ($audiobook.m4b | path dirname | path relative-to $working_directory | path split | drop nth 0 | path join)
+    let minio_target_directory =  [$minio_alias $minio_path $authors_subdirectory] | path join | sanitize_minio_filename
+    let minio_target_destination = (
+        let components = ($audiobook.m4b | path parse);
+        { parent: $minio_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
+    )
     if $skip_upload {
         mv $audiobook.m4b $output_directory
     } else {
-        log info $"Uploading (ansi yellow)($audiobook.m4b)(ansi reset) to (ansi yellow)($minio_destination)/($audiobook.m4b | path basename)(ansi reset)"
-        ^mc mv $audiobook.m4b $"($minio_destination)/($audiobook.m4b | path basename)"
+        log info $"Uploading (ansi yellow)($audiobook.m4b)(ansi reset) to (ansi yellow)($minio_target_destination)(ansi reset)"
+        ^mc mv $audiobook.m4b $minio_target_destination
     }
 
     if $delete {
         log debug "Deleting the original file"
         if ($original_file | str starts-with "minio:") {
             let actual_path = ($original_file | str replace "minio:" "")
-            if $actual_path == ([$minio_destination ($audiobook.m4b | path basename)] | path join) {
+            if ($actual_path | sanitize_minio_filename) == $minio_target_destination {
                 log info $"Not deleting the original file (ansi yellow)($original_file)(ansi reset) since it was overwritten by the updated file"
             } else {
                 log info $"Deleting the original file on MinIO (ansi yellow)($actual_path)(ansi reset)"

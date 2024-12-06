@@ -35,6 +35,7 @@ let excluded_publishers = [
     "Shogakukan"
     "Siam Inter"
     "Soleil"
+    "Square Enix"
     "Tong Li Publishing Co."
     "Tokyopop GmbH"
 ]
@@ -557,6 +558,10 @@ export def convert_for_ereader [
     $components | update stem ($components.stem + $suffix) | path join
 }
 
+export def sanitize_minio_filename []: [string -> string] {
+    $in | str replace --all "!" ""
+}
+
 # Import my comic or manga file to my collection.
 #
 # This script performs several steps to process the comic or manga file.
@@ -787,25 +792,33 @@ def main [
     # todo Functions archive_epub, upload_cbz, and perhaps copy_cbz_to_ereader
 
     let authors_subdirectory = ($authors | str join ", ")
-    let minio_destination =  [$minio_alias $minio_path $authors_subdirectory] | path join
+    let minio_target_directory =  [$minio_alias $minio_path $authors_subdirectory] | path join | sanitize_minio_filename
+    let minio_target_destination = (
+        let components = ($formats.cbz | path parse);
+        { parent: $minio_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
+    )
     if $skip_upload {
         mv $formats.cbz $output_directory
     } else {
-        log info $"Uploading (ansi yellow)($formats.cbz)(ansi reset) to (ansi yellow)($minio_destination)/($formats.cbz | path basename)(ansi reset)"
-        ^mc mv $formats.cbz $"($minio_destination)/($formats.cbz | path basename)"
+        log info $"Uploading (ansi yellow)($formats.cbz)(ansi reset) to (ansi yellow)($minio_target_destination)(ansi reset)"
+        ^mc mv $formats.cbz $minio_target_destination
     }
 
     # Keep the EPUB for archival purposes.
     # I have Calibre reduce the size of images in a so-called "lossless" manner.
     # If anything about that isn't actually lossless, that's not good...
     # Guess I'm willing to take that risk right now.
-    let minio_archival_destination =  [$minio_alias $minio_archival_path $authors_subdirectory] | path join
+    let minio_archival_target_directory =  [$minio_alias $minio_archival_path $authors_subdirectory] | path join | sanitize_minio_filename
     if "epub" in $formats {
+        let minio_archival_destination = (
+            let components = ($formats.epub | path parse);
+            { parent: $minio_archival_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
+        )
         if $skip_upload {
             mv $formats.epub $output_directory
         } else {
-            log info $"Uploading (ansi yellow)($formats.epub)(ansi reset) to (ansi yellow)($minio_archival_destination)/($formats.epub | path basename)(ansi reset)"
-            ^mc mv $formats.epub $"($minio_archival_destination)/($formats.epub | path basename)"
+            log info $"Uploading (ansi yellow)($formats.epub)(ansi reset) to (ansi yellow)($minio_archival_destination)(ansi reset)"
+            ^mc mv $formats.epub $minio_archival_destination
         }
     }
 
@@ -821,8 +834,8 @@ def main [
             cp $formats.ereader_cbz $target
         }
         if $upload_ereader_cbz {
-            log info $"Uploading (ansi yellow)($formats.ereader_cbz)(ansi reset) to (ansi yellow)($minio_destination)/($formats.ereader_cbz | path basename)(ansi reset)"
-            ^mc mv $formats.ereader_cbz $minio_destination
+            log info $"Uploading (ansi yellow)($formats.ereader_cbz)(ansi reset) to (ansi yellow)($minio_target_directory)/($formats.ereader_cbz | path basename)(ansi reset)"
+            ^mc mv $formats.ereader_cbz $minio_target_directory
         }
         if not $no_copy_to_ereader and not $upload_ereader_cbz {
             mv $formats.ereader_cbz $output_directory
@@ -835,15 +848,15 @@ def main [
             let actual_path = ($original_file | str replace "minio:" "")
             log debug $"Actual path: ($actual_path)"
             let uploaded_paths = (
-                [([$minio_destination ($formats.cbz | path basename)] | path join)]
+                [$minio_target_destination]
                 | append (if "epub" in $formats {
-                        ([$minio_archival_destination ($formats.epub | path basename)] | path join)
+                        ([$minio_archival_target_directory ($formats.epub | path basename)] | path join | sanitize_minio_filename)
                     } else {
                         null
                     })
             )
             log debug $"Uploaded paths: ($uploaded_paths)"
-            if $actual_path in $uploaded_paths {
+            if ($actual_path | sanitize_minio_filename) in $uploaded_paths {
                 log info $"Not deleting the original file (ansi yellow)($original_file)(ansi reset) since it was overwritten by the updated file"
             } else {
                 log info $"Deleting the original file on MinIO (ansi yellow)($actual_path)(ansi reset)"

@@ -145,6 +145,8 @@ curl --location --remote-name --output-dir ~/Downloads https://github.com/comict
 chmod +x ~/Downloads/ComicTagger-x86_64.AppImage
 ----
 
+// todo Document getting Audible activation bytes and setting environment variable AUDIBLE_ACTIVATION_BYTES
+
 . Now, the provided scripts can be run like so.
 +
 [,sh]

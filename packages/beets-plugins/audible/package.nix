@@ -1,9 +1,8 @@
 {
-  beets,
+  beetsPackages,
   fetchFromGitHub,
   lib,
   python3Packages,
-# uv,
 }:
 python3Packages.buildPythonApplication rec {
   pname = "beets-audible";
@@ -17,36 +16,23 @@ python3Packages.buildPythonApplication rec {
     hash = "sha256-m955KPtYfjmtm9kHhkZLWoMYzVq0THOwvKCJYiVna7k=";
   };
 
-  #   "beets ==2.0.0",
-  # nativeBuildInputs = [
-  #   beets
-  #   uv
-  # ];
+  postPatch = ''
+    substituteInPlace pyproject.toml \
+      --replace-fail '"beets ==2.0.0",' '"beets",'
+  '';
 
-  build-system = [
-    python3Packages.hatchling
+  build-system = with python3Packages; [
+    hatchling
   ];
 
   dependencies =
-    [ beets ]
+    [ beetsPackages.beets-minimal ]
     ++ (with python3Packages; [
 
       markdownify
       natsort
       tldextract
     ]);
-
-  # nativeCheckInputs = [
-  #   beets
-  # ];
-
-  doCheck = false;
-
-  # installPhase = ''
-  #   runHook preInstall
-  #   install -D --mode=0644 --target-directory=$out/lib/calibre/calibre-plugins calibre-plugin.zip calibre-migration-plugin.zip
-  #   runHook postInstall
-  # '';
 
   meta = {
     description = "Beets-audible: Organize Your Audiobook Collection With Beets";
