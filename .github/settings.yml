@@ -1,9 +1,9 @@
 repository:
   # See https://developer.github.com/v3/repos/#edit for all available settings.
 
-  name: nix-update-scripts
+  name: media-juggler
   # A short description of the repository that will show up on GitHub
-  description: Scripts to automatically update a few Nix-related things, like the version of nix-direnv in .envrc files and the NixOS release in of the nixpkgs flake input
+  description: "A collection of utilities for tagging, converting, and uploading my music, audiobooks, ebooks, and comics"
   # A URL with more information about the repository
   # homepage: ""
   # A comma-separated list of topics to set on the repository
