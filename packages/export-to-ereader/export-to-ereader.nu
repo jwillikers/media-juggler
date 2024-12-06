@@ -136,6 +136,13 @@ def main [
         exit 1
     }
 
+    if not $no_copy_to_ereader {
+      if (^findmnt --target /run/media/jordan/KOBOeReader | complete | get exit_code) != 0 {
+        ^udisksctl mount --block-device /dev/disk/by-label/KOBOeReader --no-user-interaction
+        # todo Parse the mountpoint from the output of this command
+      }
+    }
+
     for original_file in $files {
 
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
@@ -232,7 +239,6 @@ def main [
     } else {
         let username = (^id --name --user)
         let mounted_volume_name = ($ereader_profiles | where model == $ereader | first | get volume)
-        # todo Automatically mount the device.
         mkdir (["/run/media" $username $mounted_volume_name $ereader_subdirectory] | path join)
         let safe_basename = (($ereader_cbz | path basename) | str replace --all ":" "_")
         let target = (["/run/media" $username $mounted_volume_name $ereader_subdirectory $safe_basename] | path join)
@@ -247,5 +253,11 @@ def main [
         continue
     }
 
+    }
+
+    if not $no_copy_to_ereader {
+      if (^findmnt --target /run/media/jordan/KOBOeReader | complete | get exit_code) == 0 {
+        ^udisksctl unmount --block-device /dev/disk/by-label/KOBOeReader --no-user-interaction
+      }
     }
 }
