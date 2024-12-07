@@ -599,6 +599,7 @@ def main [
     --delete # Delete the original file
     --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
     --ereader-subdirectory: string = "Books/Manga" # The subdirectory on the e-reader in-which to copy
+    --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
     --interactive # Ask for input from the user
     --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
     # --issue: string # The issue number
@@ -653,6 +654,7 @@ def main [
 
     let input_format = ($file | path parse | get extension)
 
+    # todo Support PDF to CBZ (JXL) via cbconvert?
     let formats = (
         if $input_format == "acsm" {
             let epub = ($file | acsm_to_epub $temporary_directory | optimize_images_in_zip | polish_epub)
@@ -661,7 +663,7 @@ def main [
                 | epub_to_cbz --working-directory $temporary_directory
                 | (
                     let cbz = $in;
-                    if $comic_vine_issue_id == null {
+                    if $comic_vine_issue_id == null and not $ignore_epub_title {
                         $cbz | rename_cbz_from_epub_metadata $epub
                     } else {
                         $cbz
@@ -677,7 +679,7 @@ def main [
                 | epub_to_cbz --working-directory $temporary_directory
                 | (
                     let cbz = $in;
-                    if $comic_vine_issue_id == null {
+                    if $comic_vine_issue_id == null and not $ignore_epub_title {
                         $cbz | rename_cbz_from_epub_metadata $epub
                     } else {
                         $cbz
