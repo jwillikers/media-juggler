@@ -1,6 +1,7 @@
 plugins: audible copyartifacts edit embedart fromfilename inline scrub
 
-directory: ~/Books/Audiobooks
+# directory: ~/Books/Audiobooks
+directory: /audiobooks
 
 item_fields:
   first_artist: albumartist.split(', ',1)[0:1][0]

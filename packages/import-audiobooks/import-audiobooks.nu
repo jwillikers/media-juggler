@@ -57,10 +57,17 @@ export def get_image_extension []: [path -> string] {
         | filter {|extension| not ($extension | is-empty) }
         | uniq
     )
+    let file_extensions = (
+        if (($file_extensions | length) == 2 and "jpg" in $file_extensions and "jpeg" in $file_extensions) {
+            ["jpeg"]
+        } else {
+            $file_extensions
+        }
+    )
     if ($file_extensions | is-empty) {
         log error "No file extensions found"
         null
-    } else if (($file_extensions | length) > 1 or ($file_extensions | length) == 0) {
+    } else if (($file_extensions | length) > 1) {
         log error $"Multiple file extensions found: ($file_extensions)"
         null
     } else {
@@ -86,14 +93,29 @@ export def beet_import [
     let m4b = $in
     let output_directory = $working_directory | path join beets
     rm --force --recursive $output_directory
+    # (
+    #     ^beet
+    #     --config $config
+    #     --directory $output_directory
+    #     --library $library
+    #     import --move
+    #     $m4b
+    # )
     (
-        ^beet
-        --config $config
-        --directory $output_directory
-        --library $library
-        import --move
-        $m4b
+        ^podman run \
+            --detach \
+            --env "PUID=0" \
+            --env "PGID=0" \
+            --mount $"type=bind,src=($output_directory),dst=/audiobooks" \
+            --mount $"type=bind,src=($m4b | path dirname),dst=/input" \
+            --name "beets-audible" \
+            --rm \
+            --volume $"($config | path dirname):/config:Z" \
+            --volume $"($config | path dirname)/scripts:/custom-cont-init.d:Z" \
+            "lscr.io/linuxserver/beets:2.0.0"
     )
+    ^podman exec --interactive --tty beets-audible beet import --move $"/input/($m4b | path basename)"
+    ^podman stop beets-audible
     let author_directory = (ls --full-paths $output_directory | get name | first)
     let imported_m4b = (glob $"($author_directory)/*.m4b" | first)
     let directory = ($imported_m4b | path basename)

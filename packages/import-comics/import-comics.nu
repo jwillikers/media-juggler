@@ -25,7 +25,9 @@ let excluded_publishers = [
     "Jademan"
     "Japonica Polonica Fantastica"
     "Ki-oon"
+    "Kodansha"
     "Kurokawa"
+    "M&C"
     "NBM"
     "Norma Editorial"
     "Planeta DeAgostini"
@@ -239,6 +241,12 @@ export def rename_cbz_from_epub_metadata [
                 | parse --regex '(?P<series>.+) Volume (?P<issue>[0-9]+)'
                 | first
             )
+        } else if ($epub_title =~ ".*[ _]+vol[0-9]+") {
+            (
+                $epub_title
+                | parse --regex '(?P<series>.+)[ _]+vol(?P<issue>[0-9]+)'
+                | first
+            )
         } else if $epub_title =~ ".+ [0-9]+" {
             $epub_title
             | parse --regex '(?P<series>.+) (?P<issue>[0-9]+)'
@@ -301,6 +309,13 @@ export def get_image_extension []: [path -> string] {
         | get extension
         | filter {|extension| not ($extension | is-empty) }
         | uniq
+    )
+    let file_extensions = (
+        if (($file_extensions | length) == 2 and "jpg" in $file_extensions and "jpeg" in $file_extensions) {
+            ["jpeg"]
+        } else {
+            $file_extensions
+        }
     )
     if ($file_extensions | is-empty) {
         log error "No file extensions found"
@@ -698,7 +713,15 @@ def main [
     let comic_metadata = ($tag_result.result | get md)
 
     # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
-    let authors = ($comic_metadata | get credits | where role == "Writer" | get person)
+    let authors = (
+      let credits = $comic_metadata | get credits;
+      let writers = $credits | where role == "Writer" | get person;
+      if ($writers | is-empty) {
+        $credits | where role == "Artist" | get person
+      } else {
+        $writers
+      }
+    )
     log debug $"Authors determined to be (ansi purple)'($authors)'(ansi reset)"
 
     # We keep the name of the series in the title to keep things organized.
@@ -752,7 +775,8 @@ def main [
     let previous_title = ($comic_metadata | get title)
     log info $"Rewriting the title from (ansi yellow)'($previous_title)'(ansi reset) to (ansi yellow)'($title)'(ansi reset)"
     # todo Read from YAML file to ensure proper string escaping of single / double quotes?
-    $formats.cbz | comictagger_update_metadata $"manga: \"($manga)\", title: \"($title)\"" --comictagger $comictagger
+    let sanitized_title = $title | str replace --all '"' '\"'
+    $formats.cbz | comictagger_update_metadata $"manga: \"($manga)\", title: \"($sanitized_title)\"" --comictagger $comictagger
 
     let image_format = ($formats.cbz | get_image_extension)
     if $image_format == null {

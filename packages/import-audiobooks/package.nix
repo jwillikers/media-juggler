@@ -15,6 +15,7 @@ if lib.versionOlder nushell.version "0.99" then
 else
   let
     # todo Wrap invocations of beets-audible with wrapProgram --add-flags --config + --library
+    # deadnix: skip
     beets-audible = beets.override {
       pluginOverrides = {
         audible = {
@@ -37,7 +38,7 @@ else
     nativeBuildInputs = [ makeWrapper ];
 
     buildInputs = [
-      beets-audible
+      # beets-audible
       image_optim
       minio-client
       nushell
@@ -51,7 +52,7 @@ else
       wrapProgram $out/bin/import-audiobooks.nu \
         --prefix PATH : ${
           lib.makeBinPath [
-            beets-audible
+            # beets-audible
             image_optim
             minio-client
             tone

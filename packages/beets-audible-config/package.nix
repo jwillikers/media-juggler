@@ -10,7 +10,8 @@ stdenvNoCC.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    install -D --mode=0644 --target-directory=$out/etc/beets beets-audible-config.yaml
+    install -D --mode=0644 --target-directory=$out/etc/beets config.yaml
+    install -D --mode=0755 --target-directory=$out/etc/beets/scripts install-deps.sh
     runHook postInstall
   '';
 
