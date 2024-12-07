@@ -162,7 +162,6 @@ export def polish_epub []: [path -> path] {
     let epub = $in;
     (
         ^ebook-polish
-            --compress-images
             --download-external-resources
             --remove-unused-css
             --upgrade-book
