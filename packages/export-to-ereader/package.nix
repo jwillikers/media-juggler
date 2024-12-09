@@ -3,6 +3,7 @@
   cbconvert,
   image_optim,
   lib,
+  media-juggler-lib,
   minio-client,
   makeWrapper,
   nushell,
@@ -48,6 +49,7 @@ else
       runHook preInstall
       install -D --mode=0755 --target-directory=$out/bin export-to-ereader.nu
       wrapProgram $out/bin/export-to-ereader.nu \
+        --prefix NU_LIB_DIRS : ${media-juggler-lib}/share \
         --prefix PATH : ${
           lib.makeBinPath [
             cbconvert

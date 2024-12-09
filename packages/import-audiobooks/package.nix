@@ -4,6 +4,7 @@
   beetsPackages,
   beetsPlugins,
   image_optim,
+  media-juggler-lib,
   minio-client,
   makeWrapper,
   nushell,
@@ -50,6 +51,7 @@ else
       runHook preInstall
       install -D --mode=0755 --target-directory=$out/bin import-audiobooks.nu
       wrapProgram $out/bin/import-audiobooks.nu \
+        --prefix NU_LIB_DIRS : ${media-juggler-lib}/share \
         --prefix PATH : ${
           lib.makeBinPath [
             # beets-audible

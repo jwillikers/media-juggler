@@ -2,6 +2,7 @@
   beetsPackages,
   fetchFromGitHub,
   lib,
+  nix-update-script,
   python3Packages,
 }:
 python3Packages.buildPythonApplication rec {
@@ -16,10 +17,7 @@ python3Packages.buildPythonApplication rec {
     hash = "sha256-m955KPtYfjmtm9kHhkZLWoMYzVq0THOwvKCJYiVna7k=";
   };
 
-  postPatch = ''
-    substituteInPlace pyproject.toml \
-      --replace-fail '"beets ==2.0.0",' '"beets",'
-  '';
+  pythonRelaxDeps = true;
 
   build-system = with python3Packages; [
     hatchling
@@ -28,11 +26,14 @@ python3Packages.buildPythonApplication rec {
   dependencies =
     [ beetsPackages.beets-minimal ]
     ++ (with python3Packages; [
-
       markdownify
       natsort
       tldextract
     ]);
+
+  passthru = {
+    updateScript = nix-update-script { };
+  };
 
   meta = {
     description = "Beets-audible: Organize Your Audiobook Collection With Beets";

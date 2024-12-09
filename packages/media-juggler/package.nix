@@ -5,6 +5,7 @@
   lib,
   minio-client,
   makeWrapper,
+  media-juggler-lib,
   nushell,
   stdenvNoCC,
   zip,
@@ -27,7 +28,6 @@ else
       cbconvert
       # comictagger
       # todo comictagger
-      # mozjpeg
       image_optim
       minio-client
       nushell
@@ -44,6 +44,7 @@ else
       runHook preInstall
       install -D --mode=0755 --target-directory=$out/bin import-comics.nu
       wrapProgram $out/bin/import-comics.nu \
+        --prefix NU_LIB_DIRS : ${media-juggler-lib}/share \
         --prefix PATH : ${
           lib.makeBinPath [
             calibre

@@ -8,6 +8,7 @@
     "deadnix",
     "direnv",
     "envrc",
+    "epub",
     "ifdef",
     "ifndef",
     "jsonfmt",
@@ -35,5 +36,8 @@
     "result/**": true
   },
   "nix.enableLanguageServer": true,
-  "nix.serverPath": "nil"
+  "nix.serverPath": "nil",
+  "nushellLanguageServer.includeDirs": [
+    "/home/jordan/Projects/media-juggler/packages/media-juggler-lib"
+  ]
 }

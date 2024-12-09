@@ -3,6 +3,7 @@
 # ~/Projects/media-juggler/packages/import-comics/import-comics.nu --output-directory ~/Downloads ~/Downloads/ComicTagger-x86_64.AppImage ...(^mc find --name '*.cbz' "jwillikers/media/Books/Books/Ryoko Kui" | lines | par-each {|l| "minio:" + $l})
 
 use std log
+use media-juggler-lib *
 
 # Losslessly optimize images
 export def optimize_images []: [list<path> -> record] {

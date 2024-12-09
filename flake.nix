@@ -57,8 +57,12 @@
             );
           };
         };
-        devShells.default = pkgs.mkShell {
-          inherit (pre-commit) shellHook;
+        devShells.default = pkgs.mkShellNoCC {
+          shellHook =
+            pre-commit.shellHook
+            + ''
+              export NU_LIB_DIRS=${packages.media-juggler-lib}/share
+            '';
           nativeBuildInputs =
             with pkgs;
             [
@@ -72,6 +76,12 @@
               (builtins.attrValues treefmtEval.config.build.programs)
             ]
             ++ pre-commit.enabledPackages;
+          inputsFrom = with packages; [
+            import-audiobooks
+            import-comics
+            export-to-ereader
+            media-juggler-lib
+          ];
         };
         formatter = treefmtEval.config.build.wrapper;
         packages = packages // {
