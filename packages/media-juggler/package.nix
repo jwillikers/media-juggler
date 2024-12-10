@@ -1,4 +1,5 @@
 {
+  beets-audible-config,
   calibre,
   cbconvert,
   file,
@@ -83,6 +84,7 @@ else
           ]
         }
       wrapProgram $out/bin/import-audiobooks.nu \
+        --set BEETSDIR ${beets-audible-config}/etc/beets \
         --prefix PATH : ${
           lib.makeBinPath [
             # beets-audible

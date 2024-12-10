@@ -21,6 +21,7 @@ def main [
     ...files: path # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. Prefix paths with "minio:" to download them from the MinIO instance
     --delete # Delete the original file
     --isbn: string # ISBN of the book
+    # --identifiers: string # asin:XXXX
     --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
     --ereader-subdirectory: string = "Books/Books" # The subdirectory on the e-reader in-which to copy
     --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
@@ -174,6 +175,9 @@ def main [
       | where tag == "creator"
       | where attributes.role == "aut"
       | par-each {|creator| $creator | get content | first | get content }
+      | str trim --char ','
+      | str trim
+      | filter {|author| not ($author | is-empty)}
       | sort
     )
     log debug $"Authors: ($authors)"
@@ -192,13 +196,6 @@ def main [
     )
     let minio_target_directory = (
         [$minio_alias $minio_path $target_subdirectory]
-        | append (
-            if $output_format == "pdf" {
-                $book.book | path parse | get stem
-            } else {
-                null
-            }
-        )
         | path join
         | sanitize_minio_filename
     )
@@ -224,7 +221,7 @@ def main [
           ^mc mv $book.opf $opf_target_destination
           let cover_target_destination = [$minio_target_directory ($book.cover | path basename)] | path join
           log info $"Uploading (ansi yellow)($book.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
-          ^mc mv $book.cover $opf_target_destination
+          ^mc mv $book.cover $cover_target_destination
         }
     }
 
@@ -240,28 +237,26 @@ def main [
             } else {
                 log info $"Deleting the original file on MinIO (ansi yellow)($actual_path)(ansi reset)"
                 ^mc rm $actual_path
-                if $output_format == "pdf" {
-                    let opf = $actual_path | path dirname | path join "metadata.opf"
-                    if (^mc stat $opf | complete).exit_code == 0 {
-                        log info $"Deleting the metadata file on MinIO (ansi yellow)($opf)(ansi reset)"
-                        ^mc rm $opf
+                let opf = $actual_path | path dirname | path join "metadata.opf"
+                if (^mc stat $opf | complete).exit_code == 0 {
+                    log info $"Deleting the metadata file on MinIO (ansi yellow)($opf)(ansi reset)"
+                    ^mc rm $opf
+                }
+                let covers = (
+                    ^mc find ($actual_path | path dirname) --name 'cover.*'
+                    | lines --skip-empty
+                    | filter {|f|
+                        let components = ($f | path parse);
+                        $components.stem == "cover" and $components.extension in [gif jpeg jpg jxl png svg tiff]
                     }
-                    let covers = (
-                        ^mc find ($actual_path | path dirname) --json --name 'cover.*'
-                        | lines --skip-empty
-                        | filter {|f|
-                            let components = $f | path parse
-                            $components.stem == "cover" and $components.extension in [gif jpeg jpg jxl png svg tiff]
-                        }
-                    )
-                    if not ($covers | is-empty) {
-                        if ($covers | length) > 1 {
-                            log warning $"Not deleting cover file. Found multiple files looking for the cover image file:\n($covers)\n"
-                        } else {
-                            let cover = $covers | first
-                            log info $"Deleting the cover image file on MinIO (ansi yellow)($cover)(ansi reset)"
-                            ^mc rm $cover
-                        }
+                )
+                if not ($covers | is-empty) {
+                    if ($covers | length) > 1 {
+                        log warning $"Not deleting cover file. Found multiple files looking for the cover image file:\n($covers)\n"
+                    } else {
+                        let cover = $covers | first
+                        log info $"Deleting the cover image file on MinIO (ansi yellow)($cover)(ansi reset)"
+                        ^mc rm $cover
                     }
                 }
             }

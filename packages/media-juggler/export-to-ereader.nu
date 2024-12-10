@@ -12,8 +12,13 @@ def main [
     --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
     --optimize-images # Don't attempt to optimize the size of the image files with image_optim
     --output-directory: directory # Directory to place files when not being uploaded
-    --type: string = "manga" # The type of books such as "manga", "comic", "book", or "light novel"
+    --type: string # The type of books such as "manga", "comic", "book", or "light novel"
 ] {
+    if ($files | is-empty) {
+        log error "No files provided"
+        exit 1
+    }
+
     let output_directory = (
         if $output_directory == null {
             "." | path expand
@@ -23,10 +28,54 @@ def main [
     )
     mkdir $output_directory
 
-    if ($files | is-empty) {
-        log error "No files provided"
-        exit 1
+    let ereader_disk_label = ($ereader_profiles | where model == $ereader | first | get disk_label)
+    let username = (^id --name --user)
+    let ereader_mountpoint = (["/run/media" $username $ereader_disk_label] | path join)
+    if not $no_copy_to_ereader {
+      if (^findmnt --target $ereader_mountpoint | complete | get exit_code) != 0 {
+        ^udisksctl mount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
+        # todo Parse the mountpoint from the output of this command
+      }
     }
+
+    for original_file in $files {
+
+    log info $"Exporting the file (ansi purple)($original_file)(ansi reset)"
+
+    let temporary_directory = (mktemp --directory --tmpdir-path ~/.cache)
+    log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
+
+    try {
+
+    let file = (
+        if ($original_file | str starts-with "minio:") {
+            let file = ($original_file | str replace "minio:" "")
+            ^mc cp $file $"($temporary_directory)/($file | path basename)"
+            [$temporary_directory ($file | path basename)] | path join
+        } else {
+            cp $original_file $temporary_directory
+            [$temporary_directory ($original_file | path basename)] | path join
+        }
+    )
+
+    # todo Support EPUB and PDF files.
+    let input_format = ($file | path parse | get extension)
+
+    let type = (
+        if $type == null {
+            if $input_format == "cbz" {
+                "manga"
+            } else {
+                if ($file | path parse | get stem | str contains --ignore-case "light novel") {
+                    "light novel"
+                } else {
+                    "book"
+                }
+            }
+        } else {
+            $type
+        }
+    )
 
     let ereader_subdirectory = (
         if $ereader_subdirectory == null {
@@ -47,40 +96,6 @@ def main [
         }
     )
 
-    let ereader_disk_label = ($ereader_profiles | where model == $ereader | first | get disk_label)
-    let username = (^id --name --user)
-    let ereader_mountpoint = (["/run/media" $username $ereader_disk_label] | path join)
-    let ereader_target_directory = ([$ereader_mountpoint $ereader_subdirectory] | path join)
-    if not $no_copy_to_ereader {
-      if (^findmnt --target $ereader_target_directory | complete | get exit_code) != 0 {
-        ^udisksctl mount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
-        # todo Parse the mountpoint from the output of this command
-      }
-    }
-    mkdir $ereader_target_directory
-
-    for original_file in $files {
-
-    log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
-
-    let temporary_directory = (mktemp --directory --tmpdir-path ~/.cache)
-    log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
-
-    try {
-
-    let file = (
-        if ($original_file | str starts-with "minio:") {
-            let file = ($original_file | str replace "minio:" "")
-            ^mc cp $file $"($temporary_directory)/($file | path basename)"
-            [$temporary_directory ($file | path basename)] | path join
-        } else {
-            cp $original_file $temporary_directory
-            [$temporary_directory ($original_file | path basename)] | path join
-        }
-    )
-
-    # todo Support EPUB and PDF files.
-    let input_format = ($file | path parse | get extension)
     let output_format = (
       if $type in [comic manga] {
         "cbz"
@@ -89,6 +104,7 @@ def main [
         $input_format
       }
     )
+
     let file = (
         if $type in [comic manga] {
             if $input_format == "epub" {
@@ -117,6 +133,8 @@ def main [
     if $no_copy_to_ereader {
         mv $file $output_directory
     } else {
+        let ereader_target_directory = ([$ereader_mountpoint $ereader_subdirectory] | path join)
+        mkdir $ereader_target_directory
         # todo Make this a function with tests.
         let safe_basename = (($file | path basename) | str replace --all ":" "_")
         let target = ([$ereader_target_directory $safe_basename] | path join)
@@ -134,7 +152,7 @@ def main [
     }
 
     if not $no_copy_to_ereader {
-      if (^findmnt --target $ereader_target_directory | complete | get exit_code) == 0 {
+      if (^findmnt --target $ereader_mountpoint | complete | get exit_code) == 0 {
         ^udisksctl unmount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
       }
     }

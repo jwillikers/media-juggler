@@ -136,6 +136,7 @@ export def optimize_images_in_zip []: [path -> path] {
     let extraction_path = ($temporary_directory | path join "extracted")
     log debug $"Extracting zip archive to (ansi yellow)($extraction_path)(ansi reset)"
     ^unzip -q $archive -d $extraction_path
+    ^chmod --recursive +rw $extraction_path
     let reduction = [$extraction_path] | optimize_images
     log debug "Image optimization complete"
     if $reduction.difference > 0 {
@@ -401,6 +402,7 @@ export def tag_epub_comic_vine [
 # Fetch metadata for an ebook
 export def fetch-ebook-metadata [
     ...args: string
+    # Remove Comicvine because it can cause trouble, although it does have entries for some Light Novels apparently.
     --allowed-plugins: list<string> = [Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
     # --allowed-plugins: list<string> = [Google "Amazon.com"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
     --authors: list<string> # A list of authors to use
@@ -465,7 +467,16 @@ export def fetch-ebook-metadata [
   )
   # let result = ^fetch-ebook-metadata ...$args | complete
   # let opf = $result.stdout | from xml
-  let opf = ^fetch-ebook-metadata ...$args | from xml
+  log debug $"Running: fetch-ebook-metadata ($args | str join ' ')"
+  let opf = (
+    let result = (^fetch-ebook-metadata ...$args);
+    if ($result | is-empty) or ($result | lines --skip-empty | last) == "No results found" {
+      log error $"(ansi red)No metadata found!(ansi reset)"
+      exit 1
+    } else {
+      $result | from xml
+    }
+  )
   {
     opf: $opf,
     cover: (
@@ -546,7 +557,7 @@ export def fetch_book_metadata [
       let input = $in;
       let metadata_opf = $book | path dirname | path join "metadata.opf";
       if ($metadata_opf | path exists) {
-        $input | update opf (^ebook-meta --from-opf $metadata_opf | from xml)
+        $input | update opf (open $metadata_opf | from xml)
       } else {
         $input
       }
@@ -694,13 +705,22 @@ export def fetch_book_metadata [
       $"--authors=($authors | str join '&')"
     }
   )
-  let args = [
-    --opf
-    --verbose
-    $authors_flag
-    # $isbn_flag
-    $title_flag
-  ] | append $identifier_flags
+  let isbn_only = false
+  let args = (
+    [ --opf ]
+    | (
+      let input = $in;
+      if $isbn_only and $isbn_flag != null {
+        $input | append $isbn_flag
+      } else {
+        $input
+        | append $isbn_flag
+        | append $authors_flag
+        | append $title_flag
+        | append $identifier_flags
+      }
+    )
+  )
   let updated = (
     # Prefer using the current cover if there is one
     if $current.cover == null {
