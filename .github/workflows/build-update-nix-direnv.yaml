@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v16
-      - uses: DeterminateSystems/magic-nix-cache-action@v8
+      # - uses: DeterminateSystems/magic-nix-cache-action@v8
       # todo Build all other packages, too.
       - name: Build import-comics
         run: nix build '.#import-comics'

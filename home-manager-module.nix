@@ -58,9 +58,7 @@ self:
         minio-client
       ]
       ++ (with self.packages.${pkgs.stdenv.system}; [
-        export-to-ereader
-        import-audiobooks
-        import-comics
+        media-juggler
       ]);
   };
 

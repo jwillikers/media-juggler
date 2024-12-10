@@ -7,7 +7,7 @@ repository:
   # A URL with more information about the repository
   # homepage: ""
   # A comma-separated list of topics to set on the repository
-  topics: automate, automatic, automation, ci, direnv, nix, nix-direnv, nixos, nushell, update, updater,
+  topics: audiobook, automate, automation, book, cbz, comic, ebook, epub, m4b, manga, media, music, nix, nixos, nushell, pdf,
   # Either `true` to make the repository private, or `false` to make it public.
   private: false
   # Either `true` to enable issues for this repository, `false` to disable them.

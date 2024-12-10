@@ -358,15 +358,15 @@ export def get_image_extension []: path -> string {
     }
 }
 
-# Fetch metadata for the EPUB and embed it
+# Fetch metadata for the EPUB using Comic Vine and embed it
 #
-# The metadata for Authors and Title from the ComicVine Calibre plugin are corrected here.
+# The metadata for Authors and Title from the Comic Vine Calibre plugin are corrected here.
 # The title includes the issue number twice in the name, which is kind of ugly, so that is fixed.
 # All creators are tagged as authors which is incorrect.
 # To accommodate this, authors must be passed directly.
 #
-export def tag_epub [
-    comic_vine_issue_id: string # The unique ComicVine id for the issue
+export def tag_epub_comic_vine [
+    comic_vine_issue_id: string # The unique Comic Vine id for the issue
     authors: list<string> # A list of authors to use
     title: string # The title to use
     --working-directory: directory
@@ -397,6 +397,386 @@ export def tag_epub [
     rm $opf_file
     $epub
 }
+
+# Fetch metadata for an ebook
+export def fetch-ebook-metadata [
+    ...args: string
+    --allowed-plugins: list<string> # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
+    --authors: list<string> # A list of authors to use
+    --cover: path # Path to which to download the cover
+    --identifiers: list<string> # A list of identifiers
+    --isbn: string # The unique ComicVine id for the issue
+    --title: string # The title to use
+]: nothing -> record<opf: record, cover: path> {
+  let allowed_plugins = (
+    if $allowed_plugins == null {
+      null
+    } else {
+      $allowed_plugins | par-each {|plugin| $"--allowed-plugin=($plugin)"}
+    }
+  )
+  let authors = (
+    if $authors == null {
+      null
+    } else {
+      $authors | str join "&" | $"--authors=($in)"
+    }
+  )
+  let identifiers = (
+    if $identifiers == null {
+      null
+    } else {
+      $identifiers | par-each {|identifier| $"--identifier=($identifier)"}
+    }
+  )
+  let isbn = (
+    if $isbn == null {
+      null
+    } else {
+      $"--isbn=($isbn)"
+    }
+  )
+  let title = (
+    if $title == null {
+      null
+    } else {
+      $"--title=($title)"
+    }
+  )
+  let cover_arg = (
+    if $cover == null {
+      null
+    } else {
+      $"--cover=($cover)"
+    }
+  )
+  let args = (
+    $args
+    | append "--opf"
+    | append $allowed_plugins
+    | append $authors
+    | append $cover_arg
+    | append $identifiers
+    | append $isbn
+    | append $title
+  )
+  let opf = ^fetch-ebook-metadata ...$args | from xml
+  {
+    opf: $opf,
+    cover: (
+      if $cover == null {
+        null
+      } else {
+        $cover | rename_image_with_extension
+      }
+    )
+  }
+}
+
+export def extract_book_metadata [
+  working_directory: directory
+]: path -> record<opf: record, cover: path> {
+  let book = $in;
+  log debug $"book: ($book)"
+  let opf_file = ({ parent: $working_directory, stem: ($book | path parse | get stem), extension: "opf" } | path join)
+  log debug $"opf: ($opf_file)"
+  let cover_file = (
+    {
+      parent: $working_directory,
+      stem: ([($book | path parse | get stem) "-cover"] | str join),
+    } | path join
+  )
+  (
+    ^ebook-meta
+    --get-cover $cover_file
+    --to-opf $opf_file
+    $book
+  )
+  # todo Remove title == "Untitled" and creator == "Unknown"?
+  { opf: ($opf_file | open | from xml), cover: ($cover_file | rename_image_with_extension) }
+}
+
+# # Use the metadata.opf and cover.ext files for metadata
+# export def get_metadata_from_opf [
+#   --working-directory: directory
+# ]: path -> record<opf: record, cover: path> {
+#   let book = $in;
+#   let opf_file = ({ parent: $working_directory, stem: ($book | path parse | get stem), extension: "opf" } | path join)
+#   let cover_file = ({ parent: $working_directory, stem: ($book | path parse | get stem | $"($in)-cover"), extension: "" } | path join)
+#   (
+#     ^ebook-meta
+#     --get-cover $cover_file
+#     --to-opf $opf_file
+#     $book
+#   )
+#   # todo Remove title == "Untitled" and creator == "Unknown"?
+#   { opf: ($opf_file | open | from xml), cover: ($cover_file | rename_image_with_extension) }
+# }
+
+# Rename an image with the proper extension for its file type
+export def rename_image_with_extension [] : path -> path {
+  let old = $in
+  let components = $old | path parse
+  let file_type = ^file --brief $old | split words | first | str downcase
+  let new = $old | path parse | update extension $file_type | path join
+  mv $old $new
+  $new
+}
+
+# export def update_book_metadata [
+export def fetch_book_metadata [
+  working_directory: directory
+  --authors: list<string>
+  --identifiers: list<string>
+  --isbn: string
+  --title: string
+]: path -> record<book: path, cover: path, opf: record> {
+  let book = $in
+  # todo Check for metadata.opf and cover.ext files
+  # Prefer metadata.opf and cover.ext over embedded metadata and cover
+  let current = (
+    $book
+    | extract_book_metadata $working_directory
+    | (
+      let input = $in;
+      let metadata_opf = $book | path dirname | path join "metadata.opf";
+      if ($metadata_opf | path exists) {
+        $input | update opf (^ebook-meta --from-opf $metadata_opf | from xml)
+      } else {
+        $input
+      }
+    )
+    | (
+      let input = $in;
+      let covers = (
+        ls ($book | path dirname)
+        | get name
+        | filter {|f|
+          let components = $f | path parse
+          # todo use a constant for image file extensions
+          $components.stem == "cover" and $components.extension in [gif jpeg jpg jxl png svg tiff]
+        }
+      );
+      if ($covers | is-empty) {
+        $input
+      } else if ($covers | length) > 1 {
+        log error $"Found multiple files looking for the cover image file:\n($covers)\n"
+        exit 1
+      } else {
+        if ($covers | first | path exists) {
+          $input | update cover ($covers | first)
+        } else {
+          $input
+        }
+      }
+    )
+  )
+  let identifiers = (
+    # todo Merge identifiers?
+    if $identifiers == null {
+      $current.opf
+      | get content
+      | where tag == "metadata"
+      | first
+      | get content
+      | where tag == "identifier"
+      | where attributes.scheme != "ISBN"
+      | par-each {|identifier|
+        let scheme = $identifier.attributes.scheme;
+        let id = $identifier.content | get first | get content;
+        { $"($scheme):($id)" }
+      }
+    } else {
+      $identifiers
+    }
+  )
+  let identifier_flags = (
+    if $identifiers == null {
+      null
+    } else {
+      $identifiers | par-each {|identifier| $"--identifier=($identifier)" }
+    }
+  )
+  let isbn = (
+    if $isbn == null {
+      $current.opf
+      | get content
+      | where tag == "metadata"
+      | first
+      | get content
+      | where tag == "identifier"
+      | where attributes.scheme == "ISBN"
+      | first
+      | get content
+      | first
+      | get content
+    } else {
+      $isbn
+    }
+  )
+  let isbn_flag = (
+    if $isbn == null {
+      null
+    } else {
+      $"--isbn=($isbn)"
+    }
+  )
+  let title = (
+    if $title == null {
+      $current.opf
+      | get content
+      | where tag == "metadata"
+      | first
+      | get content
+      | where tag == "title"
+      | first
+      | get content
+      | first
+      | get content
+    } else {
+      $title
+    }
+  )
+  let title_flag = (
+    if $title == null {
+      null
+    } else {
+      $"--title=($title)"
+    }
+  )
+  let title_flag = (
+    if $title == null {
+      null
+    } else {
+      $"--title=($title)"
+    }
+  )
+  let authors = (
+    if $authors == null {
+      $current.opf
+      | get content
+      | where tag == "metadata"
+      | first
+      | get content
+      | where tag == "creator"
+      | where attributes.role == "aut"
+      | par-each {|creator| $creator | get content | first | get content }
+      | sort
+    } else {
+      $authors
+    }
+  )
+  let authors_flag = (
+    if $authors == null {
+      null
+    } else {
+      $"--authors=($authors | str join '&')"
+    }
+  )
+  let args = [
+    --opf
+    $authors_flag
+    $isbn_flag
+    $title_flag
+  ] | append $identifier_flags
+  let updated = (
+    # Prefer using the current cover if there is one
+    if $current.cover == null {
+      (
+        fetch-ebook-metadata
+        --cover ({ parent: $working_directory, stem: ($book | path parse | get stem | $"($in)-fetched-cover"), extension: "" } | path join)
+        ...$args
+      )
+    } else {
+      fetch-ebook-metadata ...$args
+    }
+  )
+  # todo Check if cover is empty or not found?
+  let cover_file = (
+    if $current.cover == null {
+      $updated.cover
+    } else {
+      $current.cover
+    }
+  )
+  [$cover_file] | optimize_images
+  { book: $book, opf: $updated.opf, cover: $cover_file }
+}
+
+# Export the book, OPF, and cover files to a directory named after the book
+export def export_book_to_directory [
+  working_directory: path
+] : record<book: path, cover: path, opf: record> -> record<book: path, cover: path, opf: path> {
+  let input = $in
+  let title = (
+    $input.opf
+    | get content
+    | where tag == "metadata"
+    | first
+    | get content
+    | where tag == "title"
+    | first
+    | get content
+    | first
+    | get content
+  )
+  let target_directory = [$working_directory $title] | path join
+  mkdir $target_directory
+  let opf = ({ parent: $target_directory, stem: "metadata", extension: "opf" } | path join)
+  (
+    $input.opf
+    | to xml
+    | save --force $opf
+  )
+  let cover = ($input.cover | path parse | update parent $target_directory | update stem "cover" | path join)
+  let book = ($input.book | path parse | update parent $target_directory | update stem $title | path join)
+  mv $input.cover $cover
+  mv $input.book $book
+  { book: $book, opf: $opf, cover: $cover }
+}
+
+export def embed_book_metadata [
+  working_directory: path
+] : record<book: path, cover: path, opf: path> -> record<book: path, cover: path, opf: path> {
+  let input = $in
+  let book_format = ($input.book | path parse | get extension)
+  if $book_format != "pdf" {
+    ^ebook-meta $input.book --cover $input.cover --from-opf $input.opf
+  }
+  $input
+}
+
+# export def tag_epub [
+#     # --allowed-plugins: list<string> # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
+#     # --authors: list<string> # A list of authors to use
+#     # --cover: path # Path to which to download the cover
+#     # --identifiers: list<string> # A list of identifiers
+#     # --isbn: string # The unique ComicVine id for the issue
+#     # --title: string # The title to use
+#     --working-directory: directory
+# ]: record<epub: path, opf: record, cover: path> -> path {
+#     let epub = $in
+#     # let opf_file = ({ parent: $working_directory, stem: ($epub | path parse | get stem), extension: "opf" } | path join)
+#     # let cover = ({ parent: $working_directory, stem: ($epub | path parse | get stem), extension: "opf" } | path join)
+#     let result = fetch-ebook-metadata
+#     log debug $"The fetched metadata for the book (ansi purple_bold)($epub)(ansi reset) is:\n($result.opf)\n"
+#     (
+#         $result.opf
+#         | to xml
+#         | save --force $opf_file
+#     )
+#     (
+#         ^ebook-meta
+#             $epub
+#             # --authors ($authors | str join "&")
+#             # --cover
+#             --from-opf $"($working_directory)/($comic_vine_issue_id).opf"
+#             # --title $title
+#     )
+#     rm $opf_file
+#     # rm $cover
+#     $epub
+# }
 
 # Convert images in a CBZ to lossless JXL.
 # JXL should be a great archival format going forward and is a significant reduction in size over JPEG, even using lossless compression.

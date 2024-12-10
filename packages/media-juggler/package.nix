@@ -1,18 +1,37 @@
 {
   calibre,
   cbconvert,
+  file,
   image_optim,
   lib,
   minio-client,
   makeWrapper,
-  media-juggler-lib,
   nushell,
   stdenvNoCC,
+  tone,
+  udisks,
+  util-linux,
   zip,
 }:
 if lib.versionOlder nushell.version "0.99" then
   throw "import-comics is not available for Nushell ${nushell.version}"
 else
+  # let
+  # todo Wrap invocations of beets-audible with wrapProgram --add-flags --config + --library
+  # deadnix: skip
+  # beets-audible = beets.override {
+  #   pluginOverrides = {
+  #     audible = {
+  #       enable = true;
+  #       propagatedBuildInputs = [ beetsPlugins.audible ];
+  #     };
+  #     copyartifacts = {
+  #       enable = true;
+  #       propagatedBuildInputs = [ beetsPackages.copyartifacts ];
+  #     };
+  #   };
+  # };
+  # in
   stdenvNoCC.mkDerivation {
     pname = "import-comics";
     version = "0.1.0";
@@ -24,13 +43,18 @@ else
     # doCheck = true;
 
     buildInputs = [
+      # beets-audible
       calibre
       cbconvert
       # comictagger
       # todo comictagger
+      file
+      # kcc
       image_optim
       minio-client
       nushell
+      udisks
+      util-linux
       zip
     ];
 
@@ -42,21 +66,57 @@ else
 
     installPhase = ''
       runHook preInstall
-      install -D --mode=0755 --target-directory=$out/bin import-comics.nu
-      wrapProgram $out/bin/import-comics.nu \
-        --prefix NU_LIB_DIRS : ${media-juggler-lib}/share \
+      install -D --mode=0755 --target-directory=$out/bin *.nu
+      install -D --mode=0644 --target-directory=$out/bin/media-juggler-lib media-juggler-lib/*.nu
+      wrapProgram $out/bin/export-comics.nu \
         --prefix PATH : ${
           lib.makeBinPath [
             calibre
             cbconvert
             # comictagger
             image_optim
+            # kcc
             minio-client
+            udisks
+            util-linux
+            zip
+          ]
+        }
+      wrapProgram $out/bin/import-audiobooks.nu \
+        --prefix PATH : ${
+          lib.makeBinPath [
+            # beets-audible
+            image_optim
+            minio-client
+            tone
+          ]
+        }
+      wrapProgram $out/bin/import-comics.nu \
+        --prefix PATH : ${
+          lib.makeBinPath [
+            calibre
+            cbconvert
+            # comictagger
+            image_optim
+            # kcc
+            minio-client
+            udisks
+            util-linux
+            zip
+          ]
+        }
+      wrapProgram $out/bin/import-ebooks.nu \
+        --prefix PATH : ${
+          lib.makeBinPath [
+            calibre
+            file
+            image_optim
+            minio-client
+            udisks
+            util-linux
             zip
           ]
         }
       runHook postInstall
     '';
-
-    meta.mainProgram = "import-comics.nu";
   }

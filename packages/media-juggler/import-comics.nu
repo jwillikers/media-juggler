@@ -214,15 +214,6 @@ def main [
     --title: string # The title of the comic or manga issue
     --upload-ereader-cbz # Upload the E-Reader specific format to the server
 ] {
-    let output_directory = (
-        if $output_directory == null {
-            "." | path expand
-        } else {
-            $output_directory
-        }
-    )
-    mkdir $output_directory
-
     if ($files | is-empty) {
         log error "No files provided"
         exit 1
@@ -232,6 +223,15 @@ def main [
         log error "Setting the comic vine issue id for multiple files is not allowed as it will result in overwriting the final file"
         exit 1
     }
+
+    let output_directory = (
+        if $output_directory == null {
+            "." | path expand
+        } else {
+            $output_directory
+        }
+    )
+    mkdir $output_directory
 
     let username = (^id --name --user)
     let ereader_disk_label = (
@@ -272,6 +272,19 @@ def main [
     )
 
     let input_format = ($file | path parse | get extension)
+
+    let comic_info = (
+        if ($input_format == "pdf" and $original_file | str starts-with "minio:") {
+            let comic_info_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml")
+            if (^mc stat $comic_info_file | complete).exit_code == 0 {
+              ^mc cp $comic_info_file $"($temporary_directory)/($comic_info_file | path basename)"
+            }
+            [$temporary_directory ($comic_info_file | path basename)] | path join
+        } else {
+          null
+        }
+    )
+
     let output_format = (
         if $input_format == "pdf" and not $archive_pdf {
             "pdf"
@@ -316,17 +329,26 @@ def main [
         } else if $input_format in ["cbz" "zip"] {
             { cbz: $file }
         } else if $input_format == "pdf" {
-            # todo
-            # Generate a PNG or JPEG CBZ with cbconvert
-            # Tag this with ComicTagger
-            # Rename the PDF according to the ComicTagger data
-            # Place the PDF in a directory of the same name
-            # Export the metadata to a ComicInfo.xml file in this directory
-            # Upload this directory.
-            # While CBZ is a better format, if PDFs have the best quality, it's best to use that.
-            # Just convert the PDF to CBZ as needed for target devices.
-            # Use JPEG so that ComicTagger can utilize the cover image for comparison when tagging.
-            { cbz: ($file | cbconvert --format "jpeg" --quality 80), pdf: $file }
+          let cbz = (
+            $file
+            | cbconvert --format "jpeg" --quality 80
+            | (
+              let archive = $in;
+              if $comic_info != null {
+                {
+                  archive: $archive,
+                  comic_info: $comic_info,
+                }
+                | inject_comic_info
+              } else {
+                $archive
+              }
+            )
+          )
+          if $comic_info != null {
+            rm $comic_info
+          }
+          { cbz: $cbz, pdf: $file }
         } else {
             log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
             exit 1
@@ -338,8 +360,6 @@ def main [
         $formats.cbz | tag_cbz
         $comictagger
         --comic-vine-issue-id $comic_vine_issue_id
-        # --excluded-publishers $excluded_publishers
-        # --interactive $interactive
     )
 
     log debug $"The ComicTagger result is:\n(ansi green)($tag_result.result)(ansi reset)\n"
@@ -355,9 +375,12 @@ def main [
     # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
     let authors = (
       let credits = $comic_metadata | get credits;
-      let writers = $credits | where role == "Writer" | get person;
-      let artists = $credits | where role == "Artist" | get person;
-      $writers | append $artists | sort | uniq
+      let authors = $credits | where role in ["Artist" "Inker" "Penciller" "Writer"] | get person;
+      if ($authors | is-empty) {
+        $credits | where role == "Other" | get person
+      } else {
+        $authors
+      } | sort | uniq
     )
     log debug $"Authors determined to be (ansi purple)'($authors)'(ansi reset)"
 
@@ -400,7 +423,7 @@ def main [
         if "epub" in $formats {
             # Update the metadata in the EPUB file.
             $formats.epub | (
-                tag_epub
+                tag_epub_comic_vine
                 (if $comic_vine_issue_id == null { $comic_metadata.issue_id } else { $comic_vine_issue_id })
                 $authors
                 $title
@@ -414,8 +437,10 @@ def main [
         } else if "pdf" in $formats {
             let stem = ($formats.cbz | path parse | get stem)
             let renamed_pdf = ({ parent: ($formats.pdf | path parse | get parent), stem: $stem, extension: "pdf" } | path join)
-            log debug $"Renaming the PDF from ($formats.pdf) to ($renamed_pdf)";
-            mv $formats.pdf $renamed_pdf
+            if $formats.pdf != $renamed_pdf {
+              log debug $"Renaming the PDF from ($formats.pdf) to ($renamed_pdf)";
+              mv $formats.pdf $renamed_pdf
+            }
             let comic_info = $formats.cbz | extract_comic_info $temporary_directory
             log debug "Extracted ComicInfo.xml";
             $formats
@@ -425,6 +450,7 @@ def main [
                 let input = $in;
                 log debug "Updating PDF in table";
                 log debug $"Input:\n($input)\n";
+                # todo untested
                 if $archive_pdf {
                     log debug "Creating JPEG-XL CBZ from PDF";
                     $input
@@ -604,9 +630,9 @@ def main [
             } else {
                 log info $"Deleting the original file on MinIO (ansi yellow)($actual_path)(ansi reset)"
                 ^mc rm $actual_path
-                if $output_format == "pdf" {
-                    let comic_info = $actual_path | path dirname | "ComicInfo.xml"
-                    if (^mc ls $comic_info) {
+                if $input_format == "pdf" {
+                    let comic_info = $actual_path | path dirname | path join "ComicInfo.xml" | sanitize_minio_filename
+                    if (^mc stat $comic_info | complete).exit_code == 0 {
                         log info $"Deleting the Comic Info file on MinIO (ansi yellow)($comic_info)(ansi reset)"
                         ^mc rm $comic_info
                     }
