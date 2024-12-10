@@ -77,6 +77,7 @@ def main [
 
     # try {
 
+    # todo Add support for input files from Calibre using the Calibre ID number
     let file = (
         if ($original_file | str starts-with "minio:") {
             let file = ($original_file | str replace "minio:" "")
@@ -151,7 +152,13 @@ def main [
 
     let book = (
         $formats.book
-        | fetch_book_metadata $temporary_directory
+        | (
+            if $isbn == null {
+                fetch_book_metadata $temporary_directory
+            } else {
+                fetch_book_metadata --isbn $isbn $temporary_directory
+            }
+        )
         | export_book_to_directory $temporary_directory
         | embed_book_metadata $temporary_directory
     )

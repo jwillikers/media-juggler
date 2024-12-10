@@ -401,11 +401,12 @@ export def tag_epub_comic_vine [
 # Fetch metadata for an ebook
 export def fetch-ebook-metadata [
     ...args: string
-    --allowed-plugins: list<string> # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
+    --allowed-plugins: list<string> = [Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
+    # --allowed-plugins: list<string> = [Google "Amazon.com"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
     --authors: list<string> # A list of authors to use
     --cover: path # Path to which to download the cover
     --identifiers: list<string> # A list of identifiers
-    --isbn: string # The unique ComicVine id for the issue
+    --isbn: string # The ISBN of the book
     --title: string # The title to use
 ]: nothing -> record<opf: record, cover: path> {
   let allowed_plugins = (
@@ -432,6 +433,8 @@ export def fetch-ebook-metadata [
   let isbn = (
     if $isbn == null {
       null
+      # log error "fetch-ebook-metadata currently requires that an ISBN be provided to avoid pulling in the wrong data."
+      # exit 1
     } else {
       $"--isbn=($isbn)"
     }
@@ -460,6 +463,8 @@ export def fetch-ebook-metadata [
     | append $isbn
     | append $title
   )
+  # let result = ^fetch-ebook-metadata ...$args | complete
+  # let opf = $result.stdout | from xml
   let opf = ^fetch-ebook-metadata ...$args | from xml
   {
     opf: $opf,
@@ -571,20 +576,53 @@ export def fetch_book_metadata [
       }
     )
   )
-  let identifiers = (
-    # todo Merge identifiers?
-    if $identifiers == null {
+  let all_opf_identifiers = (
       $current.opf
       | get content
       | where tag == "metadata"
       | first
       | get content
       | where tag == "identifier"
-      | where attributes.scheme != "ISBN"
-      | par-each {|identifier|
-        let scheme = $identifier.attributes.scheme;
-        let id = $identifier.content | get first | get content;
-        { $"($scheme):($id)" }
+  )
+  let isbn = (
+    if $isbn == null and ($all_opf_identifiers != null) {
+      let all_opf_isbn = (
+        $all_opf_identifiers
+        | where attributes.scheme == "ISBN"
+      )
+      if ($all_opf_isbn | is-empty) {
+        null
+      } else {
+        $all_opf_isbn
+        | first
+        | get content
+        | first
+        | get content
+      }
+    } else {
+      $isbn
+    }
+  )
+  # if $isbn == null {
+  #   log error "fetch_book_metadata currently requires an ISBN to avoid pulling in the wrong data."
+  #   exit 1
+  # }
+  let identifiers = (
+    # todo Merge identifiers?
+    if $isbn == null and ($all_opf_identifiers != null) {
+      let all_opf_non_isbn = (
+        $all_opf_identifiers
+        | where attributes.scheme != "ISBN"
+      )
+      if ($all_opf_non_isbn | is-empty) {
+        null
+      } else {
+        $all_opf_non_isbn
+        | par-each {|identifier|
+          let scheme = $identifier.attributes.scheme;
+          let id = $identifier.content | get first | get content;
+          { $"($scheme):($id)" }
+        }
       }
     } else {
       $identifiers
@@ -595,23 +633,6 @@ export def fetch_book_metadata [
       null
     } else {
       $identifiers | par-each {|identifier| $"--identifier=($identifier)" }
-    }
-  )
-  let isbn = (
-    if $isbn == null {
-      $current.opf
-      | get content
-      | where tag == "metadata"
-      | first
-      | get content
-      | where tag == "identifier"
-      | where attributes.scheme == "ISBN"
-      | first
-      | get content
-      | first
-      | get content
-    } else {
-      $isbn
     }
   )
   let isbn_flag = (
@@ -675,8 +696,9 @@ export def fetch_book_metadata [
   )
   let args = [
     --opf
+    --verbose
     $authors_flag
-    $isbn_flag
+    # $isbn_flag
     $title_flag
   ] | append $identifier_flags
   let updated = (
@@ -685,9 +707,11 @@ export def fetch_book_metadata [
       (
         fetch-ebook-metadata
         --cover ({ parent: $working_directory, stem: ($book | path parse | get stem | $"($in)-fetched-cover"), extension: "" } | path join)
+        # --isbn $isbn
         ...$args
       )
     } else {
+      # isbn $isbn
       fetch-ebook-metadata ...$args
     }
   )
