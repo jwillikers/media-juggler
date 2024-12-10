@@ -30,27 +30,31 @@ export def beet_import [
     #     import --move
     #     $m4b
     # )
-    ^podman stop beets-audible
+    # ^podman stop beets-audible
+    log debug $"Running: podman run --detach --env PUID=0 --env PGID=0 --mount type=bind,src=($output_directory),dst=/audiobooks --mount type=bind,src=($m4b | path dirname),dst=/input --name beets-audible --rm --volume ($config):/config/config.yaml:Z --volume ($config | path dirname)/scripts:/custom-cont-init.d:Z lscr.io/linuxserver/beets:2.0.0"
     (
         ^podman run
             --detach
             --env "PUID=0"
             --env "PGID=0"
-            --mount $"type=bind,src=($output_directory),dst=/audiobooks"
-            --mount $"type=bind,src=($m4b | path dirname),dst=/input"
+            # --mount $"type=bind,src=($output_directory),dst=/audiobooks"
+            # --mount $"type=bind,src=($m4b | path dirname),dst=/input"
             --name "beets-audible"
             --rm
+            --volume $"($m4b):/input/($m4b | path basename):Z"
+            --volume $"($output_directory):/audiobooks:z"
             --volume $"($config):/config/config.yaml:Z"
             --volume $"($config | path dirname)/scripts:/custom-cont-init.d:Z"
             "lscr.io/linuxserver/beets:2.0.0"
     )
-    sleep 10sec
+    # sleep 30sec
+    sleep 2min
     (
         ^podman exec
         --interactive
-        --tty beets-audible
-        beet import
-            --move $"/input/($m4b | path basename)"
+        --tty
+        "beets-audible"
+        beet import $"/input/($m4b | path basename)"
     )
     ^podman stop beets-audible
     let author_directory = (ls --full-paths $output_directory | get name | first)

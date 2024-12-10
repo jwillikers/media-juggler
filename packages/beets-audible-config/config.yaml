@@ -1,4 +1,4 @@
-plugins: audible copyartifacts edit embedart fromfilename inline scrub
+plugins: audible copyartifacts edit embedart fromfilename inline scrub # web?
 
 # directory: ~/Books/Audiobooks
 directory: /audiobooks
