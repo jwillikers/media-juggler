@@ -58,7 +58,7 @@ export def beet_import [
     )
     ^podman stop beets-audible
     let author_directory = (ls --full-paths $output_directory | get name | first)
-    let imported_m4b = (glob $"($author_directory)/*.m4b" | first)
+    let imported_m4b = (glob $"($author_directory)/**/*.m4b" | first)
     let directory = ($imported_m4b | path basename)
     let cover = (glob $"($directory)/*.{jpeg,jpg,jxl,png}" | first)
     {
@@ -139,7 +139,7 @@ def main [
         }
     )
 
-    try {
+    # try {
 
     let file = (
         if ($original_file | str starts-with "minio:") {
@@ -243,10 +243,10 @@ def main [
     log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
     rm --force --recursive $temporary_directory
 
-    } catch {
-        log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
-        continue
-    }
+    # } catch {
+    #     log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
+    #     continue
+    # }
 
     }
 }
