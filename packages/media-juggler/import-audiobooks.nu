@@ -40,6 +40,7 @@ export def format_chapter_duration []: duration -> string {
 export def tag_audiobook [
     output_directory: directory
     --asin: string
+    --tone-tag-args: list<string> = []
 ]: path -> path {
     let m4b = $in
 
@@ -61,8 +62,35 @@ export def tag_audiobook [
 
     log info $"ASIN is (ansi purple)($asin)(ansi reset)"
     let r = (http get $"https://api.audnex.us/books/($asin)")
-    let authors = $r.authors | get name | filter {|a| not ($a | str ends-with " - translator") }
-    let translators = $r.authors | get name | filter {|a| $a | str ends-with " - translator" } | str replace " - translator" ""
+    let authors = $r.authors | get name | filter {|a| not ($a | str ends-with "- translator") and not ($a | str ends-with "- illustrator") }
+    let translators = (
+        $r.authors
+        | get name
+        | filter {|a| $a | str ends-with "- translator" }
+        | str replace "- translator" ""
+        | str trim
+    )
+    let illustrators = (
+        $r.authors
+        | get name
+        | filter {|a| $a | str ends-with "- illustrator" }
+        | str replace "- illustrator" ""
+        | str trim
+    )
+    let primary_authors = (
+        let authors_with_asin = (
+            $r.authors
+            | default null asin
+            | where asin != null
+            | get name
+            | filter {|a| not ($a | str ends-with " - translator") }
+        );
+        if ($authors_with_asin | is-empty) {
+            $authors
+        } else {
+            $authors_with_asin
+        }
+    )
     let series = (
         if "seriesPrimary" in $r {
             { name: $r.seriesPrimary.name, position: $r.seriesPrimary.position }
@@ -70,12 +98,22 @@ export def tag_audiobook [
             null
         }
     )
+    # Normalize the title under weird circumstances where it doesn't match the title.
+    let title = (
+        if $series == null {
+            $r.title
+        } else {
+            # 86 - Eighty-Six, Vol. 1 -> 86--EIGHTY-SIX, Vol. 1
+            [$series.name ($r.title | str substring ($r.title | str downcase | str index-of ', vol. ')..)] | str join
+        }
+    )
+    log debug $"The title is (ansi yellow)($title)(ansi reset)"
     let tone_data = (
         {
             meta: {
-                album: $r.title
-                albumArtist: ($authors | str join ", ")
-                artist: ($authors | str join ", ")
+                album: $title
+                albumArtist: ($primary_authors | str join ", ")
+                artist: ($primary_authors | str join ", ")
                 composer: ($r.narrators | get name | str join ", ")
                 copyright: $r.copyright
                 description: $r.description
@@ -83,19 +121,38 @@ export def tag_audiobook [
                 narrator: ($r.narrators | get name | str join ", ")
                 publisher: $r.publisherName
                 publishingDate: $r.releaseDate
-                title: $r.title
+                title: $title
                 additionalFields: {
                     asin: $r.asin
                     authors: ($authors | str join ", ")
                     isbn: $r.isbn
                     language: $r.language
-                    # series: ($r.seriesPrimary | get name)
-                    # "series-part": ($r.seriesPrimary | get position)
                     tags: ($r.genres | where type == "tag" | get name | str join ", ")
-                    translators: ($translators | str join ", ")
                 }
             }
         }
+        | (
+            let input = $in;
+            if ($translators | is-empty) {
+                $input
+            } else {
+                (
+                    $input
+                    | insert meta.additionalFields.translators ($translators | str join ", ")
+                )
+            }
+        )
+        | (
+            let input = $in;
+            if ($illustrators | is-empty) {
+                $input
+            } else {
+                (
+                    $input
+                    | insert meta.additionalFields.illustrators ($illustrators | str join ", ")
+                )
+            }
+        )
         | (
             let input = $in;
             if $series == null {
@@ -103,8 +160,7 @@ export def tag_audiobook [
             } else {
                 (
                     $input
-                    | insert meta.additionalFields.series $series.name
-                    | insert meta.additionalFields.series-part $series.position
+                    | insert meta.movementName $series.name
                 )
             }
         )
@@ -129,22 +185,33 @@ export def tag_audiobook [
     # ^ffprobe -loglevel error -show_entries stream_tags:format_tags $m4b | save --force $ffmetadata
     http get --raw $r.image | save --force $cover
     [$cover] | optimize_images
+    let args = (
+        []
+        | append (
+            if $series == null {
+                null
+            } else {
+                $"--meta-part=($series.position)"
+            }
+        )
+    )
     (
         ^tone tag
-            # --taggers "*,m4bfillup"
+            # todo When tone is new enough:
+            # --id $r.asin
             --meta-chapters-file $chapters
             --meta-cover-file $cover
             --meta-tone-json-file $tone_json
             --meta-remove-property "comment"
-            # --meta-ffmetadata-file $ffmetadata
-            # ToneJson,M4BFillUp
+            ...$args
+            ...$tone_tag_args
             $m4b
     )
     let renamed = (
         let components = $m4b | path parse;
         {
             parent: (
-                [$output_directory ($authors | str join ", ")]
+                [$output_directory ($primary_authors | str join ", ")]
                 | append (
                     if $series == null {
                         null
@@ -154,7 +221,7 @@ export def tag_audiobook [
                 )
                 | path join
             ),
-            stem: $r.title,
+            stem: $title,
             extension: $components.extension,
         }
         | path join
@@ -298,6 +365,7 @@ export def embed_cover []: record<cover: path, m4b: path> -> path {
 #
 def main [
     ...files: path # The paths to M4A and M4B files to tag and upload. Prefix paths with "minio:" to download them from the MinIO instance
+    --asin: string
     --beets-config: path # The Beets config file to use
     --beets-directory: directory
     --beets-library: path # The Beets library to use
@@ -307,9 +375,15 @@ def main [
     --minio-path: string = "media/Books/Audiobooks" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
     --output-directory: directory # Directory to place files when not being uploaded
     --skip-upload # Don't upload files to the server
+    --tone-tag-args: list<string> = [] # Additional arguments to pass to the tone tag command
 ] {
     if ($files | is-empty) {
         log error "No files provided"
+        exit 1
+    }
+
+    if $asin != null and ($files | length) > 1 {
+        log error "Setting the ASIN for multiple files is not allowed as it can result in overwriting the final file"
         exit 1
     }
 
@@ -405,7 +479,13 @@ def main [
             log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
             exit 1
         }
-        | tag_audiobook $temporary_directory
+        | (
+            if $asin == null {
+                tag_audiobook --tone-tag-args $tone_tag_args $temporary_directory
+            } else {
+                tag_audiobook --asin $asin --tone-tag-args $tone_tag_args $temporary_directory
+            }
+        )
     )
 
     # log debug $"Fetching and writing metadata to '($formats.cbz)' with ComicTagger"
