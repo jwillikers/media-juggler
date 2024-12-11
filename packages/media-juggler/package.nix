@@ -1,5 +1,4 @@
 {
-  beets-audible-config,
   calibre,
   cbconvert,
   ffmpeg,
@@ -19,22 +18,6 @@
 if lib.versionOlder nushell.version "0.99" then
   throw "import-comics is not available for Nushell ${nushell.version}"
 else
-  # let
-  # todo Wrap invocations of beets-audible with wrapProgram --add-flags --config + --library
-  # deadnix: skip
-  # beets-audible = beets.override {
-  #   pluginOverrides = {
-  #     audible = {
-  #       enable = true;
-  #       propagatedBuildInputs = [ beetsPlugins.audible ];
-  #     };
-  #     copyartifacts = {
-  #       enable = true;
-  #       propagatedBuildInputs = [ beetsPackages.copyartifacts ];
-  #     };
-  #   };
-  # };
-  # in
   stdenvNoCC.mkDerivation {
     pname = "import-comics";
     version = "0.1.0";
@@ -46,7 +29,6 @@ else
     # doCheck = true;
 
     buildInputs = [
-      # beets-audible
       calibre
       cbconvert
       # todo comictagger
@@ -86,10 +68,8 @@ else
           ]
         }
       wrapProgram $out/bin/import-audiobooks.nu \
-        --set BEETSDIR ${beets-audible-config}/etc/beets \
         --prefix PATH : ${
           lib.makeBinPath [
-            # beets-audible
             ffmpeg
             image_optim
             m4b-tool
