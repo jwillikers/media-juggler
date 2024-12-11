@@ -42,7 +42,7 @@ def main [
 
     log info $"Exporting the file (ansi purple)($original_file)(ansi reset)"
 
-    let temporary_directory = (mktemp --directory --tmpdir-path ~/.cache)
+    let temporary_directory = (mktemp --directory --tmpdir-path ~/.cache "export-to-ereader.XXXXXXXXXX")
     log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
     try {

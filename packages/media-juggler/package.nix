@@ -2,9 +2,11 @@
   beets-audible-config,
   calibre,
   cbconvert,
+  ffmpeg,
   file,
   image_optim,
   lib,
+  m4b-tool,
   minio-client,
   makeWrapper,
   nushell,
@@ -47,11 +49,12 @@ else
       # beets-audible
       calibre
       cbconvert
-      # comictagger
       # todo comictagger
+      ffmpeg
       file
       # kcc
       image_optim
+      m4b-tool
       minio-client
       nushell
       udisks
@@ -69,12 +72,11 @@ else
       runHook preInstall
       install -D --mode=0755 --target-directory=$out/bin *.nu
       install -D --mode=0644 --target-directory=$out/bin/media-juggler-lib media-juggler-lib/*.nu
-      wrapProgram $out/bin/export-comics.nu \
+      wrapProgram $out/bin/export-to-ereader.nu \
         --prefix PATH : ${
           lib.makeBinPath [
             calibre
             cbconvert
-            # comictagger
             image_optim
             # kcc
             minio-client
@@ -88,7 +90,9 @@ else
         --prefix PATH : ${
           lib.makeBinPath [
             # beets-audible
+            ffmpeg
             image_optim
+            m4b-tool
             minio-client
             tone
           ]

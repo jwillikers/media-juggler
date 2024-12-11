@@ -1,19 +1,23 @@
-plugins: audible copyartifacts edit embedart fromfilename inline scrub # web?
+plugins: audible copyartifacts edit embedart fromfilename inline scrub web # web?
 
 # directory: ~/Books/Audiobooks
 directory: /audiobooks
 
+library: /config/library/library.db
+
 item_fields:
   first_artist: albumartist.split(', ',1)[0:1][0]
+  sanitized_artists: |
+    filter(lambda a : " - translator" not in a, albumartist.split(', '))
   padded_track: f"{track:02}"
   padded_series_position: series_position.zfill(2)
 
 paths:
   # For books that belong to a series
-  "albumtype:audiobook series_name::.+ series_position::.+": $first_artist/%ifdef{series_name}/%ifdef{padded_series_position} - $title
-  "albumtype:audiobook series_name::.+": $first_artist/%ifdef{series_name}/$title
+  "albumtype:audiobook series_name::.+ series_position::.+": $sanitized_artists/%ifdef{series_name}/%ifdef{padded_series_position} - $title
+  "albumtype:audiobook series_name::.+": $sanitized_artists/%ifdef{series_name}/$title
   # Stand-alone books
-  "albumtype:audiobook": $first_artist/$album%aunique{}/$padded_track - $title
+  "albumtype:audiobook": $sanitized_artists/$album%aunique{}/$padded_track - $title
   default: $first_artist/$album%aunique{}/$padded_track - $title
   singleton: Non-Album/$artist - $title
   comp: Compilations/$album%aunique{}/$padded_track - $title
@@ -36,8 +40,8 @@ audible:
   include_narrator_in_artists: false # include author and narrator in artist tag. Or just author
   keep_series_reference_in_title: true # set to false to remove ", Book X" from end of titles
   keep_series_reference_in_subtitle: true # set to false to remove subtitle if it contains the series name and the word book ex. "Book 1 in Great Series", "Great Series, Book 1"
-  write_description_file: false # output desc.txt
-  write_reader_file: false # output reader.txt
+  write_description_file: true # output desc.txt
+  write_reader_file: true # output reader.txt
   region: us # the region from which to obtain metadata can be omitted, by default it is "us"
   # pick one of the available values: au, ca, de, es, fr, in, it, jp, us, uk
   # the region value can be set for each book individually during import/re-import

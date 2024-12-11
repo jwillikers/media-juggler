@@ -15,7 +15,14 @@ use media-juggler-lib *
 #
 # Information that is not provided will be gleaned from the title of the EPUB file if possible.
 #
-# The final file is named according to Jellyfin's recommendation, Authors/Book.
+# The final file is named according to Jellyfin's recommendation.
+#
+# This ends up like this for an EPUB: "<authors>/<title>.epub".
+# For a PDF, the book is stored in its own directory with the metadata.opf and cover.ext files: "<authors>/<title>/<title>.pdf".
+#
+# I'm considering grouping books by series like this:
+# The path for a book in a series will look like "<authors>/<series>/<series-position> - <title>.epub".
+# The path for a standalone book will look like "<authors>/<title>.epub".
 #
 def main [
     ...files: path # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. Prefix paths with "minio:" to download them from the MinIO instance
@@ -73,7 +80,7 @@ def main [
 
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
-    let temporary_directory = (mktemp --directory)
+    let temporary_directory = (mktemp --directory "import-ebooks.XXXXXXXXXX")
     log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
     # try {
@@ -92,7 +99,7 @@ def main [
                 | lines --skip-empty
                 | filter {|f|
                     let components = $f | path parse
-                    $components.stem == "cover" and $components.extension in [gif jpeg jpg jxl png svg tiff]
+                    $components.stem == "cover" and $components.extension in $image_extensions
                 }
             )
             if not ($covers | is-empty) {
@@ -114,7 +121,7 @@ def main [
                 | get name
                 | filter {|f|
                     let components = $f | path parse
-                    $components.stem == "cover" and $components.extension in [gif jpeg jpg jxl png svg tiff]
+                    $components.stem == "cover" and $components.extension in $image_extensions
                 }
             );
             if not ($covers | is-empty) {
@@ -247,7 +254,7 @@ def main [
                     | lines --skip-empty
                     | filter {|f|
                         let components = ($f | path parse);
-                        $components.stem == "cover" and $components.extension in [gif jpeg jpg jxl png svg tiff]
+                        $components.stem == "cover" and $components.extension in $image_extensions
                     }
                 )
                 if not ($covers | is-empty) {

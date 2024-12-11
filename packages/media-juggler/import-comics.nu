@@ -255,7 +255,7 @@ def main [
 
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
-    let temporary_directory = (mktemp --directory)
+    let temporary_directory = (mktemp --directory "import-comics.XXXXXXXXXX")
     log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
     try {

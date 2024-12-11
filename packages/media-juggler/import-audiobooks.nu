@@ -1,69 +1,261 @@
 #!/usr/bin/env nu
 
+# todo Consider using bragibooks instead: https://github.com/djdembeck/bragibooks
+# todo Use tone and a JS script to query Audible?
+# tone can rename files as needed
+
 use std log
 use media-juggler-lib *
 
+# Unzip a directory
+export def unzip [
+    working_directory: directory
+]: path -> path {
+    let archive = $in
+    let target_directory = [$working_directory ($archive | path parse | get stem)] | path join
+    ^unzip -q $archive -d $target_directory
+    $target_directory
+}
+
+# Convert a directory of MP3 files to an M4B file
+export def mp3_directory_to_m4b [
+    working_directory: directory
+]: path -> path {
+    let directory = $in
+    let m4b = { parent: $working_directory, stem: ($directory | path basename), extension: "m4b" } | path join
+    ^m4b-tool merge --jobs ((^nproc | into int) / 2) --output-file $m4b $directory
+    $m4b
+}
+
+export def format_chapter_duration []: duration -> string {
+    # HH:MM:SS.fff
+    let time = $in
+    let hours = ($time // 1hr) | fill --alignment right --character "0" --width 2
+    let minutes = ($time mod 1hr // 1min) | fill --alignment right --character "0" --width 2
+    let seconds = ($time mod 1min // 1sec) | fill --alignment right --character "0" --width 2
+    let fractional_seconds = ($time mod 1sec / 1sec * 1000 // 1) | fill --alignment right --character "0" --width 3
+    $"($hours):($minutes):($seconds).($fractional_seconds)"
+}
+
+export def tag_audiobook [
+    output_directory: directory
+    --asin: string
+]: path -> path {
+    let m4b = $in
+
+    let current_metadata = ^tone dump --format json $m4b | from json | get meta
+    let asin = (
+        if $asin == null {
+            if "additionalFields" in $current_metadata and "asin" in $current_metadata.additionalFields {
+                $current_metadata.additionalFields.asin
+            } else if "title" in $current_metadata {
+                http get $"https://api.audible.com/1.0/catalog/products?region=us&response_groups=series&title=($current_metadata.title | url encode)"  | get products | first | get asin
+            } else {
+                log error "Unable to determine the ASIN for the book!"
+                exit 1
+            }
+        } else {
+            $asin
+        }
+    )
+
+    log info $"ASIN is (ansi purple)($asin)(ansi reset)"
+    let r = (http get $"https://api.audnex.us/books/($asin)")
+    let authors = $r.authors | get name | filter {|a| not ($a | str ends-with " - translator") }
+    let translators = $r.authors | get name | filter {|a| $a | str ends-with " - translator" } | str replace " - translator" ""
+    let series = (
+        if "seriesPrimary" in $r {
+            { name: $r.seriesPrimary.name, position: $r.seriesPrimary.position }
+        } else {
+            null
+        }
+    )
+    let tone_data = (
+        {
+            meta: {
+                album: $r.title
+                albumArtist: ($authors | str join ", ")
+                artist: ($authors | str join ", ")
+                composer: ($r.narrators | get name | str join ", ")
+                copyright: $r.copyright
+                description: $r.description
+                genre: ($r.genres | where type == "genre" | get name | first)
+                narrator: ($r.narrators | get name | str join ", ")
+                publisher: $r.publisherName
+                publishingDate: $r.releaseDate
+                title: $r.title
+                additionalFields: {
+                    asin: $r.asin
+                    authors: ($authors | str join ", ")
+                    isbn: $r.isbn
+                    language: $r.language
+                    # series: ($r.seriesPrimary | get name)
+                    # "series-part": ($r.seriesPrimary | get position)
+                    tags: ($r.genres | where type == "tag" | get name | str join ", ")
+                    translators: ($translators | str join ", ")
+                }
+            }
+        }
+        | (
+            let input = $in;
+            if $series == null {
+                $input
+            } else {
+                (
+                    $input
+                    | insert meta.additionalFields.series $series.name
+                    | insert meta.additionalFields.series-part $series.position
+                )
+            }
+        )
+    )
+    let tone_json = $"($output_directory)/tone.json"
+    $tone_data | save --force $tone_json
+    let chapters = $"($output_directory)/chapters.txt"
+    (
+        http get $"https://api.audnex.us/books/($asin)/chapters"
+        | get chapters
+        | each {|chapter|
+            let time = ($chapter.startOffsetMs | into duration --unit ms | format_chapter_duration);
+            $"($time) ($chapter.title)"
+        }
+        | str join "\n"
+        | save --force $chapters
+    )
+    log debug $"Chapters: ($chapters)"
+    # let cover = $r.cover # "https://m.media-amazon.com/images/I/91rYWS09+AL.jpg"
+    let cover = ({ parent: $output_directory, stem: "cover", extension: ($r.image | path parse | get extension )} | path join)
+    # let ffmetadata = $"($output_directory)/ffmetadata.txt"
+    # ^ffprobe -loglevel error -show_entries stream_tags:format_tags $m4b | save --force $ffmetadata
+    http get --raw $r.image | save --force $cover
+    [$cover] | optimize_images
+    (
+        ^tone tag
+            # --taggers "*,m4bfillup"
+            --meta-chapters-file $chapters
+            --meta-cover-file $cover
+            --meta-tone-json-file $tone_json
+            --meta-remove-property "comment"
+            # --meta-ffmetadata-file $ffmetadata
+            # ToneJson,M4BFillUp
+            $m4b
+    )
+    let renamed = (
+        let components = $m4b | path parse;
+        {
+            parent: (
+                [$output_directory ($authors | str join ", ")]
+                | append (
+                    if $series == null {
+                        null
+                    } else {
+                        $series.name
+                    }
+                )
+                | path join
+            ),
+            stem: $r.title,
+            extension: $components.extension,
+        }
+        | path join
+    )
+    mkdir ($renamed | path dirname)
+    mv $m4b $renamed
+    $renamed
+}
+
 # Import Audiobooks with Beets.
 #
-# The metadata for Authors and Title from the ComicVine Calibre plugin are corrected here.
-# The title includes the issue number twice in the name, which is kind of ugly, so that is fixed.
-# All creators are tagged as authors which is incorrect.
-# To accommodate this, authors must be passed directly.
+# The final file is named according to Jellyfin's recommendation, Authors/Book.
 #
 export def beet_import [
     # beet_executable: path # Path to the Beets executable to use
+    beets_directory: directory # Directory to which the books are imported
     config: path # Path to the Beets config to use
-    # library: path # Path to the Beets library to use
+    --library: path # Path to the Beets library to use
     # --search-id
     # --set
     --working-directory: directory
-]: [path -> record] {
+]: path -> record<cover: path, m4b: path> {
     let m4b = $in
-    let output_directory = $working_directory | path join beets
-    rm --force --recursive $output_directory
-    mkdir $output_directory
     # (
     #     ^beet
     #     --config $config
-    #     --directory $output_directory
+    #     --directory $beets_directory
     #     --library $library
-    #     import --move
+    #     import
     #     $m4b
     # )
-    # ^podman stop beets-audible
-    log debug $"Running: podman run --detach --env PUID=0 --env PGID=0 --mount type=bind,src=($output_directory),dst=/audiobooks --mount type=bind,src=($m4b | path dirname),dst=/input --name beets-audible --rm --volume ($config):/config/config.yaml:Z --volume ($config | path dirname)/scripts:/custom-cont-init.d:Z lscr.io/linuxserver/beets:2.0.0"
+    let args = (
+        []
+        | append (if $library == null { "--volume=audible-beets-library:/config/library:Z" } else { $"--volume=($library | path dirname):/config/library:Z" })
+    )
+    log debug $"Running: podman run --detach --env PUID=0 --env PGID=0 --name beets-audible --rm --volume ($m4b):/input/($m4b | path basename):Z --volume ($beets_directory):/audiobooks:z --volume ($config):/config/config.yaml:Z --volume ($config | path dirname)/scripts:/custom-cont-init.d:Z ($args | str join ' ') lscr.io/linuxserver/beets:2.0.0"
     (
         ^podman run
             --detach
             --env "PUID=0"
             --env "PGID=0"
-            # --mount $"type=bind,src=($output_directory),dst=/audiobooks"
-            # --mount $"type=bind,src=($m4b | path dirname),dst=/input"
             --name "beets-audible"
             --rm
+            # --volume $"($library | path dirname):/config/library:Z"
             --volume $"($m4b):/input/($m4b | path basename):Z"
-            --volume $"($output_directory):/audiobooks:z"
+            --volume $"($beets_directory):/audiobooks:z"
             --volume $"($config):/config/config.yaml:Z"
             --volume $"($config | path dirname)/scripts:/custom-cont-init.d:Z"
+            ...$args
             "lscr.io/linuxserver/beets:2.0.0"
     )
-    # sleep 30sec
     sleep 2min
     (
         ^podman exec
         --interactive
         --tty
         "beets-audible"
-        beet import $"/input/($m4b | path basename)"
+        beet import (["/input" ($m4b | path basename)] | path join)
     )
     ^podman stop beets-audible
-    let author_directory = (ls --full-paths $output_directory | get name | first)
-    let imported_m4b = (glob $"($author_directory)/**/*.m4b" | first)
-    let directory = ($imported_m4b | path basename)
-    let cover = (glob $"($directory)/*.{jpeg,jpg,jxl,png}" | first)
+    let author_directory = ls --full-paths $beets_directory | get name | first
+    let imported_m4b = (
+        let m4b_files = glob ([$author_directory "**" "*.m4b"] | path join);
+        if ($m4b_files | is-empty) {
+            log error $"No imported M4B file found in (ansi yellow)($author_directory)(ansi reset)!"
+            exit 1
+        } else if ($m4b_files | length) > 1 {
+            log error $"Multiple imported M4B files found: (ansi yellow)($m4b_files)(ansi reset)!"
+            exit 1
+        } else {
+            $m4b_files | first
+        }
+    )
+    log debug $"The imported M4B file is (ansi yellow)($imported_m4b)(ansi reset)"
+    let covers = (
+        glob ([($imported_m4b | path dirname) "**" "cover.*"] | path join)
+        | filter {|f|
+            let components = $f | path parse
+            $components.stem == "cover" and $components.extension in $image_extensions
+        }
+    );
+    let cover = (
+        if not ($covers | is-empty) {
+            if ($covers | length) > 1 {
+                log error $"Found multiple files looking for the cover image file:\n($covers)\n"
+                exit 1
+            } else {
+                $covers | first
+            }
+        } else {
+            null
+        }
+    )
+    if $cover != null {
+        log debug $"The cover file is (ansi yellow)($cover)(ansi reset)"
+    } else {
+        log warning $"No cover found!"
+    }
     {
+        cover: $cover,
         m4b: $imported_m4b,
-        cover: $cover
     }
 }
 
@@ -71,7 +263,7 @@ export def beet_import [
 export def decrypt_audible [
     activation_bytes: string # Audible activation bytes
     --working-directory: directory
-]: [path -> path] {
+]: path -> path {
     let aax = $in
     let stem = $aax | path parse | get stem
     let m4b = ({ parent: $working_directory, stem: $stem, extension: "m4b" } | path join)
@@ -80,7 +272,7 @@ export def decrypt_audible [
 }
 
 # Embed the cover art to an M4B file
-export def embed_cover []: [record -> path] {
+export def embed_cover []: record<cover: path, m4b: path> -> path {
     let audiobook = $in
     if $audiobook.cover == null {
         ^tone tag --auto-import=covers $audiobook.m4b
@@ -92,14 +284,22 @@ export def embed_cover []: [record -> path] {
 
 # Import an audiobook to my collection.
 #
+# Audiobooks can be provided in the AAX and M4B formats.
+#
 # This script performs several steps to process the audiobook file.
 #
-# 1. Decrypt the Audible book if it is from Audible.
+# 1. Decrypt the audiobook if it is from Audible.
 # 2. Tag the audiobook.
+# 3. Upload the audiobook
+#
+# The final file is named according to Jellyfin's recommendation, but includes a directory for the series if applicable.
+# The path for a book in a series will look like "<authors>/<series>/<series-position> - <title>.m4b".
+# The path for a standalone book will look like "<authors>/<title>.m4b".
 #
 def main [
     ...files: path # The paths to M4A and M4B files to tag and upload. Prefix paths with "minio:" to download them from the MinIO instance
     --beets-config: path # The Beets config file to use
+    --beets-directory: directory
     --beets-library: path # The Beets library to use
     --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
     --delete # Delete the original file
@@ -126,8 +326,17 @@ def main [
 
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
-    let temporary_directory = (mktemp --directory)
+    let temporary_directory = (mktemp --directory "import-audiobooks.XXXXXXXXXX")
     log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
+
+    let beets_directory = (
+        if $beets_directory == null {
+            [$env.HOME "Books" "Audiobooks"] | path join
+        } else {
+            $beets_directory
+        }
+    )
+    mkdir $beets_directory
 
     let audible_activation_bytes = (
         if $audible_activation_bytes != null {
@@ -152,15 +361,29 @@ def main [
         }
     )
 
-    let input_format = ($file | path parse | get extension)
+    let input_format = (
+        if ($file | path type) == "dir" {
+            "dir"
+        } else {
+            let ext = $file | path parse | get extension;
+            if $ext == null {
+                log error $"Unable to determine input file type of (ansi yellow)($file)(ansi reset). It is not a directory and has no file extension."
+                exit 1
+            } else {
+                $ext
+            }
+        }
+    )
 
-    # let beets_library = (
-    #     if $beets_library == null {
-    #         $temporary_directory | path join "library.db"
-    #     } else {
-    #         $beets_library
-    #     }
-    # )
+    let beets_library = (
+        if $beets_library == null {
+            let library_directory = [$env.HOME ".local" "share" "beets-audible"] | path join
+            mkdir $library_directory
+            [$library_directory "library.db"] | path join
+        } else {
+            $beets_library
+        }
+    )
 
     let audiobook = (
         # Assume AAX files are from Audible and require decryption.
@@ -169,32 +392,20 @@ def main [
                 log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
                 exit 1
             }
-            $file
-            | decrypt_audible $activation_bytes --working-directory $temporary_directory
-            | beet_import --working-directory $temporary_directory $beets_config # $beets_library
-            | (
-                let i = $in;
-                {
-                    m4b: $i.m4b,
-                    cover: ($i.cover | optimize_cover)
-                }
-            ) | embed_cover
+            $file | decrypt_audible $activation_bytes --working-directory $temporary_directory
         } else if $input_format in ["m4a", "m4b"] {
             $file
-            | beet_import --working-directory $temporary_directory $beets_config # $beets_library
-            | (
-                let i = $in;
-                {
-                    m4b: $i.m4b,
-                    cover: ($i.cover | optimize_cover)
-                }
-            ) | embed_cover
-        } else if $input_format == [null, "zip"] {
-            # todo Support importing zip files and directories containing mp3 files using m4b-tool
+        } else if $input_format == "dir" {
+            $file | mp3_directory_to_m4b $temporary_directory
+        } else if $input_format == "zip" {
+            $file
+            | unzip $temporary_directory
+            | mp3_directory_to_m4b $temporary_directory
         } else {
             log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
             exit 1
         }
+        | tag_audiobook $temporary_directory
     )
 
     # log debug $"Fetching and writing metadata to '($formats.cbz)' with ComicTagger"
@@ -212,17 +423,19 @@ def main [
     # let authors = ($comic_metadata | get credits | where role == "Writer" | get person)
     # log debug $"Authors determined to be (ansi purple)'($authors)'(ansi reset)"
 
-    let authors_subdirectory = ($audiobook.m4b | path dirname | path relative-to $working_directory | path split | drop nth 0 | path join)
+    # let current_metadata = ^tone dump --format json $audiobook | from json | get meta
+
+    let authors_subdirectory = $audiobook | path dirname | path relative-to $temporary_directory
     let minio_target_directory =  [$minio_alias $minio_path $authors_subdirectory] | path join | sanitize_minio_filename
     let minio_target_destination = (
-        let components = ($audiobook.m4b | path parse);
+        let components = ($audiobook | path parse);
         { parent: $minio_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
     )
     if $skip_upload {
-        mv $audiobook.m4b $output_directory
+        mv $audiobook $output_directory
     } else {
-        log info $"Uploading (ansi yellow)($audiobook.m4b)(ansi reset) to (ansi yellow)($minio_target_destination)(ansi reset)"
-        ^mc mv $audiobook.m4b $minio_target_destination
+        log info $"Uploading (ansi yellow)($audiobook)(ansi reset) to (ansi yellow)($minio_target_destination)(ansi reset)"
+        ^mc mv $audiobook $minio_target_destination
     }
 
     if $delete {

@@ -7,6 +7,19 @@ export const ereader_profiles = [
     ["Kobo Elipsa 2E" 1872 1404 "KOBOeReader"]
 ]
 
+export const image_extensions = [
+  avif
+  bmp
+  gif
+  jpeg
+  jpg
+  jxl
+  png
+  svg
+  tiff
+  webp
+]
+
 # Extract the ComicInfo.xml file from an archive
 export def extract_comic_info [
     working_directory: directory # The scratch-space directory to use
@@ -93,7 +106,7 @@ export def acsm_to_epub [
 }
 
 # Losslessly optimize images
-export def optimize_images []: [list<path> -> record] {
+export def optimize_images []: list<path> -> record<bytes: filesize, difference: float> {
     let paths = $in
     # Ignore config paths to ensure that lossy compression is not enabled.
     log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths | str join ' ')(ansi reset)"
@@ -174,9 +187,9 @@ export def epub_to_cbz [
     let cbz = ({ parent: $working_directory, stem: ($epub | path parse | get stem), extension: "cbz" } | path join)
 
     log debug $"Extracting contents of the EPUB (ansi yellow)($epub)(ansi reset) to (ansi yellow)($working_directory)/epub(ansi reset)"
-    unzip -q $epub -d ($working_directory | path join "epub")
+    ^unzip -q $epub -d ($working_directory | path join "epub")
 
-    let image_files = (glob $"($working_directory)/epub/**/*.{avif,bmp,jpeg,jpg,jxl,png,tiff,webp}")
+    let image_files = (glob $"($working_directory)/epub/**/*.{($image_extensions | str join ',')}")
     let image_file_extension = ($image_files | first | path parse | get extension)
     let image_subdirectory = ($image_files | first | path parse | get parent)
     let image_format = (
@@ -212,7 +225,7 @@ export def pdf_to_cbz [
     # Convert to jxl
 
     log debug $"Extracting contents of the PDF (ansi yellow)($pdf)(ansi reset) to (ansi yellow)($working_directory)/epub(ansi reset)"
-    unzip -q $pdf -d ($working_directory | path join "pdf")
+    ^unzip -q $pdf -d ($working_directory | path join "pdf")
 
     let image_files = (glob $"($working_directory)/epub/**/*.{avif,bmp,jpeg,jpg,jxl,png,tiff,webp}")
     let image_file_extension = ($image_files | first | path parse | get extension)
@@ -570,7 +583,7 @@ export def fetch_book_metadata [
         | filter {|f|
           let components = $f | path parse
           # todo use a constant for image file extensions
-          $components.stem == "cover" and $components.extension in [gif jpeg jpg jxl png svg tiff]
+          $components.stem == "cover" and $components.extension in $image_extensions
         }
       );
       if ($covers | is-empty) {
