@@ -24,7 +24,7 @@ export def beet_import [
         ^beet
         # --config $config
         --directory $beets_directory
-        # --library $library
+        --library $library
         import
         $item
     )
@@ -37,11 +37,9 @@ export def beet_import [
         if ($music_files | is-empty) {
             log error $"No music files found in (ansi yellow)($beets_directory)(ansi reset)!"
             exit 1
-        } else if ($music_files | length) > 1 {
-            log error $"Multiple imported M4B files found: (ansi yellow)($music_files)(ansi reset)!"
-            exit 1
         } else {
-            $music_files | first
+            # todo throw an error if multiple directories
+            $music_files | first | path dirname
         }
     )
     # let artist_directory = ls --full-paths $beets_directory | get name | first
@@ -97,7 +95,7 @@ def main [
 
     log info $"Importing the file (ansi purple)($original_item)(ansi reset)"
 
-    let temporary_directory = (mktemp --directory "import-audiobooks.XXXXXXXXXX")
+    let temporary_directory = (mktemp --directory "import-music.XXXXXXXXXX")
     log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
     let beets_directory = (
@@ -122,23 +120,23 @@ def main [
 
     # try {
 
+    let original_music_files = (
+        if ($original_item | str starts-with "minio:") {
+            let item = ($original_item | str replace "minio:" "")
+            ^mc find $item
+        } else {
+            ls $original_item | get name
+        }
+    )
+
     let item = (
         if ($original_item | str starts-with "minio:") {
             let item = ($original_item | str replace "minio:" "")
             ^mc cp --recursive $item $"($temporary_directory)/($item | path basename)"
             [$temporary_directory ($item | path basename)] | path join
         } else {
-            cp $original_item $temporary_directory
+            cp --recursive $original_item $temporary_directory
             [$temporary_directory ($original_item | path basename)] | path join
-        }
-    )
-
-    let original_music_files = (
-        if ($original_item | str starts-with "minio:") {
-            let item = ($original_item | str replace "minio:" "")
-            ^mc find $item
-        } else {
-            ls $item | get name
         }
     )
 

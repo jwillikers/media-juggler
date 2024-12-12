@@ -5,6 +5,7 @@
   ffmpeg,
   file,
   image_optim,
+  keyfinder-cli,
   lib,
   # m4b-tool,
   minio-client,
@@ -38,6 +39,7 @@ else
       file
       # kcc
       image_optim
+      keyfinder-cli
       # m4b-tool
       minio-client
       nushell
@@ -110,6 +112,7 @@ else
           lib.makeBinPath [
             beets
             image_optim
+            keyfinder-cli
             minio-client
           ]
         }

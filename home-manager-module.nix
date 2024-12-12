@@ -55,6 +55,7 @@ self:
       [
         calibre
         # comictagger
+        keyfinder-cli # todo Fix beets to properly be wrapped with this?
         minio-client
       ]
       ++ (with self.packages.${pkgs.stdenv.system}; [
@@ -100,7 +101,6 @@ self:
   };
 
   systemd.user = {
-    # ${homeDirectory}/
     tmpfiles.rules = [
       "d ${config.home.homeDirectory}/Books 0750 ${config.home.username} ${config.home.username} - -"
       "d ${config.home.homeDirectory}/Books/Audiobooks 0750 ${config.home.username} ${config.home.username} - -"
