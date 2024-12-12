@@ -77,8 +77,7 @@ self:
           "lyrics"
           "scrub"
         ];
-        chroma = {
-          auto = true;
+        acoustid = {
           # apikey = "";
         };
         embedart = {

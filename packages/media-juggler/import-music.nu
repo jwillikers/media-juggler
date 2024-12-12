@@ -28,6 +28,8 @@ export def beet_import [
         import
         $item
     )
+    # Submit fingerprint
+    ^beet submit
     # let args = (
     #     []
     #     | append (if $library == null { "--volume=audible-beets-library:/config/library:Z" } else { $"--volume=($library | path dirname):/config/library:Z" })
@@ -123,7 +125,7 @@ def main [
     let original_music_files = (
         if ($original_item | str starts-with "minio:") {
             let item = ($original_item | str replace "minio:" "")
-            ^mc find $item
+            ^mc find $item | lines
         } else {
             ls $original_item | get name
         }
