@@ -25,7 +25,7 @@ use media-juggler-lib *
 # The path for a standalone book will look like "<authors>/<title>.epub".
 #
 def main [
-    ...files: path # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. Prefix paths with "minio:" to download them from the MinIO instance
+    ...files: string # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. Prefix paths with "minio:" to download them from the MinIO instance
     --delete # Delete the original file
     --isbn: string # ISBN of the book
     # --identifiers: string # asin:XXXX

@@ -1,11 +1,12 @@
 {
+  beets,
   calibre,
   cbconvert,
   ffmpeg,
   file,
   image_optim,
   lib,
-  m4b-tool,
+  # m4b-tool,
   minio-client,
   makeWrapper,
   nushell,
@@ -29,6 +30,7 @@ else
     # doCheck = true;
 
     buildInputs = [
+      beets
       calibre
       cbconvert
       # todo comictagger
@@ -36,7 +38,7 @@ else
       file
       # kcc
       image_optim
-      m4b-tool
+      # m4b-tool
       minio-client
       nushell
       udisks
@@ -72,7 +74,7 @@ else
           lib.makeBinPath [
             ffmpeg
             image_optim
-            m4b-tool
+            # m4b-tool
             minio-client
             tone
           ]
@@ -101,6 +103,14 @@ else
             udisks
             util-linux
             zip
+          ]
+        }
+      wrapProgram $out/bin/import-music.nu \
+        --prefix PATH : ${
+          lib.makeBinPath [
+            beets
+            image_optim
+            minio-client
           ]
         }
       runHook postInstall

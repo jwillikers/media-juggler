@@ -191,7 +191,7 @@ export def comictagger_update_metadata [
 #
 def main [
     comictagger: path = "./ComicTagger-x86_64.AppImage" # Temporarily required until the Nix package is available
-    ...files: path # The paths to ACSM, EPUB, and CBZ files to convert, tag, and upload. Prefix paths with "minio:" to download them from the MinIO instance
+    ...files: string # The paths to ACSM, EPUB, and CBZ files to convert, tag, and upload. Prefix paths with "minio:" to download them from the MinIO instance
     --archive-pdf # Archive input PDF files under the --minio-archival-path instead of uploading them to the primary bucket. This will cause a high quality CBZ file to be generated and uploaded to the primary storage server.
     --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
     --delete # Delete the original file

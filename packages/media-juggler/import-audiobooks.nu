@@ -37,6 +37,39 @@ export def format_chapter_duration []: duration -> string {
     $"($hours):($minutes):($seconds).($fractional_seconds)"
 }
 
+# const audible_workarounds = [
+#     [match apply];
+#     [
+#         {
+#             key: series.name
+#             value: "Rascal Does Not Dream Series"
+#         }
+#         {
+#             authors: ["Hajime Kamoshida"]
+#             translators: ["Andrew Cunningham"]
+#             illustrators: ["Keji Mizoguchi"]
+#         }
+#     ],
+# ]
+
+# export def apply_workarounds []: record -> record {
+#     let tone_json = $in
+#     let tone_json = (
+#         $audible_workarounds
+#         | reduce --fold $tone_json {|it, acc|
+#             $acc
+#             | where $it.match.key == $it.match.value
+#             | update
+#         }
+#     )
+#     $tone_json
+# }
+
+# todo Support getting values from MusicBrainz
+#
+# Can search based on details or use the id directly
+# http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/release/?query=('secondarytype:audiobook AND packaging:"None" AND artistname:\"Brandon Sanderson\" AND release:\"The Way of Kings\"' | url encode)" | get releases | sort-by --reverse score | first
+
 export def tag_audiobook [
     output_directory: directory
     --asin: string
@@ -50,6 +83,7 @@ export def tag_audiobook [
             if "additionalFields" in $current_metadata and "asin" in $current_metadata.additionalFields {
                 $current_metadata.additionalFields.asin
             } else if "title" in $current_metadata {
+                # todo Use additional fields to make this query more reliable.
                 http get $"https://api.audible.com/1.0/catalog/products?region=us&response_groups=series&title=($current_metadata.title | url encode)"  | get products | first | get asin
             } else {
                 log error "Unable to determine the ASIN for the book!"
@@ -61,13 +95,82 @@ export def tag_audiobook [
     )
 
     log info $"ASIN is (ansi purple)($asin)(ansi reset)"
-    let r = (http get $"https://api.audnex.us/books/($asin)")
-    let authors = $r.authors | get name | filter {|a| not ($a | str ends-with "- translator") and not ($a | str ends-with "- illustrator") }
-    let translators = (
+    let r = (
+        let result = http get $"https://api.audnex.us/books/($asin)";
+        # Fix bad data
+        if "seriesPrimary" in $result {
+            if ($result.seriesPrimary.name | str contains --ignore-case "Eighty-Six") {
+                $result
+                # Just to be safe
+                | update seriesPrimary.name "86--EIGHTY-SIX"
+                | update authors [[name]; ["Asato Asato"] ["Roman Lempert - translator"] ["Shirabii - illustrator"]]
+            } else {
+                $result
+            }
+            if $result.seriesPrimary.name =~ "Rascal Does Not Dream" {
+                $result
+                # Series seems to now be Rascal Does Not Dream (light novel)
+                # todo Remove "(light novel)" and "Series" from the end of series names?
+                | update seriesPrimary.name "Rascal Does Not Dream"
+                | update authors [[name]; ["Hajime Kamoshida"] ["Andrew Cunningham - translator"] ["Keji Mizoguchi - illustrator"]]
+                | (
+                    let input = $in;
+                    if ($result.genres | is-empty) {
+                        $input | update genres [[name type]; ["Science Fiction & Fantasy" genre]]
+                    } else {
+                        $input
+                    }
+                )
+            } else {
+                $result
+            }
+            if $result.seriesPrimary.name =~ "Spice and Wolf" {
+                $result
+                | update authors [[name]; ["Isuna Hasekura"] ["Paul Starr - translator"]]
+            } else {
+                $result
+            }
+        } else {
+            $result
+        }
+    )
+    let r = (
+        if $r.title == "Arcanum Unbounded: The Cosmere Collection" {
+            $r
+            # Tries to put this under the Mistborn series, which isn't quite right
+            | reject seriesPrimary
+        } else {
+            $r
+        }
+    )
+
+    # todo Check for inconsistencies between the previous data and the current metadata, such as different authors.
+
+    let authors = (
         $r.authors
         | get name
-        | filter {|a| $a | str ends-with "- translator" }
-        | str replace "- translator" ""
+        | filter {|a|
+            (
+            not ($a | str ends-with "- afterword")
+            and not ($a | str ends-with "- contributor")
+            and not ($a | str ends-with "- editor")
+            and not ($a | str ends-with "- illustrator")
+            and not ($a | str ends-with "- translator")
+            )
+        }
+    )
+    let contributors = (
+        $r.authors
+        | get name
+        | filter {|a| $a | str ends-with "- contributor" }
+        | str replace "- contributor" ""
+        | str trim
+    )
+    let editors = (
+        $r.authors
+        | get name
+        | filter {|a| $a | str ends-with "- editor" }
+        | str replace "- editor" ""
         | str trim
     )
     let illustrators = (
@@ -77,23 +180,37 @@ export def tag_audiobook [
         | str replace "- illustrator" ""
         | str trim
     )
-    let primary_authors = (
-        let authors_with_asin = (
-            $r.authors
-            | default null asin
-            | where asin != null
-            | get name
-            | filter {|a| not ($a | str ends-with " - translator") }
-        );
-        if ($authors_with_asin | is-empty) {
-            $authors
-        } else {
-            $authors_with_asin
-        }
+    let translators = (
+        $r.authors
+        | get name
+        | filter {|a| $a | str ends-with "- translator" }
+        | str replace "- translator" ""
+        | str trim
     )
+    # let primary_authors = (
+    #     let authors_with_asin = (
+    #         $r.authors
+    #         | default null asin
+    #         | where asin != null
+    #         | get name
+    #         | filter {|a| not ($a | str ends-with " - translator") }
+    #     );
+    #     if ($authors_with_asin | is-empty) {
+    #         $authors
+    #     } else {
+    #         $authors_with_asin
+    #     }
+    # )
     let series = (
         if "seriesPrimary" in $r {
-            { name: $r.seriesPrimary.name, position: $r.seriesPrimary.position }
+            { name: $r.seriesPrimary.name } | (
+                let input = $in;
+                if "position" in $r.seriesPrimary {
+                    $input | insert position $r.seriesPrimary.position
+                } else {
+                    $input
+                }
+            )
         } else {
             null
         }
@@ -103,8 +220,20 @@ export def tag_audiobook [
         if $series == null {
             $r.title
         } else {
-            # 86 - Eighty-Six, Vol. 1 -> 86--EIGHTY-SIX, Vol. 1
-            [$series.name ($r.title | str substring ($r.title | str downcase | str index-of ', vol. ')..)] | str join
+            if ($r.title | str contains --ignore-case ', vol. ') {
+                # 86 - Eighty-Six, Vol. 1 -> 86--EIGHTY-SIX, Vol. 1
+                [$series.name ($r.title | str substring ($r.title | str downcase | str index-of ', vol. ')..)] | str join
+            } else {
+                $r.title
+            }
+        }
+    )
+    let title = (
+        # Remove inconsistent use of " (light novel)" in titles
+        if ($title | str contains --ignore-case " (light novel)") {
+            $title | str replace --regex ' \([lL]ight [nN]ovel\)' ""
+        } else {
+            $title
         }
     )
     log debug $"The title is (ansi yellow)($title)(ansi reset)"
@@ -112,33 +241,78 @@ export def tag_audiobook [
         {
             meta: {
                 album: $title
-                albumArtist: ($primary_authors | str join ", ")
-                artist: ($primary_authors | str join ", ")
+                albumArtist: ($authors | str join ", ")
+                artist: ($authors | str join ", ")
                 composer: ($r.narrators | get name | str join ", ")
-                copyright: $r.copyright
                 description: $r.description
-                genre: ($r.genres | where type == "genre" | get name | first)
+                # todo Is language used at all?
+                # language: $r.language
                 narrator: ($r.narrators | get name | str join ", ")
                 publisher: $r.publisherName
                 publishingDate: $r.releaseDate
                 title: $title
                 additionalFields: {
                     asin: $r.asin
-                    authors: ($authors | str join ", ")
-                    isbn: $r.isbn
-                    language: $r.language
-                    tags: ($r.genres | where type == "tag" | get name | str join ", ")
                 }
             }
         }
         | (
             let input = $in;
-            if ($translators | is-empty) {
+            if "genres" in $r {
+                $input
+                # Audiobookshelf supports multiple genres separated by a semicolon, so that is used here
+                | insert meta.genre ($r.genres | where type == "genre" | get name | str join ";")
+                | insert meta.additionalFields.tags ($r.genres | where type == "tag" | get name | str join ", ")
+            } else {
+                $input
+            }
+        )
+        | (
+            let input = $in;
+            if "isbn" in $r {
+                $input | insert meta.additionalFields.isbn $r.isbn
+            } else {
+                $input
+            }
+        )
+        | (
+            let input = $in;
+            if "copyright" in $r {
+                $input | insert meta.copyright $r.copyright
+            } else {
+                $input
+            }
+        )
+        # | (
+        #     let input = $in;
+        #     if ($authors | is-empty) or ($authors == $primary_authors) {
+        #         $input
+        #     } else {
+        #         (
+        #             $input
+        #             | insert meta.additionalFields.authors ($authors | str join ", ")
+        #         )
+        #     }
+        # )
+        | (
+            let input = $in;
+            if ($contributors | is-empty) {
                 $input
             } else {
                 (
                     $input
-                    | insert meta.additionalFields.translators ($translators | str join ", ")
+                    | insert meta.additionalFields.contributors ($contributors | str join ", ")
+                )
+            }
+        )
+        | (
+            let input = $in;
+            if ($editors | is-empty) {
+                $input
+            } else {
+                (
+                    $input
+                    | insert meta.additionalFields.editors ($editors | str join ", ")
                 )
             }
         )
@@ -150,6 +324,17 @@ export def tag_audiobook [
                 (
                     $input
                     | insert meta.additionalFields.illustrators ($illustrators | str join ", ")
+                )
+            }
+        )
+        | (
+            let input = $in;
+            if ($translators | is-empty) {
+                $input
+            } else {
+                (
+                    $input
+                    | insert meta.additionalFields.translators ($translators | str join ", ")
                 )
             }
         )
@@ -188,10 +373,10 @@ export def tag_audiobook [
     let args = (
         []
         | append (
-            if $series == null {
-                null
-            } else {
+            if $series != null and "position" in $series {
                 $"--meta-part=($series.position)"
+            } else {
+                null
             }
         )
     )
@@ -211,7 +396,16 @@ export def tag_audiobook [
         let components = $m4b | path parse;
         {
             parent: (
-                [$output_directory ($primary_authors | str join ", ")]
+                [$output_directory]
+                | append (
+                    # Jellyfin can't handle having a bare audiobook file in the Audiobooks directory.
+                    # So, place it in a directory named after the book if it won't be in a subdirectory for the author and/or series.
+                    if ($authors | is-empty) and $series == null {
+                        $title
+                    } else {
+                        $authors | str join ", "
+                    }
+                )
                 | append (
                     if $series == null {
                         null
@@ -364,7 +558,7 @@ export def embed_cover []: record<cover: path, m4b: path> -> path {
 # The path for a standalone book will look like "<authors>/<title>.m4b".
 #
 def main [
-    ...files: path # The paths to M4A and M4B files to tag and upload. Prefix paths with "minio:" to download them from the MinIO instance
+    ...files: string # The paths to M4A and M4B files to tag and upload. Prefix paths with "minio:" to download them from the MinIO instance
     --asin: string
     --beets-config: path # The Beets config file to use
     --beets-directory: directory
@@ -466,7 +660,7 @@ def main [
                 log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
                 exit 1
             }
-            $file | decrypt_audible $activation_bytes --working-directory $temporary_directory
+            $file | decrypt_audible $audible_activation_bytes --working-directory $temporary_directory
         } else if $input_format in ["m4a", "m4b"] {
             $file
         } else if $input_format == "dir" {
@@ -505,7 +699,9 @@ def main [
 
     # let current_metadata = ^tone dump --format json $audiobook | from json | get meta
 
-    let authors_subdirectory = $audiobook | path dirname | path relative-to $temporary_directory
+    let authors_subdirectory = (
+        $audiobook | path dirname | path relative-to $temporary_directory
+    )
     let minio_target_directory =  [$minio_alias $minio_path $authors_subdirectory] | path join | sanitize_minio_filename
     let minio_target_destination = (
         let components = ($audiobook | path parse);

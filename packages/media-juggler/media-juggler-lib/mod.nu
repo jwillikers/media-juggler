@@ -997,6 +997,8 @@ export def convert_for_ereader [
     $components | update stem ($components.stem + $suffix) | update extension "cbz" | path join
 }
 
+# Apparently no sanitization needs to be done?
 export def sanitize_minio_filename []: string -> string {
-    $in | str replace --all "!" ""
+    # $in | str replace --all "!" ""
+    $in
 }

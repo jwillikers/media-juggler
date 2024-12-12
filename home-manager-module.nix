@@ -62,12 +62,48 @@ self:
       ]);
   };
 
-  # ~/Books/Audiobooks
+  programs = {
+    beets = {
+      enable = true;
+      # todo Add API keys when SOPS support is added.
+      settings = {
+        plugins = [
+          "chroma"
+          "embedart"
+          "export"
+          "fetchart"
+          "keyfinder"
+          "lyrics"
+          "scrub"
+        ];
+        chroma = {
+          auto = true;
+          # apikey = "";
+        };
+        embedart = {
+          remove_art_file = true;
+        };
+        fetchart = {
+          # fanarttv_key = "";
+          # google_key = "";
+          high_resolution = true;
+          # lastfm_key = "";
+        };
+        lyrics = {
+          # bing_client_secret = "";
+          # bing_lang_to = "english";
+          # google_API_key = "";
+          synced = true;
+        };
+      };
+    };
+  };
+
   systemd.user = {
     # ${homeDirectory}/
     tmpfiles.rules = [
-      "d Books 0750 ${config.home.username} ${config.home.username} - -"
-      "d Books/Audiobooks 0750 ${config.home.username} ${config.home.username} - -"
+      "d ${config.home.homeDirectory}/Books 0750 ${config.home.username} ${config.home.username} - -"
+      "d ${config.home.homeDirectory}/Books/Audiobooks 0750 ${config.home.username} ${config.home.username} - -"
     ];
   };
 
