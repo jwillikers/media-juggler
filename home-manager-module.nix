@@ -90,6 +90,9 @@ self:
           high_resolution = true;
           # lastfm_key = "";
         };
+        keyfinder = {
+          bin = "keyfinder-cli";
+        };
         lyrics = {
           # bing_client_secret = "";
           # bing_lang_to = "english";
