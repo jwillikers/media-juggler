@@ -95,7 +95,7 @@ def main [
                 ^mc cp $opf $"($temporary_directory)/($opf | path basename)"
             }
             let covers = (
-                ^mc find ($file | path dirname) --json --name 'cover.*'
+                ^mc find ($file | path dirname) --name 'cover.*'
                 | lines --skip-empty
                 | filter {|f|
                     let components = $f | path parse
@@ -107,7 +107,7 @@ def main [
                     log error $"Found multiple files looking for the cover image file:\n($covers)\n"
                     exit 1
                 }
-                ^mc cp ...$covers $temporary_directory
+                ^mc cp ($covers | first) $temporary_directory
             }
             [$temporary_directory ($file | path basename)] | path join
         } else {
