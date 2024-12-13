@@ -28,7 +28,7 @@ else
 
     nativeBuildInputs = [ makeWrapper ];
 
-    # doCheck = true;
+    doCheck = true;
 
     buildInputs = [
       beets
@@ -48,11 +48,11 @@ else
       zip
     ];
 
-    # checkPhase = ''
-    #   runHook preCheck
-    #   nu import-comics-tests.nu
-    #   runHook postCheck
-    # '';
+    checkPhase = ''
+      runHook preCheck
+      nu import-music-tests.nu
+      runHook postCheck
+    '';
 
     installPhase = ''
       runHook preInstall

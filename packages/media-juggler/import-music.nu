@@ -1,9 +1,5 @@
 #!/usr/bin/env nu
 
-# todo Consider using bragibooks instead: https://github.com/djdembeck/bragibooks
-# todo Use tone and a JS script to query Audible?
-# tone can rename files as needed
-
 use std log
 use media-juggler-lib *
 
@@ -13,76 +9,155 @@ use media-juggler-lib *
 #
 export def beet_import [
     beets_directory: directory # Directory to which the books are imported
-    # config: path # Path to the Beets config to use
+    config: path # Path to the Beets config to use
     --library: path # Path to the Beets library to use
-    # --search-id
-    # --set
+    --search-id: string
     --working-directory: directory
-]: path -> path {
+]: path -> list<path> {
     let item = $in
+    let args = (
+        []
+        | append (if $search_id == null { null } else { ["--search-id" $search_id] })
+    )
     (
         ^beet
-        # --config $config
+        --config $config
         --directory $beets_directory
         --library $library
         import
+        ...$args
         $item
     )
-    # Submit fingerprint
-    ^beet submit
-    # let args = (
-    #     []
-    #     | append (if $library == null { "--volume=audible-beets-library:/config/library:Z" } else { $"--volume=($library | path dirname):/config/library:Z" })
-    # )
+    # Submit fingerprints
+    (
+        ^beet
+        --config $config
+        --directory $beets_directory
+        --library $library
+        submit
+    )
     let imported_music = (
-        let music_files = glob ([$beets_directory "**" "*.{aac,flac,m4a,mp3,opus}"] | path join);
+        let music_files = glob ([$beets_directory "**" "*.{aac,flac,lrc,m4a,mp3,opus}"] | path join);
         if ($music_files | is-empty) {
             log error $"No music files found in (ansi yellow)($beets_directory)(ansi reset)!"
             exit 1
         } else {
-            # todo throw an error if multiple directories
-            $music_files | first | path dirname
+            $music_files
         }
     )
-    # let artist_directory = ls --full-paths $beets_directory | get name | first
     log debug $"The imported music is (ansi yellow)($imported_music)(ansi reset)"
     $imported_music
 }
 
+# Get the type of a path on MinIO
+export def "mc path type" []: path -> string {
+    ^mc stat --json $in | from json | get type | str replace "folder" "dir"
+}
+
+# Generate a Beets config file
+#
+# Creating the config allows interpolating environment variables for various API tokens.
+# Takes an input configuration which is merged with the default configuration.
+#
+export def generate_beets_config []: record -> record {
+    let secrets = $in
+    {
+        embedart: {
+          remove_art_file: true
+        }
+        fetchart: {
+            high_resolution: true
+            sources: [
+                filesystem
+                coverart
+                itunes
+                amazon
+                albumart
+                google
+                fanarttv
+                # lastfm
+            ]
+        }
+        keyfinder : {
+            bin: "keyfinder-cli"
+        }
+        lyrics: {
+            bing_lang_to: "en-US"
+            synced: true
+        }
+        plugins: [
+          "chroma"
+          "embedart"
+          "export"
+          "fetchart"
+          "keyfinder"
+          "lyrics"
+          "scrub"
+        ]
+    } | merge $secrets
+}
+
+# Obtain secret tokens for the Beets config from the environment
+export def beet_secrets_from_env []: nothing -> record {
+    [
+        [env key subkey];
+        [BEETS_ACOUSTID_APIKEY acoustid apikey]
+        [BEETS_FANARTTV_KEY fetchart fanarttv_key]
+        [BEETS_GOOGLE_KEY fetchart google_key]
+        [BEETS_LASTFM_KEY fetchart lastfm_key]
+        [BEETS_BING_CLIENT_SECRET lyrics bing_client_secret]
+        [BEETS_GOOGLE_KEY lyrics google_API_key]
+    ] | reduce --fold {} {|mapping, acc|
+        if $mapping.env in $env and not ($env | get $mapping.env | is-empty) {
+            if $mapping.key in $acc {
+                $acc
+                | update $mapping.key (
+                    $acc
+                    | get $mapping.key
+                    | merge { $mapping.subkey: ($env | get $mapping.env) }
+                )
+            } else {
+                $acc | insert $mapping.key { $mapping.subkey: ($env | get $mapping.env) }
+            }
+        } else {
+            $acc
+        }
+    }
+}
+
 # Import music to my collection.
 #
-# Music can be provided in directories, zip archives, or as individual audio files.
+# Music can be provided as directories, zip archives, or as individual audio files.
 #
-# This script performs several steps to process the audiobook file.
+# This script is mostly a convenience wrapper around Beets.
 #
-# 1. Decrypt the audiobook if it is from Audible.
-# 2. Tag the audiobook.
-# 3. Upload the audiobook
+# 1. Import and tag the music with Beets
+# 2. Upload the music
 #
-# The final file is named according to Jellyfin's recommendation, but includes a directory for the series if applicable.
-# The path for a book in a series will look like "<authors>/<series>/<series-position> - <title>.m4b".
-# The path for a standalone book will look like "<authors>/<title>.m4b".
+# The directory structure for the imported music follows Beets configuration.
+# The default configuration for paths is used unless --beets-config is used to pass in alternate config file.
 #
 def main [
-    ...files: string # The paths to M4A and M4B files to tag and upload. Prefix paths with "minio:" to download them from the MinIO instance
+    ...items: string # The paths to audio files and directories containing audio files to import. Prefix paths with "minio:" to download them from the MinIO instance
     --beets-config: path # The Beets config file to use
-    --beets-directory: directory
-    --beets-library: path # The Beets library to use
+    --beets-directory: directory # The directory in which to import music with Beets. Defaults to a Music subdirectory in a temporary directory. This option can be be useful for keeping imported music between imports.
+    --beets-library: path # The Beets library database file to use
     --delete # Delete the original file
     --minio-alias: string = "jwillikers" # The alias of the MinIO server used by the MinIO client application
     --minio-path: string = "media/Music" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
     --output-directory: directory # Directory to place files when not being uploaded
+    --search-id: string # An id to limit the search for metadata. One example is the MusicBrainz release id.
     --skip-upload # Don't upload files to the server
 ] {
-    if ($files | is-empty) {
+    if ($items | is-empty) {
         log error "No files provided"
         exit 1
     }
 
-    # if $asin != null and ($files | length) > 1 {
-    #     log error "Setting the ASIN for multiple files is not allowed as it can result in overwriting the final file"
-    #     exit 1
-    # }
+    if $search_id != null and ($items | length) > 1 {
+        log error "Setting the search_id for multiple items is not allowed as it can result in overwriting the imported music on subsequent items"
+        exit 1
+    }
 
     let output_directory = (
         if $output_directory == null {
@@ -93,16 +168,31 @@ def main [
     )
     mkdir $output_directory
 
-    for original_item in $files {
+    let beets_config_data = (
+        if $beets_config == null {
+            beet_secrets_from_env | generate_beets_config
+        }
+    )
+
+    for original_item in $items {
 
     log info $"Importing the file (ansi purple)($original_item)(ansi reset)"
 
     let temporary_directory = (mktemp --directory "import-music.XXXXXXXXXX")
     log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
+    let beets_config = (
+        if $beets_config == null {
+            let config = [$temporary_directory config.yaml] | path join
+            $beets_config_data | to yaml | save --force $config
+            $config
+        } else {
+            $beets_config
+        }
+    )
+
     let beets_directory = (
         if $beets_directory == null {
-            # [$env.HOME "Music"] | path join
             [$temporary_directory "Music"] | path join
         } else {
             $beets_directory
@@ -110,51 +200,65 @@ def main [
     )
     mkdir $beets_directory
 
-    # let audible_activation_bytes = (
-    #     if $audible_activation_bytes != null {
-    #         $audible_activation_bytes
-    #     } else if "AUDIBLE_ACTIVATION_BYTES" in $env {
-    #         $env.AUDIBLE_ACTIVATION_BYTES
-    #     } else {
-    #         null
-    #     }
-    # )
-
     # try {
+
+    let item_type = (
+        if ($original_item | str starts-with "minio:") {
+            $original_item | str replace "minio:" "" | mc path type
+        } else {
+            $original_item | path type
+        }
+    )
 
     let original_music_files = (
         if ($original_item | str starts-with "minio:") {
-            let item = ($original_item | str replace "minio:" "")
-            ^mc find $item | lines
+            let item = $original_item | str replace "minio:" ""
+            let item = (
+                # It's necessary that a directory ends with a `/` when listing files with `mc find`
+                if $item_type == "dir" and not ($item | str ends-with "/") {
+                    $"($item)/"
+                } else {
+                    $item
+                }
+            )
+            ^mc find $item | lines --skip-empty
         } else {
-            ls $original_item | get name
+            glob ([$original_item "**" "*"] | path join)
         }
     )
+
+    if ($original_music_files | is-empty) {
+        log error $"No music files found for (ansi yellow)($original_music_files)(ansi reset)"
+    }
+
+    let import_directory = [$temporary_directory import] | path join
+    mkdir $import_directory
 
     let item = (
         if ($original_item | str starts-with "minio:") {
             let item = ($original_item | str replace "minio:" "")
-            ^mc cp --recursive $item $"($temporary_directory)/($item | path basename)"
-            [$temporary_directory ($item | path basename)] | path join
+            let item = (
+                if $item_type == "dir" and not ($item | str ends-with "/") {
+                    $"($item)/"
+                } else {
+                    $item
+                }
+            )
+            if $item_type == "dir" {
+                ^mc cp --recursive $item $"($import_directory)/($item | path basename)"
+            } else {
+                ^mc cp $item $"($import_directory)/($item | path basename)"
+            }
+            [$import_directory ($item | path basename)] | path join
         } else {
-            cp --recursive $original_item $temporary_directory
-            [$temporary_directory ($original_item | path basename)] | path join
+            if $item_type == "dir" {
+                cp --recursive $original_item $import_directory
+            } else {
+                cp $original_item $import_directory
+            }
+            [$import_directory ($original_item | path basename)] | path join
         }
     )
-
-    # let input_format = (
-    #     if ($item | path type) == "dir" {
-    #         "dir"
-    #     } else {
-    #         let ext = $file | path parse | get extension;
-    #         if $ext == null {
-    #             log error $"Unable to determine input file type of (ansi yellow)($file)(ansi reset). It is not a directory and has no file extension."
-    #             exit 1
-    #         } else {
-    #             $ext
-    #         }
-    #     }
-    # )
 
     let beets_library = (
         if $beets_library == null {
@@ -167,62 +271,42 @@ def main [
         }
     )
 
-    let music = (
-        # if $input_format == "aax" {
-        #     if $audible_activation_bytes == null {
-        #         log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
-        #         exit 1
-        #     }
-        #     $file | decrypt_audible $activation_bytes --working-directory $temporary_directory
-        # } else if $input_format in ["m4a", "m4b"] {
-        #     $file
-        # } else if $input_format == "dir" {
-        #     $file | mp3_directory_to_m4b $temporary_directory
-        # } else if $input_format == "zip" {
-        #     $file
-        #     | unzip $temporary_directory
-        #     | mp3_directory_to_m4b $temporary_directory
-        # } else {
-        #     log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
-        #     exit 1
-        # }
-        $item | beet_import $beets_directory --library $beets_library
-        # | (
-        #     if $asin == null {
-        #         tag_audiobook --tone-tag-args $tone_tag_args $temporary_directory
-        #     } else {
-        #         tag_audiobook --asin $asin --tone-tag-args $tone_tag_args $temporary_directory
-        #     }
-        # )
+    let music_files = (
+        if $search_id == null {
+            $item | beet_import --library $beets_library $beets_directory $beets_config
+        } else {
+            $item | beet_import --library $beets_library --search-id $search_id $beets_directory $beets_config
+        }
     )
 
-    # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
-    # let authors = ($comic_metadata | get credits | where role == "Writer" | get person)
-    # log debug $"Authors determined to be (ansi purple)'($authors)'(ansi reset)"
-
-    # let current_metadata = ^tone dump --format json $audiobook | from json | get meta
-
-    # let authors_subdirectory = $audiobook | path dirname | path relative-to $temporary_directory
-    # let subdirectory =
-    let music_files = ls $music | get name
-    let minio_target_directory = (
-        [
-            $minio_alias
-            $minio_path
-            (
-                $music_files
-                | first
-                | path dirname
-                | path relative-to $beets_directory
-            )
-        ] | path join | sanitize_minio_filename
+    let music_file_destinations = (
+        $music_files
+        | each {|f|
+            [
+                $minio_alias
+                $minio_path
+                ($f | path relative-to $beets_directory)
+            ] | path join | sanitize_minio_filename
+        }
     )
-    let music_file_destinations = $music_files | path parse | update parent $minio_target_directory | path join
     if $skip_upload {
-        $music_files | each {|| mv $in $output_directory }
+        (
+            $music_files
+            | each {|f|
+                let target = [$output_directory ($f | path relative-to $beets_directory)] | path join
+                mkdir ($target | path dirname)
+                mv $f $target
+            }
+        )
     } else {
-        log info $"Uploading (ansi yellow)($music)(ansi reset) to (ansi yellow)($minio_target_directory)(ansi reset)"
-        $music_files | zip $music_file_destinations | each {|| ^mc mv $in.0 $in.1 }
+        (
+            $music_files
+            | zip $music_file_destinations
+            | each {||
+                log info $"Uploading (ansi yellow)($in.0)(ansi reset) to (ansi yellow)($in.1)(ansi reset)"
+                ^mc mv $in.0 $in.1
+            }
+        )
     }
 
     if $delete {
@@ -230,12 +314,9 @@ def main [
         if ($original_item | str starts-with "minio:") {
             (
                 $original_music_files
-                | zip $music_file_destinations
-                | each {||
-                    let original = $in.0
-                    let upload = $in.1
-                    if $original == $upload {
-                        log info $"Not deleting the original file (ansi yellow)($original)(ansi reset) since it was overwritten by the updated file"
+                | each {|original|
+                    if $original in $music_file_destinations {
+                        log debug $"(ansi red_bold)Not(ansi reset) deleting the original file (ansi yellow)($original)(ansi reset) since it was overwritten by the updated file"
                     } else {
                         log info $"Deleting the original file on MinIO (ansi yellow)($original)(ansi reset)"
                         ^mc rm $original
@@ -248,7 +329,7 @@ def main [
                 $original_music_files
                 | each {|original|
                     log info $"Deleting the original file (ansi yellow)($original)(ansi reset)"
-                    ^mc rm $original
+                    rm $original
                 }
             )
             # todo Remove empty directories?
@@ -257,8 +338,8 @@ def main [
     log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
     rm --force --recursive $temporary_directory
 
-    # } catch {
-    #     log error $"Import of (ansi red)($original_item)(ansi reset) failed!"
+    # } catch {|err|
+    #     log error $"Import of (ansi red)($original_item)(ansi reset) failed!\n($err.msg)\n"
     #     continue
     # }
 

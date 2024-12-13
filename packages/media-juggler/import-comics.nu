@@ -19,6 +19,7 @@ let excluded_publishers = [
     "Delcourt"
     "Editorial Ivrea"
     "Edizioni BD"
+    "Edizioni Star Comics"
     "Egmont Ehapa Verlag "
     "Europe Comics"
     "Éditions Glénat "
@@ -28,9 +29,11 @@ let excluded_publishers = [
     "Ki-oon"
     "Kodansha"
     "Kurokawa"
+    "Milky Way Ediciones"
     "M&C"
     "NBM"
     "Norma Editorial"
+    "Pika Édition"
     "Planeta DeAgostini"
     "Scary Go Round"
     "Schibsted"
@@ -51,27 +54,11 @@ export def tag_cbz [
     --interactive # Ask for input from the user
 ]: path -> record {
     let cbz = $in
+    let args = (
+        [] | append $comic_vine_issue_id
+    )
     let result = (
-        if $comic_vine_issue_id != null {
-            (
-                ^$comictagger
-                --cv-use-series-start-as-volume
-                --filename-parser "original"
-                --id $comic_vine_issue_id
-                --json
-                --no-cr
-                --no-gui
-                --online
-                --parse-filename
-                --publisher-filter ...$excluded_publishers
-                --save
-                --tags-read "CR,CIX"
-                --tags-write "CIX"
-                --use-publisher-filter
-                $cbz
-            )
-            | from json
-        } else if $interactive {
+        if $interactive {
             (
                 ^$comictagger
                 --cv-use-series-start-as-volume
@@ -107,8 +94,10 @@ export def tag_cbz [
                 --parse-filename
                 --publisher-filter ...$excluded_publishers
                 --save
+                --tags-read "CR,CIX"
                 --tags-write "CIX"
                 --use-publisher-filter
+                ...$args
                 $cbz
             )
             | from json
@@ -251,7 +240,7 @@ def main [
       mkdir $ereader_target_directory
     }
 
-    for original_file in $files {
+    let results = $files | each {|original_file|
 
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
@@ -274,7 +263,7 @@ def main [
     let input_format = ($file | path parse | get extension)
 
     let comic_info = (
-        if ($input_format == "pdf" and $original_file | str starts-with "minio:") {
+        if ($input_format == "pdf" and ($original_file | str starts-with "minio:")) {
             let comic_info_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml")
             if (^mc stat $comic_info_file | complete).exit_code == 0 {
               ^mc cp $comic_info_file $"($temporary_directory)/($comic_info_file | path basename)"
@@ -357,12 +346,20 @@ def main [
 
     log debug $"Fetching and writing metadata to '($formats.cbz)' with ComicTagger"
     let tag_result = (
-        $formats.cbz | tag_cbz
-        $comictagger
-        --comic-vine-issue-id $comic_vine_issue_id
+        $formats.cbz | tag_cbz $comictagger --comic-vine-issue-id $comic_vine_issue_id
     )
 
     log debug $"The ComicTagger result is:\n(ansi green)($tag_result.result)(ansi reset)\n"
+
+    if ($tag_result.result.status == "match_failure") {
+        # todo Add stderr from ComicTagger here
+        log error $"Failed to tag ($original_file)"
+        return {
+            file: $original_file
+            # todo Add stderr from ComicTagger here
+            error: "ComicTagger failed to match the comic!"
+        }
+    }
 
     log debug "Renaming the CBZ according to the updated metadata"
     let formats = $formats | (
@@ -392,7 +389,7 @@ def main [
             | (
                 let metadata = $in;
                 # todo Handle issue_title?
-                # If the volume is most likely just a single issue, just use the series as the nameV
+                # If the volume is most likely just a single issue, just use the series as the name
                 if $metadata.issue_count == 1 and (((date now) - ($metadata.volume | into string | into datetime)) | format duration yr) > 2yr {
                   if $metadata.title == null or $metadata.title == $metadata.series {
                     $metadata.series
@@ -400,7 +397,7 @@ def main [
                     $"($metadata.series): ($metadata.title)"
                   }
                 } else {
-                  if $metadata.title == null {
+                  if $metadata.title == null or $metadata.title =~ 'Volume [0-9]+' or $metadata.title =~ 'Vol. [0-9]+' {
                     $"($metadata.series), Vol. ($metadata.issue)"
                   } else {
                     $"($metadata.series), Vol. ($metadata.issue): ($metadata.title)"
@@ -645,17 +642,29 @@ def main [
     }
     log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
     rm --force --recursive $temporary_directory
-
-    } catch {
-        log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
-        continue
+    {
+        file: $original_file
     }
-
+    } catch {|err|
+        log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
+        {
+            file: $original_file
+            error: $err.msg
+        }
+    }
     }
 
     if $ereader != null and not $no_copy_to_ereader {
       if (^findmnt --target $ereader_target_directory | complete | get exit_code) == 0 {
         ^udisksctl unmount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
       }
+    }
+
+    $results | to json | print
+
+    let errors = $results | default null error | where error != null
+    if ($errors | is-not-empty) {
+        log error $"(ansi red)Failed to import the following files due to errors!\n\n($errors | get file | str join '\n')\n(ansi reset)"
+        exit 1
     }
 }

@@ -66,6 +66,7 @@ self:
   programs = {
     beets = {
       enable = true;
+      package = pkgs.unstable.beets;
       # todo Add API keys when SOPS support is added.
       settings = {
         plugins = [
@@ -109,5 +110,8 @@ self:
     ];
   };
 
-  nixpkgs.overlays = [ self.overlays.calibre-acsm-plugin-libcrypto ];
+  nixpkgs.overlays = [
+    self.overlays.calibre-acsm-plugin-libcrypto
+    self.overlays.unstablePackages
+  ];
 }

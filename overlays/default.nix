@@ -1,4 +1,8 @@
-_: {
+{ inputs }:
+{
+  unstablePackages = final: _prev: {
+    unstable = import inputs.nixpkgs-unstable { inherit (final) system; };
+  };
   calibre-acsm-plugin-libcrypto = _final: _prev: {
     # calibre = prev.calibre.overrideAttrs (prevAttrs:
     # let

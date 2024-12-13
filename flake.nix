@@ -2,6 +2,7 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     pre-commit-hooks = {
       url = "github:cachix/pre-commit-hooks.nix";
       inputs = {
@@ -19,13 +20,18 @@
       # deadnix: skip
       self,
       nixpkgs,
+      # deadnix: skip
+      nixpkgs-unstable,
       flake-utils,
       pre-commit-hooks,
       treefmt-nix,
-    }:
+    }@inputs:
     let
-      overlays = import ./overlays { };
-      overlaysList = with overlays; [ calibre-acsm-plugin-libcrypto ];
+      overlays = import ./overlays { inherit inputs; };
+      overlaysList = with overlays; [
+        calibre-acsm-plugin-libcrypto
+        unstablePackages
+      ];
     in
     flake-utils.lib.eachDefaultSystem (
       system:
