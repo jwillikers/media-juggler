@@ -262,17 +262,87 @@ def main [
 
     let input_format = ($file | path parse | get extension)
 
-    let comic_info = (
-        if ($input_format == "pdf" and ($original_file | str starts-with "minio:")) {
+    let original_comic_info = (
+        if ($input_format == "pdf") {
             let comic_info_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml")
-            if (^mc stat $comic_info_file | complete).exit_code == 0 {
-              ^mc cp $comic_info_file $"($temporary_directory)/($comic_info_file | path basename)"
+            if ($original_file | str starts-with "minio:") {
+                if (^mc stat $comic_info_file | complete).exit_code == 0 {
+                    $comic_info_file
+                }
+            } else {
+                if ($comic_info_file | path exists) {
+                    $comic_info_file
+                }
+            }
+        } else {
+          null
+        }
+    )
+
+    let comic_info = (
+        if ($input_format == "pdf" and $original_comic_info != null) {
+            let comic_info_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml")
+            if ($original_file | str starts-with "minio:") {
+                ^mc cp $original_comic_info $"($temporary_directory)/($comic_info_file | path basename)"
+            } else {
+                cp $original_comic_info $"($temporary_directory)/($comic_info_file | path basename)"
             }
             [$temporary_directory ($comic_info_file | path basename)] | path join
         } else {
           null
         }
     )
+
+    let original_cover = (
+        if ($input_format == "pdf") {
+            if ($original_file | str starts-with "minio:") {
+                let file = $original_file | str replace "minio:" ""
+                let covers = (
+                    ^mc find ($file | path dirname) --name 'cover.*'
+                    | lines --skip-empty
+                    | filter {|f|
+                        let components = ($f | path parse);
+                        $components.stem == "cover" and $components.extension in $image_extensions
+                    }
+                )
+                if not ($covers | is-empty) {
+                    if ($covers | length) > 1 {
+                        log error $"Found multiple files looking for the cover image file:\n($covers)\n"
+                        exit 1
+                    } else {
+                        $covers | first
+                    }
+                }
+            } else {
+                let covers = (glob $"($original_file | path dirname)/cover.{($image_extensions | str join ',')}")
+                if not ($covers | is-empty) {
+                    if ($covers | length) > 1 {
+                        log error $"Found multiple files looking for the cover image file:\n($covers)\n"
+                        exit 1
+                    } else {
+                        $covers | first
+                    }
+                }
+            }
+        } else {
+          null
+        }
+    )
+
+    # let cover = (
+    #     if ($input_format == "pdf" and $original_cover != null) {
+    #         if ($original_file | str starts-with "minio:") {
+    #             ^mc cp $original_cover $"($temporary_directory)/($original_cover | path basename)"
+    #         } else {
+    #             cp $original_cover $"($temporary_directory)/($original_cover | path basename)"
+    #         }
+    #         $"($temporary_directory)/($original_cover | path basename)"
+    #     } else {
+    #       null
+    #     }
+    # )
+
+    let original_comic_files = [$original_file] | append original_comic_info | append original_cover
 
     let output_format = (
         if $input_format == "pdf" and not $archive_pdf {
@@ -353,6 +423,7 @@ def main [
 
     if ($tag_result.result.status == "match_failure") {
         # todo Add stderr from ComicTagger here
+        # todo Use make error?
         log error $"Failed to tag ($original_file)"
         return {
             file: $original_file
@@ -438,11 +509,23 @@ def main [
               log debug $"Renaming the PDF from ($formats.pdf) to ($renamed_pdf)";
               mv $formats.pdf $renamed_pdf
             }
-            let comic_info = $formats.cbz | extract_comic_info $temporary_directory
+            let comic_info = $formats.cbz | extract_comic_info $temporary_directory;
             log debug "Extracted ComicInfo.xml";
+            let cover_url = $comic_metadata._cover_image;
+            let cover = (
+                {
+                    parent: $temporary_directory
+                    stem: "cover"
+                    extension: ($cover_url | path parse | get extension)
+                } | path join
+            );
+            http get --raw $cover_url | save --force $cover;
+            [$cover] | optimize_images;
+            log debug $"Downloaded cover (ansi yellow)($cover)(ansi reset)";
             $formats
             | update pdf $renamed_pdf
             | insert comic_info $comic_info
+            | insert cover $cover
             | (
                 let input = $in;
                 log debug "Updating PDF in table";
@@ -532,7 +615,8 @@ def main [
     if $skip_upload {
         mv ($formats | get $output_format) $output_directory
         if $output_format == "pdf" {
-          mv ($formats.comic_info) $output_directory
+          mv $formats.comic_info $output_directory
+          mv $formats.cover $output_directory
         }
     } else {
         log info $"Uploading (ansi yellow)($formats | get $output_format)(ansi reset) to (ansi yellow)($minio_target_destination)(ansi reset)"
@@ -541,6 +625,9 @@ def main [
           let comic_info_target_destination = [$minio_target_directory ($formats.comic_info | path basename)] | path join
           log info $"Uploading (ansi yellow)($formats.comic_info)(ansi reset) to (ansi yellow)($comic_info_target_destination)(ansi reset)"
           ^mc mv $formats.comic_info $comic_info_target_destination
+          let cover_target_destination = [$minio_target_directory ($formats.cover | path basename)] | path join
+          log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
+          ^mc mv $formats.cover $cover_target_destination
         }
     }
 
@@ -580,14 +667,21 @@ def main [
             let components = ($formats.comic_info | path parse);
             { parent: $minio_archival_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
         )
+        let minio_cover_archival_destination = (
+            let components = ($formats.cover | path parse);
+            { parent: $minio_archival_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
+        )
         if $skip_upload {
             mv $formats.pdf $output_directory
             mv $formats.comic_info $output_directory
+            mv $formats.cover $output_directory
         } else {
             log info $"Uploading (ansi yellow)($formats.pdf)(ansi reset) to (ansi yellow)($minio_pdf_archival_destination)(ansi reset)"
             ^mc mv $formats.pdf $minio_pdf_archival_destination
             log info $"Uploading (ansi yellow)($formats.comic_info)(ansi reset) to (ansi yellow)($minio_comic_info_archival_destination)(ansi reset)"
             ^mc mv $formats.comic_info $minio_comic_info_archival_destination
+            log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($minio_cover_archival_destination)(ansi reset)"
+            ^mc mv $formats.cover $minio_cover_archival_destination
         }
     }
 
@@ -609,35 +703,60 @@ def main [
 
     if $delete {
         log debug "Deleting the original file"
+        let uploaded_paths = (
+            [$minio_target_destination]
+            | append
+            (if "epub" in $formats {
+                ([$minio_archival_target_directory ($formats.epub | path basename)] | path join | sanitize_minio_filename)
+            } else {
+                null
+            })
+            | append
+            (if "comic_info" in $formats {
+                ([$minio_target_directory ($formats.comic_info | path basename)] | path join | sanitize_minio_filename)
+            } else {
+                null
+            })
+            | append
+            (if "cover" in $formats {
+                ([$minio_target_directory ($formats.cover | path basename)] | path join | sanitize_minio_filename)
+            } else {
+                null
+            })
+        )
+        log debug $"Uploaded paths: ($uploaded_paths)"
         if ($original_file | str starts-with "minio:") {
             let actual_path = ($original_file | str replace "minio:" "")
             log debug $"Actual path: ($actual_path)"
-            let uploaded_paths = (
-                [$minio_target_destination]
-                | append
-                (if "epub" in $formats {
-                    ([$minio_archival_target_directory ($formats.epub | path basename)] | path join | sanitize_minio_filename)
-                } else {
-                    null
-                })
-            )
-            log debug $"Uploaded paths: ($uploaded_paths)"
             if ($actual_path | sanitize_minio_filename) in $uploaded_paths {
                 log info $"Not deleting the original file (ansi yellow)($original_file)(ansi reset) since it was overwritten by the updated file"
             } else {
                 log info $"Deleting the original file on MinIO (ansi yellow)($actual_path)(ansi reset)"
                 ^mc rm $actual_path
                 if $input_format == "pdf" {
-                    let comic_info = $actual_path | path dirname | path join "ComicInfo.xml" | sanitize_minio_filename
-                    if (^mc stat $comic_info | complete).exit_code == 0 {
-                        log info $"Deleting the Comic Info file on MinIO (ansi yellow)($comic_info)(ansi reset)"
-                        ^mc rm $comic_info
+                    if $original_comic_info != null and $original_comic_info not-in $uploaded_paths {
+                        log info $"Deleting the Comic Info file on MinIO (ansi yellow)($original_comic_info)(ansi reset)"
+                        ^mc rm $original_comic_info
+                    }
+                    if $original_cover != null and $original_cover not-in $uploaded_paths {
+                        log info $"Deleting the cover file on MinIO (ansi yellow)($original_cover)(ansi reset)"
+                        ^mc rm $original_cover
                     }
                 }
             }
         } else {
             log info $"Deleting the original file (ansi yellow)($original_file)(ansi reset)"
             rm $original_file
+            if $input_format == "pdf" {
+                if $original_comic_info != null and $original_comic_info not-in $uploaded_paths {
+                    log info $"Deleting the Comic Info file (ansi yellow)($original_comic_info)(ansi reset)"
+                    ^rm $original_comic_info
+                }
+                if $original_cover != null and $original_cover not-in $uploaded_paths {
+                    log info $"Deleting the cover file (ansi yellow)($original_cover)(ansi reset)"
+                    ^rm $original_cover
+                }
+            }
         }
     }
     log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
