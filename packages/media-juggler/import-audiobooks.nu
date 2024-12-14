@@ -65,7 +65,8 @@ export def format_chapter_duration []: duration -> string {
 #     $tone_json
 # }
 
-# todo Support getting values from MusicBrainz
+# todo Support getting values from MusicBrainz first and then falling back to Audible.
+# Audible's data is not the most accurate...
 #
 # Can search based on details or use the id directly
 # http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/release/?query=('secondarytype:audiobook AND packaging:"None" AND artistname:\"Brandon Sanderson\" AND release:\"The Way of Kings\"' | url encode)" | get releases | sort-by --reverse score | first
@@ -237,17 +238,19 @@ export def tag_audiobook [
         }
     )
     log debug $"The title is (ansi yellow)($title)(ansi reset)"
+    # Audiobookshelf and Picard use a semicolon followed by a space to separate multiple values, I think.
+    # Technically, I think ID3v2.4 is supposed to use a null byte, but not sure whether that's just what is shown or what is actually used.
     let tone_data = (
         {
             meta: {
                 album: $title
-                albumArtist: ($authors | str join ", ")
-                artist: ($authors | str join ", ")
-                composer: ($r.narrators | get name | str join ", ")
+                albumArtist: ($authors | str join ";")
+                artist: ($authors | str join ";")
+                composer: ($r.narrators | get name | str join ";")
                 description: $r.description
                 # todo Is language used at all?
                 # language: $r.language
-                narrator: ($r.narrators | get name | str join ", ")
+                narrator: ($r.narrators | get name | str join ";")
                 publisher: $r.publisherName
                 publishingDate: $r.releaseDate
                 title: $title
@@ -260,9 +263,8 @@ export def tag_audiobook [
             let input = $in;
             if "genres" in $r {
                 $input
-                # Audiobookshelf supports multiple genres separated by a semicolon, so that is used here
                 | insert meta.genre ($r.genres | where type == "genre" | get name | str join ";")
-                | insert meta.additionalFields.tags ($r.genres | where type == "tag" | get name | str join ", ")
+                | insert meta.additionalFields.tags ($r.genres | where type == "tag" | get name | str join ";")
             } else {
                 $input
             }
@@ -290,7 +292,7 @@ export def tag_audiobook [
         #     } else {
         #         (
         #             $input
-        #             | insert meta.additionalFields.authors ($authors | str join ", ")
+        #             | insert meta.additionalFields.authors ($authors | str join ";")
         #         )
         #     }
         # )
@@ -301,7 +303,7 @@ export def tag_audiobook [
             } else {
                 (
                     $input
-                    | insert meta.additionalFields.contributors ($contributors | str join ", ")
+                    | insert meta.additionalFields.contributors ($contributors | str join ";")
                 )
             }
         )
@@ -312,7 +314,7 @@ export def tag_audiobook [
             } else {
                 (
                     $input
-                    | insert meta.additionalFields.editors ($editors | str join ", ")
+                    | insert meta.additionalFields.editors ($editors | str join ";")
                 )
             }
         )
@@ -323,7 +325,7 @@ export def tag_audiobook [
             } else {
                 (
                     $input
-                    | insert meta.additionalFields.illustrators ($illustrators | str join ", ")
+                    | insert meta.additionalFields.illustrators ($illustrators | str join ";")
                 )
             }
         )
@@ -334,7 +336,7 @@ export def tag_audiobook [
             } else {
                 (
                     $input
-                    | insert meta.additionalFields.translators ($translators | str join ", ")
+                    | insert meta.additionalFields.translators ($translators | str join ";")
                 )
             }
         )

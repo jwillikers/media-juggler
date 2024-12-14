@@ -551,7 +551,7 @@ export def convert_for_ereader [
             $file
             | cbconvert $suffix
                 # Alternatively, PNG could also be used for PDFs i.e. when image_format is null.
-                --format (if $image_format in [ "avif", "jxl", "png", ] { "png" } else { "jpeg" })
+                --format (if $image_format in [ "avif" "jxl" "png", ] { "png" } else { "jpeg" })
                 --height ($ereader_profiles | where model == $ereader | first | get height)
                 --quality 100
                 --width ($ereader_profiles | where model == $ereader | first | get width)

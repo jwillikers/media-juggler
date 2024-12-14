@@ -62,6 +62,7 @@ export def "mc path type" []: path -> string {
 export def generate_beets_config []: record -> record {
     let secrets = $in
     {
+        artist_credit: true
         embedart: {
           remove_art_file: true
         }
