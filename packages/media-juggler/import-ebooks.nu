@@ -117,7 +117,7 @@ def main [
                 cp $opf $"($temporary_directory)/($opf | path basename)"
             }
             let covers = (
-                ls ($original_file | path dirname)
+                ls ($original_file | path expand | path dirname)
                 | get name
                 | filter {|f|
                     let components = $f | path parse

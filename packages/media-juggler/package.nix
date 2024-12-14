@@ -11,6 +11,7 @@
   minio-client,
   makeWrapper,
   nushell,
+  picard,
   stdenvNoCC,
   tone,
   udisks,
@@ -43,6 +44,7 @@ else
       # m4b-tool
       minio-client
       nushell
+      picard
       udisks
       util-linux
       zip
@@ -114,6 +116,7 @@ else
             image_optim
             keyfinder-cli
             minio-client
+            picard # For mbsubmit Beets plugin
           ]
         }
       runHook postInstall

@@ -2,6 +2,8 @@
 
 # ~/Projects/media-juggler/packages/import-comics/import-comics.nu --output-directory ~/Downloads ~/Downloads/ComicTagger-x86_64.AppImage ...(^mc find --name '*.cbz' "jwillikers/media/Books/Books/Ryoko Kui" | lines | par-each {|l| "minio:" + $l})
 
+# todo Place the Calibre library and database in the temporary directory
+
 use std log
 use media-juggler-lib *
 
@@ -55,7 +57,11 @@ export def tag_cbz [
 ]: path -> record {
     let cbz = $in
     let args = (
-        [] | append $comic_vine_issue_id
+        [] | append (
+            if $comic_vine_issue_id != null {
+                $"--id=($comic_vine_issue_id)"
+            }
+        )
     )
     let result = (
         if $interactive {
@@ -252,11 +258,13 @@ def main [
     let file = (
         if ($original_file | str starts-with "minio:") {
             let file = ($original_file | str replace "minio:" "")
-            ^mc cp $file $"($temporary_directory)/($file | path basename)"
-            [$temporary_directory ($file | path basename)] | path join
+            let target = [$temporary_directory ($file | path basename)] | path join
+            ^mc cp $file $target
+            $target
         } else {
-            cp $original_file $temporary_directory
-            [$temporary_directory ($original_file | path basename)] | path join
+            let target = [$temporary_directory ($original_file | path basename)] | path join
+            cp $original_file $target
+            $target
         }
     )
 
@@ -390,7 +398,7 @@ def main [
         } else if $input_format == "pdf" {
           let cbz = (
             $file
-            | cbconvert --format "jpeg" --quality 80
+            | cbconvert --format "jpeg" --quality 90
             | (
               let archive = $in;
               if $comic_info != null {
@@ -425,6 +433,7 @@ def main [
         # todo Add stderr from ComicTagger here
         # todo Use make error?
         log error $"Failed to tag ($original_file)"
+        rm --force --recursive $temporary_directory
         return {
             file: $original_file
             # todo Add stderr from ComicTagger here
@@ -765,6 +774,7 @@ def main [
         file: $original_file
     }
     } catch {|err|
+        rm --force --recursive $temporary_directory
         log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
         {
             file: $original_file
@@ -783,7 +793,8 @@ def main [
 
     let errors = $results | default null error | where error != null
     if ($errors | is-not-empty) {
-        log error $"(ansi red)Failed to import the following files due to errors!\n\n($errors | get file | str join '\n')\n(ansi reset)"
+        log error $"(ansi red)Failed to import the following files due to errors!(ansi reset)"
+        $errors | get file | $"(ansi red)($in)(ansi reset)" | print --stderr
         exit 1
     }
 }

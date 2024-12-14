@@ -87,12 +87,16 @@ export def generate_beets_config []: record -> record {
         }
         plugins: [
           "chroma"
+          "deezer"
+          "discogs"
           "embedart"
           "export"
           "fetchart"
           "keyfinder"
           "lyrics"
+          "mbsubmit"
           "scrub"
+          "spotify"
         ]
     } | merge $secrets
 }
@@ -102,10 +106,12 @@ export def beet_secrets_from_env []: nothing -> record {
     [
         [env key subkey];
         [BEETS_ACOUSTID_APIKEY acoustid apikey]
+        [BEETS_DISCOGS_TOKEN discogs user_token]
         [BEETS_FANARTTV_KEY fetchart fanarttv_key]
         [BEETS_GOOGLE_KEY fetchart google_key]
         [BEETS_LASTFM_KEY fetchart lastfm_key]
-        [BEETS_BING_CLIENT_SECRET lyrics bing_client_secret]
+        # todo Doesn't work?
+        # [BEETS_BING_CLIENT_SECRET lyrics bing_client_secret]
         [BEETS_GOOGLE_KEY lyrics google_API_key]
     ] | reduce --fold {} {|mapping, acc|
         if $mapping.env in $env and not ($env | get $mapping.env | is-empty) {
@@ -223,12 +229,13 @@ def main [
             )
             ^mc find $item | lines --skip-empty
         } else {
-            glob ([$original_item "**" "*"] | path join)
+            # todo Make function to sanitize for glob expressions or list all files a different way. Probably the latter.
+            glob --no-dir ([($original_item | str replace --all "(" "\\(" | str replace --all ")" "\\)" | str replace --all "," "\\,") "**" "*"] | path join)
         }
     )
 
     if ($original_music_files | is-empty) {
-        log error $"No music files found for (ansi yellow)($original_music_files)(ansi reset)"
+        log error $"No music files found for (ansi yellow)($original_item)(ansi reset)"
     }
 
     let import_directory = [$temporary_directory import] | path join

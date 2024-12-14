@@ -14,6 +14,7 @@ def test_beet_secrets_from_env_all_empty [] {
   assert equal (
     with-env {
       BEETS_ACOUSTID_APIKEY: ""
+      BEETS_DISCOGS_TOKEN: ""
       BEETS_FANARTTV_KEY: ""
       BEETS_GOOGLE_KEY: ""
       BEETS_LASTFM_KEY: ""
@@ -44,23 +45,27 @@ def test_beet_secrets_from_env_all [] {
     acoustid: {
       apikey: "W75seRNKI8&#4&"
     }
+    discogs: {
+      user_token: "Snv3Uxysi$wtC!6#PtEX^LJV"
+    }
     fetchart: {
       fanarttv_key: "Pp9Yd^PgiX*&AR"
       google_key: "ssV1Cd$kBMu!H#@*bQF8rPyFhe"
       lastfm_key: "QB@vkRnew6Ajtn9kwzLcdX%Qt@HM!khiTbNfFNAdyf^"
     }
     lyrics: {
-      bing_client_secret: "ytub9ZaYY6Ugk5JZ!$LQp3nDcTPrU0tbfg!VYsXmh7PsiXI9@qb2C#!J!Fsr&U308"
+      # bing_client_secret: "ytub9ZaYY6Ugk5JZ!$LQp3nDcTPrU0tbfg!VYsXmh7PsiXI9@qb2C#!J!Fsr&U308"
       google_API_key: "ssV1Cd$kBMu!H#@*bQF8rPyFhe"
     }
   }
   assert equal (
     with-env {
       BEETS_ACOUSTID_APIKEY: "W75seRNKI8&#4&"
+      BEETS_DISCOGS_TOKEN: "Snv3Uxysi$wtC!6#PtEX^LJV"
       BEETS_FANARTTV_KEY: "Pp9Yd^PgiX*&AR"
       BEETS_GOOGLE_KEY: "ssV1Cd$kBMu!H#@*bQF8rPyFhe"
       BEETS_LASTFM_KEY: "QB@vkRnew6Ajtn9kwzLcdX%Qt@HM!khiTbNfFNAdyf^"
-      BEETS_BING_CLIENT_SECRET: "ytub9ZaYY6Ugk5JZ!$LQp3nDcTPrU0tbfg!VYsXmh7PsiXI9@qb2C#!J!Fsr&U308"
+      # BEETS_BING_CLIENT_SECRET: "ytub9ZaYY6Ugk5JZ!$LQp3nDcTPrU0tbfg!VYsXmh7PsiXI9@qb2C#!J!Fsr&U308"
     } {
       beet_secrets_from_env
     }
