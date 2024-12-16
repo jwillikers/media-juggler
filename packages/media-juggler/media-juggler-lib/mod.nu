@@ -416,7 +416,7 @@ export def tag_epub_comic_vine [
 export def fetch-ebook-metadata [
     ...args: string
     # Remove Comicvine because it can cause trouble, although it does have entries for some Light Novels apparently.
-    --allowed-plugins: list<string> = [Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
+    --allowed-plugins: list<string> = ["Kobo Metadata" Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
     # --allowed-plugins: list<string> = [Google "Amazon.com"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
     --authors: list<string> # A list of authors to use
     --cover: path # Path to which to download the cover

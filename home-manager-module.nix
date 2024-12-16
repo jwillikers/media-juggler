@@ -29,6 +29,10 @@ self:
           self.packages.${pkgs.stdenv.system}.calibrePlugins.embedcomicmetadata
           + "/lib/calibre/calibre-plugins/EmbedComicMetadata.zip"
         }
+        ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
+          self.packages.${pkgs.stdenv.system}.calibrePlugins.kobo-metadata
+          + "/lib/calibre/calibre-plugins/KoboMetadata.zip"
+        }
         chmod +w ${config.xdg.configHome}/calibre/plugins/*.zip
       '';
     };
