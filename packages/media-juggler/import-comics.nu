@@ -198,7 +198,7 @@ def main [
     --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
     # --issue: string # The issue number
     # --issue-year: string # The publication year of the issue
-    --manga: string = "Yes" # Whether the file is manga "Yes", right-to-left manga "Yes (Right to Left)", or not manga "No"
+    --manga: string = "Yes (Right to Left)" # Whether the file is manga "Yes", right-to-left manga "Yes (Right to Left)", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
     --minio-alias: string = "jwillikers" # The alias of the MinIO server used by the MinIO client application
     --minio-path: string = "media/Books/Books" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
     --minio-archival-path: string = "media-archive/Books/Books" # The upload bucket and directory on the MinIO server where EPUBs will be archived. The file will be uploaded under a subdirectory named after the author.
