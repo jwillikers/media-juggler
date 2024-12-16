@@ -34,6 +34,10 @@ self:
           + "/lib/calibre/calibre-plugins/Extract ISBN.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
+          self.packages.${pkgs.stdenv.system}.calibrePlugins.goodreads
+          + "/lib/calibre/calibre-plugins/Goodreads.zip"
+        }
+        ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
           self.packages.${pkgs.stdenv.system}.calibrePlugins.kobo-metadata
           + "/lib/calibre/calibre-plugins/KoboMetadata.zip"
         }
