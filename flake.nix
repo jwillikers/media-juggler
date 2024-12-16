@@ -61,6 +61,7 @@
                 ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.extract_isbn --build --flake
                 ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.goodreads --build --flake
                 ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.kobo-metadata --build --flake
+                ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.modify_epub --build --flake
                 ^${pkgs.lib.getExe treefmtEval.config.build.wrapper}
               ''
             );

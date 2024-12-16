@@ -41,6 +41,10 @@ self:
           self.packages.${pkgs.stdenv.system}.calibrePlugins.kobo-metadata
           + "/lib/calibre/calibre-plugins/KoboMetadata.zip"
         }
+        ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
+          self.packages.${pkgs.stdenv.system}.calibrePlugins.modify_epub
+          + "/lib/calibre/calibre-plugins/Modify ePub.zip"
+        }
         chmod +w ${config.xdg.configHome}/calibre/plugins/*.zip
       '';
     };
