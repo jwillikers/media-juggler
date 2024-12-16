@@ -95,7 +95,7 @@ def main [
                 ^mc cp $opf $"($temporary_directory)/($opf | path basename)"
             }
             let covers = (
-                ^mc find ($file | path dirname) --name 'cover.*'
+                ^mc find --maxdepth 1 ($file | path dirname) --name 'cover.*'
                 | lines --skip-empty
                 | filter {|f|
                     let components = $f | path parse
