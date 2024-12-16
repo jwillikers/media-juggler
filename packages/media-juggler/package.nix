@@ -1,5 +1,5 @@
 {
-  beets,
+  # beets,
   calibre,
   cbconvert,
   ffmpeg,
@@ -15,6 +15,7 @@
   stdenvNoCC,
   tone,
   udisks,
+  unstable,
   util-linux,
   zip,
 }:
@@ -32,7 +33,7 @@ else
     doCheck = true;
 
     buildInputs = [
-      beets
+      unstable.beets
       calibre
       cbconvert
       # todo comictagger
@@ -112,7 +113,7 @@ else
       wrapProgram $out/bin/import-music.nu \
         --prefix PATH : ${
           lib.makeBinPath [
-            beets
+            unstable.beets
             image_optim
             keyfinder-cli
             minio-client

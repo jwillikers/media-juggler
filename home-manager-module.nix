@@ -79,46 +79,6 @@ self:
       ]);
   };
 
-  programs = {
-    beets = {
-      enable = true;
-      package = pkgs.unstable.beets;
-      # todo Add API keys when SOPS support is added.
-      settings = {
-        plugins = [
-          "chroma"
-          "embedart"
-          "export"
-          "fetchart"
-          "keyfinder"
-          "lyrics"
-          "scrub"
-        ];
-        acoustid = {
-          # apikey = "";
-        };
-        embedart = {
-          remove_art_file = true;
-        };
-        fetchart = {
-          # fanarttv_key = "";
-          # google_key = "";
-          high_resolution = true;
-          # lastfm_key = "";
-        };
-        keyfinder = {
-          bin = "keyfinder-cli";
-        };
-        lyrics = {
-          # bing_client_secret = "";
-          # bing_lang_to = "english";
-          # google_API_key = "";
-          synced = true;
-        };
-      };
-    };
-  };
-
   systemd.user = {
     tmpfiles.rules = [
       "d ${config.home.homeDirectory}/Books 0750 ${config.home.username} ${config.home.username} - -"
