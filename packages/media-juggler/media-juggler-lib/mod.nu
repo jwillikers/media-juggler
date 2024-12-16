@@ -171,6 +171,7 @@ export def polish_epub []: [path -> path] {
         ^ebook-polish
             --download-external-resources
             --remove-unused-css
+            --subset-fonts
             --upgrade-book
             $epub
             $epub
