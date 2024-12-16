@@ -14,6 +14,10 @@ self:
           + "/lib/calibre/calibre-plugins/calibre-plugin.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
+          self.packages.${pkgs.stdenv.system}.calibrePlugins.comicvine
+          + "/lib/calibre/calibre-plugins/Comicvine.zip"
+        }
+        ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
           self.packages.${pkgs.stdenv.system}.calibrePlugins.dedrm
           + "/lib/calibre/calibre-plugins/DeDRM_plugin.zip"
         }
@@ -22,12 +26,12 @@ self:
           + "/lib/calibre/calibre-plugins/Obok_plugin.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
-          self.packages.${pkgs.stdenv.system}.calibrePlugins.comicvine
-          + "/lib/calibre/calibre-plugins/Comicvine.zip"
-        }
-        ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
           self.packages.${pkgs.stdenv.system}.calibrePlugins.embedcomicmetadata
           + "/lib/calibre/calibre-plugins/EmbedComicMetadata.zip"
+        }
+        ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
+          self.packages.${pkgs.stdenv.system}.calibrePlugins.extract_isbn
+          + "/lib/calibre/calibre-plugins/Extract ISBN.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
           self.packages.${pkgs.stdenv.system}.calibrePlugins.kobo-metadata

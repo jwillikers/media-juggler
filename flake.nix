@@ -58,6 +58,7 @@
                 ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.comicvine --build --flake
                 ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.dedrm --build --flake --version branch
                 ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.embedcomicmetadata --build --flake --version branch
+                ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.extract_isbn --build --flake
                 ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.kobo-metadata --build --flake
                 ^${pkgs.lib.getExe treefmtEval.config.build.wrapper}
               ''
