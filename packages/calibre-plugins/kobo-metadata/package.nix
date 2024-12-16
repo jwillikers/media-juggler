@@ -11,15 +11,15 @@ stdenvNoCC.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "NotSimone";
     repo = "Kobo-Metadata";
-    rev = "tags/refs/${version}";
-    hash = lib.fakeHash;
+    rev = "refs/tags/${version}";
+    hash = "sha256-2ScBVW6SCQoJn/xTsUCBhPzJovV7r6hWDbQkssBcMO4=";
   };
 
   nativeBuildInputs = [ zip ];
 
   buildPhase = ''
     runHook preBuild
-    zip --recurse-paths KoboMetadata *
+    ${lib.getExe zip} --recurse-paths KoboMetadata *
     runHook postBuild
   '';
 
@@ -30,7 +30,7 @@ stdenvNoCC.mkDerivation rec {
   '';
 
   meta = {
-    description = "Fetch metadata for Calibre from Kobo.";
+    description = "Fetch metadata for Calibre from Kobo";
     homepage = "https://github.com/NotSimone/Kobo-Metadata";
     changelog = "https://github.com/NotSimone/Kobo-Metadata/releases/tag/v${version}";
     platforms = with lib.platforms; linux ++ darwin ++ windows;
