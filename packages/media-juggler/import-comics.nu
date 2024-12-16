@@ -188,6 +188,7 @@ def main [
     comictagger: path = "./ComicTagger-x86_64.AppImage" # Temporarily required until the Nix package is available
     ...files: string # The paths to ACSM, EPUB, and CBZ files to convert, tag, and upload. Prefix paths with "minio:" to download them from the MinIO instance
     --archive-pdf # Archive input PDF files under the --minio-archival-path instead of uploading them to the primary bucket. This will cause a high quality CBZ file to be generated and uploaded to the primary storage server.
+    --clear-comictagger-cache # Clear the ComicTagger cache to force it to pull in updated data
     --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
     --delete # Delete the original file
     --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
@@ -244,6 +245,10 @@ def main [
         # todo Parse the mountpoint from the output of this command
       }
       mkdir $ereader_target_directory
+    }
+
+    if $clear_comictagger_cache {
+      rm --force --recursive ([$env.HOME ".cache" "ComicTagger"] | path join)
     }
 
     let results = $files | each {|original_file|
