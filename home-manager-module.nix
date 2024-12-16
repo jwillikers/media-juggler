@@ -29,10 +29,10 @@ self:
           self.packages.${pkgs.stdenv.system}.calibrePlugins.embedcomicmetadata
           + "/lib/calibre/calibre-plugins/EmbedComicMetadata.zip"
         }
-        ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
+        ${pkgs.calibre}/bin/calibre-customize --add-plugin='${
           self.packages.${pkgs.stdenv.system}.calibrePlugins.extract_isbn
           + "/lib/calibre/calibre-plugins/Extract ISBN.zip"
-        }
+        }'
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
           self.packages.${pkgs.stdenv.system}.calibrePlugins.goodreads
           + "/lib/calibre/calibre-plugins/Goodreads.zip"
@@ -41,10 +41,10 @@ self:
           self.packages.${pkgs.stdenv.system}.calibrePlugins.kobo-metadata
           + "/lib/calibre/calibre-plugins/KoboMetadata.zip"
         }
-        ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
+        ${pkgs.calibre}/bin/calibre-customize --add-plugin='${
           self.packages.${pkgs.stdenv.system}.calibrePlugins.modify_epub
           + "/lib/calibre/calibre-plugins/Modify ePub.zip"
-        }
+        }'
         chmod +w ${config.xdg.configHome}/calibre/plugins/*.zip
       '';
     };
