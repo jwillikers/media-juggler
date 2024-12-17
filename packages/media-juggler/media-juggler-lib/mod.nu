@@ -858,7 +858,8 @@ export def inject_comic_info []: [
     let target = [$temporary_directory "ComicInfo.xml"] | path join
     $input.comic_info | to xml | save $target
     ^zip --junk-paths $input.archive $target
-    rm $target $temporary_directory
+    rm $target
+    rm $temporary_directory
     $input.archive
 }
 
@@ -1068,17 +1069,13 @@ export def metadata_from_comic_filename []: path -> record {
   let stem = $file | path parse | get stem
   let metadata = (
     $stem
-    | parse --regex '(?P<series>.+?)\s+(?:\((?P<series_year>[0-9]+)\)\s+){0,1}#(?P<issue>[0-9]+)\s+(?:\((?P<issue_year>[0-9]+)\)){0,1}'
+    | parse --regex '(?P<series>.+?)\s+(?:\((?P<series_year>[0-9]+)\)\s+){0,1}#(?P<issue>[0-9]+)(?:\s+\((?P<issue_year>[0-9]+)\)){0,1}'
   )
-  # let metadata = (
-    if ($metadata | is-empty) {
-      null
-      # $stem
-      # | parse --regex '(?P<series>.+) (?P<series_year>\([0-9]+\))? #(?P<issue>[0-9]+) (?P<issue_year>\([0-9]+\))?'
-    } else {
-      $metadata | first
-    }
-  # )
+  if ($metadata | is-empty) {
+    null
+  } else {
+    $metadata | first
+  }
 }
 
 # Incorporate metadata for ComicTagger in the filename.
@@ -1171,6 +1168,9 @@ export def comic_file_name_from_metadata [
     )
 
     let parsed_title = (
+      if $title == null {
+        null
+      } else {
         if ($title | str contains "Volume") {
             (
                 $title
@@ -1190,8 +1190,11 @@ export def comic_file_name_from_metadata [
         } else {
             { series: $title, issue: 1 }
         }
+      }
     )
-    log debug $"Parsed the title as (ansi purple)($parsed_title)(ansi reset)"
+    if $parsed_title != null {
+      log debug $"Parsed the title as (ansi purple)($parsed_title)(ansi reset)"
+    }
 
     let series = (
         if $series == null {

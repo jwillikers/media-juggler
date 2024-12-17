@@ -260,8 +260,8 @@ def main [
 
     # let results = null
     # let original_file = $files | first
-
     let results = $files | each {|original_file|
+
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
     let temporary_directory = (mktemp --directory "import-comics.XXXXXXXXXX")
@@ -456,13 +456,36 @@ def main [
         }
     )
 
+    # Generate a CBZ from the PDF format which may be used to extract the ISBN.
+    let formats = (
+        if "pdf" in $formats {
+            log debug "Generating a CBZ from the PDF"
+            $formats | insert cbz ($formats.pdf | cbconvert --format "jpeg" --quality 90)
+        } else {
+            $formats
+        }
+    )
+
     # Try to get the ISBN from the pages in the comic
     let isbn = (
         if $isbn == null {
             log debug "Attempting to get the ISBN from the first ten and last ten pages of the comic"
             let isbn_numbers = $file | isbn_from_pages $temporary_directory
             if ($isbn_numbers | is-empty) {
-                null
+                # Check images of the PDF for the ISBN if text doesn't work out.
+                if $input_format == "pdf" and "cbz" in $formats {
+                    let isbn_from_cbz = $formats.cbz | isbn_from_pages $temporary_directory
+                    if ($isbn_from_cbz | is-empty) {
+                        null
+                    } else if ($isbn_from_cbz | length) > 1 {
+                        # todo Allow selecting from one of these ISBNs interactively?
+                        log warning $"Found multiple potential ISBNs in the book's pages: ($isbn_from_cbz). Ignoring the ISBNs."
+                    } else {
+                        $isbn_from_cbz | first
+                    }
+                } else {
+                    null
+                }
             } else if ($isbn_numbers | length) > 1 {
                 # todo Allow selecting from one of these ISBNs interactively?
                 log warning $"Found multiple potential ISBNs in the book's pages: ($isbn_numbers). Ignoring the ISBNs."
@@ -513,6 +536,17 @@ def main [
                 $formats | get $input_format
             }
         )
+        | (
+            let i = $in;
+            if $input_format == "pdf" and "cbz" in $i {
+                # Rename the CBZ according to the name of the PDF
+                let target = $i | get $input_format | path parse | update extension cbz | path join
+                mv $i.cbz $target
+                $i | update cbz $target
+            } else {
+                $i
+            }
+        )
     )
 
     # Generate a CBZ from the EPUB and PDF formats
@@ -521,10 +555,9 @@ def main [
             log debug "Generating a CBZ from the EPUB"
             $formats | insert cbz ($formats.epub | epub_to_cbz --working-directory $temporary_directory)
         } else if "pdf" in $formats {
-            log debug "Generating a CBZ from the PDF"
+            log debug "Updating the CBZ for the PDF"
             let cbz = (
-                $formats.pdf
-                | cbconvert --format "jpeg" --quality 90
+                $formats.cbz
                 | (
                 let archive = $in;
                 if $comic_info != null {
@@ -542,7 +575,7 @@ def main [
                 log debug $"Removing the sidecar ComicInfo file (ansi yellow)($comic_info)(ansi reset)"
                 rm $comic_info
             }
-            $formats | insert cbz $cbz
+            $formats | update cbz $cbz
         } else {
             $formats
         }
