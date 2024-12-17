@@ -53,11 +53,19 @@ export def pdf_page_count []: path -> int {
 
 # Parse ISBN from text
 export def parse_isbn [
-]: string -> list<string> {
+]: list<string> -> list<string> {
   let text = $in
+  # ISBN 978-1-250-16947-1 (ebook)
   let obvious_isbn = (
     $text
-    | lines --skip-empty
+    | parse --regex 'ISBN\s*(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))\s*\(ebook\)'
+  )
+  if ($obvious_isbn | is-not-empty) {
+    return ($obvious_isbn | get isbn | str replace --all "-" "" | uniq)
+  }
+
+  let obvious_isbn = (
+    $text
     | parse --regex 'ISBN:\s*(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))'
   )
   if ($obvious_isbn | is-not-empty) {
@@ -66,7 +74,6 @@ export def parse_isbn [
 
   let isbn_numbers = (
     $text
-    | lines --skip-empty
     | parse --regex '(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))'
   )
   if ($isbn_numbers | is-empty) {
@@ -76,9 +83,8 @@ export def parse_isbn [
   }
 }
 
-
-# Convert the first 10 and last 10 pages of an EPUB or PDF file to text
-export def book_to_text []: path -> string {
+# Convert the first 10 and last 10 pages of a PDF file to text
+export def pdf_to_text []: path -> string {
   let pdf = $in
   let pages = $pdf | pdf_page_count
   let text_file = mktemp
@@ -93,6 +99,30 @@ export def book_to_text []: path -> string {
   let text = open $text_file
   rm $text_file
   $text
+}
+
+# Convert the first 10 and last 10 pages of an EPUB file to text
+export def epub_to_text []: path -> string {
+  let epub = $in
+  let text_file = mktemp --suffix .txt
+  # todo Get a smaller portion of the EPUB's pages?
+  ^ebook-convert $epub $text_file
+  let text = open $text_file
+  rm $text_file
+  $text
+}
+
+# Convert a PDF or EPUB to text
+export def book_to_text []: path -> string {
+  let book = $in
+  let input_format = $book | path parse | get extension
+  if $input_format == "epub" {
+    $book | epub_to_text
+  } else if $input_format == "pdf" {
+    $book | pdf_to_text
+  } else {
+    null
+  }
 }
 
 export def isbn_from_images_in_archive [
@@ -113,7 +143,7 @@ export def isbn_from_images_in_archive [
   # }
   for page in $pages {
     let image = $archive | extract_file_from_archive $page $working_directory
-    let isbn = $image | image_to_text | parse_isbn
+    let isbn = $image | image_to_text | lines --skip-empty | reverse | parse_isbn
     rm $image
     if ($isbn | is-not-empty) {
       return $isbn
@@ -147,7 +177,7 @@ export def isbn_from_pages [
   let isbn = (
     if $input_format in ["epub" "pdf"] {
       log debug "Attempting to parse the ISBN from the book's text"
-      $file | book_to_text | parse_isbn
+      $file | book_to_text | lines --skip-empty | reverse | parse_isbn
     } else {
       []
     }
@@ -269,7 +299,7 @@ export def isbn_from_comic_info []: record -> string {
   if ($gtin | is-empty) {
     return null
   }
-  let isbn_numbers = ($gtin | first | get content | first | get content) | parse_isbn
+  let isbn_numbers = ($gtin | first | get content | first | get content) | lines --skip-empty | reverse | parse_isbn
   if ($isbn_numbers | is-empty) {
     return null
   }
@@ -495,7 +525,7 @@ export def isbn_from_opf []: record -> string {
     log warning $"Somehow found multiple ISBN values in the OPF metadata: ($metadata). Ignoring ISBN numbers."
     return null
   }
-  let isbn_numbers = ($isbn_values | first) | parse_isbn
+  let isbn_numbers = ($isbn_values | first) | lines --skip-empty | reverse | parse_isbn
   if ($isbn_numbers | is-empty) {
     return null
   }
