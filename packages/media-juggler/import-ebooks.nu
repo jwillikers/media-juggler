@@ -158,10 +158,36 @@ def main [
         }
     )
 
+    # Try to get the ISBN from the comics metadata.
+    let isbn = (
+        if $isbn == null {
+          $file | isbn_from_metadata $temporary_directory
+        } else {
+          null
+        }
+    )
+
+    # Try to get the ISBN from the pages in the comic
+    let isbn = (
+        if $isbn == null {
+            let isbn_numbers = $file | isbn_from_pages $temporary_directory
+            if ($isbn_numbers | is-empty) {
+                null
+            } else if ($isbn_numbers | length) > 1 {
+                log warning $"Found multiple potential ISBNs in the book's pages: ($isbn_numbers). Ignoring the ISBNs."
+                null
+            } else {
+                $isbn_numbers | first
+            }
+        } else {
+            null
+        }
+    )
+
     let book = (
         $formats.book
         | (
-            if $isbn == null {
+            if $isbn == null or ($isbn | is-empty) {
                 fetch_book_metadata $temporary_directory
             } else {
                 fetch_book_metadata --isbn $isbn $temporary_directory

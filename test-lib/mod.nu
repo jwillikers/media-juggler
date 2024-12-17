@@ -114,7 +114,7 @@ export def optimize_images []: [list<path> -> record] {
                 { difference: 0.0, bytes: (0.0 | into filesize) }
             } else {
                 $line
-                | parse --regex 'Total:\W+(?P<difference>.+)%\W+(?P<bytes>.+)'
+                | parse --regex 'Total:\s+(?P<difference>.+)%\s+(?P<bytes>.+)'
                 | first
                 | (
                     let i = $in;

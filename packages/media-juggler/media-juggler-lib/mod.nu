@@ -20,36 +20,845 @@ export const image_extensions = [
   webp
 ]
 
+# Get the number of pages in a PDF
+export def pdf_page_count []: path -> int {
+  let pdf = $in
+  # ^pdfinfo $pdf | lines --skip-empty | parse --regex '(?P<key>\w+):\W+(?P<value>\w+.*)' | where key == "Pages" | get value
+  ^mutool show $pdf trailer/Root/Pages/Count | into int
+}
+
+# Get text from a PDF
+# export def pdftotext [
+#   --first: int # First page to convert
+#   --last: int # Last page to convert
+# ]: path -> string {
+#   let pdf = $in
+#   ^pdftotext  -
+# }
+
+# RE_NORMAL = re.compile(
+#     r'97[89]{1}-?[0-9]{10}|'
+#     r'97[89]{1}-[-0-9]{13}|'
+#     r'\d{9}[0-9X]{1}|'
+#     r'[-0-9X]{10,16}',
+#     re.I | re.M | re.S,
+# )
+
+# r'^(?:ISBN(?:-1[03])?:? )?(?=[0-9X]{10}$|'
+# r'(?=(?:[0-9]+[- ]){3})'
+# r'[- 0-9X]{13}$|97[89][0-9]{10}$|'
+# r'(?=(?:[0-9]+[- ]){4})'
+# r'[- 0-9]{17}$)(?:97[89][- ]?)?[0-9]{1,5}'
+# r'[- ]?[0-9]+[- ]?[0-9]+[- ]?[0-9X]$',
+
+# Parse ISBN from text
+export def parse_isbn [
+]: string -> list<string> {
+  let text = $in
+  let obvious_isbn = (
+    $text
+    | lines --skip-empty
+    | parse --regex 'ISBN:\s*(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))'
+  )
+  if ($obvious_isbn | is-not-empty) {
+    return ($obvious_isbn | get isbn | str replace --all "-" "" | uniq)
+  }
+
+  let isbn_numbers = (
+    $text
+    | lines --skip-empty
+    | parse --regex '(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))'
+  )
+  if ($isbn_numbers | is-empty) {
+    []
+  } else {
+    $isbn_numbers | get isbn | str replace --all "-" "" | uniq
+  }
+}
+
+
+# Convert the first 10 and last 10 pages of an EPUB or PDF file to text
+export def book_to_text []: path -> string {
+  let pdf = $in
+  let pages = $pdf | pdf_page_count
+  let text_file = mktemp
+  if $pages <= 20 {
+    # ^pdftotext $pdf -
+    # todo https://bugs.ghostscript.com/show_bug.cgi?id=707651
+    ^mutool convert -F text -o $text_file -O mediabox-clip=no $pdf
+  } else {
+    ^mutool convert -F text -o $text_file -O mediabox-clip=no $pdf $"1-10,($pages - 10)-N"
+    # [(^pdftotext -l 10 $pdf -) (^pdftotext -f ($pages - 10) $pdf -)] | str join "\n"
+  }
+  let text = open $text_file
+  rm $text_file
+  $text
+}
+
+export def isbn_from_images_in_archive [
+  working_directory: path
+]: path -> list<string> {
+  let archive = $in
+  let images = $archive | list_image_files_in_archive
+  # We start at the back first
+  let pages = (
+    $images
+    | last 10
+    | reverse
+    | append ($images | first 10)
+    | uniq
+  )
+  # $pages | each {|page|
+  #   $page | image_to_text | parse_isbn
+  # }
+  for page in $pages {
+    let image = $archive | extract_file_from_archive $page $working_directory
+    let isbn = $image | image_to_text | parse_isbn
+    rm $image
+    if ($isbn | is-not-empty) {
+      return $isbn
+    }
+  }
+  []
+}
+
+# Extract text from an image using OCR
+export def image_to_text []: path -> string {
+  let image = $in
+  ^tesseract $image stdout
+}
+
+# todo
+# export def isbn_10_to_isbn_13 []: string -> string {
+#   str substring 0 11
+# }
+
+# export def extract_isbn_from_image []: path -> list<string> {
+#   let image = $in
+#   $image | image_to_text | lines --skip-empty | parse_isbn
+# }
+
+# Extract an ISBN from the pages of CBZ, PDF, or EPUB file
+export def isbn_from_pages [
+    working_directory: directory # The scratch-space directory to use
+]: path -> list<string> {
+  let $file = $in
+  let input_format = $file | path parse | get extension
+  let isbn = (
+    if $input_format in ["epub" "pdf"] {
+      log debug "Attempting to parse the ISBN from the book's text"
+      $file | book_to_text | parse_isbn
+    } else {
+      []
+    }
+  )
+  if ($isbn | is-not-empty) {
+    return $isbn
+  }
+  if $input_format in ["cbz" "epub" "zip"] {
+    log debug "Attempting to parse the ISBN from the book's images"
+    $file | isbn_from_images_in_archive $working_directory
+  } else {
+    []
+  }
+}
+
+# Extract the issue from ComicInfo.xml metadata
+#
+# todo Add tests
+export def issue_from_comic_info []: record -> string {
+  let comic_info = $in
+  let number = $comic_info | get content | where tag == "Number" | get content
+  if ($number | is-empty) {
+    return null
+  }
+  if ($number | length) > 1 {
+    log warning $"Somehow found multiple Number fields in the ComicInfo.xml metadata: ($number). Ignoring Number fields."
+    return null
+  }
+  let values = $number | first | get content | first
+  if ($values | is-empty) {
+    return null
+  }
+  if ($values | length) > 1 {
+    log warning $"Somehow found multiple values in the Number field of the ComicInfo.xml metadata: ($values). Ignoring Number field."
+    return null
+  }
+  $values | first
+}
+
+# Extract the issue year from ComicInfo.xml metadata
+#
+# todo Add tests
+export def issue_year_from_comic_info []: record -> string {
+  let comic_info = $in
+  let year = $comic_info | get content | where tag == "Year" | get content
+  if ($year | is-empty) {
+    return null
+  }
+  if ($year | length) > 1 {
+    log warning $"Somehow found multiple Year fields in the ComicInfo.xml metadata: ($year). Ignoring Year fields."
+    return null
+  }
+  let values = $year | first | get content | first
+  if ($values | is-empty) {
+    return null
+  }
+  if ($values | length) > 1 {
+    log warning $"Somehow found multiple years in the Year field of the ComicInfo.xml metadata: ($values). Ignoring Year field."
+    return null
+  }
+  $values | first
+}
+
+# Extract the series year from ComicInfo.xml metadata
+#
+# todo Add tests
+export def series_year_from_comic_info []: record -> string {
+  let comic_info = $in
+  let volume = $comic_info | get content | where tag == "Volume" | get content
+  if ($volume | is-empty) {
+    return null
+  }
+  if ($volume | length) > 1 {
+    log warning $"Somehow found multiple Volume fields in the ComicInfo.xml metadata: ($volume). Ignoring Volume fields."
+    return null
+  }
+  let values = $volume | first | get content | first
+  if ($values | is-empty) {
+    return null
+  }
+  if ($values | length) > 1 {
+    log warning $"Somehow found multiple volumes in the Volume field of the ComicInfo.xml metadata: ($values). Ignoring Volume field."
+    return null
+  }
+  $values | first
+}
+
+# Extract the series from ComicInfo.xml metadata
+#
+# todo Add tests
+export def series_from_comic_info []: record -> string {
+  let comic_info = $in
+  let series = $comic_info | get content | where tag == "Series" | get content
+  if ($series | is-empty) {
+    return null
+  }
+  if ($series | length) > 1 {
+    log warning $"Somehow found multiple Series fields in the ComicInfo.xml metadata: ($series). Ignoring Series fields."
+    return null
+  }
+  let values = $series | first | get content | first
+  if ($values | is-empty) {
+    return null
+  }
+  if ($values | length) > 1 {
+    log warning $"Somehow found multiple series in the Series field of the ComicInfo.xml metadata: ($values). Ignoring Series field."
+    return null
+  }
+  $values | first
+}
+
+# Extract the ISBN from ComicInfo.xml metadata
+#
+# The GTIN field stores a value that can be an ISBN.
+# todo Add tests
+export def isbn_from_comic_info []: record -> string {
+  let comic_info = $in
+  let gtin = $comic_info | get content | where tag == GTIN
+  if ($gtin | is-empty) {
+    return null
+  }
+  let isbn_numbers = ($gtin | first | get content | first | get content) | parse_isbn
+  if ($isbn_numbers | is-empty) {
+    return null
+  }
+  if ($isbn_numbers | length) > 1 {
+    log warning $"Somehow found multiple ISBN numbers in the GTIN field of the ComicInfo.xml metadata: ($isbn_numbers). Ignoring GTIN field."
+    return null
+  }
+  $isbn_numbers | first
+}
+
+# Inject the ISBN in ComicInfo.xml metadata
+#
+# The GTIN field stores a value that can be an ISBN.
+# todo Add tests
+export def add_isbn_to_comic_info [
+  isbn: string
+]: record -> record {
+  let comic_info = $in
+  # let gtin = $comic_info | get content | where tag == GTIN
+  # if ($gtin | is-empty) {
+  #   (
+  #     $comic_info
+  #     | (
+  #       let i = $in;
+  #       $i
+  #       | update content (
+  #         $i
+  #         | get content
+  #         | append {
+  #           tag: GTIN
+  #           attributes: {}
+  #           content: [
+  #             [tag attributes content];
+  #             [null null $isbn]
+  #           ]
+  #         }
+  #       )
+  #     )
+  #   )
+  # } else {
+    (
+      $comic_info
+      | (
+        let i = $in;
+        $i
+        | update content (
+          $i
+          | get content
+          | where tag != "GTIN"
+          | append {
+            tag: "GTIN"
+            attributes: {}
+            content: [
+              [tag attributes content];
+              [null null $isbn]
+            ]
+          }
+        )
+      )
+    )
+  # }
+}
+
+export def upsert_comic_info [
+  field: record<tag: string, value: string>
+]: record -> record {
+  let comic_info = $in
+  (
+    $comic_info
+    | (
+      let i = $in;
+      $i
+      | update content (
+        $i
+        | get content
+        | where tag != $field.tag
+        | append {
+          tag: $field.tag
+          attributes: {}
+          content: [
+            [tag attributes content];
+            [null null $field.value]
+          ]
+        }
+      )
+    )
+  )
+}
+
+# Extract the title from ComicInfo.xml metadata
+#
+# todo Add tests
+export def title_from_comic_info []: record -> string {
+  let comic_info = $in
+  let title = $comic_info | get content | where tag == "Title"
+  if ($title | is-empty) {
+    return null
+  }
+  let titles = $title | first | get content | first | get content
+  if ($titles | is-empty) {
+    return null
+  }
+  if ($titles | length) > 1 {
+    log warning $"Somehow found multiple titles in the Title field of the ComicInfo.xml metadata: ($titles). Ignoring Title field."
+    return null
+  }
+  $titles | first
+}
+
+# Extract the metadata from an EPUB file in the OPF format
+export def opf_from_epub [
+  working_directory: directory
+]: path -> record {
+  let epub = $in
+  let opf_file = mktemp # ($epub | path parse | update  | update extension "opf" | path join)
+  ^ebook-meta --to-opf $opf_file $epub
+  let opf = open $opf_file | from xml
+  rm $opf_file
+  $opf
+}
+
+# Extract the metadata from an EPUB, CBZ, or sidecar OPF or ComicInfo.xml file
+#
+# The ISBN from a side-car ComicInfo.xml has the highest precedence, followed by a sidecar metadata.opf file.
+# Metadata embedded in an EPUB file or a ComicInfo.xml embedded in a CBZ or ZIP archive have the lowest precedence.
+# The sidecar metadata.opf and ComicInfo.xml files are assumed to reside in the same directory as the target file.
+#
+export def get_metadata [
+  working_directory: directory # The scratch-space directory to use
+]: path -> record {
+  let file = $in
+  let metadata = {}
+  let metadata = (
+    let comic_info_file = [($file | path dirname) "ComicInfo.xml"] | path join;
+    if ($comic_info_file | path exists) {
+      let comic_info = open $comic_info_file
+      if $comic_info == null {
+        $metadata
+      } else {
+        $metadata | insert comic_info $comic_info
+      }
+    } else {
+      $metadata
+    }
+  )
+
+  let metadata = (
+    let metadata_opf_file = [($file | path dirname) "metadata.opf"] | path join;
+    if ($metadata_opf_file | path exists) {
+      let opf = open $metadata_opf_file | from xml
+      if $opf == null {
+        $metadata
+      } else {
+        $metadata | insert opf $opf
+      }
+    } else {
+      $metadata
+    }
+  )
+
+  let input_format = $file | path parse | get extension
+  let metadata = (
+    if $input_format == "epub" {
+      let opf = $file | opf_from_epub $working_directory
+      if $opf == null {
+        $metadata
+      } else {
+        $metadata | upsert opf (
+          if "opf" in $metadata {
+            $metadata | get opf | merge $opf
+          } else {
+            $opf
+          }
+        )
+      }
+    } else if $input_format in ["cbz" "zip"] {
+      let comic_info = $file | extract_comic_info_xml $working_directory
+      if $comic_info == null {
+        $metadata
+      } else {
+        $metadata | upsert comic_info (
+          if "comic_info" in $metadata {
+            $metadata | get comic_info | merge $comic_info
+          } else {
+            $comic_info
+          }
+        )
+      }
+    } else {
+      $metadata
+    }
+  )
+
+  $metadata
+}
+
+# Extract the ISBN from OPF metadata
+#
+# todo Add tests
+export def isbn_from_opf []: record -> string {
+  let opf = $in
+  let metadata = $opf | get content | where tag == "metadata"
+  if ($metadata | is-empty) {
+    return null
+  }
+  if ($metadata | length) > 1 {
+    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring metadata."
+    return null
+  }
+  let isbn = $metadata | first | where tag == "identifier" | where attributes.scheme == "ISBN"
+  if ($isbn | is-empty) {
+    return null
+  }
+  if ($isbn | length) > 1 {
+    log warning $"Somehow found multiple ISBN numbers in the OPF metadata: ($metadata). Ignoring ISBN numbers."
+    return null
+  }
+  let isbn_values = $isbn | first | get content | get content
+  if ($isbn_values | is-empty) {
+    return null
+  }
+  if ($isbn_values | length) > 1 {
+    log warning $"Somehow found multiple ISBN values in the OPF metadata: ($metadata). Ignoring ISBN numbers."
+    return null
+  }
+  let isbn_numbers = ($isbn_values | first) | parse_isbn
+  if ($isbn_numbers | is-empty) {
+    return null
+  }
+  if ($isbn_numbers | length) > 1 {
+    log warning $"Somehow parsed multiple ISBN numbers from the ISBN field of the OPF metadata: ($isbn_numbers). Ignoring ISBN numbers."
+    return null
+  }
+  $isbn_numbers | first
+}
+
+# Extract the issue from OPF metadata
+#
+# todo Add tests
+export def issue_from_opf []: record -> string {
+  let opf = $in
+  let metadata = $opf | get content | where tag == "metadata"
+  if ($metadata | is-empty) {
+    return null
+  }
+  if ($metadata | length) > 1 {
+    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring."
+    return null
+  }
+  let series_index = $metadata | first | get content | where tag == "meta" | where attributes.name == "calibre:series_index" | get attributes | get content
+  if ($series_index | is-empty) {
+    return null
+  }
+  if ($series_index | length) > 1 {
+    log warning $"Somehow found multiple calibre:series_index field of the OPF metadata: ($series_index). Ignoring."
+    return null
+  }
+  $series_index | first
+}
+
+# Extract the issue year from OPF metadata
+#
+# todo Add tests
+export def issue_year_from_opf []: record -> string {
+  let opf = $in
+  let metadata = $opf | get content | where tag == "metadata"
+  if ($metadata | is-empty) {
+    return null
+  }
+  if ($metadata | length) > 1 {
+    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring metadata."
+    return null
+  }
+  let date = $metadata | first | get content | where tag == "date"
+  if ($date | is-empty) {
+    return null
+  }
+  if ($date | length) > 1 {
+    log warning $"Somehow found multiple date fields in the OPF metadata: ($date). Ignoring."
+    return null
+  }
+  let values = $date | first | get content | get content
+  if ($values | is-empty) {
+    return null
+  }
+  if ($values | length) > 1 {
+    log warning $"Somehow found multiple values for the date field of the OPF metadata: ($values). Ignoring title field."
+    return null
+  }
+  $values | first | into datetime | format date "%Y"
+}
+
+# Extract the series from OPF metadata
+#
+# todo Add tests
+export def series_from_opf []: record -> string {
+  let opf = $in
+  let metadata = $opf | get content | where tag == "metadata"
+  if ($metadata | is-empty) {
+    return null
+  }
+  if ($metadata | length) > 1 {
+    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring."
+    return null
+  }
+  let series = $metadata | first | get content | where tag == "meta" | where attributes.name == "calibre:series" | get attributes | get content
+  if ($series | is-empty) {
+    return null
+  }
+  if ($series | length) > 1 {
+    log warning $"Somehow found multiple calibre:series fields of the OPF metadata: ($series). Ignoring."
+    return null
+  }
+  $series | first
+}
+
+# Extract the series year from OPF metadata
+#
+# I don't know how this is actually stored in OPF metadata if it is at all.
+# todo Add tests
+#
+# export def series_year_from_opf []: record -> string {
+#   ""
+# }
+
+# Extract the title from OPF metadata
+#
+# todo Add tests
+export def title_from_opf []: record -> string {
+  let opf = $in
+  let metadata = $opf | get content | where tag == "metadata"
+  if ($metadata | is-empty) {
+    return null
+  }
+  if ($metadata | length) > 1 {
+    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring metadata."
+    return null
+  }
+  let title = $metadata | first | get content | where tag == "title"
+  if ($title | is-empty) {
+    return null
+  }
+  if ($metadata | length) > 1 {
+    log warning $"Somehow found multiple title fields of the OPF metadata: ($title). Ignoring metadata."
+    return null
+  }
+  let titles = $title | first | get content | get content
+  if ($titles | is-empty) {
+    return null
+  }
+  if ($titles | length) > 1 {
+    log warning $"Somehow found multiple Titles field of the OPF metadata: ($titles). Ignoring title field."
+    return null
+  }
+  $titles | first
+}
+
+# Extract the ISBN from Comic Info and/or OPF metadata
+#
+# todo Add tests.
+#
+export def isbn_from_metadata [
+  working_directory: directory # The scratch-space directory to use
+]: record -> string {
+  let metadata = $in
+  if $metadata == null or ($metadata | is-empty) {
+    return null
+  }
+
+  # Prefer the Comic Info metadata
+  let isbn = (
+    if "comic_info" in $metadata {
+      $metadata.comic_info | isbn_from_comic_info
+    } else {
+      null
+    }
+  )
+
+  if $isbn == null {
+    if "opf" in $metadata {
+      $metadata.opf | isbn_from_opf
+    } else {
+      null
+    }
+  } else {
+    $isbn
+  }
+}
+
+# Extract the issue from Comic Info and/or OPF metadata
+#
+# todo Add tests.
+#
+export def issue_from_metadata []: record -> string {
+  let metadata = $in
+  if $metadata == null or ($metadata | is-empty) {
+    return null
+  }
+
+  # Prefer the Comic Info metadata
+  let issue = (
+    if "comic_info" in $metadata {
+      $metadata.comic_info | issue_from_comic_info
+    } else {
+      null
+    }
+  )
+
+  if $issue == null {
+    if "opf" in $metadata {
+      $metadata.opf | issue_from_opf
+    } else {
+      null
+    }
+  } else {
+    $issue
+  }
+}
+
+# Extract the issue year from Comic Info and/or OPF metadata
+#
+# todo Add tests.
+#
+export def issue_year_from_metadata []: record -> string {
+  let metadata = $in
+  if $metadata == null or ($metadata | is-empty) {
+    return null
+  }
+
+  # Prefer the Comic Info metadata
+  let issue_year = (
+    if "comic_info" in $metadata {
+      $metadata.comic_info | issue_year_from_comic_info
+    } else {
+      null
+    }
+  )
+
+  if $issue_year == null {
+    if "opf" in $metadata {
+      $metadata.opf | issue_year_from_opf
+    } else {
+      null
+    }
+  } else {
+    $issue_year
+  }
+}
+
+# Extract the series from Comic Info and/or OPF metadata
+#
+# todo Add tests.
+#
+export def series_from_metadata []: record -> string {
+  let metadata = $in
+  if $metadata == null or ($metadata | is-empty) {
+    return null
+  }
+
+  # Prefer the Comic Info metadata
+  let series = (
+    if "comic_info" in $metadata {
+      $metadata.comic_info | series_from_comic_info
+    } else {
+      null
+    }
+  )
+
+  if $series == null {
+    if "opf" in $metadata {
+      $metadata.opf | series_from_opf
+    } else {
+      null
+    }
+  } else {
+    $series
+  }
+}
+
+# Extract the series year from Comic Info and/or OPF metadata
+#
+# Don't know how to get the series year from OPF metadata, so the year can only be retrieved from Comic Info.
+#
+# todo Add tests.
+#
+export def series_year_from_metadata []: record -> string {
+  let metadata = $in
+  if $metadata == null or ($metadata | is-empty) {
+    return null
+  }
+  let series_year = (
+    if "comic_info" in $metadata {
+      $metadata.comic_info | series_year_from_comic_info
+    } else {
+      null
+    }
+  )
+}
+
+# Extract the title from Comic Info and/or OPF metadata
+#
+# todo Add tests.
+#
+export def title_from_metadata []: record -> string {
+  let metadata = $in
+  if $metadata == null or ($metadata | is-empty) {
+    return null
+  }
+
+  # Prefer the Comic Info metadata
+  let title = (
+    if "comic_info" in $metadata {
+      $metadata.comic_info | title_from_comic_info
+    } else {
+      null
+    }
+  )
+
+  if $title == null {
+    if "opf" in $metadata {
+      $metadata.opf | title_from_opf
+    } else {
+      null
+    }
+  } else {
+    $title
+  }
+}
+
+# Extract a file from a zip archive
+export def extract_file_from_archive [
+    file: path
+    working_directory: directory # The scratch-space directory to use
+]: path -> path {
+    let archive = $in
+    ^unzip $archive $file -d $working_directory
+    [$working_directory $file] | path join
+}
+
+# Extract the ComicInfo.xml file from an archive
+export def extract_comic_info_xml [
+    working_directory: directory # The scratch-space directory to use
+]: path -> record {
+    let archive = $in
+    if not ($archive | has_comic_info) {
+      return null
+    }
+    let comic_info_file = $archive | extract_file_from_archive "ComicInfo.xml" $working_directory
+    let comic_info = $comic_info_file | open
+    rm $comic_info_file
+    $comic_info
+}
+
 # Extract the ComicInfo.xml file from an archive
 export def extract_comic_info [
     working_directory: directory # The scratch-space directory to use
 ]: path -> path {
-    let archive = $in;
+    let archive = $in
     ^unzip $archive "ComicInfo.xml" -d $working_directory
     [$working_directory "ComicInfo.xml"] | path join
 }
 
-# Inject a ComicInfo.xml file into an archive
+export def has_comic_info []: [
+    path -> bool
+] {
+  let archive = $in
+  (
+    $archive
+    | list_files_in_archive
+    | path basename
+    | any {|name| $name == "ComicInfo.xml"}
+  )
+}
+
+# Inject ComicInfo data into a zip archive
+#
 # Takes a record containing the archive and ComicInfo.xml file
 export def inject_comic_info []: [
-    record<archive: path, comic_info: path> -> path
+  record<archive: path, comic_info: record> -> path
 ] {
     let input = $in
-    let has_comic_info = (
-        ^unzip -l $input.archive
-        | lines
-        | drop nth 0 1
-        | drop 2
-        | str trim
-        | parse "{length}  {date} {time}   {name}"
-        | get name
-        | path basename
-        | any {|name| $name == "ComicInfo.xml"}
-    )
-    if $has_comic_info {
+    if ($input.archive | has_comic_info) {
         ^zip --delete $input.archive "ComicInfo.xml"
     }
-    ^zip --junk-paths $input.archive $input.comic_info
+    let temporary_directory = mktemp --directory
+    let target = [$temporary_directory "ComicInfo.xml"] | path join
+    $input.comic_info | to xml | save $target
+    ^zip --junk-paths $input.archive $target
+    rm $target $temporary_directory
     $input.archive
 }
 
@@ -127,7 +936,7 @@ export def optimize_images []: list<path> -> record<bytes: filesize, difference:
                 { difference: 0.0, bytes: (0.0 | into filesize) }
             } else {
                 $line
-                | parse --regex 'Total:\W+(?P<difference>.+)%\W+(?P<bytes>.+)'
+                | parse --regex 'Total:\s+(?P<difference>.+)%\s+(?P<bytes>.+)'
                 | first
                 | (
                     let i = $in;
@@ -251,56 +1060,139 @@ export def pdf_to_cbz [
     $cbz
 }
 
+# Parse metadata from a comic file name
+#
+# <series> (<series_year>) #<issue> (<issue_year>)
+export def metadata_from_comic_filename []: path -> record {
+  let file = $in
+  let stem = $file | path parse | get stem
+  let metadata = (
+    $stem
+    | parse --regex '(?P<series>.+?)\s+(?:\((?P<series_year>[0-9]+)\)\s+){0,1}#(?P<issue>[0-9]+)\s+(?:\((?P<issue_year>[0-9]+)\)){0,1}'
+  )
+  # let metadata = (
+    if ($metadata | is-empty) {
+      null
+      # $stem
+      # | parse --regex '(?P<series>.+) (?P<series_year>\([0-9]+\))? #(?P<issue>[0-9]+) (?P<issue_year>\([0-9]+\))?'
+    } else {
+      $metadata | first
+    }
+  # )
+}
+
 # Incorporate metadata for ComicTagger in the filename.
-export def rename_cbz_from_epub_metadata [
-    epub: path
+export def comic_file_name_from_metadata [
+    working_directory: directory
     --issue: string
-    --issue_year: string
+    --issue-year: string
     --series: string
-    --series_year: string
-    --title: string
+    --series-year: string
 ]: path -> path {
-    let cbz = $in
-    let opf_file = ($epub | path parse | update extension "opf" | path join)
-    ^ebook-meta --to-opf $opf_file $epub
-    let epub_title = (
-        $opf_file
-        | open
-        | from xml
-        | get content
-        | where tag == 'metadata'
-        | first
-        | get content
-        | where tag == 'title'
-        | first
-        | get content
-        | first
-        | get content
+    let file = $in
+    let metadata = $file | get_metadata $working_directory
+    let title = $metadata | title_from_metadata
+    if $title != null {
+      log debug $"Title from metadata: ($title)"
+    }
+    let series = (
+      if $series == null {
+        $metadata | series_from_metadata
+      } else {
+        $series
+      }
     )
-    log debug $"EPUB title: ($epub_title)"
+    let series_year = (
+      if $series_year == null {
+        $metadata | series_year_from_metadata
+      } else {
+        $series_year
+      }
+    )
+    let issue = (
+      if $issue == null {
+        $metadata | issue_from_metadata
+      } else {
+        $issue
+      }
+    )
+    let issue_year = (
+      if $issue_year == null {
+        $metadata | issue_year_from_metadata
+      } else {
+        $issue_year
+      }
+    )
+
+    let filename_metadata = $file | metadata_from_comic_filename
+    let series = (
+      if $series == null {
+        if $filename_metadata == null {
+          null
+        } else {
+          $filename_metadata | get series
+        }
+      } else {
+        $series
+      }
+    )
+    let series_year = (
+      if $series_year == null {
+        if $filename_metadata == null {
+          null
+        } else {
+          $filename_metadata | get series_year
+        }
+      } else {
+        $series_year
+      }
+    )
+    let issue = (
+      if $issue == null {
+        if $filename_metadata == null {
+          null
+        } else {
+          $filename_metadata | get issue
+        }
+      } else {
+        $issue
+      }
+    )
+    let issue_year = (
+      if $issue_year == null {
+        if $filename_metadata == null {
+          null
+        } else {
+          $filename_metadata | get issue_year
+        }
+      } else {
+        $issue_year
+      }
+    )
 
     let parsed_title = (
-        if ($epub_title | str contains "Volume") {
+        if ($title | str contains "Volume") {
             (
-                $epub_title
+                $title
                 | parse --regex '(?P<series>.+) Volume (?P<issue>[0-9]+)'
                 | first
             )
-        } else if ($epub_title =~ '.*,*[\W_]+[vV][oO][lL]\.*\W*[0-9]+') {
+        } else if ($title =~ '.*,*[\s_]+[vV][oO][lL]\.*\s*[0-9]+') {
             (
-                $epub_title
-                | parse --regex '(?P<series>.+),*[\W_]+[vV][oO][lL]\.*\W*(?P<issue>[0-9]+)'
+                $title
+                | parse --regex '(?P<series>.+),*[\s_]+[vV][oO][lL]\.*\s*(?P<issue>[0-9]+)'
                 | first
             )
-        } else if $epub_title =~ ".+ [0-9]+" {
-            $epub_title
+        } else if $title =~ ".+ [0-9]+" {
+            $title
             | parse --regex '(?P<series>.+) (?P<issue>[0-9]+)'
             | first
         } else {
-            { series: $epub_title, issue: 1 }
+            { series: $title, issue: 1 }
         }
     )
-    log debug $"Retrieved the title (ansi purple)'($parsed_title)'(ansi reset) from Calibre"
+    log debug $"Parsed the title as (ansi purple)($parsed_title)(ansi reset)"
+
     let series = (
         if $series == null {
             if $parsed_title == null {
@@ -327,30 +1219,48 @@ export def rename_cbz_from_epub_metadata [
     )
 
     if $series == null and $issue == null {
-        log error $"Unable to determine the series and issue from the EPUB title '($epub_title)'. Pass the Comic Vine issue id with the (ansi green)--comic-vine-issue-id(ansi reset) flag."
-        $cbz
+        log error $"Unable to determine the series and issue from the metadata title '($title)'. Pass the Comic Vine issue id with the (ansi green)--comic-vine-issue-id(ansi reset) flag."
+        $file
     } else {
-        let directory = ($cbz | path parse | get parent)
-        let comic_file = $"($series) \(($series_year)\) #($issue) \(($issue_year)\).cbz"
-        log debug $"Renaming the CBZ file to (ansi yellow)($directory)/($comic_file)(ansi reset) for ComicTagger"
-        mv $cbz $"($directory)/($comic_file)"
-        $"($directory)/($comic_file)"
+        $file | path parse | update stem $"($series) \(($series_year)\) #($issue) \(($issue_year)\)" | path join
     }
+}
+
+# List the files in a zip archive
+export def list_files_in_archive []: path -> list<path> {
+    let archive = $in
+    (
+      ^unzip -l $archive
+      | lines
+      | drop nth 0 1
+      | drop 2
+      | str trim
+      | parse "{length}  {date} {time}   {name}"
+      | get name
+      | uniq
+      | sort
+    )
+}
+
+# List the image files in a zip archive
+export def list_image_files_in_archive []: path -> list<path> {
+    let archive = $in
+    (
+      $archive
+        | list_files_in_archive
+        | path parse
+        | where extension in $image_extensions
+        | path join
+    )
 }
 
 # Get the image extension used in a comic book archive
 export def get_image_extension []: path -> string {
     let cbz = $in
     let file_extensions = (
-        ^unzip -l $cbz
-        | lines
-        | drop nth 0 1
-        | drop 2
-        | str trim
-        | parse "{length}  {date} {time}   {name}"
-        | get name
+        $cbz
+        | list_image_files_in_archive
         | path parse
-        | where extension != "xml"
         | get extension
         | filter {|extension| not ($extension | is-empty) }
         | uniq
@@ -793,12 +1703,13 @@ export def export_book_to_directory [
   { book: $book, opf: $opf, cover: $cover }
 }
 
+# todo Pass around opf as metadata instead of a file path.
 export def embed_book_metadata [
   working_directory: path
-] : record<book: path, cover: path, opf: path> -> record<book: path, cover: path, opf: path> {
+]: record<book: path, cover: path, opf: path> -> record<book: path, cover: path, opf: path> {
   let input = $in
   let book_format = ($input.book | path parse | get extension)
-  if $book_format != "pdf" {
+  if $book_format == "epub" {
     ^ebook-meta $input.book --cover $input.cover --from-opf $input.opf
   }
   $input

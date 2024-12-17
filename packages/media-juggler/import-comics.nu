@@ -193,12 +193,13 @@ def main [
     --delete # Delete the original file
     --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
     --ereader-subdirectory: string = "Books/Manga" # The subdirectory on the e-reader in-which to copy
-    --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
+    # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
+    --isbn: string
     --interactive # Ask for input from the user
     --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
     # --issue: string # The issue number
     # --issue-year: string # The publication year of the issue
-    --manga: string = "Yes (Right to Left)" # Whether the file is manga "Yes", right-to-left manga "Yes (Right to Left)", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
+    --manga: string = "YesAndRightToLeft" # Whether the file is manga "Yes", right-to-left manga "YesAndRightToLeft", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
     --minio-alias: string = "jwillikers" # The alias of the MinIO server used by the MinIO client application
     --minio-path: string = "media/Books/Books" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
     --minio-archival-path: string = "media-archive/Books/Books" # The upload bucket and directory on the MinIO server where EPUBs will be archived. The file will be uploaded under a subdirectory named after the author.
@@ -217,6 +218,11 @@ def main [
 
     if $comic_vine_issue_id != null and ($files | length) > 1 {
         log error "Setting the comic vine issue id for multiple files is not allowed as it will result in overwriting the final file"
+        exit 1
+    }
+
+    if $isbn != null and ($files | length) > 1 {
+        log error "Setting the ISBN for multiple files is not allowed as it will result in overwriting the final file"
         exit 1
     }
 
@@ -248,11 +254,14 @@ def main [
     }
 
     if $clear_comictagger_cache {
+      log debug "Clearing the ComicTagger cache"
       rm --force --recursive ([$env.HOME ".cache" "ComicTagger"] | path join)
     }
 
-    let results = $files | each {|original_file|
+    # let results = null
+    # let original_file = $files | first
 
+    let results = $files | each {|original_file|
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
     let temporary_directory = (mktemp --directory "import-comics.XXXXXXXXXX")
@@ -264,41 +273,47 @@ def main [
         if ($original_file | str starts-with "minio:") {
             let file = ($original_file | str replace "minio:" "")
             let target = [$temporary_directory ($file | path basename)] | path join
+            log debug $"Downloading the file (ansi yellow)($file)(ansi reset) from MinIO to (ansi yellow)($target)(ansi reset)"
             ^mc cp $file $target
             $target
         } else {
             let target = [$temporary_directory ($original_file | path basename)] | path join
+            log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
             cp $original_file $target
             $target
         }
     )
 
-    let input_format = ($file | path parse | get extension)
+    let original_input_format = ($file | path parse | get extension)
 
     let original_comic_info = (
-        if ($input_format == "pdf") {
-            let comic_info_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml")
-            if ($original_file | str starts-with "minio:") {
-                if (^mc stat $comic_info_file | complete).exit_code == 0 {
-                    $comic_info_file
-                }
-            } else {
-                if ($comic_info_file | path exists) {
-                    $comic_info_file
-                }
+        let comic_info_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml");
+        if ($original_file | str starts-with "minio:") {
+            if (^mc stat $comic_info_file | complete).exit_code == 0 {
+                $comic_info_file
             }
         } else {
-          null
+            if ($comic_info_file | path exists) {
+                $comic_info_file
+            }
         }
     )
 
+    if $original_comic_info != null {
+        log debug $"Found Comic Info file (ansi yellow)($original_comic_info)(ansi reset)"
+    }
+
     let comic_info = (
-        if ($input_format == "pdf" and $original_comic_info != null) {
+        if $original_comic_info != null {
             let comic_info_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml")
             if ($original_file | str starts-with "minio:") {
-                ^mc cp $original_comic_info $"($temporary_directory)/($comic_info_file | path basename)"
+                let target = [$temporary_directory ($comic_info_file | path basename)] | path join
+                log debug $"Downloading the file (ansi yellow)($original_comic_info)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                ^mc cp $original_comic_info $target
             } else {
-                cp $original_comic_info $"($temporary_directory)/($comic_info_file | path basename)"
+                let target = [$temporary_directory ($comic_info_file | path basename)] | path join
+                log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                cp $original_comic_info $target
             }
             [$temporary_directory ($comic_info_file | path basename)] | path join
         } else {
@@ -306,42 +321,78 @@ def main [
         }
     )
 
-    let original_cover = (
-        if ($input_format == "pdf") {
-            if ($original_file | str starts-with "minio:") {
-                let file = $original_file | str replace "minio:" ""
-                let covers = (
-                    ^mc find ($file | path dirname) --name 'cover.*'
-                    | lines --skip-empty
-                    | filter {|f|
-                        let components = ($f | path parse);
-                        $components.stem == "cover" and $components.extension in $image_extensions
-                    }
-                )
-                if not ($covers | is-empty) {
-                    if ($covers | length) > 1 {
-                        log error $"Found multiple files looking for the cover image file:\n($covers)\n"
-                        exit 1
-                    } else {
-                        $covers | first
-                    }
-                }
-            } else {
-                let covers = (glob $"($original_file | path dirname)/cover.{($image_extensions | str join ',')}")
-                if not ($covers | is-empty) {
-                    if ($covers | length) > 1 {
-                        log error $"Found multiple files looking for the cover image file:\n($covers)\n"
-                        exit 1
-                    } else {
-                        $covers | first
-                    }
-                }
+    let original_opf = (
+        let opf_file = ($original_file | str replace "minio:" "" | path dirname | path join "metadata.opf");
+        if ($original_file | str starts-with "minio:") {
+            if (^mc stat $opf_file | complete).exit_code == 0 {
+                $opf_file
             }
+        } else {
+            if ($opf_file | path exists) {
+                $opf_file
+            }
+        }
+    )
+
+    if $original_opf != null {
+        log debug $"Found OPF metadata file (ansi yellow)($original_opf)(ansi reset)"
+    }
+
+    let opf = (
+        if $original_opf != null {
+            let opf_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml")
+            if ($original_file | str starts-with "minio:") {
+                let target = [$temporary_directory ($opf_file | path basename)] | path join
+                log debug $"Downloading the file (ansi yellow)($original_opf)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                ^mc cp $original_opf $target
+            } else {
+                let target = [$temporary_directory ($opf_file | path basename)] | path join
+                log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                cp $original_opf $target
+            }
+            [$temporary_directory ($opf_file | path basename)] | path join
         } else {
           null
         }
     )
 
+    let original_cover = (
+        if ($original_file | str starts-with "minio:") {
+            let file = $original_file | str replace "minio:" ""
+            let covers = (
+                ^mc find ($file | path dirname) --name 'cover.*'
+                | lines --skip-empty
+                | filter {|f|
+                    let components = ($f | path parse);
+                    $components.stem == "cover" and $components.extension in $image_extensions
+                }
+            )
+            if not ($covers | is-empty) {
+                if ($covers | length) > 1 {
+                    log error $"Found multiple files looking for the cover image file:\n($covers)\n"
+                    exit 1
+                } else {
+                    $covers | first
+                }
+            }
+        } else {
+            let covers = (glob $"($original_file | path dirname)/cover.{($image_extensions | str join ',')}")
+            if not ($covers | is-empty) {
+                if ($covers | length) > 1 {
+                    log error $"Found multiple files looking for the cover image file:\n($covers)\n"
+                    exit 1
+                } else {
+                    $covers | first
+                }
+            }
+        }
+    )
+
+    if $original_cover != null {
+        log debug $"Found the cover file (ansi yellow)($original_cover)(ansi reset)"
+    }
+
+    # todo Incorporate the original cover file?
     # let cover = (
     #     if ($input_format == "pdf" and $original_cover != null) {
     #         if ($original_file | str starts-with "minio:") {
@@ -355,83 +406,152 @@ def main [
     #     }
     # )
 
-    let original_comic_files = [$original_file] | append original_comic_info | append original_cover
+    let original_comic_files = [$original_file] | append $original_comic_info | append $original_cover | append $original_opf
+    log debug $"The original files for the comic are (ansi yellow)($original_comic_files)(ansi reset)"
 
     let output_format = (
-        if $input_format == "pdf" and not $archive_pdf {
+        if $original_input_format == "pdf" and not $archive_pdf {
             "pdf"
         } else {
             "cbz"
         }
     )
 
-    # todo Support PDF to CBZ (JXL) via cbconvert?
     let formats = (
-        if $input_format == "acsm" {
-            let epub = ($file | acsm_to_epub $temporary_directory | optimize_images_in_zip | polish_epub)
-            let cbz = (
-                $epub
-                | epub_to_cbz --working-directory $temporary_directory
-                | (
-                    let cbz = $in;
-                    if $comic_vine_issue_id == null and not $ignore_epub_title {
-                        $cbz | rename_cbz_from_epub_metadata $epub
-                    } else {
-                        $cbz
-                    }
-                )
-            )
-            { cbz: $cbz, epub: $epub }
-        } else if $input_format == "epub" {
-            let cbz = (
-                $file
-                | optimize_images_in_zip
-                | polish_epub
-                | epub_to_cbz --working-directory $temporary_directory
-                | (
-                    let cbz = $in;
-                    if $comic_vine_issue_id == null and not $ignore_epub_title {
-                        $cbz | rename_cbz_from_epub_metadata $file
-                    } else {
-                        $cbz
-                    }
-                )
-            )
-            { cbz: $cbz, epub: $file }
-        } else if $input_format in ["cbz" "zip"] {
+        if $original_input_format == "acsm" {
+            log debug "Decrypting and converting the ACSM file to an EPUB"
+            { epub: ($file | acsm_to_epub $temporary_directory) }
+        } else if $original_input_format == "epub" {
+            { epub: $file }
+        } else if $original_input_format in ["cbz" "zip"] {
             { cbz: $file }
-        } else if $input_format == "pdf" {
-          let cbz = (
-            $file
-            | cbconvert --format "jpeg" --quality 90
-            | (
-              let archive = $in;
-              if $comic_info != null {
-                {
-                  archive: $archive,
-                  comic_info: $comic_info,
-                }
-                | inject_comic_info
-              } else {
-                $archive
-              }
-            )
-          )
-          if $comic_info != null {
-            rm $comic_info
-          }
-          { cbz: $cbz, pdf: $file }
+        } else if $original_input_format == "pdf" {
+          { pdf: $file }
         } else {
-            log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
+            log error $"Unsupported input file type (ansi red_bold)($original_input_format)(ansi reset)"
             exit 1
         }
     )
 
-    log debug $"Fetching and writing metadata to '($formats.cbz)' with ComicTagger"
+    let input_format = (
+        if $original_input_format == "acsm" {
+            "epub"
+        } else {
+            $original_input_format
+        }
+    )
+
+    if "epub" in $formats {
+        log debug "Optimizing the EPUB"
+        $formats.epub | optimize_images_in_zip | polish_epub
+    }
+
+    # Try to get the ISBN from the comics metadata.
+    let isbn = (
+        if $isbn == null {
+            log debug "Attempting to get the ISBN from existing metadata"
+            $file | get_metadata $temporary_directory | isbn_from_metadata $temporary_directory
+        } else {
+          $isbn
+        }
+    )
+
+    # Try to get the ISBN from the pages in the comic
+    let isbn = (
+        if $isbn == null {
+            log debug "Attempting to get the ISBN from the first ten and last ten pages of the comic"
+            let isbn_numbers = $file | isbn_from_pages $temporary_directory
+            if ($isbn_numbers | is-empty) {
+                null
+            } else if ($isbn_numbers | length) > 1 {
+                # todo Allow selecting from one of these ISBNs interactively?
+                log warning $"Found multiple potential ISBNs in the book's pages: ($isbn_numbers). Ignoring the ISBNs."
+                null
+            } else {
+                $isbn_numbers | first
+            }
+        } else {
+            $isbn
+        }
+    )
+    if $isbn == null {
+        log warning $"Unable to determine the ISBN from metadata or the pages of the comic"
+    } else {
+        log debug $"The ISBN is (ansi purple)($isbn)(ansi reset)"
+    }
+
+    # todo Should existing metadata be merged with the fetched metadata?
+    # Right now, existing metadata is completely ignored except for the Comic Info already embedded in a CBZ because ComicTagger will read that.
+
+    # Fetch ebook metadata using the ISBN
+    let formats = (
+        if $isbn != null {
+            log debug $"Fetching book metadata for the ISBN (ansi purple)($isbn)(ansi reset)"
+            $formats | update $input_format (
+                $formats
+                | get $input_format
+                | fetch_book_metadata --isbn $isbn $temporary_directory
+                | export_book_to_directory $temporary_directory
+                | embed_book_metadata $temporary_directory
+                | get book
+            )
+        } else {
+            $formats
+        }
+    )
+
+    # Rename input file according to metadata
+    let formats = (
+        $formats
+        | update $input_format (
+            if $comic_vine_issue_id == null {
+                let target = $formats | get $input_format | comic_file_name_from_metadata $temporary_directory
+                log debug $"Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                mv ($formats | get $input_format) $target
+                $target
+            } else {
+                $formats | get $input_format
+            }
+        )
+    )
+
+    # Generate a CBZ from the EPUB and PDF formats
+    let formats = (
+        if "epub" in $formats {
+            log debug "Generating a CBZ from the EPUB"
+            $formats | insert cbz ($formats.epub | epub_to_cbz --working-directory $temporary_directory)
+        } else if "pdf" in $formats {
+            log debug "Generating a CBZ from the PDF"
+            let cbz = (
+                $formats.pdf
+                | cbconvert --format "jpeg" --quality 90
+                | (
+                let archive = $in;
+                if $comic_info != null {
+                    {
+                        archive: $archive,
+                        comic_info: (open $comic_info),
+                    }
+                    | inject_comic_info
+                } else {
+                    $archive
+                }
+                )
+            )
+            if $comic_info != null {
+                log debug $"Removing the sidecar ComicInfo file (ansi yellow)($comic_info)(ansi reset)"
+                rm $comic_info
+            }
+            $formats | insert cbz $cbz
+        } else {
+            $formats
+        }
+    )
+
+    log debug $"Fetching and writing metadata to (ansi yellow)($formats.cbz)(ansi reset) with ComicTagger"
     let tag_result = (
         $formats.cbz | tag_cbz $comictagger --comic-vine-issue-id $comic_vine_issue_id
     )
-
     log debug $"The ComicTagger result is:\n(ansi green)($tag_result.result)(ansi reset)\n"
 
     if ($tag_result.result.status == "match_failure") {
@@ -446,7 +566,7 @@ def main [
         }
     }
 
-    log debug "Renaming the CBZ according to the updated metadata"
+    log debug "Renaming the CBZ according to the updated metadata from ComicTagger"
     let formats = $formats | (
         let format = $in;
         $format | update cbz ($format.cbz | comictagger_rename_cbz --comictagger $comictagger)
@@ -464,10 +584,11 @@ def main [
         $authors
       } | sort | uniq
     )
-    log debug $"Authors determined to be (ansi purple)'($authors)'(ansi reset)"
+    log debug $"The authors are (ansi purple)'($authors)'(ansi reset)"
 
     # We keep the name of the series in the title to keep things organized.
     # Displaying only "Vol. 4" as the title can be confusing.
+    log debug "Including the series as part of the title and making it consistent"
     let title = (
         if $title == null {
             $comic_metadata
@@ -479,14 +600,32 @@ def main [
                   if $metadata.title == null or $metadata.title == $metadata.series {
                     $metadata.series
                   } else {
-                    $"($metadata.series): ($metadata.title)"
+                    if ($metadata.title | str starts-with $"($metadata.series): ") {
+                        $metadata.title
+                    } else {
+                        $"($metadata.series): ($metadata.title)"
+                    }
                   }
                 } else {
-                  if $metadata.title == null or $metadata.title =~ 'Volume [0-9]+' or $metadata.title =~ 'Vol. [0-9]+' {
-                    $"($metadata.series), Vol. ($metadata.issue)"
-                  } else {
-                    $"($metadata.series), Vol. ($metadata.issue): ($metadata.title)"
-                  }
+                    let sanitized_title = (
+                        if $metadata.title == null {
+                            null
+                        } else {
+                            # todo Use a regex here so that this ignores incorrect series and issue information?
+                            if ($metadata.title | str starts-with $"($metadata.series), Vol. ($metadata.issue): ") {
+                                $metadata.title | str replace $"($metadata.series), Vol. ($metadata.issue): " ""
+                            } else if ($metadata.title | str starts-with $"($metadata.series), Vol. ($metadata.issue)") {
+                                $"Volume ($metadata.issue)"
+                            } else {
+                                $metadata.title
+                            }
+                        }
+                    )
+                    if $sanitized_title == null or $sanitized_title =~ 'Volume [0-9]+' or $sanitized_title =~ 'Vol. [0-9]+' {
+                        $"($metadata.series), Vol. ($metadata.issue)"
+                    } else {
+                        $"($metadata.series), Vol. ($metadata.issue): ($sanitized_title)"
+                    }
                 }
             )
         } else {
@@ -496,9 +635,41 @@ def main [
 
     let previous_title = ($comic_metadata | get title)
     log info $"Rewriting the title from (ansi yellow)'($previous_title)'(ansi reset) to (ansi yellow)'($title)'(ansi reset)"
-    let sanitized_title = $title | str replace --all '"' '\"'
+    # let sanitized_title = $title | str replace --all '"' '\"'
     # todo Read from YAML file to ensure proper string escaping of single / double quotes?
-    $formats.cbz | comictagger_update_metadata $"manga: \"($manga)\", title: \"($sanitized_title)\"" --comictagger $comictagger
+    # let metadata_yaml = $"manga: \"($manga)\", title: \"($sanitized_title)\""
+    # let metadata_yaml = (
+    #   if $isbn != null {
+    #     $metadata_yaml
+    #   } else {
+    #     $metadata_yaml + $", GTIN: \"($isbn)\""
+    #   }
+    # )
+    # $formats.cbz | comictagger_update_metadata $metadata_yaml --comictagger $comictagger
+
+    # Add the ISBN to the ComicInfo
+    log info "Updating the ComicInfo"
+    (
+        $formats.cbz
+        | extract_comic_info_xml $temporary_directory
+        # todo Determine BlackAndWhite automatically.
+        # | upsert_comic_info {BlackAndWhite: $}
+        | (
+            let info = $in;
+            if $isbn == null {
+                $info
+            } else {
+                $info | upsert_comic_info {tag: "GTIN", value: $isbn}
+            }
+        )
+        | upsert_comic_info {tag: "Manga", value: $manga}
+        | upsert_comic_info {tag: "Title", value: $title}
+        | {
+            archive: $formats.cbz
+            comic_info: $in
+        }
+        | inject_comic_info
+    )
 
     let formats = (
         # Update the metadata in the EPUB and rename it to match the filename of the CBZ
@@ -553,7 +724,10 @@ def main [
                       | convert_to_lossless_jxl
                       | (
                         let cbz = $in;
-                        { archive: $cbz, comic_info: $formats.comic_info }
+                        {
+                            archive: $cbz
+                            comic_info: (open $formats.comic_info)
+                        }
                     ) | inject_comic_info
                   )
                 } else {

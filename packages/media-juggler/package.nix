@@ -10,9 +10,11 @@
   # m4b-tool,
   minio-client,
   makeWrapper,
+  mupdf-headless,
   nushell,
   picard,
   stdenvNoCC,
+  tesseract,
   tone,
   udisks,
   unstable,
@@ -46,6 +48,7 @@ else
       minio-client
       nushell
       picard
+      tesseract
       udisks
       util-linux
       zip
@@ -93,6 +96,8 @@ else
             image_optim
             # kcc
             minio-client
+            mupdf-headless
+            tesseract
             udisks
             util-linux
             zip
@@ -105,6 +110,8 @@ else
             file
             image_optim
             minio-client
+            mupdf-headless
+            tesseract
             udisks
             util-linux
             zip
