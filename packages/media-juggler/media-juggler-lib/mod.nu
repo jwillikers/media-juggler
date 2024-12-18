@@ -1730,16 +1730,36 @@ export def export_book_to_directory [
     | first
     | get content
   )
-  let target_directory = [$working_directory $title] | path join
+  # todo Handle missing title?
+  let sanitized_title_for_filename = $title | str replace --all "/" "-"
+  let target_directory = [$working_directory $sanitized_title_for_filename] | path join
   mkdir $target_directory
-  let opf = ({ parent: $target_directory, stem: "metadata", extension: "opf" } | path join)
+  let opf = (
+    {
+      parent: $target_directory
+      stem: "metadata"
+      extension: "opf"
+    } | path join
+  )
   (
     $input.opf
     | to xml
     | save --force $opf
   )
-  let cover = ($input.cover | path parse | update parent $target_directory | update stem "cover" | path join)
-  let book = ($input.book | path parse | update parent $target_directory | update stem $title | path join)
+  let cover = (
+    $input.cover
+    | path parse
+    | update parent $target_directory
+    | update stem "cover"
+    | path join
+  )
+  let book = (
+    $input.book
+    | path parse
+    | update parent $target_directory
+    | update stem $sanitized_title_for_filename
+    | path join
+  )
   mv $input.cover $cover
   mv $input.book $book
   {
