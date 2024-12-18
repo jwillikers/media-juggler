@@ -35,7 +35,7 @@ def main [
     --minio-alias: string = "jwillikers" # The alias of the MinIO server used by the MinIO client application
     --minio-path: string = "media/Books/Books" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
     --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
-    --output-directory: directory # Directory to place files when not being uploaded
+    --output-directory: directory # Directory to place files on the local filesystem if desired
     --skip-upload # Don't upload files to the server
     --title: string # The title of the comic or manga issue
 ] {
@@ -51,12 +51,18 @@ def main [
 
     let output_directory = (
         if $output_directory == null {
+          if $skip_upload {
             "." | path expand
+          } else {
+            null
+          }
         } else {
-            $output_directory
+          $output_directory | path expand
         }
     )
-    mkdir $output_directory
+    if $output_directory != null {
+        mkdir $output_directory
+    }
 
     let username = (^id --name --user)
     let ereader_disk_label = (
@@ -76,14 +82,15 @@ def main [
       mkdir $ereader_target_directory
     }
 
-    for original_file in $files {
+    # let original_file = $files | first
+    let results = $files | each {|original_file|
 
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
     let temporary_directory = (mktemp --directory "import-ebooks.XXXXXXXXXX")
     log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
-    # try {
+    try {
 
     # todo Add support for input files from Calibre using the Calibre ID number?
     let file = (
@@ -92,72 +99,94 @@ def main [
             let target = [$temporary_directory ($file | path basename)] | path join
             log debug $"Downloading the file (ansi yellow)($file)(ansi reset) from MinIO to (ansi yellow)($target)(ansi reset)"
             ^mc cp $file $target
-            let opf = $file | path dirname | path join "metadata.opf"
-            if (^mc stat $opf | complete).exit_code == 0 {
-                let opf_target = [$temporary_directory ($opf | path basename)] | path join
-                log debug $"Downloading the file (ansi yellow)($opf)(ansi reset) from MinIO to (ansi yellow)($opf_target)(ansi reset)"
-                ^mc cp $opf $opf_target
-            }
-            let covers = (
-                ^mc find --maxdepth 1 ($file | path dirname) --name 'cover.*'
-                | lines --skip-empty
-                | filter {|f|
-                    let components = $f | path parse
-                    $components.stem == "cover" and $components.extension in $image_extensions
-                }
-            )
-            let cover = (
-                if ($covers | is-not-empty) {
-                    if ($covers | length) > 1 {
-                        log error $"Found multiple files looking for the cover image file:\n($covers)\n"
-                        null
-                    } else {
-                        $covers | first
-                    }
-                }
-            )
-            if $cover != null {
-                let cover_target = [$temporary_directory ($cover | path basename)] | path join
-                log debug $"Downloading the file (ansi yellow)($cover)(ansi reset) from MinIO to (ansi yellow)($cover_target)(ansi reset)"
-                ^mc cp $cover $cover_target
-            }
             [$temporary_directory ($file | path basename)] | path join
         } else {
             let target = [$temporary_directory ($original_file | path basename)] | path join
             log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
             cp $original_file $target
-            let opf = $original_file | path dirname | path join "metadata.opf"
-            if ($opf | path exists) {
-                let opf_target = [$temporary_directory ($opf | path basename)] | path join
-                log debug $"Copying the file (ansi yellow)($opf)(ansi reset) to (ansi yellow)($opf_target)(ansi reset)"
-                cp $opf $"($temporary_directory)/($opf | path basename)"
-            }
-            let covers = (
-                ls ($original_file | path expand | path dirname)
-                | get name
-                | filter {|f|
-                    let components = $f | path parse
-                    $components.stem == "cover" and $components.extension in $image_extensions
-                }
-            );
-            let cover = (
-                if ($covers | is-not-empty) {
-                    if ($covers | length) > 1 {
-                        log error $"Found multiple files looking for the cover image file:\n($covers)\n"
-                        null
-                    } else {
-                        $covers | first
-                    }
-                }
-            )
-            if $cover != null {
-                let cover_target = [$temporary_directory ($cover | path basename)] | path join
-                log debug $"Copying the file (ansi yellow)($cover)(ansi reset) to (ansi yellow)($cover_target)(ansi reset)"
-                cp $cover $cover_target
-            }
             [$temporary_directory ($original_file | path basename)] | path join
         }
     )
+
+    let original_input_format = $file | path parse | get extension
+
+    let original_opf = (
+        let opf_file = ($original_file | str replace "minio:" "" | path dirname | path join "metadata.opf");
+        if ($original_file | str starts-with "minio:") {
+            if (^mc stat $opf_file | complete).exit_code == 0 {
+                $opf_file
+            }
+        } else {
+            if ($opf_file | path exists) {
+                $opf_file
+            }
+        }
+    )
+
+    if $original_opf != null {
+        log debug $"Found OPF metadata file (ansi yellow)($original_opf)(ansi reset)"
+    }
+
+    let opf = (
+        if $original_opf != null {
+            let target = [$temporary_directory ($original_opf | path basename)] | path join
+            if ($original_file | str starts-with "minio:") {
+                log debug $"Downloading the file (ansi yellow)($original_opf)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                ^mc cp $original_opf $target
+            } else {
+                log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                cp $original_opf $target
+            }
+            $target
+        }
+    )
+
+    let original_cover = (
+        if ($original_file | str starts-with "minio:") {
+            let file = $original_file | str replace "minio:" ""
+            let covers = (
+                ^mc find ($file | path dirname) --name 'cover.*'
+                | lines --skip-empty
+                | filter {|f|
+                    let components = ($f | path parse);
+                    $components.stem == "cover" and $components.extension in $image_extensions
+                }
+            )
+            if not ($covers | is-empty) {
+                if ($covers | length) > 1 {
+                    rm --force --recursive $temporary_directory
+                    return {
+                        file: $original_file
+                        error: $"Found multiple files looking for the cover image file:\n($covers)\n"
+                    }
+                } else {
+                    $covers | first
+                }
+            }
+        } else {
+            let covers = (glob $"($original_file | path dirname)/cover.{($image_extensions | str join ',')}")
+            if not ($covers | is-empty) {
+                if ($covers | length) > 1 {
+                    rm --force --recursive $temporary_directory
+                    return {
+                        file: $original_file
+                        error: $"Found multiple files looking for the cover image file:\n($covers)\n"
+                    }
+                } else {
+                    $covers | first
+                }
+            }
+        }
+    )
+
+    if $original_cover != null {
+        log debug $"Found the cover file (ansi yellow)($original_cover)(ansi reset)"
+    }
+
+    # todo Incorporate the original cover file?
+
+    let original_book_files = [($original_file | str replace "minio:" "")] | append $original_cover | append $original_opf
+    log debug $"The original files for the book are (ansi yellow)($original_book_files)(ansi reset)"
 
     let input_format = ($file | path parse | get extension)
     let output_format = (
@@ -177,38 +206,118 @@ def main [
         } else if $input_format == "pdf" {
             { book: $file }
         } else {
-            log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
-            # todo return error here instead
-            exit 1
+            rm --force --recursive $temporary_directory
+            return {
+                file: $original_file
+                error: $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
+            }
         }
     )
 
-    # Try to get the ISBN from the book's metadata.
-    let isbn = (
-        if $isbn == null {
-          $file | isbn_from_metadata $temporary_directory
-        } else {
-          null
-        }
+    log debug "Attempting to get the ISBN from existing metadata"
+    let metadata_isbn = (
+        $file | get_metadata $temporary_directory | isbn_from_metadata $temporary_directory
     )
+    if $metadata_isbn != null {
+        log debug $"Found the ISBN (ansi purple)($metadata_isbn)(ansi reset) in the book's metadata"
+    }
 
-    # Try to get the ISBN from the pages in the book
-    let isbn = (
-        if $isbn == null {
-            let isbn_numbers = $file | isbn_from_pages $temporary_directory
-            # todo Use OCR on images like for PDF comics here?
-            if ($isbn_numbers | is-empty) {
-                null
-            } else if ($isbn_numbers | length) > 1 {
-                log warning $"Found multiple potential ISBNs in the book's pages: ($isbn_numbers). Ignoring the ISBNs."
-                null
+    log debug "Attempting to get the ISBN from the first ten and last ten pages of the book"
+    let book_isbn_numbers = (
+        $file | isbn_from_pages $temporary_directory;
+        # # todo Use OCR on images like for PDF comics here?
+        # let isbn_numbers = $file | isbn_from_pages $temporary_directory;
+        # if ($isbn_numbers | is-empty) {
+        # } else if ($isbn_numbers | length) > 1 {
+        #     log warning $"Found multiple potential ISBNs in the book's pages: ($isbn_numbers). Ignoring the ISBNs."
+        #     $isbn_numbers
+        # } else {
+        #     $isbn_numbers
+        # }
+    )
+    if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
+        log debug $"Found ISBN numbers in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
+    }
+
+    # Determine the most likely ISBN from the metadata and pages
+    let likely_isbn_from_pages_and_metadata = (
+        if $metadata_isbn != null and $book_isbn_numbers != null {
+            if ($book_isbn_numbers | is-empty) {
+                log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
+                $metadata_isbn
+            } else if $metadata_isbn in $book_isbn_numbers {
+                if ($book_isbn_numbers | length) == 1 {
+                    log debug "Found an exact match between the ISBN in the metadata and the ISBN in the pages of the book"
+                } else if ($book_isbn_numbers | length) > 10 {
+                    rm --force --recursive $temporary_directory
+                    return {
+                        file: $original_file
+                        error: $"Found more than 10 ISBN numbers in the pages of the book: (ansi purple)($book_isbn_numbers)(ansi reset)"
+                    }
+                }
+                $metadata_isbn
             } else {
-                $isbn_numbers | first
+                # todo If only one number is available in the pages, should it be preferred?
+                log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+                if ($book_isbn_numbers | length) == 1 {
+                    log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+                    $book_isbn_numbers | first
+                } else {
+                    if $isbn == null {
+                        rm --force --recursive $temporary_directory
+                        return {
+                            file: $original_file
+                            error: $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset). Use the `--isbn` flag to set the ISBN instead."
+                        }
+                    } else {
+                        log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+                    }
+                }
+            }
+        } else if $metadata_isbn != null {
+            log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
+            $metadata_isbn
+        } else if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
+            if ($book_isbn_numbers | length) == 1 {
+                log debug $"Found a single ISBN in the pages of the book: (ansi purple)($book_isbn_numbers | first)(ansi reset)"
+                $book_isbn_numbers | first
+            } else if ($book_isbn_numbers | length) > 10 {
+                log warning $"Found more than 10 ISBN numbers in the pages of the book: (ansi purple)($book_isbn_numbers)(ansi reset)"
+            } else {
+                log warning $"Found multiple ISBN numbers in the pages of the book: (ansi purple)($book_isbn_numbers)(ansi reset)"
             }
         } else {
-            null
+            log debug "No ISBN numbers found in the metadata or pages of the book"
         }
     )
+
+    let isbn = (
+        if $isbn == null {
+            if $likely_isbn_from_pages_and_metadata == null {
+                log warning $"Unable to determine the ISBN from metadata or the pages of the book"
+            } else {
+                $likely_isbn_from_pages_and_metadata
+            }
+        } else {
+            if $likely_isbn_from_pages_and_metadata != null {
+                if $isbn == $likely_isbn_from_pages_and_metadata {
+                    log debug "The provided ISBN matches the one found using the book's metadata and pages"
+                } else {
+                    log warning $"The provided ISBN (ansi purple)($isbn)(ansi reset) does not match the one found using the book's metadata and pages (ansi purple)($likely_isbn_from_pages_and_metadata)(ansi reset)"
+                }
+            } else if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
+                if $isbn in $book_isbn_numbers {
+                    log debug $"The provided ISBN is among those found in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
+                } else {
+                    log warning $"The provided ISBN is not among those found in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
+                }
+            }
+            $isbn
+        }
+    )
+    if $isbn != null {
+        log debug $"The ISBN is (ansi purple)($isbn)(ansi reset)"
+    }
 
     let book = (
         $formats.book
@@ -241,7 +350,7 @@ def main [
     )
     log debug $"Authors: ($authors)"
 
-    let authors_subdirectory = ($authors | str join ", ")
+    let authors_subdirectory = $authors | str join ", "
     let target_subdirectory = (
         [$authors_subdirectory]
         | append (
@@ -261,9 +370,29 @@ def main [
     log debug $"MinIO target directory: ($minio_target_directory)"
     let minio_target_destination = (
         let components = $book.book | path parse;
-        { parent: $minio_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
+        {
+            parent: $minio_target_directory
+            stem: $components.stem
+            extension: $components.extension
+        } | path join | sanitize_minio_filename
     )
     log debug $"MinIO target destination: ($minio_target_destination)"
+    let opf_target_destination = (
+        if $output_format == "pdf" {
+            [
+                $minio_target_directory
+                ($book.opf | path basename)
+            ] | path join
+        }
+    )
+    let cover_target_destination = (
+        if $output_format == "pdf" {
+            [
+                $minio_target_directory
+                ($book.cover | path basename)
+            ] | path join
+        }
+    )
     if $skip_upload {
         mkdir $target_subdirectory
         if $output_format == "pdf" {
@@ -275,68 +404,72 @@ def main [
         log info $"Uploading (ansi yellow)($book.book)(ansi reset) to (ansi yellow)($minio_target_destination)(ansi reset)"
         ^mc mv $book.book $minio_target_destination
         if $output_format == "pdf" {
-          let opf_target_destination = [$minio_target_directory ($book.opf | path basename)] | path join
           log info $"Uploading (ansi yellow)($book.opf)(ansi reset) to (ansi yellow)($opf_target_destination)(ansi reset)"
           ^mc mv $book.opf $opf_target_destination
-          let cover_target_destination = [$minio_target_directory ($book.cover | path basename)] | path join
           log info $"Uploading (ansi yellow)($book.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
           ^mc mv $book.cover $cover_target_destination
         }
     }
 
     if $delete {
-        log debug "Deleting the original file"
+        let uploaded_paths = (
+            [$minio_target_destination]
+            | append $cover_target_destination
+            | append $opf_target_destination
+        )
+        log debug $"Uploaded paths: ($uploaded_paths)"
         if ($original_file | str starts-with "minio:") {
-            let actual_path = ($original_file | str replace "minio:" "")
-            log debug $"Actual path: ($actual_path)"
-            let uploaded_path = $minio_target_destination
-            log debug $"Uploaded path: ($uploaded_path)"
-            if ($actual_path | sanitize_minio_filename) == $uploaded_path {
-                log info $"Not deleting the original file (ansi yellow)($original_file)(ansi reset) since it was overwritten by the updated file"
-            } else {
-                log info $"Deleting the original file on MinIO (ansi yellow)($actual_path)(ansi reset)"
-                ^mc rm $actual_path
-                let opf = $actual_path | path dirname | path join "metadata.opf"
-                if (^mc stat $opf | complete).exit_code == 0 {
-                    log info $"Deleting the metadata file on MinIO (ansi yellow)($opf)(ansi reset)"
-                    ^mc rm $opf
-                }
-                let covers = (
-                    ^mc find ($actual_path | path dirname) --name 'cover.*'
-                    | lines --skip-empty
-                    | filter {|f|
-                        let components = ($f | path parse);
-                        $components.stem == "cover" and $components.extension in $image_extensions
-                    }
-                )
-                if not ($covers | is-empty) {
-                    if ($covers | length) > 1 {
-                        log warning $"Not deleting cover file. Found multiple files looking for the cover image file:\n($covers)\n"
-                    } else {
-                        let cover = $covers | first
-                        log info $"Deleting the cover image file on MinIO (ansi yellow)($cover)(ansi reset)"
-                        ^mc rm $cover
+            if not $skip_upload {
+                for original in $original_book_files {
+                    if $original not-in $uploaded_paths {
+                        log info $"Deleting the file (ansi yellow)($original)(ansi reset) on MinIO"
+                        ^mc rm $original
                     }
                 }
             }
         } else {
-            log info $"Deleting the original file (ansi yellow)($original_file)(ansi reset)"
-            rm $original_file
+            if $output_directory != null {
+                for original in $original_book_files {
+                    let output = [$output_directory ($original | path basename)] | path join
+                    if $original != $output {
+                        log info $"Deleting the file (ansi yellow)($original)(ansi reset)"
+                        rm $original
+                    }
+                }
+            }
+            if $original_input_format == "acsm" {
+                rm $original_file
+            }
         }
     }
     log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
     rm --force --recursive $temporary_directory
+    {
+        file: $original_file
+    }
 
-    # } catch {
-    #     log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
-    #     continue
-    # }
-
+    } catch {|err|
+        rm --force --recursive $temporary_directory
+        log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
+        {
+            file: $original_file
+            error: $err.msg
+        }
+    }
     }
 
     if $ereader != null and not $no_copy_to_ereader {
       if (^findmnt --target $ereader_target_directory | complete | get exit_code) == 0 {
         ^udisksctl unmount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
       }
+    }
+
+    $results | to json | print
+
+    let errors = $results | default null error | where error != null
+    if ($errors | is-not-empty) {
+        log error $"(ansi red)Failed to import the following files due to errors!(ansi reset)"
+        $errors | get file | $"(ansi red)($in)(ansi reset)" | print --stderr
+        exit 1
     }
 }

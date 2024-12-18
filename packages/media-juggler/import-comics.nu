@@ -204,7 +204,7 @@ def main [
     --minio-path: string = "media/Books/Books" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
     --minio-archival-path: string = "media-archive/Books/Books" # The upload bucket and directory on the MinIO server where EPUBs will be archived. The file will be uploaded under a subdirectory named after the author.
     --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
-    --output-directory: directory # Directory to place files when not being uploaded
+    --output-directory: directory # Directory to place files on the local filesystem if desired
     # --series: string # The name of the series
     # --series-year: string # The initial publication year of the series, also referred to as the volume
     --skip-upload # Don't upload files to the server
@@ -228,12 +228,18 @@ def main [
 
     let output_directory = (
         if $output_directory == null {
+          if $skip_upload {
             "." | path expand
+          } else {
+            null
+          }
         } else {
-            $output_directory
+          $output_directory | path expand
         }
     )
-    mkdir $output_directory
+    if $output_directory != null {
+        mkdir $output_directory
+    }
 
     let username = (^id --name --user)
     let ereader_disk_label = (
@@ -284,7 +290,7 @@ def main [
         }
     )
 
-    let original_input_format = ($file | path parse | get extension)
+    let original_input_format = $file | path parse | get extension
 
     let original_comic_info = (
         let comic_info_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml");
@@ -305,17 +311,15 @@ def main [
 
     let comic_info = (
         if $original_comic_info != null {
-            let comic_info_file = ($original_file | str replace "minio:" "" | path dirname | path join "ComicInfo.xml")
+            let target = [$temporary_directory ($original_comic_info | path basename)] | path join
             if ($original_file | str starts-with "minio:") {
-                let target = [$temporary_directory ($comic_info_file | path basename)] | path join
                 log debug $"Downloading the file (ansi yellow)($original_comic_info)(ansi reset) to (ansi yellow)($target)(ansi reset)"
                 ^mc cp $original_comic_info $target
             } else {
-                let target = [$temporary_directory ($comic_info_file | path basename)] | path join
                 log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
                 cp $original_comic_info $target
             }
-            [$temporary_directory ($comic_info_file | path basename)] | path join
+            $target
         } else {
           null
         }
@@ -369,8 +373,11 @@ def main [
             )
             if not ($covers | is-empty) {
                 if ($covers | length) > 1 {
-                    log error $"Found multiple files looking for the cover image file:\n($covers)\n"
-                    exit 1
+                    rm --force --recursive $temporary_directory
+                    return {
+                        file: $original_file
+                        error: $"Found multiple files looking for the cover image file:\n($covers)\n"
+                    }
                 } else {
                     $covers | first
                 }
@@ -379,8 +386,11 @@ def main [
             let covers = (glob $"($original_file | path dirname)/cover.{($image_extensions | str join ',')}")
             if not ($covers | is-empty) {
                 if ($covers | length) > 1 {
-                    log error $"Found multiple files looking for the cover image file:\n($covers)\n"
-                    exit 1
+                    rm --force --recursive $temporary_directory
+                    return {
+                        file: $original_file
+                        error: $"Found multiple files looking for the cover image file:\n($covers)\n"
+                    }
                 } else {
                     $covers | first
                 }
@@ -406,7 +416,7 @@ def main [
     #     }
     # )
 
-    let original_comic_files = [$original_file] | append $original_comic_info | append $original_cover | append $original_opf
+    let original_comic_files = [($original_file | str replace "minio:" "")] | append $original_comic_info | append $original_cover | append $original_opf
     log debug $"The original files for the comic are (ansi yellow)($original_comic_files)(ansi reset)"
 
     let output_format = (
@@ -428,8 +438,11 @@ def main [
         } else if $original_input_format == "pdf" {
           { pdf: $file }
         } else {
-            log error $"Unsupported input file type (ansi red_bold)($original_input_format)(ansi reset)"
-            exit 1
+            rm --force --recursive $temporary_directory
+            return {
+                file: $original_file
+                error: $"Unsupported input file type (ansi red_bold)($original_input_format)(ansi reset)"
+            }
         }
     )
 
@@ -446,16 +459,6 @@ def main [
         $formats.epub | optimize_images_in_zip | polish_epub
     }
 
-    # Try to get the ISBN from the comics metadata.
-    let isbn = (
-        if $isbn == null {
-            log debug "Attempting to get the ISBN from existing metadata"
-            $file | get_metadata $temporary_directory | isbn_from_metadata $temporary_directory
-        } else {
-          $isbn
-        }
-    )
-
     # Generate a CBZ from the PDF format which may be used to extract the ISBN.
     let formats = (
         if "pdf" in $formats {
@@ -466,40 +469,115 @@ def main [
         }
     )
 
-    # Try to get the ISBN from the pages in the comic
-    let isbn = (
-        if $isbn == null {
-            log debug "Attempting to get the ISBN from the first ten and last ten pages of the comic"
-            let isbn_numbers = $file | isbn_from_pages $temporary_directory
-            if ($isbn_numbers | is-empty) {
-                # Check images of the PDF for the ISBN if text doesn't work out.
-                if $input_format == "pdf" and "cbz" in $formats {
-                    let isbn_from_cbz = $formats.cbz | isbn_from_pages $temporary_directory
-                    if ($isbn_from_cbz | is-empty) {
-                        null
-                    } else if ($isbn_from_cbz | length) > 1 {
-                        # todo Allow selecting from one of these ISBNs interactively?
-                        log warning $"Found multiple potential ISBNs in the book's pages: ($isbn_from_cbz). Ignoring the ISBNs."
-                    } else {
-                        $isbn_from_cbz | first
-                    }
-                } else {
-                    null
+    log debug "Attempting to get the ISBN from existing metadata"
+    let metadata_isbn = (
+        $file | get_metadata $temporary_directory | isbn_from_metadata $temporary_directory
+    )
+    if $metadata_isbn != null {
+        log debug $"Found the ISBN (ansi purple)($metadata_isbn)(ansi reset) in the book's metadata"
+    }
+
+    log debug "Attempting to get the ISBN from the first ten and last ten pages of the book"
+    let book_isbn_numbers = (
+        let isbn_numbers = $file | isbn_from_pages $temporary_directory;
+        if ($isbn_numbers | is-empty) {
+            # Check images for the ISBN if text doesn't work out.
+            if "cbz" in $formats {
+                let isbn_from_cbz = $formats.cbz | isbn_from_pages $temporary_directory
+                if ($isbn_from_cbz | is-not-empty) {
+                    $isbn_from_cbz
                 }
-            } else if ($isbn_numbers | length) > 1 {
-                # todo Allow selecting from one of these ISBNs interactively?
-                log warning $"Found multiple potential ISBNs in the book's pages: ($isbn_numbers). Ignoring the ISBNs."
-                null
-            } else {
-                $isbn_numbers | first
+            } else if "epub" in $formats {
+                let isbn_from_epub = $formats.epub | isbn_from_pages $temporary_directory
+                if ($isbn_from_epub | is-not-empty) {
+                    $isbn_from_epub
+                }
             }
         } else {
+          $isbn_numbers
+        }
+    )
+    if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
+        log debug $"Found ISBN numbers in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
+    }
+
+    # Determine the most likely ISBN from the metadata and pages
+    let likely_isbn_from_pages_and_metadata = (
+        if $metadata_isbn != null and $book_isbn_numbers != null {
+            if ($book_isbn_numbers | is-empty) {
+                log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
+                $metadata_isbn
+            } else if $metadata_isbn in $book_isbn_numbers {
+                if ($book_isbn_numbers | length) == 1 {
+                    log debug "Found an exact match between the ISBN in the metadata and the ISBN in the pages of the book"
+                } else if ($book_isbn_numbers | length) > 10 {
+                    rm --force --recursive $temporary_directory
+                    return {
+                        file: $original_file
+                        error: $"Found more than 10 ISBN numbers in the pages of the book: (ansi purple)($book_isbn_numbers)(ansi reset)"
+                    }
+                }
+                $metadata_isbn
+            } else {
+                # todo If only one number is available in the pages, should it be preferred?
+                log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+                if ($book_isbn_numbers | length) == 1 {
+                    log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+                    $book_isbn_numbers | first
+                } else {
+                    if $isbn == null {
+                        rm --force --recursive $temporary_directory
+                        return {
+                            file: $original_file
+                            error: $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset). Use the `--isbn` flag to set the ISBN instead."
+                        }
+                    } else {
+                        log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+                    }
+                }
+            }
+        } else if $metadata_isbn != null {
+            log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
+            $metadata_isbn
+        } else if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
+            if ($book_isbn_numbers | length) == 1 {
+                log debug $"Found a single ISBN in the pages of the book: (ansi purple)($book_isbn_numbers | first)(ansi reset)"
+                $book_isbn_numbers | first
+            } else if ($book_isbn_numbers | length) > 10 {
+                log warning $"Found more than 10 ISBN numbers in the pages of the book: (ansi purple)($book_isbn_numbers)(ansi reset)"
+            } else {
+                log warning $"Found multiple ISBN numbers in the pages of the book: (ansi purple)($book_isbn_numbers)(ansi reset)"
+            }
+        } else {
+            log debug "No ISBN numbers found in the metadata or pages of the book"
+        }
+    )
+
+    let isbn = (
+        if $isbn == null {
+            if $likely_isbn_from_pages_and_metadata == null {
+                log warning $"Unable to determine the ISBN from metadata or the pages of the book"
+            } else {
+                $likely_isbn_from_pages_and_metadata
+            }
+        } else {
+            if $likely_isbn_from_pages_and_metadata != null {
+                if $isbn == $likely_isbn_from_pages_and_metadata {
+                    log debug "The provided ISBN matches the one found using the book's metadata and pages"
+                } else {
+                    log warning $"The provided ISBN (ansi purple)($isbn)(ansi reset) does not match the one found using the book's metadata and pages (ansi purple)($likely_isbn_from_pages_and_metadata)(ansi reset)"
+                }
+            } else if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
+                if $isbn in $book_isbn_numbers {
+                    log debug $"The provided ISBN is among those found in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
+                } else {
+                    log warning $"The provided ISBN is not among those found in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
+                }
+            }
             $isbn
         }
     )
-    if $isbn == null {
-        log warning $"Unable to determine the ISBN from metadata or the pages of the comic"
-    } else {
+    if $isbn != null {
         log debug $"The ISBN is (ansi purple)($isbn)(ansi reset)"
     }
 
@@ -509,7 +587,7 @@ def main [
     # Fetch ebook metadata using the ISBN
     let formats = (
         if $isbn != null {
-            log debug $"Fetching book metadata for the ISBN (ansi purple)($isbn)(ansi reset)"
+            log debug $"Fetching book metadata for the ISBN (ansi purple)($isbn)(ansi reset)";
             $formats | update $input_format (
                 $formats
                 | get $input_format
@@ -680,6 +758,45 @@ def main [
     # )
     # $formats.cbz | comictagger_update_metadata $metadata_yaml --comictagger $comictagger
 
+    # Attempt to get book metadata in order to obtain the ISBN
+    # todo Interactively confirm this ISBN to ensure there are no hiccups, like a different issue from the same series
+    let $isbn = (
+      if $isbn == null {
+        log debug "Attempting to get the ISBN from the fetched metadata"
+        log debug $"Fetching book metadata using title (ansi yellow)($title)(ansi reset) and authors (ansi yellow)($authors)(ansi reset)"
+        # Kobo Metadata is not working well for getting the right issue number.
+        let fetched = (
+          fetch-ebook-metadata --allowed-plugins ["Google"] --authors $authors --title $title | get opf
+        )
+        let fetched_isbn_for_google = $fetched | isbn_from_opf
+        log debug $"Fetched ISBN: (ansi purple)($fetched_isbn_for_google)(ansi reset)"
+        let fetched_title_for_google = $fetched | title_from_opf
+        log debug $"Fetched title from Google: (ansi purple)($fetched_title_for_google)(ansi reset)"
+
+        # Use the ISBN from Google ISBN to look it up
+        let fetched = fetch-ebook-metadata --isbn $fetched_isbn_for_google | get opf
+
+        let fetched_isbn = $fetched | isbn_from_opf
+        log debug $"Fetched ISBN: (ansi purple)($fetched_isbn)(ansi reset)"
+        let fetched_title = $fetched | title_from_opf
+        log debug $"Fetched title: (ansi purple)($fetched_title)(ansi reset)"
+        let fetched_series = $fetched | series_from_opf
+        log debug $"Fetched series: (ansi purple)($fetched_series)(ansi reset)"
+        let fetched_issue = $fetched | issue_from_opf
+        log debug $"Fetched issue: (ansi purple)($fetched_issue)(ansi reset)"
+
+        if $fetched_isbn != null and $fetched_isbn == $fetched_isbn_for_google and $fetched_series == $comic_metadata.series and $fetched_issue == $comic_metadata.issue {
+            log debug $"Found the ISBN (ansi purple)($fetched_isbn)(ansi reset) from the fetched metadata"
+            $fetched_isbn
+        } else if $fetched_isbn_for_google != null and $fetched_title_for_google == $title {
+            log debug $"Found the ISBN (ansi purple)($fetched_isbn_for_google)(ansi reset) from the fetched metadata"
+            $fetched_isbn_for_google
+        }
+      } else {
+        $isbn
+      }
+    )
+
     # Add the ISBN to the ComicInfo
     log info "Updating the ComicInfo"
     (
@@ -697,6 +814,8 @@ def main [
         )
         | upsert_comic_info {tag: "Manga", value: $manga}
         | upsert_comic_info {tag: "Title", value: $title}
+        # todo Incorporate Comic Vine issue id and series id in Notes section of ComicInfo.xml or sidecar metadata.opf
+        # This will allow easily updating the metadata in the future without having to redo all the lookup work.
         | {
             archive: $formats.cbz
             comic_info: $in
@@ -706,18 +825,52 @@ def main [
 
     let formats = (
         # Update the metadata in the EPUB and rename it to match the filename of the CBZ
+        let comic_vine_id = (if $comic_vine_issue_id == null { $comic_metadata.issue_id } else { $comic_vine_issue_id });
         if "epub" in $formats {
             # Update the metadata in the EPUB file.
-            $formats.epub | (
-                tag_epub_comic_vine
-                (if $comic_vine_issue_id == null { $comic_metadata.issue_id } else { $comic_vine_issue_id })
-                $authors
-                $title
-                --working-directory $temporary_directory
+            let epub = (
+              $formats.epub | (
+                  fetch_book_metadata
+                  # Use Comic Vine to ensure series information is correct.
+                  --allowed-plugins ["Comicvine"]
+                  # todo Get the EPUB metadata from sources besides Comic Vine as well?
+                  # I think it probably isn't necessary at this point.
+                  # This still doesn't actually use Comic Vine, but it does still en up working.
+                  # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
+                  --authors $authors
+                  --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
+                  --isbn $isbn
+                  --title $title
+                  $temporary_directory
+              )
+              | export_book_to_directory $temporary_directory
+              | embed_book_metadata $temporary_directory
+              | (
+                let input = $in;
+                (
+                  let args = (
+                    []
+                    | append (
+                      if $isbn != null {
+                        $"--isbn=($isbn)"
+                      }
+                    )
+                  );
+                  ^ebook-meta
+                    $input.book
+                    ...$args
+                    --authors ($authors | str join "&")
+                    --title $title
+                    --identifier $"comicvine:($comic_vine_id)"
+                    --identifier $"comicvine-volume:($comic_metadata.series_id)"
+                );
+                $input
+              )
+              | get book
             )
             let stem = ($formats.cbz | path parse | get stem)
-            let renamed_epub = ({ parent: ($formats.epub | path parse | get parent), stem: $stem, extension: "epub" } | path join)
-            mv $formats.epub $renamed_epub
+            let renamed_epub = ({ parent: ($epub | path parse | get parent), stem: $stem, extension: "epub" } | path join)
+            mv $epub $renamed_epub
             $formats | update epub $renamed_epub
         # Rename the PDF
         } else if "pdf" in $formats {
@@ -777,8 +930,11 @@ def main [
     if "cbz" in $formats {
         let image_format = ($formats.cbz | get_image_extension)
         if $image_format == null {
-            log error "Failed to determine the image file format"
-            exit 1
+            rm --force --recursive $temporary_directory
+            return {
+                file: $original_file
+                error: "Failed to determine the image file format"
+            }
         }
 
         # todo Detect if another lossless format, i.e. webp, is being used and if so, convert those to jxl as well.
@@ -808,7 +964,7 @@ def main [
 
     # todo Functions archive_epub, upload_cbz, and perhaps copy_cbz_to_ereader
 
-    let authors_subdirectory = ($authors | str join ", ")
+    let authors_subdirectory = $authors | str join ", "
     let minio_target_directory = (
         [$minio_alias $minio_path $authors_subdirectory]
         | append (
@@ -823,17 +979,33 @@ def main [
     )
     log debug $"MinIO target directory: ($minio_target_directory)"
     let minio_target_destination = (
-        let components = (
-            if $output_format == "pdf" {
-                $formats.pdf
-            } else {
-                $formats.cbz
-            } | path parse
-        );
-        { parent: $minio_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
+        let components = ($formats | get $output_format | path parse);
+        {
+          parent: $minio_target_directory
+          stem: $components.stem
+          extension: $components.extension
+        } | path join | sanitize_minio_filename
     )
     log debug $"MinIO target destination: ($minio_target_destination)"
+    let comic_info_target_destination = (
+      if $output_format == "pdf" {
+        [
+          $minio_target_directory
+          ($formats.comic_info | path basename)
+        ] | path join
+      }
+    )
+    let cover_target_destination = (
+      if $output_format == "pdf" {
+        [
+          $minio_target_directory
+          ($formats.cover | path basename)
+        ] | path join
+      }
+    )
+
     if $skip_upload {
+        # todo Fix skip upload option by replacing it with a proper output directory option?
         mv ($formats | get $output_format) $output_directory
         if $output_format == "pdf" {
           mv $formats.comic_info $output_directory
@@ -843,10 +1015,8 @@ def main [
         log info $"Uploading (ansi yellow)($formats | get $output_format)(ansi reset) to (ansi yellow)($minio_target_destination)(ansi reset)"
         ^mc mv ($formats | get $output_format) $minio_target_destination
         if $output_format == "pdf" {
-          let comic_info_target_destination = [$minio_target_directory ($formats.comic_info | path basename)] | path join
           log info $"Uploading (ansi yellow)($formats.comic_info)(ansi reset) to (ansi yellow)($comic_info_target_destination)(ansi reset)"
           ^mc mv $formats.comic_info $comic_info_target_destination
-          let cover_target_destination = [$minio_target_directory ($formats.cover | path basename)] | path join
           log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
           ^mc mv $formats.cover $cover_target_destination
         }
@@ -868,42 +1038,60 @@ def main [
         | path join
         | sanitize_minio_filename
     )
-    if "epub" in $formats {
-        let minio_archival_destination = (
-            let components = ($formats.epub | path parse);
-            { parent: $minio_archival_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
-        )
-        if $skip_upload {
-            mv $formats.epub $output_directory
-        } else {
-            log info $"Uploading (ansi yellow)($formats.epub)(ansi reset) to (ansi yellow)($minio_archival_destination)(ansi reset)"
-            ^mc mv $formats.epub $minio_archival_destination
+    let minio_epub_archival_destination = (
+        if "epub" in $formats {
+          let components = ($formats.epub | path parse);
+          {
+            parent: (if $skip_upload { $output_directory } else { $minio_archival_target_directory })
+            stem: $components.stem
+            extension: $components.extension
+          } | path join | sanitize_minio_filename
         }
-    } else if "pdf" in $formats and $archive_pdf  {
-        let minio_pdf_archival_destination = (
-            let components = ($formats.pdf | path parse);
-            { parent: $minio_archival_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
-        )
-        let minio_comic_info_archival_destination = (
-            let components = ($formats.comic_info | path parse);
-            { parent: $minio_archival_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
-        )
-        let minio_cover_archival_destination = (
-            let components = ($formats.cover | path parse);
-            { parent: $minio_archival_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
-        )
-        if $skip_upload {
-            mv $formats.pdf $output_directory
-            mv $formats.comic_info $output_directory
-            mv $formats.cover $output_directory
-        } else {
-            log info $"Uploading (ansi yellow)($formats.pdf)(ansi reset) to (ansi yellow)($minio_pdf_archival_destination)(ansi reset)"
-            ^mc mv $formats.pdf $minio_pdf_archival_destination
-            log info $"Uploading (ansi yellow)($formats.comic_info)(ansi reset) to (ansi yellow)($minio_comic_info_archival_destination)(ansi reset)"
-            ^mc mv $formats.comic_info $minio_comic_info_archival_destination
-            log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($minio_cover_archival_destination)(ansi reset)"
-            ^mc mv $formats.cover $minio_cover_archival_destination
+    )
+    let minio_pdf_archival_destination = (
+      if "pdf" in $formats and $archive_pdf {
+        let components = ($formats.pdf | path parse);
+        {
+          parent: $minio_archival_target_directory
+          stem: $components.stem
+          extension: $components.extension
         }
+        | path join
+        | sanitize_minio_filename
+      }
+    )
+    let minio_comic_info_archival_destination = (
+      if "pdf" in $formats and $archive_pdf {
+        let components = ($formats.comic_info | path parse);
+        {
+          parent: $minio_archival_target_directory
+          stem: $components.stem
+          extension: $components.extension
+        } | path join | sanitize_minio_filename
+      }
+    )
+    let minio_cover_archival_destination = (
+      if "pdf" in $formats and $archive_pdf {
+        let components = ($formats.cover | path parse);
+        {
+          parent: $minio_archival_target_directory
+          stem: $components.stem
+          extension: $components.extension
+        } | path join | sanitize_minio_filename
+      }
+    )
+    if not $skip_upload {
+      if "epub" in $formats {
+          log info $"Uploading (ansi yellow)($formats.epub)(ansi reset) to (ansi yellow)($minio_epub_archival_destination)(ansi reset)"
+          ^mc mv $formats.epub $minio_epub_archival_destination
+      } else if "pdf" in $formats and $archive_pdf  {
+          log info $"Uploading (ansi yellow)($formats.pdf)(ansi reset) to (ansi yellow)($minio_pdf_archival_destination)(ansi reset)"
+          ^mc mv $formats.pdf $minio_pdf_archival_destination
+          log info $"Uploading (ansi yellow)($formats.comic_info)(ansi reset) to (ansi yellow)($minio_comic_info_archival_destination)(ansi reset)"
+          ^mc mv $formats.comic_info $minio_comic_info_archival_destination
+          log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($minio_cover_archival_destination)(ansi reset)"
+          ^mc mv $formats.cover $minio_cover_archival_destination
+      }
     }
 
     if ereader_cbz in $formats {
@@ -926,58 +1114,36 @@ def main [
         log debug "Deleting the original file"
         let uploaded_paths = (
             [$minio_target_destination]
-            | append
-            (if "epub" in $formats {
-                ([$minio_archival_target_directory ($formats.epub | path basename)] | path join | sanitize_minio_filename)
-            } else {
-                null
-            })
-            | append
-            (if "comic_info" in $formats {
-                ([$minio_target_directory ($formats.comic_info | path basename)] | path join | sanitize_minio_filename)
-            } else {
-                null
-            })
-            | append
-            (if "cover" in $formats {
-                ([$minio_target_directory ($formats.cover | path basename)] | path join | sanitize_minio_filename)
-            } else {
-                null
-            })
+            | append $comic_info_target_destination
+            | append $cover_target_destination
+            | append $minio_epub_archival_destination
+            | append $minio_pdf_archival_destination
+            | append $minio_cover_archival_destination
+            | append $minio_comic_info_archival_destination
         )
         log debug $"Uploaded paths: ($uploaded_paths)"
         if ($original_file | str starts-with "minio:") {
-            let actual_path = ($original_file | str replace "minio:" "")
-            log debug $"Actual path: ($actual_path)"
-            if ($actual_path | sanitize_minio_filename) in $uploaded_paths {
-                log info $"Not deleting the original file (ansi yellow)($original_file)(ansi reset) since it was overwritten by the updated file"
-            } else {
-                log info $"Deleting the original file on MinIO (ansi yellow)($actual_path)(ansi reset)"
-                ^mc rm $actual_path
-                if $input_format == "pdf" {
-                    if $original_comic_info != null and $original_comic_info not-in $uploaded_paths {
-                        log info $"Deleting the Comic Info file on MinIO (ansi yellow)($original_comic_info)(ansi reset)"
-                        ^mc rm $original_comic_info
-                    }
-                    if $original_cover != null and $original_cover not-in $uploaded_paths {
-                        log info $"Deleting the cover file on MinIO (ansi yellow)($original_cover)(ansi reset)"
-                        ^mc rm $original_cover
-                    }
-                }
+          if not $skip_upload {
+            for original in $original_comic_files {
+              if $original not-in $uploaded_paths {
+                  log info $"Deleting the file (ansi yellow)($original)(ansi reset) on MinIO"
+                  ^mc rm $original
+              }
             }
+          }
         } else {
-            log info $"Deleting the original file (ansi yellow)($original_file)(ansi reset)"
-            rm $original_file
-            if $input_format == "pdf" {
-                if $original_comic_info != null and $original_comic_info not-in $uploaded_paths {
-                    log info $"Deleting the Comic Info file (ansi yellow)($original_comic_info)(ansi reset)"
-                    ^rm $original_comic_info
-                }
-                if $original_cover != null and $original_cover not-in $uploaded_paths {
-                    log info $"Deleting the cover file (ansi yellow)($original_cover)(ansi reset)"
-                    ^rm $original_cover
-                }
+          if $output_directory != null {
+            for original in $original_comic_files {
+              let output = [$output_directory ($original | path basename)] | path join
+              if $original != $output {
+                  log info $"Deleting the file (ansi yellow)($original)(ansi reset)"
+                  rm $original
+              }
             }
+          }
+          if $original_input_format == "acsm" {
+            rm $original_file
+          }
         }
     }
     log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"

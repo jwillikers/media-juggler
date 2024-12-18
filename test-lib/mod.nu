@@ -271,13 +271,13 @@ export def rename_cbz_from_epub_metadata [
                 | parse --regex '(?P<series>.+) Volume (?P<issue>[0-9]+)'
                 | first
             )
-        } else if ($epub_title =~ ".*[ _]+vol[0-9]+") {
+        } else if ($epub_title =~ '.*[\s,_]+[vV]ol\.{0,1}\s*[0-9]+') {
             (
                 $epub_title
-                | parse --regex '(?P<series>.+)[ _]+vol(?P<issue>[0-9]+)'
+                | parse --regex '(?P<series>.+?)[\s,_]+[vV]ol\.{0,1}\s*(?P<issue>[0-9]+)'
                 | first
             )
-        } else if $epub_title =~ ".+ [0-9]+" {
+        } else if $epub_title =~ '.+ [0-9]+' {
             $epub_title
             | parse --regex '(?P<series>.+) (?P<issue>[0-9]+)'
             | first

@@ -56,9 +56,39 @@ export def parse_isbn [
 ]: list<string> -> list<string> {
   let text = $in
   # ISBN 978-1-250-16947-1 (ebook)
+  # 978-1-250-16947-1 (ebook)
+  # eISBN 978-1-6374-1067-7
+  # ISBN: 978-1-250-16947-1
+
+  # ISBN-13: 978-1-7185-0186-7 (ebook)
+  let obvious_isbn = (
+    $text
+    | parse --regex 'ISBN-13:\s*(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))\s*\(ebook\)'
+  )
+  if ($obvious_isbn | is-not-empty) {
+    return ($obvious_isbn | get isbn | str replace --all "-" "" | uniq)
+  }
+
   let obvious_isbn = (
     $text
     | parse --regex 'ISBN\s*(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))\s*\(ebook\)'
+  )
+  if ($obvious_isbn | is-not-empty) {
+    return ($obvious_isbn | get isbn | str replace --all "-" "" | uniq)
+  }
+
+  let obvious_isbn = (
+    $text
+    | parse --regex '(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))\s*\(ebook\)'
+  )
+  if ($obvious_isbn | is-not-empty) {
+    return ($obvious_isbn | get isbn | str replace --all "-" "" | uniq)
+  }
+
+  # eISBN 978-1-6374-1067-7
+  let obvious_isbn = (
+    $text
+    | parse --regex 'eISBN\s*(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))'
   )
   if ($obvious_isbn | is-not-empty) {
     return ($obvious_isbn | get isbn | str replace --all "-" "" | uniq)
@@ -206,7 +236,7 @@ export def issue_from_comic_info []: record -> string {
     log warning $"Somehow found multiple Number fields in the ComicInfo.xml metadata: ($number). Ignoring Number fields."
     return null
   }
-  let values = $number | first | get content | first
+  let values = $number | first | get content
   if ($values | is-empty) {
     return null
   }
@@ -230,7 +260,7 @@ export def issue_year_from_comic_info []: record -> string {
     log warning $"Somehow found multiple Year fields in the ComicInfo.xml metadata: ($year). Ignoring Year fields."
     return null
   }
-  let values = $year | first | get content | first
+  let values = $year | first | get content
   if ($values | is-empty) {
     return null
   }
@@ -254,7 +284,7 @@ export def series_year_from_comic_info []: record -> string {
     log warning $"Somehow found multiple Volume fields in the ComicInfo.xml metadata: ($volume). Ignoring Volume fields."
     return null
   }
-  let values = $volume | first | get content | first
+  let values = $volume | first | get content
   if ($values | is-empty) {
     return null
   }
@@ -278,7 +308,7 @@ export def series_from_comic_info []: record -> string {
     log warning $"Somehow found multiple Series fields in the ComicInfo.xml metadata: ($series). Ignoring Series fields."
     return null
   }
-  let values = $series | first | get content | first
+  let values = $series | first | get content
   if ($values | is-empty) {
     return null
   }
@@ -394,11 +424,11 @@ export def upsert_comic_info [
 # todo Add tests
 export def title_from_comic_info []: record -> string {
   let comic_info = $in
-  let title = $comic_info | get content | where tag == "Title"
-  if ($title | is-empty) {
+  let tags = $comic_info | get content | where tag == "Title"
+  if ($tags | is-empty) {
     return null
   }
-  let titles = $title | first | get content | first | get content
+  let titles = $tags | first | get content | get content
   if ($titles | is-empty) {
     return null
   }
@@ -501,7 +531,7 @@ export def get_metadata [
 # todo Add tests
 export def isbn_from_opf []: record -> string {
   let opf = $in
-  let metadata = $opf | get content | where tag == "metadata"
+  let metadata = $opf | get content | where tag == "metadata" | get content
   if ($metadata | is-empty) {
     return null
   }
@@ -590,6 +620,38 @@ export def issue_year_from_opf []: record -> string {
     return null
   }
   $values | first | into datetime | format date "%Y"
+}
+
+# Extract the issue datetime from OPF metadata
+#
+# todo Add tests
+export def issue_datetime_from_opf []: record -> string {
+  let opf = $in
+  let metadata = $opf | get content | where tag == "metadata"
+  if ($metadata | is-empty) {
+    return null
+  }
+  if ($metadata | length) > 1 {
+    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring metadata."
+    return null
+  }
+  let date = $metadata | first | get content | where tag == "date"
+  if ($date | is-empty) {
+    return null
+  }
+  if ($date | length) > 1 {
+    log warning $"Somehow found multiple date fields in the OPF metadata: ($date). Ignoring."
+    return null
+  }
+  let values = $date | first | get content | get content
+  if ($values | is-empty) {
+    return null
+  }
+  if ($values | length) > 1 {
+    log warning $"Somehow found multiple values for the date field of the OPF metadata: ($values). Ignoring title field."
+    return null
+  }
+  $values | first | into datetime
 }
 
 # Extract the series from OPF metadata
@@ -740,7 +802,13 @@ export def issue_year_from_metadata []: record -> string {
 
   if $issue_year == null {
     if "opf" in $metadata {
-      $metadata.opf | issue_year_from_opf
+      let exact = $metadata.opf | issue_datetime_from_opf
+      # For some reason, this appears to be a placeholder and should be ignored
+      if $exact == ("2013-03-04T11:00:00+00:00" | into datetime) {
+        null
+      } else {
+        $exact | format date "%Y"
+      }
     } else {
       null
     }
@@ -1207,10 +1275,10 @@ export def comic_file_name_from_metadata [
                 | parse --regex '(?P<series>.+) Volume (?P<issue>[0-9]+)'
                 | first
             )
-        } else if ($title =~ '.*,*[\s_]+[vV][oO][lL]\.*\s*[0-9]+') {
+        } else if ($title =~ '.*[\s,_]+[vV][oO][lL]\.*\s*[0-9]+') {
             (
                 $title
-                | parse --regex '(?P<series>.+),*[\s_]+[vV][oO][lL]\.*\s*(?P<issue>[0-9]+)'
+                | parse --regex '(?P<series>.+?)[\s,_]+[vV][oO][lL]\.*\s*(?P<issue>[0-9]+)'
                 | first
             )
         } else if $title =~ ".+ [0-9]+" {
@@ -1451,7 +1519,15 @@ export def extract_book_metadata [
 ]: path -> record<opf: record, cover: path> {
   let book = $in;
   log debug $"book: ($book)"
-  let opf_file = ({ parent: $working_directory, stem: ($book | path parse | get stem), extension: "opf" } | path join)
+  let opf_file = mktemp --suffix ".xml"
+  # let opf_file = (
+  #   {
+  #     parent: $working_directory
+  #     # stem: ($book | path parse | get stem)
+  #     # stem: "metadata"
+  #     extension: "opf"
+  #   } | path join
+  # )
   log debug $"opf: ($opf_file)"
   let cover_file = (
     {
@@ -1466,7 +1542,12 @@ export def extract_book_metadata [
     $book
   )
   # todo Remove title == "Untitled" and creator == "Unknown"?
-  { opf: ($opf_file | open | from xml), cover: ($cover_file | rename_image_with_extension) }
+  let opf = $opf_file | open
+  rm $opf_file
+  {
+    opf: $opf
+    cover: ($cover_file | rename_image_with_extension)
+  }
 }
 
 # # Use the metadata.opf and cover.ext files for metadata
@@ -1499,6 +1580,7 @@ export def rename_image_with_extension [] : path -> path {
 # export def update_book_metadata [
 export def fetch_book_metadata [
   working_directory: directory
+  --allowed-plugins: list<string>
   --authors: list<string>
   --identifiers: list<string>
   --isbn: string
@@ -1506,6 +1588,7 @@ export def fetch_book_metadata [
 ]: path -> record<book: path, cover: path, opf: record> {
   let book = $in
   # todo Check for metadata.opf and cover.ext files
+  # todo Use ComicInfo.xml as well here?
   # Prefer metadata.opf and cover.ext over embedded metadata and cover
   let current = (
     $book
@@ -1632,13 +1715,6 @@ export def fetch_book_metadata [
       $"--title=($title)"
     }
   )
-  let title_flag = (
-    if $title == null {
-      null
-    } else {
-      $"--title=($title)"
-    }
-  )
   let authors = (
     if $authors == null {
       $current.opf
@@ -1678,6 +1754,7 @@ export def fetch_book_metadata [
     if $current.cover == null {
       (
         fetch-ebook-metadata
+        --allowed-plugins $allowed_plugins
         --cover (
           {
             parent: $working_directory
@@ -1685,12 +1762,10 @@ export def fetch_book_metadata [
             extension: ""
           } | path join
         )
-        # --isbn $isbn
         ...$args
       )
     } else {
-      # isbn $isbn
-      fetch-ebook-metadata ...$args
+      fetch-ebook-metadata --allowed-plugins $allowed_plugins ...$args
     }
   )
   # todo Check if cover is empty or not found?
