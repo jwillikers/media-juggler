@@ -1526,7 +1526,6 @@ export def fetch_book_metadata [
         | get name
         | filter {|f|
           let components = $f | path parse
-          # todo use a constant for image file extensions
           $components.stem == "cover" and $components.extension in $image_extensions
         }
       );
@@ -1662,28 +1661,30 @@ export def fetch_book_metadata [
       $"--authors=($authors | str join '&')"
     }
   )
-  let isbn_only = false
   let args = (
     [ --opf ]
     | (
       let input = $in;
-      if $isbn_only and $isbn_flag != null {
-        $input | append $isbn_flag
-      } else {
-        $input
-        | append $isbn_flag
-        | append $authors_flag
-        | append $title_flag
-        | append $identifier_flags
-      }
+      $input
+      | append $isbn_flag
+      | append $authors_flag
+      | append $title_flag
+      | append $identifier_flags
     )
   )
   let updated = (
     # Prefer using the current cover if there is one
+    # todo I should probably prefer the highest resolution cover if it is similar to the current one.
     if $current.cover == null {
       (
         fetch-ebook-metadata
-        --cover ({ parent: $working_directory, stem: ($book | path parse | get stem | $"($in)-fetched-cover"), extension: "" } | path join)
+        --cover (
+          {
+            parent: $working_directory
+            stem: ($book | path parse | get stem | $"($in)-fetched-cover")
+            extension: ""
+          } | path join
+        )
         # --isbn $isbn
         ...$args
       )
@@ -1701,13 +1702,21 @@ export def fetch_book_metadata [
     }
   )
   [$cover_file] | optimize_images
-  { book: $book, opf: $updated.opf, cover: $cover_file }
+  {
+    book: $book
+    opf: $updated.opf
+    cover: $cover_file
+  }
 }
 
 # Export the book, OPF, and cover files to a directory named after the book
 export def export_book_to_directory [
   working_directory: path
-] : record<book: path, cover: path, opf: record> -> record<book: path, cover: path, opf: path> {
+]: [
+  record<book: path, cover: path, opf: record>
+  ->
+  record<book: path, cover: path, opf: path>
+] {
   let input = $in
   let title = (
     $input.opf
@@ -1733,13 +1742,19 @@ export def export_book_to_directory [
   let book = ($input.book | path parse | update parent $target_directory | update stem $title | path join)
   mv $input.cover $cover
   mv $input.book $book
-  { book: $book, opf: $opf, cover: $cover }
+  {
+    book: $book
+    opf: $opf
+    cover: $cover
+  }
 }
 
 # todo Pass around opf as metadata instead of a file path.
 export def embed_book_metadata [
   working_directory: path
-]: record<book: path, cover: path, opf: path> -> record<book: path, cover: path, opf: path> {
+]: [
+  record<book: path, cover: path, opf: path> -> record<book: path, cover: path, opf: path>
+] {
   let input = $in
   let book_format = ($input.book | path parse | get extension)
   if $book_format == "epub" {

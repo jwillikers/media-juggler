@@ -85,14 +85,18 @@ def main [
 
     # try {
 
-    # todo Add support for input files from Calibre using the Calibre ID number
+    # todo Add support for input files from Calibre using the Calibre ID number?
     let file = (
         if ($original_file | str starts-with "minio:") {
             let file = ($original_file | str replace "minio:" "")
-            ^mc cp $file $"($temporary_directory)/($file | path basename)"
+            let target = [$temporary_directory ($file | path basename)] | path join
+            log debug $"Downloading the file (ansi yellow)($file)(ansi reset) from MinIO to (ansi yellow)($target)(ansi reset)"
+            ^mc cp $file $target
             let opf = $file | path dirname | path join "metadata.opf"
             if (^mc stat $opf | complete).exit_code == 0 {
-                ^mc cp $opf $"($temporary_directory)/($opf | path basename)"
+                let opf_target = [$temporary_directory ($opf | path basename)] | path join
+                log debug $"Downloading the file (ansi yellow)($opf)(ansi reset) from MinIO to (ansi yellow)($opf_target)(ansi reset)"
+                ^mc cp $opf $opf_target
             }
             let covers = (
                 ^mc find --maxdepth 1 ($file | path dirname) --name 'cover.*'
@@ -102,18 +106,30 @@ def main [
                     $components.stem == "cover" and $components.extension in $image_extensions
                 }
             )
-            if not ($covers | is-empty) {
-                if ($covers | length) > 1 {
-                    log error $"Found multiple files looking for the cover image file:\n($covers)\n"
-                    exit 1
+            let cover = (
+                if ($covers | is-not-empty) {
+                    if ($covers | length) > 1 {
+                        log error $"Found multiple files looking for the cover image file:\n($covers)\n"
+                        null
+                    } else {
+                        $covers | first
+                    }
                 }
-                ^mc cp ($covers | first) $temporary_directory
+            )
+            if $cover != null {
+                let cover_target = [$temporary_directory ($cover | path basename)] | path join
+                log debug $"Downloading the file (ansi yellow)($cover)(ansi reset) from MinIO to (ansi yellow)($cover_target)(ansi reset)"
+                ^mc cp $cover $cover_target
             }
             [$temporary_directory ($file | path basename)] | path join
         } else {
-            cp $original_file $temporary_directory
+            let target = [$temporary_directory ($original_file | path basename)] | path join
+            log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+            cp $original_file $target
             let opf = $original_file | path dirname | path join "metadata.opf"
             if ($opf | path exists) {
+                let opf_target = [$temporary_directory ($opf | path basename)] | path join
+                log debug $"Copying the file (ansi yellow)($opf)(ansi reset) to (ansi yellow)($opf_target)(ansi reset)"
                 cp $opf $"($temporary_directory)/($opf | path basename)"
             }
             let covers = (
@@ -124,12 +140,20 @@ def main [
                     $components.stem == "cover" and $components.extension in $image_extensions
                 }
             );
-            if not ($covers | is-empty) {
-                if ($covers | length) > 1 {
-                    log error $"Found multiple files looking for the cover image file:\n($covers)\n"
-                    exit 1
+            let cover = (
+                if ($covers | is-not-empty) {
+                    if ($covers | length) > 1 {
+                        log error $"Found multiple files looking for the cover image file:\n($covers)\n"
+                        null
+                    } else {
+                        $covers | first
+                    }
                 }
-                cp ...$covers $temporary_directory
+            )
+            if $cover != null {
+                let cover_target = [$temporary_directory ($cover | path basename)] | path join
+                log debug $"Copying the file (ansi yellow)($cover)(ansi reset) to (ansi yellow)($cover_target)(ansi reset)"
+                cp $cover $cover_target
             }
             [$temporary_directory ($original_file | path basename)] | path join
         }
@@ -154,11 +178,12 @@ def main [
             { book: $file }
         } else {
             log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
+            # todo return error here instead
             exit 1
         }
     )
 
-    # Try to get the ISBN from the comics metadata.
+    # Try to get the ISBN from the book's metadata.
     let isbn = (
         if $isbn == null {
           $file | isbn_from_metadata $temporary_directory
@@ -167,10 +192,11 @@ def main [
         }
     )
 
-    # Try to get the ISBN from the pages in the comic
+    # Try to get the ISBN from the pages in the book
     let isbn = (
         if $isbn == null {
             let isbn_numbers = $file | isbn_from_pages $temporary_directory
+            # todo Use OCR on images like for PDF comics here?
             if ($isbn_numbers | is-empty) {
                 null
             } else if ($isbn_numbers | length) > 1 {
