@@ -134,7 +134,7 @@ def main [
                 log debug $"Downloading the file (ansi yellow)($original_opf)(ansi reset) to (ansi yellow)($target)(ansi reset)"
                 ^mc cp $original_opf $target
             } else {
-                log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                log debug $"Copying the file (ansi yellow)($original_opf)(ansi reset) to (ansi yellow)($target)(ansi reset)"
                 cp $original_opf $target
             }
             $target
@@ -183,7 +183,20 @@ def main [
         log debug $"Found the cover file (ansi yellow)($original_cover)(ansi reset)"
     }
 
-    # todo Incorporate the original cover file?
+    # todo Extract the cover from metadata?
+    let cover = (
+        if $original_cover != null {
+            let target = [$temporary_directory ($original_cover | path basename)] | path join
+            if ($original_file | str starts-with "minio:") {
+                log debug $"Downloading the file (ansi yellow)($original_cover)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                ^mc cp $original_cover $target
+            } else {
+                log debug $"Copying the file (ansi yellow)($original_cover)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                cp $original_cover $target
+            }
+            $target
+        }
+    )
 
     let original_book_files = [($original_file | str replace "minio:" "")] | append $original_cover | append $original_opf
     log debug $"The original files for the book are (ansi yellow)($original_book_files)(ansi reset)"
@@ -214,9 +227,13 @@ def main [
         }
     )
 
+    let original_metadata = (
+        $file | get_metadata $temporary_directory
+    )
+
     log debug "Attempting to get the ISBN from existing metadata"
     let metadata_isbn = (
-        $file | get_metadata $temporary_directory | isbn_from_metadata $temporary_directory
+        $original_metadata | isbn_from_metadata
     )
     if $metadata_isbn != null {
         log debug $"Found the ISBN (ansi purple)($metadata_isbn)(ansi reset) in the book's metadata"
@@ -224,16 +241,25 @@ def main [
 
     log debug "Attempting to get the ISBN from the first ten and last ten pages of the book"
     let book_isbn_numbers = (
-        $file | isbn_from_pages $temporary_directory;
-        # # todo Use OCR on images like for PDF comics here?
-        # let isbn_numbers = $file | isbn_from_pages $temporary_directory;
-        # if ($isbn_numbers | is-empty) {
-        # } else if ($isbn_numbers | length) > 1 {
-        #     log warning $"Found multiple potential ISBNs in the book's pages: ($isbn_numbers). Ignoring the ISBNs."
-        #     $isbn_numbers
-        # } else {
-        #     $isbn_numbers
-        # }
+        let isbn_numbers = $file | isbn_from_pages $temporary_directory;
+        if ($isbn_numbers | is-empty) {
+            # Check images for the ISBN if text doesn't work out.
+            if "pdf" in $formats {
+                let cbz = $formats.pdf | cbconvert --format "jpeg" --quality 90
+                let isbn_from_cbz = $cbz | isbn_from_pages $temporary_directory
+                rm $cbz
+                if ($isbn_from_cbz | is-not-empty) {
+                    $isbn_from_cbz
+                }
+            } else if "epub" in $formats {
+                let isbn_from_epub = $formats.epub | isbn_from_pages $temporary_directory
+                if ($isbn_from_epub | is-not-empty) {
+                    $isbn_from_epub
+                }
+            }
+        } else {
+          $isbn_numbers
+        }
     )
     if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
         log debug $"Found ISBN numbers in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
@@ -319,34 +345,26 @@ def main [
         log debug $"The ISBN is (ansi purple)($isbn)(ansi reset)"
     }
 
-    # todo Handle failure in case no metadata is found or fallback to using the available embedded metadata.
     let book = (
         $formats.book
         | (
             let input = $in;
             if $isbn == null or ($isbn | is-empty) {
                 # Don't use Kobo unless we know the ISBN... or it will probably find something arbitrary and wrong instead of the actual book.
-                $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] $temporary_directory
-            } else {
-                # todo output details of discovered metadata for verification
-                let result = $input | fetch_book_metadata --isbn $isbn $temporary_directory
-                let fetched_isbn = $result.opf | isbn_from_opf
-                if $fetched_isbn == null or ($fetched_isbn | is-empty) {
-                    log warning "No ISBN in retrieved metadata!"
-                    $result
-                } else if $fetched_isbn == $isbn {
-                    $result
+                let result = $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] $temporary_directory
+                if $result.opf == null {
+                    {
+                        book: $input
+                        cover: null
+                        opf: null
+                    }
                 } else {
-                    log info "Fetched ISBN doesn't match the ISBN used to search! Will attempt another search with only the Google and Amazon.com metadata sources"
-                    let result = $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] --isbn $isbn $temporary_directory
-                    let fetched_isbn = $result.opf | isbn_from_opf
-                    if $fetched_isbn == null or ($fetched_isbn | is-empty) {
-                        log warning "No ISBN in retrieved metadata!"
-                        $result
-                    } else if $fetched_isbn == $isbn {
+                    let original_title = $original_metadata | title_from_metadata
+                    let fetched_title = $result.opf | title_from_opf
+                    if $fetched_title == $original_title {
                         $result
                     } else {
-                        log warning "No metadata found!"
+                        log warning $"The fetched title (ansi yellow)($fetched_title)(ansi reset) does not match the original title (ansi yellow)($original_title)(ansi reset). Ignoring metadata."
                         {
                             book: $input
                             cover: null
@@ -354,7 +372,67 @@ def main [
                         }
                     }
                 }
+            } else {
+                # todo output details of discovered metadata for verification
+                let result = $input | fetch_book_metadata --isbn $isbn $temporary_directory
+                if $result.opf == null {
+                    {
+                        book: $input
+                        cover: null
+                        opf: null
+                    }
+                } else {
+                    let fetched_isbn = $result.opf | isbn_from_opf
+                    if $fetched_isbn == null or ($fetched_isbn | is-empty) {
+                        log warning "No ISBN in retrieved metadata!"
+                        $result
+                    } else if $fetched_isbn == $isbn {
+                        $result
+                    } else {
+                        log info "Fetched ISBN doesn't match the ISBN used to search! Will attempt another search with only the Google and Amazon.com metadata sources"
+                        let result = $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] --isbn $isbn $temporary_directory
+                        if $result.opf == null {
+                            {
+                                book: $input
+                                cover: null
+                                opf: null
+                            }
+                        } else {
+                            let fetched_isbn = $result.opf | isbn_from_opf
+                            if $fetched_isbn == null or ($fetched_isbn | is-empty) {
+                                log warning "No ISBN in retrieved metadata!"
+                                $result
+                            } else if $fetched_isbn == $isbn {
+                                $result
+                            } else {
+                                log warning "No metadata found!"
+                                {
+                                    book: $input
+                                    cover: null
+                                    opf: null
+                                }
+                            }
+                        }
+                    }
+                }
             }
+        )
+        | (
+            let input = $in;
+            $input | update opf (
+                if $input.opf != null {
+                    # todo Should probably have a better way of merging metadata
+                    $original_metadata.opf | merge $input.opf
+                } else {
+                    $original_metadata.opf
+                }
+            ) | update cover (
+                if $cover != null {
+                    $cover
+                } else {
+                    $input.cover
+                }
+            )
         )
         | export_book_to_directory $temporary_directory
         | embed_book_metadata $temporary_directory

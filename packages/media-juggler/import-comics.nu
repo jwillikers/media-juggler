@@ -351,7 +351,7 @@ def main [
                 ^mc cp $original_opf $target
             } else {
                 let target = [$temporary_directory ($opf_file | path basename)] | path join
-                log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                log debug $"Copying the file (ansi yellow)($original_opf)(ansi reset) to (ansi yellow)($target)(ansi reset)"
                 cp $original_opf $target
             }
             [$temporary_directory ($opf_file | path basename)] | path join
@@ -471,7 +471,7 @@ def main [
 
     log debug "Attempting to get the ISBN from existing metadata"
     let metadata_isbn = (
-        $file | get_metadata $temporary_directory | isbn_from_metadata $temporary_directory
+        $file | get_metadata $temporary_directory | isbn_from_metadata
     )
     if $metadata_isbn != null {
         log debug $"Found the ISBN (ansi purple)($metadata_isbn)(ansi reset) in the book's metadata"

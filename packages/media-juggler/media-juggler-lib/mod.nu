@@ -727,7 +727,6 @@ export def title_from_opf []: record -> string {
 # todo Add tests.
 #
 export def isbn_from_metadata [
-  working_directory: directory # The scratch-space directory to use
 ]: record -> string {
   let metadata = $in
   if $metadata == null or ($metadata | is-empty) {
@@ -1497,12 +1496,15 @@ export def fetch-ebook-metadata [
   # let opf = $result.stdout | from xml
   log debug $"Running: fetch-ebook-metadata ($args | str join ' ')"
   let opf = (
-    let result = (^fetch-ebook-metadata ...$args);
-    if ($result | is-empty) or ($result | lines --skip-empty | last) == "No results found" {
-      log error $"(ansi red)No metadata found!(ansi reset)"
-      exit 1
+    let result = (^fetch-ebook-metadata ...$args | complete);
+    if $result.exit_code == 0 {
+      $result.stdout | from xml
+    } else if ($result.stderr | lines --skip-empty | last) == "No results found" {
+      log debug $"(ansi red)No metadata found!(ansi reset)"
+      null
     } else {
-      $result | from xml
+      log error $"fetch-ebook-metadata failed with the exit code (ansi red)($result.exit_code)(ansi reset): ($result.stderr)"
+      null
     }
   )
   {
@@ -1600,7 +1602,9 @@ export def fetch_book_metadata [
       let input = $in;
       let metadata_opf = $book | path dirname | path join "metadata.opf";
       if ($metadata_opf | path exists) {
-        $input | update opf (open $metadata_opf | from xml)
+        $input | update opf (
+          $input | merge (open $metadata_opf | from xml)
+        )
       } else {
         $input
       }
