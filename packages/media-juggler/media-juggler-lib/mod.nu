@@ -51,17 +51,26 @@ export def pdf_page_count []: path -> int {
 # r'[- 0-9]{17}$)(?:97[89][- ]?)?[0-9]{1,5}'
 # r'[- ]?[0-9]+[- ]?[0-9]+[- ]?[0-9X]$',
 
+# todo Use a confidence rating for all ISBN results and use that to determine the most likely candidates?
 # Parse ISBN from text
 export def parse_isbn [
 ]: list<string> -> list<string> {
   let text = $in
+
+  # todo Fix this so that ISBN's occurring after the first one on this line are still eligible?
+  # Avoid the ISBN preview in Tor books like this:
+  # A Tor Hardcover ISBN    978-0-3128-51408
+  let text = (
+    $text | filter {
+      |l| not ($l | str contains "A Tor Hardcover ISBN")
+    }
+  )
+
   # ISBN 978-1-250-16947-1 (ebook)
   # 978-1-250-16947-1 (ebook)
   # eISBN 978-1-6374-1067-7
+  # eISBN
   # ISBN: 978-1-250-16947-1
-
-  # todo Avoid the ISBN preview in Tor books like this:
-  # A Tor Hardcover ISBN    978-0-3128-51408
 
   # ISBN-13: 978-1-7185-0186-7 (ebook)
   let obvious_isbn = (
