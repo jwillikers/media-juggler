@@ -60,6 +60,9 @@ export def parse_isbn [
   # eISBN 978-1-6374-1067-7
   # ISBN: 978-1-250-16947-1
 
+  # todo Avoid the ISBN preview in Tor books like this:
+  # A Tor Hardcover ISBN    978-0-3128-51408
+
   # ISBN-13: 978-1-7185-0186-7 (ebook)
   let obvious_isbn = (
     $text
@@ -1517,7 +1520,7 @@ export def fetch-ebook-metadata [
 export def extract_book_metadata [
   working_directory: directory
 ]: path -> record<opf: record, cover: path> {
-  let book = $in;
+  let book = $in
   log debug $"book: ($book)"
   let opf_file = mktemp --suffix ".xml"
   # let opf_file = (
@@ -1738,7 +1741,8 @@ export def fetch_book_metadata [
     }
   )
   let args = (
-    [ --opf ]
+    # [ --opf ]
+    []
     | (
       let input = $in;
       $input
@@ -1746,6 +1750,21 @@ export def fetch_book_metadata [
       | append $authors_flag
       | append $title_flag
       | append $identifier_flags
+      # | append (
+      #   if $isbn == null {
+      #     $authors_flag
+      #   }
+      # )
+      # | append (
+      #   if $isbn == null {
+      #     $title_flag
+      #   }
+      # )
+      # | append (
+      #   if $isbn == null {
+      #     $identifier_flags
+      #   }
+      # )
     )
   )
   let updated = (

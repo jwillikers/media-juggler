@@ -1140,9 +1140,10 @@ def main [
                   rm $original
               }
             }
-          }
-          if $original_input_format == "acsm" {
-            rm $original_file
+          } else {
+              for original in $original_comic_files {
+                  rm $original
+              }
           }
         }
     }

@@ -90,7 +90,7 @@ def main [
     let temporary_directory = (mktemp --directory "import-ebooks.XXXXXXXXXX")
     log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
-    try {
+    # try {
 
     # todo Add support for input files from Calibre using the Calibre ID number?
     let file = (
@@ -319,13 +319,41 @@ def main [
         log debug $"The ISBN is (ansi purple)($isbn)(ansi reset)"
     }
 
+    # todo Handle failure in case no metadata is found or fallback to using the available embedded metadata.
     let book = (
         $formats.book
         | (
+            let input = $in;
             if $isbn == null or ($isbn | is-empty) {
-                fetch_book_metadata $temporary_directory
+                # Don't use Kobo unless we know the ISBN... or it will probably find something arbitrary and wrong instead of the actual book.
+                $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] $temporary_directory
             } else {
-                fetch_book_metadata --isbn $isbn $temporary_directory
+                # todo output details of discovered metadata for verification
+                let result = $input | fetch_book_metadata --isbn $isbn $temporary_directory
+                let fetched_isbn = $result.opf | isbn_from_opf
+                if $fetched_isbn == null or ($fetched_isbn | is-empty) {
+                    log warning "No ISBN in retrieved metadata!"
+                    $result
+                } else if $fetched_isbn == $isbn {
+                    $result
+                } else {
+                    log info "Fetched ISBN doesn't match the ISBN used to search! Will attempt another search with only the Google and Amazon.com metadata sources"
+                    let result = $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] --isbn $isbn $temporary_directory
+                    let fetched_isbn = $result.opf | isbn_from_opf
+                    if $fetched_isbn == null or ($fetched_isbn | is-empty) {
+                        log warning "No ISBN in retrieved metadata!"
+                        $result
+                    } else if $fetched_isbn == $isbn {
+                        $result
+                    } else {
+                        log warning "No metadata found!"
+                        {
+                            book: $input
+                            cover: null
+                            opf: null
+                        }
+                    }
+                }
             }
         )
         | export_book_to_directory $temporary_directory
@@ -436,9 +464,10 @@ def main [
                         rm $original
                     }
                 }
-            }
-            if $original_input_format == "acsm" {
-                rm $original_file
+            } else {
+                for original in $original_book_files {
+                    rm $original
+                }
             }
         }
     }
@@ -448,14 +477,14 @@ def main [
         file: $original_file
     }
 
-    } catch {|err|
-        rm --force --recursive $temporary_directory
-        log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
-        {
-            file: $original_file
-            error: $err.msg
-        }
-    }
+    # } catch {|err|
+    #     rm --force --recursive $temporary_directory
+    #     log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
+    #     {
+    #         file: $original_file
+    #         error: $err.msg
+    #     }
+    # }
     }
 
     if $ereader != null and not $no_copy_to_ereader {
