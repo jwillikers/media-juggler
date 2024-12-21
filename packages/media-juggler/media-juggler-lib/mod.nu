@@ -2089,3 +2089,26 @@ export def sanitize_minio_filename []: string -> string {
     # $in | str replace --all "!" ""
     $in
 }
+
+# Format the duration of a chapter in format used for audiobook chapters
+export def format_chapter_duration []: duration -> string {
+    # HH:MM:SS.fff
+    let time = $in
+    let hours = (
+        ($time // 1hr)
+        | fill --alignment right --character "0" --width 2
+    )
+    let minutes = (
+        ($time mod 1hr // 1min)
+        | fill --alignment right --character "0" --width 2
+    )
+    let seconds = (
+        ($time mod 1min // 1sec)
+        | fill --alignment right --character "0" --width 2
+    )
+    let fractional_seconds = (
+        ($time mod 1sec / 1sec * 1000 // 1)
+        | fill --alignment right --character "0" --width 3
+    )
+    $"($hours):($minutes):($seconds).($fractional_seconds)"
+}

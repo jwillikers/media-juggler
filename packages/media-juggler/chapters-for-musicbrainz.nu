@@ -3,7 +3,9 @@
 # Print out the chapters for an audiobook in the format used when adding the track list to MusicBrainz.
 #
 # Unfortunately, MusicBrainz doesn't support down to the millisecond level in their editor yet.
+# https://tickets.metabrainz.org/browse/MBS-7130
 # For right now, I just round to the nearest second.
+# However, I could take into account the cumulative remainder seconds and adjust the durations better this way.
 #
 #
 def main [
@@ -48,9 +50,7 @@ def main [
                 | into string
                 | fill --width 2 --alignment right --character '0'
             )
-            # let fractional_seconds = ($d mod 1sec / 1sec * 1000 // 1) | fill --alignment right --character "0" --width 3
             $"($c.index) ($c.item.title) \(($hours):($minutes):($seconds)\)"
-            # $"($c.index) ($c.item.title) \(($hours):($minutes):($seconds).($fractional_seconds)\)"
         }
         | print --raw
     )
