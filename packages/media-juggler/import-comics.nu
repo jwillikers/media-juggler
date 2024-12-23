@@ -207,6 +207,7 @@ def main [
     --output-directory: directory # Directory to place files on the local filesystem if desired
     # --series: string # The name of the series
     # --series-year: string # The initial publication year of the series, also referred to as the volume
+    --skip-ocr # Don't attempt to parse the ISBN from images using OCR
     --skip-upload # Don't upload files to the server
     --title: string # The title of the comic or manga issue
     --upload-ereader-cbz # Upload the E-Reader specific format to the server
@@ -480,7 +481,7 @@ def main [
     log debug "Attempting to get the ISBN from the first ten and last ten pages of the book"
     let book_isbn_numbers = (
         let isbn_numbers = $file | isbn_from_pages $temporary_directory;
-        if ($isbn_numbers | is-empty) {
+        if not $skip_ocr and ($isbn_numbers | is-empty) {
             # Check images for the ISBN if text doesn't work out.
             if "cbz" in $formats {
                 let isbn_from_cbz = $formats.cbz | isbn_from_pages $temporary_directory
@@ -494,7 +495,7 @@ def main [
                 }
             }
         } else {
-          $isbn_numbers
+            $isbn_numbers
         }
     )
     if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
