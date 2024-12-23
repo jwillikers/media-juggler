@@ -16,6 +16,8 @@ use media-juggler-lib *
 #
 def main [
     input: string
+    format: string = "musicbrainz" # Can also be "chapters.txt" or "debug"
+    --round # Force rounding for chapters.txt
 ]: {
     let chapters = (
         if ($input | path parse | get extension) == "m4b" {
@@ -45,8 +47,15 @@ def main [
         }
     )
     let chapters = (
-        let durations = $chapters | get duration | round_to_second_using_cumulative_offset;
-        $chapters | merge ($durations | wrap duration)
+        if $format == "musicbrainz" or $round {
+            let durations = $chapters | get duration | round_to_second_using_cumulative_offset
+            $chapters | merge ($durations | wrap duration)
+        } else {
+            $chapters
+        }
+    )
+    let start_offsets = (
+        $chapters | get duration | lengths_to_start_offsets
     )
 
     (
@@ -83,9 +92,27 @@ def main [
                 | into string
                 | fill --width 2 --alignment right --character '0'
             )
-            $"($c.index) ($c.title) \(($hours):($minutes):($seconds)\)"
-            # $"($c.duration | format duration ms)"
+            if $format == "musicbrainz" {
+                $"($c.index) ($c.title) \(($hours):($minutes):($seconds)\)"
+            } else if $format == "chapters.txt" {
+                let offset = $start_offsets | get $c.index | format_chapter_duration
+                $"($offset) ($c.title)"
+            } else if $format == "debug" {
+                {
+                    index: $c.index
+                    start_offset: ($start_offsets | get $c.index | format_chapter_duration)
+                    length: $"($hours):($minutes):($seconds)"
+                    title: $c.title
+                }
+            }
         }
-        | print --raw
+        | (
+            let i = $in;
+            if $format == "debug" {
+                $i | print
+            } else {
+                $i | print --raw
+            }
+        )
     )
 }

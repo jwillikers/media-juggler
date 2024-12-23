@@ -2090,6 +2090,16 @@ export def sanitize_minio_filename []: string -> string {
     $in
 }
 
+# Get a list of start offsets from a list of durations
+export def lengths_to_start_offsets []: list<duration> -> list<duration> {
+  let lengths = $in | enumerate
+  $lengths | each {|i|
+      $lengths | where index < $i.index | reduce --fold 0ms {|it,acc|
+          $it.item + $acc
+      }
+  }
+}
+
 # Format the duration of a chapter in format used for audiobook chapters
 export def format_chapter_duration []: duration -> string {
     # HH:MM:SS.fff
