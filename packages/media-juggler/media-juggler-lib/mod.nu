@@ -2112,3 +2112,35 @@ export def format_chapter_duration []: duration -> string {
     )
     $"($hours):($minutes):($seconds).($fractional_seconds)"
 }
+
+export def round_to_second_using_cumulative_offset []: list<duration> -> list<duration> {
+    let i = $in
+    $i | reduce --fold {durations: [], cumulative_offset: 0.0} {|it, acc|
+    # $i | reduce {|it, acc|
+        let seconds = $it / 1sec
+        let floor = $seconds // 1
+        let ceil = ($seconds // 1) + 1
+        let floor_offset = $floor - $seconds
+        let ceil_offset = $ceil - $seconds
+        let duration_and_offset = (
+            if (($acc.cumulative_offset + $floor_offset) | math abs) <= (($acc.cumulative_offset + $ceil_offset) | math abs) {
+                # round down
+                {
+                    cumulative_offset: ($acc.cumulative_offset + $floor_offset)
+                    duration: ($floor | into int | into duration --unit sec)
+                }
+            } else {
+                # round up
+                {
+                    cumulative_offset: ($acc.cumulative_offset + $ceil_offset)
+                    duration: ($ceil | into int | into duration --unit sec)
+                }
+            }
+        )
+
+        {
+            durations: ($acc.durations | append $duration_and_offset.duration)
+            cumulative_offset: $duration_and_offset.cumulative_offset
+        }
+    } | get durations
+}

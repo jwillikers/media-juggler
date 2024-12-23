@@ -1,5 +1,9 @@
 #!/usr/bin/env nu
 
+use std log
+
+use media-juggler-lib *
+
 # Print out the chapters for an audiobook in the format used when adding the track list to MusicBrainz.
 #
 # Unfortunately, MusicBrainz doesn't support down to the millisecond level in their editor yet.
@@ -11,15 +15,29 @@
 def main [
     m4b: path
 ]: {
-    (
+    let chapters = (
         ^tone dump --format json $m4b
         | from json
         | get meta
-        | reject embeddedPictures
         | get chapters
         | enumerate
         | each {|c|
-            let d = $c.item.length | into duration --unit ms
+            {
+                index: $c.index
+                title: $c.item.title
+                duration: ($c.item.length | into duration --unit ms)
+            }
+        }
+    )
+    let chapters = (
+        let durations = $chapters | get duration | round_to_second_using_cumulative_offset;
+        $chapters | merge ($durations | wrap duration)
+    )
+
+    (
+        $chapters
+        | each {|c|
+            let d = $c.duration
             let seconds = (
                 ($d mod 1min) / 1sec
                 | math round
@@ -50,7 +68,8 @@ def main [
                 | into string
                 | fill --width 2 --alignment right --character '0'
             )
-            $"($c.index) ($c.item.title) \(($hours):($minutes):($seconds)\)"
+            $"($c.index) ($c.title) \(($hours):($minutes):($seconds)\)"
+            # $"($c.duration | format duration ms)"
         }
         | print --raw
     )
