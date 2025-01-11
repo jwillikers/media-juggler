@@ -196,6 +196,7 @@ def main [
     # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
     --isbn: string
     --interactive # Ask for input from the user
+    --keep # Don't delete the temporary directory when there's an error
     --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
     # --issue: string # The issue number
     # --issue-year: string # The publication year of the issue
@@ -374,7 +375,9 @@ def main [
             )
             if not ($covers | is-empty) {
                 if ($covers | length) > 1 {
-                    rm --force --recursive $temporary_directory
+                    if not $keep {
+                      rm --force --recursive $temporary_directory
+                    }
                     return {
                         file: $original_file
                         error: $"Found multiple files looking for the cover image file:\n($covers)\n"
@@ -387,7 +390,9 @@ def main [
             let covers = (glob $"($original_file | path dirname)/cover.{($image_extensions | str join ',')}")
             if not ($covers | is-empty) {
                 if ($covers | length) > 1 {
-                    rm --force --recursive $temporary_directory
+                    if not $keep {
+                      rm --force --recursive $temporary_directory
+                    }
                     return {
                         file: $original_file
                         error: $"Found multiple files looking for the cover image file:\n($covers)\n"
@@ -439,7 +444,9 @@ def main [
         } else if $original_input_format == "pdf" {
           { pdf: $file }
         } else {
-            rm --force --recursive $temporary_directory
+            if not $keep {
+              rm --force --recursive $temporary_directory
+            }
             return {
                 file: $original_file
                 error: $"Unsupported input file type (ansi red_bold)($original_input_format)(ansi reset)"
@@ -512,7 +519,9 @@ def main [
                 if ($book_isbn_numbers | length) == 1 {
                     log debug "Found an exact match between the ISBN in the metadata and the ISBN in the pages of the book"
                 } else if ($book_isbn_numbers | length) > 10 {
-                    rm --force --recursive $temporary_directory
+                    if not $keep {
+                      rm --force --recursive $temporary_directory
+                    }
                     return {
                         file: $original_file
                         error: $"Found more than 10 ISBN numbers in the pages of the book: (ansi purple)($book_isbn_numbers)(ansi reset)"
@@ -527,7 +536,9 @@ def main [
                     $book_isbn_numbers | first
                 } else {
                     if $isbn == null {
-                        rm --force --recursive $temporary_directory
+                        if not $keep {
+                          rm --force --recursive $temporary_directory
+                        }
                         return {
                             file: $original_file
                             error: $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset). Use the `--isbn` flag to set the ISBN instead."
@@ -670,7 +681,9 @@ def main [
         # todo Add stderr from ComicTagger here
         # todo Use make error?
         log error $"Failed to tag ($original_file)"
-        rm --force --recursive $temporary_directory
+        if not $keep {
+          rm --force --recursive $temporary_directory
+        }
         return {
             file: $original_file
             # todo Add stderr from ComicTagger here
@@ -689,12 +702,18 @@ def main [
     # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
     let authors = (
       let credits = $comic_metadata | get credits;
-      let authors = $credits | where role in ["Artist" "Inker" "Penciller" "Writer"] | get person;
-      if ($authors | is-empty) {
-        $credits | where role == "Other" | get person
+      # todo Get actual primary creators from BookBrainz. This is too inaccurate.
+      let writers = $credits | where role in ["Writer"] | get person;
+      if ($writers | is-empty) {
+        let authors = $credits | where role in ["Artist" "Inker" "Penciller"] | get person;
+        if ($authors | is-empty) {
+            $credits | where role == "Other" | get person
+        } else {
+            $authors
+        } | sort | uniq
       } else {
-        $authors
-      } | sort | uniq
+        $writers | sort | uniq
+      }
     )
     log debug $"The authors are (ansi purple)'($authors)'(ansi reset)"
 
@@ -931,7 +950,9 @@ def main [
     if "cbz" in $formats {
         let image_format = ($formats.cbz | get_image_extension)
         if $image_format == null {
-            rm --force --recursive $temporary_directory
+            if not $keep {
+              rm --force --recursive $temporary_directory
+            }
             return {
                 file: $original_file
                 error: "Failed to determine the image file format"
@@ -1154,7 +1175,9 @@ def main [
         file: $original_file
     }
     } catch {|err|
-        rm --force --recursive $temporary_directory
+        if not $keep {
+          rm --force --recursive $temporary_directory
+        }
         log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
         {
             file: $original_file
