@@ -1115,7 +1115,7 @@ export def epub_to_cbz [
       return null
     }
 
-    let covers = $image_files | path parse | where stem =~ 'cover' | sort-by stem | path join
+    let covers = $image_files | path parse | where stem =~ 'cover' | path join
     let pages = $image_files | path parse | where stem !~ 'cover' | path join
     let pages = $covers | append $pages
 
