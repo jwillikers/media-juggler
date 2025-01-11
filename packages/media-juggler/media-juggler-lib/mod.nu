@@ -1109,54 +1109,42 @@ export def epub_to_cbz [
     log debug $"Extracting contents of the EPUB (ansi yellow)($epub)(ansi reset) to (ansi yellow)($working_directory)/epub(ansi reset)"
     ^unzip -q $epub -d ($working_directory | path join "epub")
 
-    let image_files = (glob $"($working_directory)/epub/**/*.{($image_extensions | str join ',')}")
-    # todo Move all images to the directory with the most images.
-    # 1. Find the directory containing the largest number of image files.
-    # 2. Rename the files according to the proper order, i.e. cover, then blank, then everything else in the same order.
-    # 3. Move all other images to this directory, without clobbering any files in case of conflicts.
-    let image_file_extension = ($image_files | last | path parse | get extension)
-    let image_subdirectory = ($image_files | last | path parse | get parent)
-    let image_format = (
-        if $image_file_extension == "jpg" {
-            "jpeg"
-        } else {
-            $image_file_extension
-        }
-    )
+    let image_files = (glob $"($working_directory)/epub/**/*.{($image_extensions | str join ',')}") | sort
+    if ($image_files | is-empty) {
+      log error $"No images found under the directory (ansi yellow)($working_directory)/epub/(ansi reset)"
+      return null
+    }
 
-    # todo Verify the cover is indeed the first page in the archive.
-    # Especially for the bonking sorting order used by ComicTagger.
-    if ($"($image_subdirectory)/page_cover.($image_file_extension)" | path exists) {
-        log debug $"Renaming ($image_subdirectory)/page_cover.($image_file_extension) to ($image_subdirectory)/cover.($image_file_extension) to avoid the cover not being detected as the first page"
-        mv --no-clobber $"($image_subdirectory)/page_cover.($image_file_extension)" $"($image_subdirectory)/cover.($image_file_extension)"
-    }
-    # Hack to move a cover residing outside the directory with all of the images to the directory with all of the images.
-    # See the todo comment earlier in the function for fixing this properly.
-    let top_level_cover = [$working_directory "epub" "EPUB" $"cover.($image_file_extension)"] | path join
-    if ($top_level_cover | path exists) {
-        log debug $"Moving the cover ($top_level_cover) to ($image_subdirectory)/cover.($image_file_extension)"
-        mv --no-clobber $top_level_cover $"($image_subdirectory)/cover.($image_file_extension)"
-    }
-    # Hack to move any "blank" images to follow the cover.
-    # See the todo comment earlier in the function for fixing this properly.
-    let blanks = $image_files | path parse | where stem == "blank" | path join | each {|blank|
-      if ($blank | path exists) {
-        let components = $blank | path parse
-        let destination = (
-          {
-            parent: ($components | get parent)
-            stem: "cp_blank"
-            extension: ($components | get extension)
-          } | path join
-        )
-        log debug $"Renaming the blank page image from (ansi yellow)($blank)(ansi reset) to (ansi yellow)($destination)(ansi reset) so that it is ordered after the cover"
-        mv --no-clobber $blank $destination
+    let covers = $image_files | path parse | where stem =~ 'cover' | sort-by stem | path join
+    let pages = $image_files | path parse | where stem !~ 'cover' | path join
+    let pages = $covers | append $pages
+
+    let number_of_digits = (($pages | length) - 1) | into string | str length
+
+    let image_subdirectory = (mktemp --directory) #| path join "images"
+    log debug $"Organizing images for the CBZ file in the directory (ansi yellow)($image_subdirectory)(ansi reset)"
+
+    # Rename everything for consistency.
+    let pages = (
+      $pages | enumerate | each {|p|
+        let old_page = $p.item
+        let components = $p.item | path parse
+        let new_page = {
+          parent: $image_subdirectory
+          stem: (
+            "page_" + ($p.index | fill --alignment r --character '0' --width $number_of_digits)
+          )
+          extension: $components.extension
+        } | path join
+        mv --no-clobber $old_page $new_page
+        $new_page
       }
-    }
+    )
     log debug $"Compressing the contents of the directory (ansi yellow)($image_subdirectory)(ansi reset) into the CBZ file (ansi yellow)($cbz)(ansi reset)"
     log debug $"Running command: ^zip -jqr ($cbz) ($image_subdirectory)"
     ^zip -jqr $cbz $image_subdirectory
     rm --force --recursive $"($working_directory)/epub"
+    rm --force --recursive $image_subdirectory
     $cbz
 }
 
