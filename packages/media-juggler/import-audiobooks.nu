@@ -61,6 +61,181 @@ export def mp3_directory_to_m4b [
 # Can search based on details or use the id directly
 # http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/release/?query=('secondarytype:audiobook AND packaging:"None" AND artistname:\"Brandon Sanderson\" AND release:\"The Way of Kings\"' | url encode)" | get releases | sort-by --reverse score | first
 
+# Lookup a MusicBrainz release
+export def find_musicbrainz_release []: [record -> table] {
+  let metadata = $in
+  let url = "https://musicbrainz.org/ws/2/release/"
+  let query = "primary-type:Other AND secondarytype:Audiobook"
+  let query = (
+    if "authors" in $metadata {
+      $query += $metadata.authors | reduce {|it, acc|
+        $acc + $" AND artistname:\"($it)\""
+      }
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "country" in $metadata {
+      $query += $" AND country:($metadata.country)"
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "isbn" in $metadata {
+      $query += $" AND barcode:($metadata.isbn)"
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "packaging" in $metadata {
+      $query += $" AND packaging:\"($metadata.packaging)\""
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "title" in $metadata {
+      $query += $" AND release:\"($metadata.title)\""
+    } else {
+      $query
+    }
+  )
+  let query = $query | url encode
+
+  http get --headers [Accept "application/json"] $"($url)?query=($query)" | get releases | sort-by --reverse score
+}
+
+# Fetch a release from MusicBrainz by ID
+export def get_musicbrainz_release []: string -> record {
+  let id = $in
+  let url = "https://musicbrainz.org/ws/2/release"
+  http get --headers [Accept "application/json"] $"($url)/($id)/?inc=artist-credits+labels+recordings"
+}
+
+# Get the release groups to which a release belongs
+export def get_musicbrainz_release_groups_for_release []: string -> table {
+  let release_id = $in
+  let url = "https://musicbrainz.org/ws/2/release-group/"
+  let query = $"reid:($release_id)" | url encode
+  http get --headers [Accept "application/json"] $"($url)/?query=($query)"
+}
+
+# Fetch a release group from MusicBrainz by ID
+export def get_musicbrainz_release_group []: string -> record {
+  let release_group_id = $in
+  let url = "https://musicbrainz.org/ws/2/release-group"
+  http get --headers [Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"
+}
+
+# Get the Release series groups to which a release group belongs
+export def get_series_from_release_group []: record -> record {
+  # let release_group_id =
+  let release_group_series = (
+    $in
+    | get relations
+    | where series.type == "Release group series"
+    | where type == "part of"
+  )
+  if ($release_group_series | is-empty) {
+    return null
+  }
+  if ($release_group_series | length) > 1 {
+    log info "Parsed multiple release group series. Using the first one."
+  }
+
+  let release_group_series = $release_group_series | first
+  let series_name = $release_group_series.series.name
+  let series_name = (
+    if $series_name =~ '.+, read by .+' {
+      $series_name | str substring 0..(($series_name | str index-of ", read by ") - 1)
+    } else {
+      $series_name
+    }
+  )
+
+  if "ordering-key" not-in $release_group_series {
+    return {name: $series_name}
+  }
+
+  {
+    name: $series_name
+    number: $release_group_series.ordering-key
+  }
+}
+
+# Parse chapters out of MusicBrainz recordings data.
+# $release | get media
+export def chapters_from_musicbrainz_release_media []: table -> string {
+  (
+    $in
+    | get tracks
+    | flatten
+    | each {|recording|
+      # Unfortunately, lengths are in seconds and not milliseconds.
+      let time = ($recording.length | into duration --unit sec | lengths_to_start_offsets | format_chapter_duration)
+      $"($time) ($recording.title)"
+    }
+    | str join "\n"
+  )
+}
+
+# todo Add function to get series using the Work series from the work associated with a recording
+
+# todo Get artist en alias?  http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/artist/616f49c8-b33a-4de9-80c6-d99a4a74184e/?inc=aliases"
+
+# Get the metadata for an Audiobook using MusicBrainz
+export def get_audiobook_metadata_from_musicbrainz []: record -> record {
+  let audiobook_metadata = $in
+  let releases = $audiobook_metadata | find_musicbrainz_release | where score >= 90
+  if ($releases | is-empty) {
+    log debug "No matches with at least a 90% score from MusicBrainz"
+    return null
+  }
+  if ($releases | length) > 1 {
+    log warning "Multiple matches with a score of at least 90% from MusicBrainz"
+  }
+  let release = $releases | first
+
+  let release_groups = $release.id | get_musicbrainz_release_groups_for_release
+  if ($release_groups | is-empty) {
+    log debug $"No release groups for release ($release.id)"
+  } else if ($release_groups | length) > 1 {
+    log warning $"Multiple release groups found for the release ($release.id). Using the first one."
+  }
+  let release_group = $release_groups | first | get id | get_musicbrainz_release_group
+
+  let series = $release_group | get_series_from_release_group
+  let chapters = $release_group | get media | chapters_from_musicbrainz_release_media
+
+  # todo
+  # let authors =
+  # let narrators =
+
+  {
+    # authors: $authors from artist-credit
+    chapters: $chapters
+    # cover
+    date: $release.date
+    # disambiguation?
+    # labels (tags)
+    # country
+    # language?
+    musicbrainz_id: $release.id
+    series: $series
+    title: $release.title
+  } | (
+    let i = $in;
+    if "barcode" in $release {
+      $i | insert isbn $release.barcode
+    } else {
+      $i
+    }
+  )
+}
+
 export def tag_audiobook [
     output_directory: directory
     --asin: string
