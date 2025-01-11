@@ -81,6 +81,16 @@ export def parse_isbn [
     return ($obvious_isbn | get isbn | str replace --all "-" "" | uniq)
   }
 
+  # ebook ISBN: xxx
+  let obvious_isbn = (
+    $text
+    | parse --regex 'ebook ISBN:\s*(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))'
+  )
+  if ($obvious_isbn | is-not-empty) {
+    return ($obvious_isbn | get isbn | str replace --all "-" "" | uniq)
+  }
+
+  # ISBN xxx (ebook)
   let obvious_isbn = (
     $text
     | parse --regex 'ISBN\s*(?P<isbn>(?:97[89]{1}-?[0-9]{10})|(?:97[89]{1}-[-0-9]{13}))\s*\(ebook\)'
@@ -1109,41 +1119,41 @@ export def epub_to_cbz [
     log debug $"Extracting contents of the EPUB (ansi yellow)($epub)(ansi reset) to (ansi yellow)($working_directory)/epub(ansi reset)"
     ^unzip -q $epub -d ($working_directory | path join "epub")
 
-    let image_files = (glob $"($working_directory)/epub/**/*.{($image_extensions | str join ',')}") | sort
+    let image_files = (glob --no-dir --no-symlink $"($working_directory)/epub/**/*.{($image_extensions | str join ',')}") | sort | path parse
     if ($image_files | is-empty) {
       log error $"No images found under the directory (ansi yellow)($working_directory)/epub/(ansi reset)"
       return null
     }
 
-    let covers = $image_files | path parse | where stem =~ 'cover' | path join
-    let pages = $image_files | path parse | where stem !~ 'cover' | path join
+    let covers = $image_files | where stem =~ 'cover'
+    let pages = $image_files | where stem !~ 'cover'
     let pages = $covers | append $pages
 
     let number_of_digits = (($pages | length) - 1) | into string | str length
 
-    let image_subdirectory = (mktemp --directory) #| path join "images"
+    let image_subdirectory = (mktemp --directory)
     log debug $"Organizing images for the CBZ file in the directory (ansi yellow)($image_subdirectory)(ansi reset)"
 
     # Rename everything for consistency.
     let pages = (
       $pages | enumerate | each {|p|
-        let old_page = $p.item
-        let components = $p.item | path parse
+        let old_page = $p.item | path join
         let new_page = {
           parent: $image_subdirectory
           stem: (
             "page_" + ($p.index | fill --alignment r --character '0' --width $number_of_digits)
           )
-          extension: $components.extension
+          extension: $p.item.extension
         } | path join
         mv --no-clobber $old_page $new_page
         $new_page
       }
     )
+    log debug $"Pages (ansi yellow)($pages)(ansi reset)"
     log debug $"Compressing the contents of the directory (ansi yellow)($image_subdirectory)(ansi reset) into the CBZ file (ansi yellow)($cbz)(ansi reset)"
     log debug $"Running command: ^zip -jqr ($cbz) ($image_subdirectory)"
     ^zip -jqr $cbz $image_subdirectory
-    rm --force --recursive $"($working_directory)/epub"
+    rm --force --recursive ($working_directory | path join "epub")
     rm --force --recursive $image_subdirectory
     $cbz
 }

@@ -270,6 +270,14 @@ def main [
     # let original_file = $files | first
     let results = $files | each {|original_file|
 
+    let original_file = (
+        if ($original_file | str starts-with "minio:") {
+            $original_file
+        } else {
+            $original_file | path expand
+        }
+    )
+
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
     let temporary_directory = (mktemp --directory "import-comics.XXXXXXXXXX")
