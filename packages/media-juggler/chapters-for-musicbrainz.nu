@@ -41,7 +41,7 @@ def main [
                 {
                     index: $c.index
                     title: $c.item.title
-                    duration: ($c.item.startOffsetMs | into duration --unit ms)
+                    duration: ($c.item.lengthMs | into duration --unit ms)
                 }
             }
         }
@@ -93,7 +93,7 @@ def main [
                 | fill --width 2 --alignment right --character '0'
             )
             if $format == "musicbrainz" {
-                $"($c.index) ($c.title) \(($hours):($minutes):($seconds)\)"
+                $"($c.index + 1) ($c.title) \(($hours):($minutes):($seconds)\)"
             } else if $format == "chapters.txt" {
                 let offset = $start_offsets | get $c.index | format_chapter_duration
                 $"($offset) ($c.title)"
