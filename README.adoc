@@ -17,6 +17,14 @@ endif::[]
 
 Scripts to tag, convert, and upload my music, audiobooks, ebooks, and comics.
 
+[NOTE]
+====
+This mostly a minimum-viable product right now, in need of a lot more work.
+I've realized that MusicBrainz and BookBrainz are the best solutions for tagging Audiobooks, books, and comics.
+Unfortunately, they aren't populated with a ton of metadata yet, so I'm working on adding as much metadata to them as I can right now.
+I plan on coming back to improve these scripts after that.
+====
+
 == Usage
 
 This repository provides a collection of scripts to make it easier to add various digital media to my collection.

@@ -10,13 +10,14 @@ use media-juggler-lib *
 #
 # Unfortunately, MusicBrainz doesn't support down to the millisecond level in their editor yet.
 # https://tickets.metabrainz.org/browse/MBS-7130
-# For right now, I just round to the nearest second.
-# However, I could take into account the cumulative remainder seconds and adjust the durations better this way.
 #
+# So, I use some logic to round the track length based on the cumulative drift from previous rounding.
+# This way, the drift due to rounding won't accumulate and make the chapter offsets incorrect.
 #
 def main [
     input: string
     format: string = "musicbrainz" # Can also be "chapters.txt" or "debug"
+    # --chapter-offset: int = 0 # The number to use as the first chapter number
     --round # Force rounding for chapters.txt
 ]: {
     let chapters = (
