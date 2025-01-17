@@ -2180,3 +2180,26 @@ export def round_to_second_using_cumulative_offset []: list<duration> -> list<du
         }
     } | get durations
 }
+
+# Fetch a release from MusicBrainz by ID
+export def get_musicbrainz_release []: string -> record {
+  let id = $in
+  let url = "https://musicbrainz.org/ws/2/release"
+  http get --headers [Accept "application/json"] $"($url)/($id)/?inc=artist-credits+labels+recordings"
+}
+
+# Parse chapters out of MusicBrainz recordings data.
+# $release | get media
+export def chapters_from_musicbrainz_release_media []: table -> string {
+  (
+    $in
+    | get tracks
+    | flatten
+    | each {|recording|
+      # Unfortunately, lengths are in seconds and not milliseconds.
+      let time = ($recording.length | into duration --unit ms | lengths_to_start_offsets | each {|t| $t | format_chapter_duration})
+      $"($time) ($recording.title)"
+    }
+    | str join "\n"
+  )
+}

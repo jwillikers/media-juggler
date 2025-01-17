@@ -108,13 +108,6 @@ export def find_musicbrainz_release []: [record -> table] {
   http get --headers [Accept "application/json"] $"($url)?query=($query)" | get releases | sort-by --reverse score
 }
 
-# Fetch a release from MusicBrainz by ID
-export def get_musicbrainz_release []: string -> record {
-  let id = $in
-  let url = "https://musicbrainz.org/ws/2/release"
-  http get --headers [Accept "application/json"] $"($url)/($id)/?inc=artist-credits+labels+recordings"
-}
-
 # Get the release groups to which a release belongs
 export def get_musicbrainz_release_groups_for_release []: string -> table {
   let release_id = $in
@@ -166,22 +159,6 @@ export def get_series_from_release_group []: record -> record {
   }
 }
 
-# Parse chapters out of MusicBrainz recordings data.
-# $release | get media
-export def chapters_from_musicbrainz_release_media []: table -> string {
-  (
-    $in
-    | get tracks
-    | flatten
-    | each {|recording|
-      # Unfortunately, lengths are in seconds and not milliseconds.
-      let time = ($recording.length | into duration --unit sec | lengths_to_start_offsets | format_chapter_duration)
-      $"($time) ($recording.title)"
-    }
-    | str join "\n"
-  )
-}
-
 # todo Add function to get series using the Work series from the work associated with a recording
 
 # todo Get artist en alias?  http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/artist/616f49c8-b33a-4de9-80c6-d99a4a74184e/?inc=aliases"
@@ -208,7 +185,7 @@ export def get_audiobook_metadata_from_musicbrainz []: record -> record {
   let release_group = $release_groups | first | get id | get_musicbrainz_release_group
 
   let series = $release_group | get_series_from_release_group
-  let chapters = $release_group | get media | chapters_from_musicbrainz_release_media
+  let chapters = $release | get media | chapters_from_musicbrainz_release_media
 
   # todo
   # let authors =

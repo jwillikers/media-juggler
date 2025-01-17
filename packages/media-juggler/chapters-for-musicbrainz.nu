@@ -6,7 +6,7 @@ use media-juggler-lib *
 
 # Print out the chapters for an audiobook in the format used when adding the track list to MusicBrainz.
 #
-# Takes the path to an M4B file or an Audible ASIN
+# Takes the path to an M4B file, an Audible ASIN, or a MusicBrainz Release ID.
 #
 # Unfortunately, MusicBrainz doesn't support down to the millisecond level in their editor yet.
 # https://tickets.metabrainz.org/browse/MBS-7130
@@ -20,8 +20,24 @@ def main [
     # --chapter-offset: int = 0 # The number to use as the first chapter number
     --round # Force rounding for chapters.txt
 ]: {
-    let chapters = (
+    let input_type = (
         if ($input | path parse | get extension) == "m4b" {
+          "m4b"
+        } else if $input =~ '[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12}' {
+          "MusicBrainz" # Release ID
+        } else if $input =~ '[a-zA-Z0-9]{10}' {
+          "ASIN"
+        } else {
+          null
+        }
+    )
+    if $input_type == null {
+      log error $"Unsupported input (ansi purple)($input)(ansi reset)"
+      exit 1
+    }
+
+    let chapters = (
+        if $input_type == "m4b" {
             ^tone dump --format json $input
             | from json
             | get meta
@@ -34,7 +50,7 @@ def main [
                     duration: ($c.item.length | into duration --unit ms)
                 }
             }
-        } else {
+        } else if $input_type == "ASIN" {
             http get $"https://api.audnex.us/books/($input)/chapters"
             | get chapters
             | enumerate
@@ -45,6 +61,22 @@ def main [
                     duration: ($c.item.lengthMs | into duration --unit ms)
                 }
             }
+        } else if $input_type == "MusicBrainz" {
+            (
+              $input
+              | get_musicbrainz_release
+              | get media
+              | get tracks
+              | flatten
+              | enumerate
+              | each {|recording|
+                {
+                    index: $recording.index
+                    title: $recording.item.title
+                    duration: ($recording.item.length | into duration --unit ms)
+                }
+              }
+            )
         }
     )
     let chapters = (
