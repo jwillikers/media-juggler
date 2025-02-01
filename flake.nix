@@ -1,6 +1,15 @@
 {
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
+    nix-update-scripts = {
+      url = "github:jwillikers/nix-update-scripts";
+      inputs = {
+        flake-utils.follows = "flake-utils";
+        nixpkgs.follows = "nixpkgs";
+        pre-commit-hooks.follows = "pre-commit-hooks";
+        treefmt-nix.follows = "treefmt-nix";
+      };
+    };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     pre-commit-hooks = {
@@ -19,6 +28,7 @@
     {
       # deadnix: skip
       self,
+      nix-update-scripts,
       nixpkgs,
       # deadnix: skip
       nixpkgs-unstable,
@@ -50,6 +60,7 @@
       {
         apps = {
           default = self.apps.${system}.update-nix-direnv;
+          inherit (nix-update-scripts.apps.${system}) update-nix-direnv update-nixos-release;
           update-packages = {
             type = "app";
             program = builtins.toString (
