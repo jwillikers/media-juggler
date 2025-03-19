@@ -1,8 +1,6 @@
-# Due to rate limiting from digikey.com and gnu.org
+# Due to rate limiting from gnu.org
 accept = [429]
 
 cache = true
-exclude = [
-  # '^https://www.example.com',
-]
+exclude = ['^https://www\.adobe\.com']
 max_cache_age = "2w"
