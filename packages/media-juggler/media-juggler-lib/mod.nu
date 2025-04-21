@@ -2461,21 +2461,66 @@ export def parse_audiobook_metadata_from_file []: record -> record {
     $metadata | parse_audiobook_metadata_from_file
 }
 
+# Parse audiobook metadata from a list individual tracks' metadata
+export def parse_audiobook_metadata_from_tracks_metadata []: list<record> -> record {
+  let metadata = $in | sort-by track.index
+  # The book metadata should match across all tracks.
+  # Narrators and writers for each track need to be combined to produce the narrators and writers for the book.
+  let book = $metadata | get book | reduce {|it, acc|
+    # todo Log a warning here if the book data doesn't match?
+    # Or, just use the item with the most occurrences?
+    $acc | merge $it
+  }
+  # tracks are just the separate tracks brought together
+  let tracks = $metadata | get track # | sort-by index
+  let cumulative_tracks_metadata = (
+    $tracks | reduce --fold {narrators: [], writers: [], embedded_pictures: []} {|it, acc|
+      let embedded_pictures = (
+        if "embedded_pictures" in $it {
+          $acc.embedded_pictures | append $it.embedded_pictures | uniq
+        } else {
+          $acc.embedded_pictures
+        }
+      );
+      let narrators = (
+        if "narrators" in $it {
+          $acc.narrators | append $it.narrators | uniq
+        } else {
+          $acc.narrators
+        }
+      );
+      let writers = (
+        if "writers" in $it {
+          $acc.writers | append $it.writers | uniq
+        } else {
+          $acc.writers
+        }
+      );
+      {
+        narrators: $narrators
+        writers: $writers
+        embedded_pictures: $embedded_pictures
+      }
+    }
+  )
+
+  let book = (
+    $book
+    | upsert_if_value narrators $cumulative_tracks_metadata.narrators
+    | upsert_if_value writers $cumulative_tracks_metadata.writers
+    | upsert_if_value embedded_pictures $cumulative_tracks_metadata.embedded_pictures
+  )
+  {
+      book: $book
+      tracks: $tracks
+  }
+}
+
 # Parse audiobook metadata from a list of audio files correlating to the tracks of the audiobook
 export def parse_audiobook_metadata_from_files []: list<path> -> record {
     let files = $in
     let metadata = $files | par-each {|file|
         $file | parse_audiobook_metadata_from_file
     }
-    # The book metadata should match across all tracks.
-    # Narrators and writers for each track need to be combined to produce the narrators and writers for the book.
-    let book = $metadata | get book | reduce {|it, acc|
-      $acc = $acc | merge $it
-    }
-    # tracks are just the separate tracks brought together
-    let tracks = $metadata | get track | sort-by index
-    {
-        book: $book
-        tracks: $tracks
-    }
+    $metadata | parse_audiobook_metadata_from_tracks_metadata
 }
