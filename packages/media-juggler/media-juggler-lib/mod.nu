@@ -2203,3 +2203,279 @@ export def chapters_from_musicbrainz_release_media []: table -> string {
     | str join "\n"
   )
 }
+
+# Parse series from the group metadata tag
+#
+# audiobookshelf stores series in a semicolon-separated list in the group field
+# The index in the series is preceded by a hash sign.
+export def parse_series_from_group []: string -> table<title: string, index: string> {
+  $in | split row ";" | str trim | each {|series|
+    if "#" in $series {
+      $series | parse '{title} #{index}'
+    } else {
+      [[title index]; [$series null]]
+    }
+  } | flatten
+}
+
+# Parse series from the series and series-part tags from the additionalFields metadata
+#
+# A table is returned despite the fact that there will only ever be one series parsed from these tags.
+export def parse_series_from_series_tags []: record -> table<title: string, index: string> {
+  let additionalFields = $in
+  if "series" in $additionalFields and $additionalFields.series != null {
+      [
+        [title index];
+        [
+          ($additionalFields.series | into string)
+          (if "series-part" in $additionalFields and $additionalFields.series-part != null {$additionalFields.series-part | into string})
+        ]
+      ]
+  }
+}
+
+# Upsert a value in the input record if a value is present for the given column in the source record
+#
+# The source column may be omitted when it has the same name as the destination column.
+export def upsert_if_present [
+  destination_column: string
+  source: record
+  source_column: string = ""
+]: record -> record {
+  let source_column = (
+    if $source_column == null or ($source_column | is-empty) {
+      $destination_column
+    } else {
+      $source_column
+    }
+  )
+  $in | (
+    let input = $in;
+    if $source_column in $source and (($source | get $source_column) != null) {
+      $input | upsert $destination_column ($source | get $source_column)
+    } else {
+      $input
+    }
+  )
+}
+
+# Upsert a value in the input record if the value is not null or empty
+export def upsert_if_value [
+  destination_column: string
+  value: any
+]: record -> record {
+  $in | (
+    let input = $in;
+    if ($value | is-empty) {
+      $input
+    } else {
+      $input | upsert $destination_column $value
+    }
+  )
+}
+
+# Parse audiobook metadata from tone for a single file into a standard format
+#
+# todo Parse using a generic schema?
+export def parse_audiobook_metadata_from_tone []: record -> record {
+    let metadata = $in
+    let narrators = (
+        ["composer" "narrator"] | par-each {|type|
+            if $type in $metadata {
+                $metadata | get $type | split row "," | str trim
+            }
+        } | flatten | uniq
+    )
+    let series = (
+        let group_series = (
+          if "group" in $metadata {
+            $metadata.group | parse_series_from_group
+          }
+        );
+        let series = (
+          if "additionalFields" in $metadata {
+            $metadata.additionalFields | parse_series_from_series_tags
+          }
+        );
+        # The first series should be considered the primary series
+        [] | append $series | append $group_series | uniq
+    )
+    let genres = (
+      if "genre" in $metadata {
+        $metadata.genre | split row ";" | str trim
+      }
+    )
+    let publication_date = (
+      if "recordingDate" in $metadata {
+        $metadata.recordingDate | into datetime
+      } else if "additionalFields" in $metadata and "originaldate" in $metadata.additionalFields {
+        $metadata.additionalFields.originaldate | into datetime
+      } else if "additionalFields" in $metadata and "originalyear" in $metadata.additionalFields {
+        ($metadata.additionalFields.originalyear + "-01-01") | into datetime
+      }
+    )
+    let writers = (
+      if "additionalFields" in $metadata and "writer" in $metadata.additionalFields {
+        $metadata.additionalFields.writer | split row ";" | str trim
+      }
+    )
+    let publishers = (
+      # MusicBrainz may have multiple set
+      let publishers = (
+        if "additionalFields" in $metadata and publisher in $metadata.additionalFields {
+          $metadata.additionalFields.publisher | split row ";" | str trim
+        }
+      );
+      let labels = (
+        if "additionalFields" in $metadata and label in $metadata.additionalFields {
+          $metadata.additionalFields.label | split row ";" | str trim
+        }
+      );
+      # audiobookshelf stores the publisher in the copyright field.
+      # I don't think there can be multiple here.
+      let copyright = (
+        if copyright in $metadata {
+          $metadata.copyright
+        }
+      );
+      [] | append $publishers | append $labels | append $copyright | uniq
+    )
+    # let publication_date = (
+    #     let date = $metadata.recordingDate | into datetime;
+    #     let month = $date | format date '%m' | into int;
+    #     let day = $date | format date '%d' | into int;
+    #     if $month == 1 and $day == 1 {
+    #     }
+    # )
+
+    let musicbrainz_album_types = (
+      if "additionalFields" in $metadata and "musicBrainz Album Type" in $metadata.additionalFields {
+        $metadata.additionalFields."musicBrainz Album Type" | split row ";" | str trim
+      }
+    )
+    let musicbrainz_album_artist_ids = (
+      if "additionalFields" in $metadata and "musicBrainz Album Artist Id" in $metadata.additionalFields {
+        $metadata.additionalFields."musicBrainz Album Artist Id" | split row ";" | str trim
+      }
+    )
+    let musicbrainz_track_artist_ids = (
+      if "additionalFields" in $metadata and "musicBrainz Artist Id" in $metadata.additionalFields {
+        $metadata.additionalFields."musicBrainz Artist Id" | split row ";" | str trim
+      }
+    )
+    let producers = (
+      if "additionalFields" in $metadata and "producer" in $metadata.additionalFields {
+        $metadata.additionalFields.producer | split row ";" | str trim
+      }
+    )
+    let engineers = (
+      if "additionalFields" in $metadata and "engineer" in $metadata.additionalFields {
+        $metadata.additionalFields.engineer | split row ";" | str trim
+      }
+    )
+    let performers = (
+      if "additionalFields" in $metadata and "performer" in $metadata.additionalFields {
+        $metadata.additionalFields.performer | split row ";" | str trim
+      }
+    )
+    let musicbrainz_work_ids = (
+      if "additionalFields" in $metadata and "musicBrainz Work Id" in $metadata.additionalFields {
+        $metadata.additionalFields."musicBrainz Work Id" | split row ";" | str trim
+      }
+    )
+
+    # todo Is it worth parsing additionalFields artists field?
+
+    let book = (
+      {}
+      | upsert_if_present title $metadata album
+      | upsert_if_present artist_credit $metadata albumArtist
+      | upsert_if_present artist_credit_sort $metadata sortAlbumArtist
+      | upsert_if_present comment $metadata
+      | upsert_if_value publishers $publishers
+      | upsert_if_value publication_date $publication_date
+      | upsert_if_value series $series
+      | upsert_if_value genres $genres
+      | upsert_if_value musicbrainz_release_types $musicbrainz_album_types
+      | upsert_if_value musicbrainz_artist_ids $musicbrainz_album_artist_ids
+      | (
+        let input = $in;
+        if additionalFields in $metadata {
+          $input
+          | upsert_if_present media $metadata.additionalFields
+          | upsert_if_present script $metadata.additionalFields
+          | upsert_if_present barcode $metadata.additionalFields
+          | upsert_if_present musicbrainz_release_group_id $metadata.additionalFields "musicBrainz Release Group Id"
+          | upsert_if_present musicbrainz_release_id $metadata.additionalFields "musicBrainz Album Id"
+          | upsert_if_present musicbrainz_release_country $metadata.additionalFields "musicBrainz Album Release Country"
+          | upsert_if_present musicbrainz_release_status $metadata.additionalFields "musicBrainz Album Status"
+        } else {
+          $input
+        }
+      )
+      | (
+        let input = $in;
+        if chapters in $metadata and ($metadata.chapters | is-not-empty) {
+          $input | upsert chapters ($metadata.chapters | sort-by start)
+        } else {
+          $input
+        }
+      )
+    );
+    let track = (
+      {}
+      | upsert_if_present title $metadata
+      | upsert_if_present artist_credit $metadata artist
+      | upsert_if_present artist_credit_sort $metadata sortArtist
+      | upsert_if_present index $metadata trackNumber
+      | upsert_if_present embedded_pictures $metadata embeddedPictures
+      | upsert_if_value musicbrainz_work_ids $musicbrainz_work_ids
+      | upsert_if_value musicbrainz_artist_ids $musicbrainz_track_artist_ids
+      | upsert_if_value writers $writers
+      | upsert_if_value narrators $narrators
+      | upsert_if_value producers $producers
+      | upsert_if_value engineers $engineers
+      | upsert_if_value performers $performers
+      | (
+        let input = $in;
+        if additionalFields in $metadata {
+          $input
+          | upsert_if_present acoustid_fingerprint $metadata.additionalFields "acoustid Fingerprint"
+          | upsert_if_present musicbrainz_track_id $metadata.additionalFields "musicBrainz Track Id"
+          | upsert_if_present musicbrainz_release_track_id $metadata.additionalFields "musicBrainz Release Track Id"
+        } else {
+          $input
+        }
+      )
+    );
+    {
+        book: $book
+        track: $track
+    }
+}
+
+# Parse audiobook metadata for a single file into a standard format
+export def parse_audiobook_metadata_from_file []: record -> record {
+    let file = $in
+    let metadata = ^tone dump --format json $file | from json | get meta
+    $metadata | parse_audiobook_metadata_from_file
+}
+
+# Parse audiobook metadata from a list of audio files correlating to the tracks of the audiobook
+export def parse_audiobook_metadata_from_files []: list<path> -> record {
+    let files = $in
+    let metadata = $files | par-each {|file|
+        $file | parse_audiobook_metadata_from_file
+    }
+    # The book metadata should match across all tracks.
+    # Narrators and writers for each track need to be combined to produce the narrators and writers for the book.
+    let book = $metadata | get book | reduce {|it, acc|
+      $acc = $acc | merge $it
+    }
+    # tracks are just the separate tracks brought together
+    let tracks = $metadata | get track | sort-by index
+    {
+        book: $book
+        tracks: $tracks
+    }
+}

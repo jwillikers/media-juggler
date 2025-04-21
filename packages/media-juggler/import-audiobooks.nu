@@ -61,14 +61,35 @@ export def mp3_directory_to_m4b [
 # Can search based on details or use the id directly
 # http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/release/?query=('secondarytype:audiobook AND packaging:"None" AND artistname:\"Brandon Sanderson\" AND release:\"The Way of Kings\"' | url encode)" | get releases | sort-by --reverse score | first
 
-# Lookup a MusicBrainz release
-export def find_musicbrainz_release []: [record -> table] {
+# Lookup a MusicBrainz release given metadata for the tracks
+#
+#
+export def find_musicbrainz_release []: [list<record> -> table] {
   let metadata = $in
   let url = "https://musicbrainz.org/ws/2/release/"
-  let query = "primary-type:Other AND secondarytype:Audiobook"
+
+  # First, check if there is already a release MBID in the metadata.
+
+  # The release must be an Audiobook or Audio drama
+  let query = "primary-type:Other AND (secondarytype:Audiobook OR secondarytype:\"Audio drama\""
+
   let query = (
-    if "authors" in $metadata {
-      $query += $metadata.authors | reduce {|it, acc|
+    if "albumArtist" in $metadata {
+      $query += $" AND artist:\"($metadata.albumArtist)\""
+    } else {
+      $query
+    }
+  )
+  let query = (
+    let artists = (
+        ["artist" "composer" "narrator"] | each {|type|
+            if $type in $metadata {
+                $metadata | get $type | split row "," | str trim
+            }
+        }
+    );
+    if ($artists | is-not-empty) {
+      $query += $artists | reduce {|it, acc|
         $acc + $" AND artistname:\"($it)\""
       }
     } else {
@@ -76,15 +97,24 @@ export def find_musicbrainz_release []: [record -> table] {
     }
   )
   let query = (
-    if "country" in $metadata {
-      $query += $" AND country:($metadata.country)"
+    if "recordingDate" in $metadata {
+      $query += $" AND date:($metadata.data | into datetime | format date '%Y-%m-%d')"
+    } else if "originalyear" in $metadata.additionalFields {
+      $query += $" AND date:($metadata.additionalFields.originalyear)"
     } else {
       $query
     }
   )
   let query = (
-    if "isbn" in $metadata {
-      $query += $" AND barcode:($metadata.isbn)"
+    if "musicBrainz Album Release Country" in $metadata.additionalFields {
+      $query += $" AND country:($metadata.'musicBrainz Album Release Country')"
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "barcode" in $metadata.additionalFields {
+      $query += $" AND barcode:($metadata.additionalFields.barcode)"
     } else {
       $query
     }
@@ -97,15 +127,33 @@ export def find_musicbrainz_release []: [record -> table] {
     }
   )
   let query = (
-    if "title" in $metadata {
-      $query += $" AND release:\"($metadata.title)\""
+    if "album" in $metadata {
+      $query += $" AND release:\"($metadata.album)\""
     } else {
       $query
     }
   )
+
+  # Must search for recording using acoustid
+#   let query = (
+#     if "acoustid Fingerprint" in $metadata {
+#       $query += $" AND :\"($metadata.title)\""
+#     } else {
+#       $query
+#     }
+#   )
+
+  # todo Distributor = Libro.fm if in comment
+  # todo Number of tracks
+  # todo Track length
+  # todo Acoustid
+  # todo recordingDate == release Date
+
   let query = $query | url encode
 
   http get --headers [Accept "application/json"] $"($url)?query=($query)" | get releases | sort-by --reverse score
+
+    # filter based on distributor where $comment contains "Libro.fm"
 }
 
 # Get the release groups to which a release belongs
@@ -123,8 +171,8 @@ export def get_musicbrainz_release_group []: string -> record {
   http get --headers [Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"
 }
 
-# Get the Release series groups to which a release group belongs
-export def get_series_from_release_group []: record -> record {
+# Get the Release group series to which a release group belongs
+export def get_series_from_release_group []: record -> list<record> {
   # let release_group_id =
   let release_group_series = (
     $in
@@ -135,27 +183,17 @@ export def get_series_from_release_group []: record -> record {
   if ($release_group_series | is-empty) {
     return null
   }
-  if ($release_group_series | length) > 1 {
-    log info "Parsed multiple release group series. Using the first one."
-  }
 
-  let release_group_series = $release_group_series | first
-  let series_name = $release_group_series.series.name
-  let series_name = (
-    if $series_name =~ '.+, read by .+' {
-      $series_name | str substring 0..(($series_name | str index-of ", read by ") - 1)
-    } else {
-      $series_name
-    }
-  )
-
-  if "ordering-key" not-in $release_group_series {
-    return {name: $series_name}
-  }
-
-  {
-    name: $series_name
-    number: $release_group_series.ordering-key
+  $release_group_series | par-each {|series|
+    {
+        name: $series.name
+        number: $release_group_series.ordering-key
+    } | (
+        let input = $in
+        if "ordering-key" in $series {
+            $in | insert number $series.ordering-key
+        }
+    )
   }
 }
 
@@ -164,7 +202,9 @@ export def get_series_from_release_group []: record -> record {
 # todo Get artist en alias?  http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/artist/616f49c8-b33a-4de9-80c6-d99a4a74184e/?inc=aliases"
 
 # Get the metadata for an Audiobook using MusicBrainz
-export def get_audiobook_metadata_from_musicbrainz []: record -> record {
+#
+# Takes a list of records where each record is the metadata of a track
+export def get_audiobook_metadata_from_musicbrainz []: list<record> -> record {
   let audiobook_metadata = $in
   let releases = $audiobook_metadata | find_musicbrainz_release | where score >= 90
   if ($releases | is-empty) {
@@ -188,20 +228,27 @@ export def get_audiobook_metadata_from_musicbrainz []: record -> record {
   let chapters = $release | get media | chapters_from_musicbrainz_release_media
 
   # todo
-  # let authors =
-  # let narrators =
+  # let authors = authors_from release
+  # let narrators = narrators_from_release
 
   {
-    # authors: $authors from artist-credit
+    # https://www.audiobookshelf.org/docs#book-audio-metadata
+    # authors: $authors should be taken from associated works first, and if not that, then the from artist-credit
+    # Use name as it appears in the artist credit when present
     chapters: $chapters
-    # cover
+    # cover image from release
     date: $release.date
     # disambiguation?
+    # Assume the first label is the publisher... if there is no label, use the publisher relationship on the release if available
+    # publisher: $label
+    # narrators: narrators from spoken-vocal relationships on all recordings or parsed from artist-credit (narrated by, read by, performed by)
+    # year: release year, just parse this from the release date
     # labels (tags)
     # country
     # language?
+    # todo embed for Amazon releases the ASIN
     musicbrainz_id: $release.id
-    series: $series
+    series: $series # Can tone support multiple?
     title: $release.title
   } | (
     let i = $in;
