@@ -2218,12 +2218,19 @@ export def parse_series_from_group []: string -> table<title: string, index: str
   } | flatten
 }
 
-# Parse series from the series and series-part tags from the additionalFields metadata
-#
-# A table is returned despite the fact that there will only ever be one series parsed from these tags.
+# Parse series from the series / series-part and mvnm / mvin tags from the additionalFields metadata
 export def parse_series_from_series_tags []: record -> table<title: string, index: string> {
   let additionalFields = $in
-  if "series" in $additionalFields and $additionalFields.series != null {
+  if "mvnm" in $additionalFields and $additionalFields.mvnm != null {
+    [
+      [title index];
+      [
+        ($additionalFields.mvnm | into string)
+        (if "mvin" in $additionalFields and $additionalFields.mvin != null {$additionalFields.mvin | into string})
+      ]
+    ]
+  } | append (
+    if "series" in $additionalFields and $additionalFields.series != null {
       [
         [title index];
         [
@@ -2231,7 +2238,8 @@ export def parse_series_from_series_tags []: record -> table<title: string, inde
           (if "series-part" in $additionalFields and $additionalFields.series-part != null {$additionalFields.series-part | into string})
         ]
       ]
-  }
+    }
+  ) | (let i = $in; if ($i | is-empty) {null} else {$i})
 }
 
 # Upsert a value in the input record if a value is present for the given column in the source record
@@ -2303,6 +2311,11 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     let genres = (
       if "genre" in $metadata {
         $metadata.genre | split row ";" | str trim
+      }
+    )
+    let tags = (
+      if "additionalFields" in $metadata and "tags" in $metadata.additionalFields {
+        $metadata.additionalFields.tags | split row ";" | str trim
       }
     )
     let publication_date = (
@@ -2389,9 +2402,15 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     let book = (
       {}
       | upsert_if_present title $metadata album
+      | upsert_if_present subtitle $metadata
       | upsert_if_present artist_credit $metadata albumArtist
       | upsert_if_present artist_credit_sort $metadata sortAlbumArtist
       | upsert_if_present comment $metadata
+      | upsert_if_present language $metadata lang
+      | upsert_if_present language $metadata
+      | upsert_if_present isbn $metadata
+      | upsert_if_present amazon_asin $metadata asin
+      | upsert_if_present audible_asin $metadata
       | upsert_if_value publishers $publishers
       | upsert_if_value publication_date $publication_date
       | upsert_if_value series $series
@@ -2409,6 +2428,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
           | upsert_if_present musicbrainz_release_id $metadata.additionalFields "musicBrainz Album Id"
           | upsert_if_present musicbrainz_release_country $metadata.additionalFields "musicBrainz Album Release Country"
           | upsert_if_present musicbrainz_release_status $metadata.additionalFields "musicBrainz Album Status"
+          | upsert_if_value tags $tags
         } else {
           $input
         }
@@ -2523,4 +2543,109 @@ export def parse_audiobook_metadata_from_files []: list<path> -> record {
         $file | parse_audiobook_metadata_from_file
     }
     $metadata | parse_audiobook_metadata_from_tracks_metadata
+}
+
+# Convert the series table to a value suitable for the group tag
+export def convert_series_for_group_tag []: table<title: string, index: string> -> string {
+  let series = $in
+  $series | each {|s|
+    if index in $s and ($s.index | is-not-empty) {
+      $s.title + " #" + $s.index
+    } else {
+      $s.title
+    }
+  } | str join ";"
+}
+
+# Convert the internal audiobook metadata representation of a track into the format required for tone
+#
+# The input metadata should be for an individual track, with a book and track record at the top level.
+#
+# audiobookshelf and Picard use a semicolon followed by a space to separate multiple values, I think.
+# Technically, I think ID3v2.4 is supposed to use a null byte, but tone doesn't seem to support that.
+export def into_tone_format []: record -> record {
+  let metadata = $in
+  let group = (
+    if series in $metadata.book and $metadata.book.series != null {
+      $metadata.book.series | convert_series_for_group_tag
+    }
+  )
+  let publication_date = (
+    if publication_date in $metadata.book and ($metadata.book.publication_date | is-not-empty) {
+      $metadata.book.publication_date | format date '%+'
+    }
+  )
+  let additionalFields = (
+    {}
+    # book metadata
+    | upsert_if_value tags ($metadata.book | get --ignore-errors tags | str join ";")
+    | upsert_if_value "musicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | str join ";")
+    | upsert_if_value "musicBrainz Album Artist Id" ($metadata.book | get --ignore-errors musicbrainz_artist_ids | str join ";")
+    | upsert_if_present "musicBrainz Release Group Id" $metadata.book musicbrainz_release_group_id
+    | upsert_if_present "musicBrainz Album Id" $metadata.book musicbrainz_release_id
+    | upsert_if_present "musicBrainz Album Release Country" $metadata.book musicbrainz_release_country
+    | upsert_if_present "musicBrainz Album Status" $metadata.book musicbrainz_release_status
+    | upsert_if_present script $metadata.book
+    | upsert_if_present media $metadata.book
+    | upsert_if_present chapters $metadata.book
+    # track metadata
+    | upsert_if_present "acoustid Fingerprint" $metadata.track acoustid_fingerprint
+    | upsert_if_present "musicBrainz Track Id" $metadata.track musicbrainz_track_id
+    | upsert_if_present "musicBrainz Release Track Id" $metadata.track musicbrainz_release_track_id
+    | upsert_if_value "musicBrainz Artist Id" ($metadata.track | get --ignore-errors musicbrainz_artist_ids | str join ";")
+    | upsert_if_value "musicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_work_ids | str join ";")
+    | upsert_if_value producers ($metadata.track | get --ignore-errors producers | str join ";")
+    | upsert_if_value engineers ($metadata.track | get --ignore-errors engineers | str join ";")
+    | upsert_if_value performers ($metadata.track | get --ignore-errors performers | str join ";")
+    # todo illustrators, translators, adapters, editors
+  )
+  (
+    {}
+    #
+    # book metadata
+    #
+    | upsert_if_present album $metadata.book title
+    | upsert_if_present subtitle $metadata.book
+    | upsert_if_value albumArtist ($metadata.book | get --ignore-errors writers | str join ";")
+    # | upsert_if_present artist_credit_sort $metadata.book
+    | upsert_if_present language $metadata.book
+    | upsert_if_present description $metadata.book
+    | upsert_if_present comment $metadata.book
+    | upsert_if_value group $group
+    | upsert_if_value genre ($metadata.book | get --ignore-errors genres | str join ";")
+    # todo I'm not sure audiobookshelf supports multiple values for the publisher
+    | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | str join ";")
+    | upsert_if_value publishingDate $publication_date
+    | upsert_if_present asin $metadata.book amazon_asin
+    | upsert_if_present audible_asin $metadata.book
+    | upsert_if_present isbn $metadata.book
+    #
+    # track metadata
+    #
+    | upsert_if_present title $metadata.track
+    | upsert_if_present trackNumber $metadata.track index
+    | upsert_if_value artist ($metadata.track | get --ignore-errors writers | str join ";")
+    | upsert_if_value narrator ($metadata.track | get --ignore-errors narrators | str join ";")
+    # Use the composer field for the narrators for audiobookshelf
+    | upsert_if_value composer ($metadata.track | get --ignore-errors narrators | str join ";")
+    | upsert_if_present embeddedPictures $metadata.track embedded_pictures
+    #
+    # additionalFields
+    #
+    | upsert_if_value additionalFields $additionalFields
+  )
+}
+
+# Convert the metadata for a set of tracks into a format suitable for tone
+#
+# The input data should be in the form of a book and a list of tracks.
+#
+export def tracks_into_tone_format []: record -> record {
+  let metadata = $in
+  $metadata.tracks | par-each {|track|
+    {
+      book: $metadata.book
+      track: $track
+    } | into_tone_format
+  }
 }

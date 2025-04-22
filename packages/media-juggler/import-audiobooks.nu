@@ -437,8 +437,7 @@ export def tag_audiobook [
                 artist: ($authors | str join ";")
                 composer: ($r.narrators | get name | str join ";")
                 description: $r.description
-                # todo Is language used at all?
-                # language: $r.language
+                language: $r.language
                 narrator: ($r.narrators | get name | str join ";")
                 publisher: $r.publisherName
                 publishingDate: $r.releaseDate
