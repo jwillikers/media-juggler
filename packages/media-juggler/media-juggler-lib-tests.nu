@@ -260,6 +260,7 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
       "©work": "Dark One: Forgotten"
       "©dir": "Max Epstein;David Pace"
     }
+    file: "/home/listener/audiobooks/Dark One: Forgotten/Dark One: Forgotten.m4b"
   }
   let expected = {
     book: {
@@ -332,6 +333,7 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
       engineers: ["Anthony Cozzi" "Vincent Early" "Tom Pinkava" "Timothy Waldner"]
       musicbrainz_artist_ids: ["b7b9f742-8de0-44fd-afd3-fa536701d27e" "f0e00197-4291-40cb-a448-c2f3c86f54c7"]
       acoustid_fingerprint: "XXXX"
+      file: "/home/listener/audiobooks/Dark One: Forgotten/Dark One: Forgotten.m4b"
     }
   }
   let actual = $input | parse_audiobook_metadata_from_tone
@@ -383,6 +385,7 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
       [code mimetype];
       [13, image/jpeg]
     ]
+    file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
   }
   let expected = {
     book: {
@@ -425,6 +428,7 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
         [code mimetype];
         [13, image/jpeg]
       ]
+      file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
     }
   }
   let actual = $input | parse_audiobook_metadata_from_tone
@@ -721,6 +725,7 @@ def test_into_tone_format_simple [] {
         [code mimetype];
         [13 image/jpeg]
       ]
+      file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
     }
   }
   let expected = {
@@ -738,6 +743,7 @@ def test_into_tone_format_simple [] {
       [code mimetype];
       [13 image/jpeg]
     ]
+    file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
   }
   assert equal ($input | into_tone_format) $expected
 }
@@ -786,6 +792,7 @@ def test_into_tone_format_complex [] {
         [code mimetype];
         [13 image/jpeg]
       ]
+      file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
     }
   }
   let expected = {
@@ -805,6 +812,7 @@ def test_into_tone_format_complex [] {
       [code mimetype];
       [13 image/jpeg]
     ]
+    file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
   }
   assert equal ($input | into_tone_format) $expected
 }
@@ -858,6 +866,7 @@ def test_tracks_into_tone_format_one_track [] {
         [code mimetype];
         [13 image/jpeg]
       ]
+      file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
     }]
   }
   let expected = [{
@@ -877,6 +886,7 @@ def test_tracks_into_tone_format_one_track [] {
       [code mimetype];
       [13 image/jpeg]
     ]
+    file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
   }]
   assert equal ($input | tracks_into_tone_format) $expected
 }
@@ -925,6 +935,7 @@ def test_tracks_into_tone_format_two_tracks [] {
         [code mimetype];
         [13 image/jpeg]
       ]
+      file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
     }, {
       title: "My Happy Marriage, Vol. 2 - Track 002"
       comment: "Akumi Agitogi Purchased from Libro.fm."
@@ -940,6 +951,7 @@ def test_tracks_into_tone_format_two_tracks [] {
         [code mimetype];
         [13 image/jpeg]
       ]
+      file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 2.mp3"
     }]
   }
   let expected = [{
@@ -959,6 +971,7 @@ def test_tracks_into_tone_format_two_tracks [] {
       [code mimetype];
       [13 image/jpeg]
     ]
+    file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
   }, {
     album: "My Happy Marriage, Vol. 2"
     albumArtist: "Akumi Agitogi"
@@ -976,6 +989,7 @@ def test_tracks_into_tone_format_two_tracks [] {
       [code mimetype];
       [13 image/jpeg]
     ]
+    file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 2.mp3"
   }]
   assert equal ($input | tracks_into_tone_format | sort-by trackNumber) $expected
 }

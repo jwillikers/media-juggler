@@ -2443,7 +2443,10 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       )
     );
     let track = (
-      {}
+      {
+        # The path of the track on the filesystem is used internally
+        file: $metadata.file
+      }
       | upsert_if_present title $metadata
       | upsert_if_present artist_credit $metadata artist
       | upsert_if_present artist_credit_sort $metadata sortArtist
@@ -2476,9 +2479,9 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
 
 # Parse audiobook metadata for a single file into a standard format
 export def parse_audiobook_metadata_from_file []: record -> record {
-    let file = $in
+    let file = $in | path expand
     let metadata = ^tone dump --format json $file | from json | get meta
-    $metadata | parse_audiobook_metadata_from_file
+    $metadata | insert file $file | parse_audiobook_metadata_from_file
 }
 
 # Parse audiobook metadata from a list individual tracks' metadata
@@ -2597,10 +2600,14 @@ export def into_tone_format []: record -> record {
     | upsert_if_value producers ($metadata.track | get --ignore-errors producers | str join ";")
     | upsert_if_value engineers ($metadata.track | get --ignore-errors engineers | str join ";")
     | upsert_if_value performers ($metadata.track | get --ignore-errors performers | str join ";")
+    | upsert_if_value performers ($metadata.track | get --ignore-errors performers | str join ";")
     # todo illustrators, translators, adapters, editors
   )
   (
-    {}
+    {
+      # The file path is used internally and dropped before writing the final metadata
+      file: $metadata.track.file
+    }
     #
     # book metadata
     #
