@@ -2563,6 +2563,7 @@ export def convert_series_for_group_tag []: table<title: string, index: string> 
 # Convert the internal audiobook metadata representation of a track into the format required for tone
 #
 # The input metadata should be for an individual track, with a book and track record at the top level.
+# The returned record contains a file key for the path of the file on disk and a metadata key for the metadata for tone.
 #
 # audiobookshelf and Picard use a semicolon followed by a space to separate multiple values, I think.
 # Technically, I think ID3v2.4 is supposed to use a null byte, but tone doesn't seem to support that.
@@ -2604,10 +2605,7 @@ export def into_tone_format []: record -> record {
     # todo illustrators, translators, adapters, editors
   )
   (
-    {
-      # The file path is used internally and dropped before writing the final metadata
-      file: $metadata.track.file
-    }
+    {}
     #
     # book metadata
     #
@@ -2646,15 +2644,23 @@ export def into_tone_format []: record -> record {
 # Convert the metadata for a set of tracks into a format suitable for tone
 #
 # The input data should be in the form of a book and a list of tracks.
-#
-export def tracks_into_tone_format []: record -> record {
+# The returned records will contain the metadata for tone under the metadata key.
+# The other key, file, will contain the path to the track on disk.
+export def tracks_into_tone_format []: record -> list<record> {
   let metadata = $in
   $metadata.tracks | par-each {|track|
     {
       book: $metadata.book
       track: $track
-    } | into_tone_format
-  }
+    } | into_tone_format | (
+      let input = $in;
+      {
+        metadata: $input
+        # Keep the association between the track and its path on disk.
+        file: $track.file
+      }
+    )
+  } # | sort-by metadata.trackNumber
 }
 
 # Calculate the AcoustID of an audio file or files with the fpcalc utility
@@ -2693,4 +2699,15 @@ export def tone_tag [
   )
   rm $tone_json
   $audio_file
+}
+
+# Tag audio files with tone using the provided metadata
+export def tone_tag_tracks [
+  working_directory: directory
+  tone_args: list<string> = []
+]: record -> list<path> {
+  let metadata = $in
+  $metadata | tracks_into_tone_format | par-each {|track|
+    $track.metadata | tone_tag $track.file $working_directory $tone_args
+  }
 }

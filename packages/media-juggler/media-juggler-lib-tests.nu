@@ -743,7 +743,6 @@ def test_into_tone_format_simple [] {
       [code mimetype];
       [13 image/jpeg]
     ]
-    file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
   }
   assert equal ($input | into_tone_format) $expected
 }
@@ -812,7 +811,6 @@ def test_into_tone_format_complex [] {
       [code mimetype];
       [13 image/jpeg]
     ]
-    file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
   }
   assert equal ($input | into_tone_format) $expected
 }
@@ -870,23 +868,25 @@ def test_tracks_into_tone_format_one_track [] {
     }]
   }
   let expected = [{
-    album: "My Happy Marriage, Vol. 2"
-    albumArtist: "Akumi Agitogi"
-    comment: "Akumi Agitogi Purchased from Libro.fm."
-    group: "My Happy Marriage #2;Test Series 2 #5"
-    genre: "Fiction;Fantasy"
-    publisher: "Yen Audio"
-    publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
-    title: "My Happy Marriage, Vol. 2 - Track 001"
-    artist: "Akumi Agitogi"
-    composer: "Damien Haas;Miranda Parkin"
-    narrator: "Damien Haas;Miranda Parkin"
-    trackNumber: 1
-    embeddedPictures: [
-      [code mimetype];
-      [13 image/jpeg]
-    ]
     file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
+    metadata: {
+      album: "My Happy Marriage, Vol. 2"
+      albumArtist: "Akumi Agitogi"
+      comment: "Akumi Agitogi Purchased from Libro.fm."
+      group: "My Happy Marriage #2;Test Series 2 #5"
+      genre: "Fiction;Fantasy"
+      publisher: "Yen Audio"
+      publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
+      title: "My Happy Marriage, Vol. 2 - Track 001"
+      artist: "Akumi Agitogi"
+      composer: "Damien Haas;Miranda Parkin"
+      narrator: "Damien Haas;Miranda Parkin"
+      trackNumber: 1
+      embeddedPictures: [
+        [code mimetype];
+        [13 image/jpeg]
+      ]
+    }
   }]
   assert equal ($input | tracks_into_tone_format) $expected
 }
@@ -955,43 +955,47 @@ def test_tracks_into_tone_format_two_tracks [] {
     }]
   }
   let expected = [{
-    album: "My Happy Marriage, Vol. 2"
-    albumArtist: "Akumi Agitogi"
-    comment: "Akumi Agitogi Purchased from Libro.fm."
-    group: "My Happy Marriage #2;Test Series 2 #5"
-    genre: "Fiction;Fantasy"
-    publisher: "Yen Audio"
-    publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
-    title: "My Happy Marriage, Vol. 2 - Track 001"
-    artist: "Akumi Agitogi"
-    composer: "Damien Haas;Miranda Parkin"
-    narrator: "Damien Haas;Miranda Parkin"
-    trackNumber: 1
-    embeddedPictures: [
-      [code mimetype];
-      [13 image/jpeg]
-    ]
     file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
+    metadata: {
+      album: "My Happy Marriage, Vol. 2"
+      albumArtist: "Akumi Agitogi"
+      comment: "Akumi Agitogi Purchased from Libro.fm."
+      group: "My Happy Marriage #2;Test Series 2 #5"
+      genre: "Fiction;Fantasy"
+      publisher: "Yen Audio"
+      publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
+      title: "My Happy Marriage, Vol. 2 - Track 001"
+      artist: "Akumi Agitogi"
+      composer: "Damien Haas;Miranda Parkin"
+      narrator: "Damien Haas;Miranda Parkin"
+      trackNumber: 1
+      embeddedPictures: [
+        [code mimetype];
+        [13 image/jpeg]
+      ]
+    }
   }, {
-    album: "My Happy Marriage, Vol. 2"
-    albumArtist: "Akumi Agitogi"
-    comment: "Akumi Agitogi Purchased from Libro.fm."
-    group: "My Happy Marriage #2;Test Series 2 #5"
-    genre: "Fiction;Fantasy"
-    publisher: "Yen Audio"
-    publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
-    title: "My Happy Marriage, Vol. 2 - Track 002"
-    artist: "Akumi Agitogi"
-    composer: "Damien Haas;Miranda Parkin"
-    narrator: "Damien Haas;Miranda Parkin"
-    trackNumber: 2
-    embeddedPictures: [
-      [code mimetype];
-      [13 image/jpeg]
-    ]
     file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 2.mp3"
+    metadata: {
+      album: "My Happy Marriage, Vol. 2"
+      albumArtist: "Akumi Agitogi"
+      comment: "Akumi Agitogi Purchased from Libro.fm."
+      group: "My Happy Marriage #2;Test Series 2 #5"
+      genre: "Fiction;Fantasy"
+      publisher: "Yen Audio"
+      publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
+      title: "My Happy Marriage, Vol. 2 - Track 002"
+      artist: "Akumi Agitogi"
+      composer: "Damien Haas;Miranda Parkin"
+      narrator: "Damien Haas;Miranda Parkin"
+      trackNumber: 2
+      embeddedPictures: [
+        [code mimetype];
+        [13 image/jpeg]
+      ]
+    }
   }]
-  assert equal ($input | tracks_into_tone_format | sort-by trackNumber) $expected
+  assert equal ($input | tracks_into_tone_format | sort-by metadata.trackNumber) $expected
 }
 
 def test_tracks_into_tone_format [] {
