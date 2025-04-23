@@ -2668,3 +2668,29 @@ export def fpcalc [...files: path]: nothing -> record {
     $input | update duration ($input.duration | into duration --unit sec)
   )
 }
+
+# Tag an audio file with tone using the provided metadata
+export def tone_tag [
+  audio_file: path
+  working_directory: directory
+  # chapters_file: path = ""
+  # cover_file: path = ""
+  tone_args: list<string> = []
+]: record -> path {
+  let metadata = $in
+  let tone_json = $working_directory | path join "tone.json"
+  $metadata | save --force $tone_json
+  (
+    ^tone tag
+        # todo When tone is new enough?
+        # --id $isbn | amazon_asin | audible_asin?
+        # --meta-chapters-file $chapters_file
+        # --meta-cover-file $cover_file
+        --meta-tone-json-file $tone_json
+        # --meta-remove-property "comment"
+        ...$tone_args
+        $audio_file
+  )
+  rm $tone_json
+  $audio_file
+}
