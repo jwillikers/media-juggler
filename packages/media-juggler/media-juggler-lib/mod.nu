@@ -2642,10 +2642,10 @@ export def parse_series_from_release_group []: record -> table<name: string, ind
     return null
   }
 
-  $release_group_series | par-each {|series|
+  $release_group_series | par-each {|relation|
     {
-        name: $series.name
-        index: ($series | get --ignore-errors ordering-key)
+      name: $relation.series.name
+      index: ($relation.attribute-values | get --ignore-errors number)
     }
   }
 }
@@ -2664,6 +2664,105 @@ export def fetch_musicbrainz_release_group []: string -> record {
   let url = "https://musicbrainz.org/ws/2/release-group"
   http get --headers [Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"
 }
+
+# Parses release ids from an AcoustID server response
+#
+# Takes an AcoustID server response as input.
+export def parse_release_ids_from_acoustid_response []: record<results: table<id: string, releases: table<id: string>, score: float>, status: string> -> table<acoustid_track_id: string, release_ids: list<string>, score: float> {
+  let response = $in
+  if $response.status != "ok" {
+    log error $"Received response with status (ansi red)($response.status)(ansi reset) querying the AcoustID server"
+    return null
+  }
+  # let exact_matches = $results | where score == 1.00
+  # if ($exact_matches | length) > 1 {
+  #   log error $"Multiple exact AcoustID matches found"
+  #   return null
+  # }
+  # if ($exact_matches | length) < 1 {
+  #   log info $"No exact AcoustID match found"
+  #   return null
+  # }
+  $response | get results | par-each {|result|
+    let input = $in;
+    {
+      acoustid_track_id: $input.id
+      release_ids: ($input.releases | get id)
+      score: $input.score
+    }
+  }
+}
+
+# Find tracks linked to an AcoustID fingerprint
+#
+# Requires an AcoustID application API key.
+export def fetch_release_ids_by_acoustid_fingerprint [
+  client_key: string # The application API key for the AcoustID server
+]: record<duration: duration, fingerprint: string> -> table<acoustid_track_id: string, release_ids: list<string>, score: float> {
+  let input = $in
+  let url = "https://api.acoustid.org/v2/lookup"
+  let response = (
+    $"format=json&meta=releaseids&client=($client_key)&fingerprint=($input.fingerprint)&duration=($input.duration | format duration sec | math round)"
+    | ^gzip --stdout
+    | http post --content-type application/x-www-form-urlencoded --headers [Content-Encoding gzip] $url
+  )
+  $response | parse_release_ids_from_acoustid_response
+}
+
+# Attempt to find a release based on the AcoustID fingerprints of a set of tracks
+#
+# Takes as input a list of AcoustID fingerprints.
+# Requires an AcoustID application API key.
+#
+# Returns the releases to which all tracks belong.
+export def determine_release_from_acoustid_fingerprints [
+  client_key: string # The application API key for the AcoustID server
+]: table<duration: duration, fingerprint: string> -> list<string> {
+  let fingerprints = $in
+  let results = (
+    # Only 3 API requests per second
+    $fingerprints | chunks 3 | each {|chunk|
+      let matches = (
+        $chunk | par-each {|fingerprint|
+          # Require the matches to be exact
+          let match = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key | where score == 1.00
+          # If any track fails to match, a release can't be matched perfectly, so fail matching
+          if ($match | is-empty) {
+            return null
+          }
+          {
+            fingerprint: $fingerprint
+            matches: $match
+          }
+        }
+      )
+      sleep 1sec
+      $matches
+    } | flatten
+  )
+
+  # {
+  #   acoustid_track_id: $input.id
+  #   release_ids: ($input.releases | get id)
+  #   score: $input.score
+  # }
+
+  # A release is considered a match if there is only one release in common for each track each release is a 100% match
+  let all_possible_release_ids = $results | get matches | get release_ids | uniq
+  $all_possible_release_ids | filter {|release_id|
+    $results | all {|result|
+      $release_id in $result.matches.release_ids
+    }
+  }
+}
+
+# Search for a recording on MusicBrainz, using the AcoustID fingerprint
+# export def search_by_acoustid_fingerprint []: record -> table {
+# }
+
+# Using metadata from the audio tracks, search for a MusicBrainz release
+# export def search_for_musicbrainz_release []: record -> table {
+# }
 
 ##### chapterz.nu #####
 

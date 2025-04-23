@@ -1004,7 +1004,43 @@ def test_tracks_into_tone_format [] {
 }
 
 def test_parse_series_from_release_group_one_series_without_index [] {
-  let input = {relations: [[type, end, ordering-key, attribute-values, attributes, direction, series, source-credit, ended, type-id, begin, target-credit, target-type, attribute-ids]; ["part of", null, 2, {}, [], forward, {id: "e3e2cf21-988e-4c2e-a849-3ea4e32f94bf", name: "Mushoku Tensei: Jobless Reincarnation, read by Cliff Kirk", type: "Release group series", disambiguation: unabridged, type-id: "4c1c4949-7b6c-3a2d-9d54-a50a27e4fa77"}, "", false, "01018437-91d8-36b9-bf89-3f885d53b5bd", null, "", series, {}]], title: "Mushoku Tensei: Jobless Reincarnation – A Journey of Two Lifetimes", id: "d2afbb83-ae96-4386-96a0-bfd0dc7cc94e", first-release-date: "2025-03-27", secondary-type-ids: ["499a387e-6195-333e-91c0-9592bfec535e"], disambiguation: "light novel, English", primary-type-id: "4fc3be2b-de1e-396b-a933-beb8f1607a22", primary-type: Other, secondary-types: [Audiobook]}
+  let input = {
+    relations: [
+      [type end ordering-key attribute-values attributes direction series source-credit ended type-id begin target-credit target-type attribute-ids];
+      [
+        "part of"
+        null
+        2
+        {}
+        []
+        forward
+        {
+          id: "e3e2cf21-988e-4c2e-a849-3ea4e32f94bf"
+          name: "Mushoku Tensei: Jobless Reincarnation, read by Cliff Kirk"
+          type: "Release group series"
+          disambiguation: "unabridged"
+          "type-id": "4c1c4949-7b6c-3a2d-9d54-a50a27e4fa77"
+        }
+        ""
+        false
+        "01018437-91d8-36b9-bf89-3f885d53b5bd"
+        null
+        ""
+        series
+        {}
+      ]
+    ]
+    title: "Mushoku Tensei: Jobless Reincarnation – A Journey of Two Lifetimes"
+    id: "d2afbb83-ae96-4386-96a0-bfd0dc7cc94e"
+    "first-release-date": "2025-03-27"
+    "secondary-type-ids": [
+      "499a387e-6195-333e-91c0-9592bfec535e"
+    ]
+    disambiguation: "light novel, English"
+    "primary-type-id": "4fc3be2b-de1e-396b-a933-beb8f1607a22"
+    "primary-type": Other
+    "secondary-types": [Audiobook]
+  }
   let expected = [[name index]; ["Mushoku Tensei: Jobless Reincarnation, read by Cliff Kirk" null]]
   assert equal ($input | parse_series_from_release_group | sort-by name) $expected
 }
@@ -1065,13 +1101,47 @@ def test_parse_series_from_release_group_two_series_with_indices [] {
     primary-type: Other
     first-release-date: "2008-12-23"
   }
-  let expected = [[name index]; ["Mistborn, read by Michael Kramer", "1"] ["Mistborn Original Trilogy, read by Michael Kramer" "1"]]
+  let expected = [[name index]; ["Mistborn Original Trilogy, read by Michael Kramer" "1"] ["Mistborn, read by Michael Kramer", "1"]]
   assert equal ($input | parse_series_from_release_group | sort-by name) $expected
 }
 
 def test_parse_series_from_release_group [] {
   test_parse_series_from_release_group_one_series_without_index
   test_parse_series_from_release_group_two_series_with_indices
+}
+
+def test_parse_release_ids_from_acoustid_response_one_track_with_two_releases [] {
+  let input = {
+    results: [
+      [id releases score];
+      [
+        "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+        [
+          [id];
+          ["b2c93465-beb1-4037-92ca-eab9d63ccdda"]
+          ["2f167f9c-d4df-4980-9cb2-876a98f829ef"]
+        ]
+        1.0
+      ]
+    ]
+    status: ok
+  }
+  let expected = [
+    [acoustid_track_id release_ids score];
+    [
+      "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+      [
+        "b2c93465-beb1-4037-92ca-eab9d63ccdda"
+        "2f167f9c-d4df-4980-9cb2-876a98f829ef"
+      ]
+      1.0
+    ]
+  ]
+  assert equal ($input | parse_release_ids_from_acoustid_response) $expected
+}
+
+def test_parse_release_ids_from_acoustid_response [] {
+  test_parse_release_ids_from_acoustid_response_one_track_with_two_releases
 }
 
 def main []: {
@@ -1085,5 +1155,7 @@ def main []: {
   test_convert_series_for_group_tag
   test_into_tone_format
   test_tracks_into_tone_format
+  test_parse_series_from_release_group
+  test_parse_release_ids_from_acoustid_response
   echo "All tests passed!"
 }
