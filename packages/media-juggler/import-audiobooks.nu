@@ -140,8 +140,7 @@ export def get_musicbrainz_release_group []: string -> record {
 }
 
 # Get the Release group series to which a release group belongs
-export def get_series_from_release_group []: record -> list<record> {
-  # let release_group_id =
+export def get_series_from_release_group []: record -> table<name: string, index: string> {
   let release_group_series = (
     $in
     | get relations
@@ -155,13 +154,8 @@ export def get_series_from_release_group []: record -> list<record> {
   $release_group_series | par-each {|series|
     {
         name: $series.name
-        number: $release_group_series.ordering-key
-    } | (
-        let input = $in
-        if "ordering-key" in $series {
-            $in | insert number $series.ordering-key
-        }
-    )
+        index: ($series | get --ignore-errors ordering-key)
+    }
   }
 }
 

@@ -2120,22 +2120,22 @@ export def sanitize_minio_filename []: string -> string {
 #
 # audiobookshelf stores series in a semicolon-separated list in the group field
 # The index in the series is preceded by a hash sign.
-export def parse_series_from_group []: string -> table<title: string, index: string> {
+export def parse_series_from_group []: string -> table<name: string, index: string> {
   $in | split row ";" | str trim | each {|series|
     if "#" in $series {
-      $series | parse '{title} #{index}'
+      $series | parse '{name} #{index}'
     } else {
-      [[title index]; [$series null]]
+      [[name index]; [$series null]]
     }
   } | flatten
 }
 
 # Parse series from the series / series-part and mvnm / mvin tags from the additionalFields metadata
-export def parse_series_from_series_tags []: record -> table<title: string, index: string> {
+export def parse_series_from_series_tags []: record -> table<name: string, index: string> {
   let additionalFields = $in
   if "mvnm" in $additionalFields and $additionalFields.mvnm != null {
     [
-      [title index];
+      [name index];
       [
         ($additionalFields.mvnm | into string)
         (if "mvin" in $additionalFields and $additionalFields.mvin != null {$additionalFields.mvin | into string})
@@ -2144,7 +2144,7 @@ export def parse_series_from_series_tags []: record -> table<title: string, inde
   } | append (
     if "series" in $additionalFields and $additionalFields.series != null {
       [
-        [title index];
+        [name index];
         [
           ($additionalFields.series | into string)
           (if "series-part" in $additionalFields and $additionalFields.series-part != null {$additionalFields.series-part | into string})
@@ -2461,13 +2461,13 @@ export def parse_audiobook_metadata_from_files []: list<path> -> record {
 }
 
 # Convert the series table to a value suitable for the group tag
-export def convert_series_for_group_tag []: table<title: string, index: string> -> string {
+export def convert_series_for_group_tag []: table<name: string, index: string> -> string {
   let series = $in
   $series | each {|s|
     if index in $s and ($s.index | is-not-empty) {
-      $s.title + " #" + $s.index
+      $s.name + " #" + $s.index
     } else {
-      $s.title
+      $s.name
     }
   } | str join ";"
 }

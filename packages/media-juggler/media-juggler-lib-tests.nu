@@ -59,27 +59,27 @@ def test_round_to_second_using_cumulative_offset [] {
 }
 
 def test_parse_series_from_group_one_without_index [] {
-  let expected = [[title index]; ["The Stormlight Archive" null]]
+  let expected = [[name index]; ["The Stormlight Archive" null]]
   assert equal ("The Stormlight Archive" | parse_series_from_group) $expected
 }
 
 def test_parse_series_from_group_one_with_index [] {
-  let expected = [[title index]; ["The Stormlight Archive" "1"]]
+  let expected = [[name index]; ["The Stormlight Archive" "1"]]
   assert equal ("The Stormlight Archive #1" | parse_series_from_group) $expected
 }
 
 def test_parse_series_from_group_two_without_index [] {
-  let expected = [[title index]; ["The Stormlight Archive" null] ["Cosmere" null]]
+  let expected = [[name index]; ["The Stormlight Archive" null] ["Cosmere" null]]
   assert equal ("The Stormlight Archive; Cosmere" | parse_series_from_group) $expected
 }
 
 def test_parse_series_from_group_two_with_index [] {
-  let expected = [[title index]; ["The Stormlight Archive" "1"] ["Cosmere" "10"]]
+  let expected = [[name index]; ["The Stormlight Archive" "1"] ["Cosmere" "10"]]
   assert equal ("The Stormlight Archive #1; Cosmere #10" | parse_series_from_group) $expected
 }
 
 def test_parse_series_from_group_one_with_index_and_one_without_index [] {
-  let expected = [[title index]; ["The Stormlight Archive" "1"] ["Cosmere" null]]
+  let expected = [[name index]; ["The Stormlight Archive" "1"] ["Cosmere" null]]
   assert equal ("The Stormlight Archive #1; Cosmere" | parse_series_from_group) $expected
 }
 
@@ -100,43 +100,43 @@ def test_parse_series_from_series_tags_one_null_series [] {
 }
 
 def test_parse_series_from_series_tags_one_series_without_index [] {
-  let expected = [[title index]; ["Mistborn" null]]
+  let expected = [[name index]; ["Mistborn" null]]
   assert equal ({series: "Mistborn"} | parse_series_from_series_tags) $expected
 }
 
 def test_parse_series_from_series_tags_one_series_with_index [] {
-  let expected = [[title index]; ["Mistborn" "1"]]
+  let expected = [[name index]; ["Mistborn" "1"]]
   assert equal ({series: "Mistborn", series-part: "1"} | parse_series_from_series_tags) $expected
 }
 
 def test_parse_series_from_series_tags_one_series_with_int_index [] {
-  let expected = [[title index]; ["Mistborn" "1"]]
+  let expected = [[name index]; ["Mistborn" "1"]]
   assert equal ({series: "Mistborn", series-part: 1} | parse_series_from_series_tags) $expected
 }
 
 def test_parse_series_from_series_tags_one_int_series_without_index [] {
-  let expected = [[title index]; ["86" null]]
+  let expected = [[name index]; ["86" null]]
   assert equal ({series: 86} | parse_series_from_series_tags) $expected
 }
 
 def test_parse_series_from_series_tags_one_series_with_null_index [] {
-  let expected = [[title index]; ["86" null]]
+  let expected = [[name index]; ["86" null]]
   assert equal ({series: "86", series-part: null} | parse_series_from_series_tags) $expected
 }
 
 def test_parse_series_from_series_tags_one_mvnm_without_index [] {
-  let expected = [[title index]; ["86" null]]
+  let expected = [[name index]; ["86" null]]
   assert equal ({mvnm: "86"} | parse_series_from_series_tags) $expected
 }
 
 def test_parse_series_from_series_tags_one_mvnm_with_index [] {
-  let expected = [[title index]; ["86" "5.1"]]
+  let expected = [[name index]; ["86" "5.1"]]
   assert equal ({mvnm: "86", mvin: 5.1} | parse_series_from_series_tags) $expected
 }
 
 def test_parse_series_from_series_tags_one_mvnm_one_series [] {
-  let expected = [[title index]; ["Series One" "1"] ["Series Two" "3"]]
-  assert equal ({ mvnm: "Series One", series: "Series Two", series-part: 3, mvin: 1} | parse_series_from_series_tags | sort-by title) $expected
+  let expected = [[name index]; ["Series One" "1"] ["Series Two" "3"]]
+  assert equal ({ mvnm: "Series One", series: "Series Two", series-part: 3, mvin: 1} | parse_series_from_series_tags | sort-by name) $expected
 }
 
 def test_parse_series_from_series_tags [] {
@@ -274,7 +274,7 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
       media: "Digital Media"
       script: "Latn"
       series: [{
-        title: "Dark One, performed by various narrators"
+        name: "Dark One, performed by various narrators"
         index: "1"
       }]
       barcode: "9781980062875"
@@ -394,10 +394,10 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
@@ -458,10 +458,10 @@ def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
@@ -488,10 +488,10 @@ def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
@@ -543,10 +543,10 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
@@ -572,10 +572,10 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
@@ -602,10 +602,10 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
@@ -668,17 +668,17 @@ def test_parse_audiobook_metadata_from_tracks_metadata [] {
 
 def test_convert_series_for_group_tag_one_with_index [] {
   let expected = "Series One #1"
-  assert equal ([[title index]; ["Series One" "1"]] | convert_series_for_group_tag) $expected
+  assert equal ([[name index]; ["Series One" "1"]] | convert_series_for_group_tag) $expected
 }
 
 def test_convert_series_for_group_tag_two_with_index [] {
   let expected = "Series One #1;Mistborn #3"
-  assert equal ([[title index]; ["Series One" "1"] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
+  assert equal ([[name index]; ["Series One" "1"] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
 }
 
 def test_convert_series_for_group_tag_one_without_index_one_with_index [] {
   let expected = "Series One;Mistborn #3"
-  assert equal ([[title index]; ["Series One" null] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
+  assert equal ([[name index]; ["Series One" null] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
 }
 
 def test_convert_series_for_group_tag [] {
@@ -695,10 +695,10 @@ def test_into_tone_format_simple [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
@@ -755,10 +755,10 @@ def test_into_tone_format_complex [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
@@ -828,10 +828,10 @@ def test_tracks_into_tone_format_one_track [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
@@ -899,10 +899,10 @@ def test_tracks_into_tone_format_two_tracks [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [{
-        title: "My Happy Marriage"
+        name: "My Happy Marriage"
         index: "2"
       }, {
-        title: "Test Series 2"
+        name: "Test Series 2"
         index: "5"
       }]
       genres: ["Fiction" "Fantasy"]
