@@ -2656,3 +2656,15 @@ export def tracks_into_tone_format []: record -> record {
     } | into_tone_format
   }
 }
+
+# Calculate the AcoustID of an audio file or files with the fpcalc utility
+#
+# fpcalc is part of the chromaprint package.
+#
+# Returns a record containing the duration and the fingerprint.
+export def fpcalc [...files: path]: nothing -> record {
+  ^fpcalc -json ...$files | from json | (
+    let input = $in;
+    $input | update duration ($input.duration | into duration --unit sec)
+  )
+}
