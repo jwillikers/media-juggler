@@ -1,7 +1,6 @@
 #!/usr/bin/env nu
 
 # todo Consider using bragibooks instead: https://github.com/djdembeck/bragibooks
-# todo Use tone and a JS script to query Audible?
 # tone can rename files as needed
 
 use std log
@@ -27,37 +26,6 @@ export def mp3_directory_to_m4b [
     $m4b
 }
 
-# const audible_workarounds = [
-#     [match apply];
-#     [
-#         {
-#             key: series.name
-#             value: "Rascal Does Not Dream Series"
-#         }
-#         {
-#             authors: ["Hajime Kamoshida"]
-#             translators: ["Andrew Cunningham"]
-#             illustrators: ["Keji Mizoguchi"]
-#         }
-#     ],
-# ]
-
-# export def apply_workarounds []: record -> record {
-#     let tone_json = $in
-#     let tone_json = (
-#         $audible_workarounds
-#         | reduce --fold $tone_json {|it, acc|
-#             $acc
-#             | where $it.match.key == $it.match.value
-#             | update
-#         }
-#     )
-#     $tone_json
-# }
-
-# todo Support getting values from MusicBrainz first and then falling back to Audible.
-# Audible's data is not the most accurate...
-#
 # Can search based on details or use the id directly
 # http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/release/?query=('secondarytype:audiobook AND packaging:"None" AND artistname:\"Brandon Sanderson\" AND release:\"The Way of Kings\"' | url encode)" | get releases | sort-by --reverse score | first
 
@@ -749,10 +717,9 @@ export def embed_cover []: record<cover: path, m4b: path> -> path {
 #
 def main [
     ...files: string # The paths to M4A and M4B files to tag and upload. Prefix paths with "minio:" to download them from the MinIO instance
-    --asin: string
-    --beets-config: path # The Beets config file to use
-    --beets-directory: directory
-    --beets-library: path # The Beets library to use
+    # --asin: string
+    # --isbn: string
+    # --musicbrainz-release-id: string
     --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
     --delete # Delete the original file
     --minio-alias: string = "jwillikers" # The alias of the MinIO server used by the MinIO client application
@@ -784,17 +751,8 @@ def main [
 
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
-    let temporary_directory = (mktemp --directory "import-audiobooks.XXXXXXXXXX")
-    log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
-
-    let beets_directory = (
-        if $beets_directory == null {
-            [$env.HOME "Books" "Audiobooks"] | path join
-        } else {
-            $beets_directory
-        }
-    )
-    mkdir $beets_directory
+    let working_directory = (mktemp --directory "import-audiobooks.XXXXXXXXXX")
+    log info $"Using the temporary directory (ansi yellow)($working_directory)(ansi reset)"
 
     let audible_activation_bytes = (
         if $audible_activation_bytes != null {
@@ -811,11 +769,11 @@ def main [
     let file = (
         if ($original_file | str starts-with "minio:") {
             let file = ($original_file | str replace "minio:" "")
-            ^mc cp $file $"($temporary_directory)/($file | path basename)"
-            [$temporary_directory ($file | path basename)] | path join
+            ^mc cp $file $"($working_directory)/($file | path basename)"
+            [$working_directory ($file | path basename)] | path join
         } else {
-            cp $original_file $temporary_directory
-            [$temporary_directory ($original_file | path basename)] | path join
+            cp $original_file $working_directory
+            [$working_directory ($original_file | path basename)] | path join
         }
     )
 
@@ -833,16 +791,6 @@ def main [
         }
     )
 
-    let beets_library = (
-        if $beets_library == null {
-            let library_directory = [$env.HOME ".local" "share" "beets-audible"] | path join
-            mkdir $library_directory
-            [$library_directory "library.db"] | path join
-        } else {
-            $beets_library
-        }
-    )
-
     let audiobook = (
         # Assume AAX files are from Audible and require decryption.
         if $input_format == "aax" {
@@ -850,24 +798,24 @@ def main [
                 log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
                 exit 1
             }
-            $file | decrypt_audible $audible_activation_bytes --working-directory $temporary_directory
+            $file | decrypt_audible $audible_activation_bytes --working-directory $working_directory
         } else if $input_format in ["m4a", "m4b"] {
             $file
         } else if $input_format == "dir" {
-            $file | mp3_directory_to_m4b $temporary_directory
+            $file | mp3_directory_to_m4b $working_directory
         } else if $input_format == "zip" {
             $file
-            | unzip $temporary_directory
-            | mp3_directory_to_m4b $temporary_directory
+            | unzip $working_directory
+            | mp3_directory_to_m4b $working_directory
         } else {
             log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
             exit 1
         }
         | (
             if $asin == null {
-                tag_audiobook --tone-tag-args $tone_tag_args $temporary_directory
+                tag_audiobook --tone-tag-args $tone_tag_args $working_directory
             } else {
-                tag_audiobook --asin $asin --tone-tag-args $tone_tag_args $temporary_directory
+                tag_audiobook --asin $asin --tone-tag-args $tone_tag_args $working_directory
             }
         )
     )
@@ -890,7 +838,7 @@ def main [
     # let current_metadata = ^tone dump --format json $audiobook | from json | get meta
 
     let authors_subdirectory = (
-        $audiobook | path dirname | path relative-to $temporary_directory
+        $audiobook | path dirname | path relative-to $working_directory
     )
     let minio_target_directory =  [$minio_alias $minio_path $authors_subdirectory] | path join | sanitize_minio_filename
     let minio_target_destination = (
@@ -919,8 +867,8 @@ def main [
             rm $original_file
         }
     }
-    log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
-    rm --force --recursive $temporary_directory
+    log debug $"Removing the working directory (ansi yellow)($working_directory)(ansi reset)"
+    rm --force --recursive $working_directory
 
     # } catch {
     #     log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
