@@ -2733,7 +2733,7 @@ export def round_to_second_using_cumulative_offset []: list<duration> -> list<du
 }
 
 # Fetch a release from MusicBrainz by ID
-export def get_musicbrainz_release []: string -> record {
+export def fetch_musicbrainz_release []: string -> record {
   let id = $in
   let url = "https://musicbrainz.org/ws/2/release"
   http get --headers [Accept "application/json"] $"($url)/($id)/?inc=artist-credits+labels+recordings"
