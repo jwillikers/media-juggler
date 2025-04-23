@@ -124,41 +124,6 @@ export def find_musicbrainz_release []: [list<record> -> table] {
     # filter based on distributor where $comment contains "Libro.fm"
 }
 
-# Get the release groups to which a release belongs
-export def get_musicbrainz_release_groups_for_release []: string -> table {
-  let release_id = $in
-  let url = "https://musicbrainz.org/ws/2/release-group/"
-  let query = $"reid:($release_id)" | url encode
-  http get --headers [Accept "application/json"] $"($url)/?query=($query)"
-}
-
-# Fetch a release group from MusicBrainz by ID
-export def get_musicbrainz_release_group []: string -> record {
-  let release_group_id = $in
-  let url = "https://musicbrainz.org/ws/2/release-group"
-  http get --headers [Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"
-}
-
-# Get the Release group series to which a release group belongs
-export def get_series_from_release_group []: record -> table<name: string, index: string> {
-  let release_group_series = (
-    $in
-    | get relations
-    | where series.type == "Release group series"
-    | where type == "part of"
-  )
-  if ($release_group_series | is-empty) {
-    return null
-  }
-
-  $release_group_series | par-each {|series|
-    {
-        name: $series.name
-        index: ($series | get --ignore-errors ordering-key)
-    }
-  }
-}
-
 # todo Add function to get series using the Work series from the work associated with a recording
 
 # todo Get artist en alias?  http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/artist/616f49c8-b33a-4de9-80c6-d99a4a74184e/?inc=aliases"
@@ -178,15 +143,15 @@ export def get_audiobook_metadata_from_musicbrainz []: list<record> -> record {
   }
   let release = $releases | first
 
-  let release_groups = $release.id | get_musicbrainz_release_groups_for_release
+  let release_groups = $release.id | fetch_musicbrainz_release_group_for_release
   if ($release_groups | is-empty) {
     log debug $"No release groups for release ($release.id)"
   } else if ($release_groups | length) > 1 {
     log warning $"Multiple release groups found for the release ($release.id). Using the first one."
   }
-  let release_group = $release_groups | first | get id | get_musicbrainz_release_group
+  let release_group = $release_groups | first | get id | fetch_musicbrainz_release_group
 
-  let series = $release_group | get_series_from_release_group
+  let series = $release_group | parse_series_from_release_group
   let chapters = $release | get media | chapters_from_musicbrainz_release_media
 
   # todo

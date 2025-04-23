@@ -2624,6 +2624,47 @@ export def tone_tag_tracks [
   }
 }
 
+### MusicBrainz functions
+
+# Functions prefixed with "fetch_" are used to query the MusicBrainz API.
+# Functions prefixed with "parse_" are used to parse responses from the MusicBrainz API without making any external calls.
+# This allows using unit tests for the functions prefixed with "parse_".
+
+# Get the Release Group Series to which a Release Group belongs
+export def parse_series_from_release_group []: record -> table<name: string, index: string> {
+  let release_group_series = (
+    $in
+    | get relations
+    | where series.type == "Release group series"
+    | where type == "part of"
+  )
+  if ($release_group_series | is-empty) {
+    return null
+  }
+
+  $release_group_series | par-each {|series|
+    {
+        name: $series.name
+        index: ($series | get --ignore-errors ordering-key)
+    }
+  }
+}
+
+# Get the release group to which a release belongs
+export def fetch_musicbrainz_release_group_for_release []: string -> table {
+  let release_id = $in
+  let url = "https://musicbrainz.org/ws/2/release-group/"
+  let query = $"reid:($release_id)" | url encode
+  http get --headers [Accept "application/json"] $"($url)/?query=($query)"
+}
+
+# Fetch a release group from MusicBrainz by ID
+export def fetch_musicbrainz_release_group []: string -> record {
+  let release_group_id = $in
+  let url = "https://musicbrainz.org/ws/2/release-group"
+  http get --headers [Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"
+}
+
 ##### chapterz.nu #####
 
 # Get a list of start offsets from a list of durations
