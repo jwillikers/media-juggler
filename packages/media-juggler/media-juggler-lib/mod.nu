@@ -2681,6 +2681,8 @@ export def fetch_musicbrainz_release []: string -> table {
     artist-credits
     labels
     recordings
+    genres
+    tags
     release-group-rels
     work-rels
     series-rels
@@ -2689,6 +2691,7 @@ export def fetch_musicbrainz_release []: string -> table {
     recording-level-rels
     release-group-level-rels
     work-level-rels
+    url-rels # for Audible ASIN
   ]
   http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_id)/?inc=($includes | str join '+')"
 }
@@ -2834,9 +2837,73 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<finger
   }
 }
 
-# Parse narrators from MusicBrainz release data
+export def parse_narrators_from_musicbrainz_relations []: list -> table {
+  let relations = $in
+  (
+    $relations
+    | where target-type == "artist"
+    | where type == "vocal"
+    | filter {|rel| "spoken vocals" in $rel.attributes}
+    # attribute-credits is used for specific characters, which isn't useful for tagging yet
+    | select artist target-credit # attribute-credits
+    | uniq
+    | par-each {|narrator|
+      let name = (
+        if "target-credit" in $narrator and ($narrator.target-credit | is-not-empty) {
+          $narrator.target-credit
+        } else {
+          $narrator.artist.name
+        }
+      )
+      {
+        name: $name
+        id: $narrator.artist.id
+      }
+    }
+  )
+}
+
+export def parse_works_from_musicbrainz_relations []: list -> table {
+  let relations = $in
+  (
+    $relations
+    | where target-type == "work"
+    | where type == "performance"
+    | get work
+  )
+}
+
+export def parse_writers_from_musicbrainz_work_relations []: list -> table {
+  let relations = $in
+  let writers = (
+    $relations
+    | where target-type == "artist"
+    | where type == "writer"
+  )
+  if ($writers | is-empty) {
+    return null
+  }
+  $writers | par-each {|writer|
+    let name = (
+      if "target-credit" in $writer and ($writer.target-credit | is-not-empty) {
+        $writer.target-credit
+      } else {
+        $writer.artist.name
+      }
+    )
+    {
+      name: $name
+      id: $writer.artist.id
+    }
+  } | uniq
+}
+
+# Parse narrators from MusicBrainz release and track data
 export def parse_narrators_from_musicbrainz_release []: record -> table {
   let metadata = $in
+  if ($metadata | is-empty) {
+    return null
+  }
   (
     $metadata
     | get media
@@ -2847,26 +2914,112 @@ export def parse_narrators_from_musicbrainz_release []: record -> table {
     | flatten
     # Append the release relationships
     | append ($metadata | get relations)
-    | where target-type == "artist"
-    | where type == "vocal"
-    | filter {|rel| "spoken vocals" in $rel.attributes}
-    # attribute-credits is used for specific characters, which isn't useful for tagging yet
-    | select artist target-credit # attribute-credits
-    | uniq
-    | par-each {|narrator|
-      if "target-credit" in $narrator and ($narrator.target-credit | is-not-empty) {
-        $narrator.target-credit
-      } else {
-        $narrator.artist.name
-      }
-    }
+    | parse_narrators_from_musicbrainz_relations
+  )
+}
+
+# Parse writers from MusicBrainz release and track data
+export def parse_writers_from_musicbrainz_release []: record -> table {
+  let metadata = $in
+  if ($metadata | is-empty) {
+    return null
+  }
+  (
+    $metadata
+    | get media
+    | get tracks
+    | flatten
+    | get recording
+    | get relations
+    | flatten
+    | where target-type == "work"
+    | get work
+    | get relations
+    | flatten
+    | parse_writers_from_musicbrainz_work_relations
   )
 }
 
 export def parse_musicbrainz_release []: record -> table {
   let metadata = $in
-  let narrators = $metadata | parse_narrators_from_musicbrainz_release
-  # let title = $metadata |
+
+  # Track metadata
+  let tracks = (
+    $metadata | get media | get tracks | flatten | par-each {|track|
+      # We probably don't need the length since we have the actual tracks, probably
+      # let length = (
+      #   if "length" in $track.recording {
+      #     $track.recording.length | into duration --unit sec
+      #   }
+      # );
+      let narrators = $track.recording.relations | parse_narrators_from_musicbrainz_relations | get --ignore-errors name
+      let works = $track.recording.relations | parse_works_from_musicbrainz_relations;
+      let musicbrainz_work_ids = (
+        if ($works | is-not-empty) {
+          $works | get id
+        }
+      )
+      let writers = (
+        if ($works | is-not-empty) and "relations" in "works" {
+          $works | get relations | parse_writers_from_musicbrainz_work_relations | get --ignore-errors name
+        }
+      )
+      (
+        {
+          index: $track.position
+        }
+        | upsert_if_present musicbrainz_track_id $track id
+        | upsert_if_present title $track
+        # todo Handle these in input / output
+        | upsert_if_present musicbrainz_recording_id $track.recording id
+        | upsert_if_present genres $track.recording
+        | upsert_if_present tags $track.recording
+        | upsert_if_value musicbrainz_work_ids $musicbrainz_work_ids
+        | upsert_if_value narrators $narrators
+        | upsert_if_value writers $writers
+        # | upsert_if_value duration $length
+      )
+    }
+  )
+
+  let narrators = $metadata | parse_narrators_from_musicbrainz_release | get --ignore-errors name
+  let writers = $metadata | parse_writers_from_musicbrainz_release | get --ignore-errors name
+  let publication_date = (
+    if "date" in $metadata {
+      $metadata | get date | into datetime
+    }
+  )
+  let publishers = (
+    # todo Also check for publishers in the release relationships.
+    if "label-info" in $metadata and "label" in $metadata.label-info {
+      $metadata.label-info.label.name
+    }
+  )
+
+  # Book metadata
+  (
+    {}
+    | upsert_if_present musicbrainz_release_id $metadata id
+    | upsert_if_present title $metadata
+    | upsert_if_value writers $writers
+    | upsert_if_present isbn $metadata barcode
+    | upsert_if_present country $metadata
+    | upsert_if_present amazon_asin $metadata asin
+    # todo audible_asin
+    | upsert_if_present genres $metadata
+    | upsert_if_present tags $metadata
+    | upsert_if_value publication_date $publication_date
+    | (
+      let input = $in;
+      if "text-representation" in $metadata {
+        $input
+        | upsert_if_present script $metadata.text-representation
+        | upsert_if_present language $metadata.text-representation
+      } else {
+        $input
+      }
+    )
+  )
 }
 
 # Using metadata from the audio tracks, search for a MusicBrainz release

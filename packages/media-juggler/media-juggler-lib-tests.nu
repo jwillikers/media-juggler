@@ -1454,16 +1454,30 @@ def test_determine_releases_from_acoustid_fingerprint_matches [] {
 def test_parse_narrators_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = [
-    "Cristina Vee"
-    "Erica Mendez"
-    "Erik Kimerer"
-    "Keith Silverstein"
+    [name id];
+    ["Cristina Vee" "9fac1f69-0044-4b51-ad1c-6bee4c749b91"]
+    ["Erica Mendez" "91225f09-2f8e-4aee-8718-9329cac8ef03"]
+    ["Erik Kimerer" "ac830008-5b9c-4f98-ae2b-cac499c40ad8"]
+    ["Keith Silverstein" "9c1e9bd5-4ded-4944-8190-1fec6e530e64"]
   ]
-  assert equal ($input | parse_narrators_from_musicbrainz_release | sort) $expected
+  assert equal ($input | parse_narrators_from_musicbrainz_release | sort-by name) $expected
 }
 
 def test_parse_narrators_from_musicbrainz_release [] {
   test_parse_narrators_from_musicbrainz_release_bakemonogatari_part_01
+}
+
+def test_parse_writers_from_musicbrainz_release_bakemonogatari_part_01 [] {
+  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
+  let expected = [
+    [name id];
+    ["NISIOISIN" "2c7b9427-6776-4969-8028-5de988724659"]
+  ]
+  assert equal ($input | parse_writers_from_musicbrainz_release | sort-by name) $expected
+}
+
+def test_parse_writers_from_musicbrainz_release [] {
+  test_parse_writers_from_musicbrainz_release_bakemonogatari_part_01
 }
 
 # def test_parse_musicbrainz_release_baccano [] {
@@ -1489,6 +1503,7 @@ def main []: {
   test_parse_release_ids_from_acoustid_response
   test_determine_releases_from_acoustid_fingerprint_matches
   test_parse_narrators_from_musicbrainz_release
+  test_parse_writers_from_musicbrainz_release
   # test_parse_musicbrainz_release
   echo "All tests passed!"
 }
