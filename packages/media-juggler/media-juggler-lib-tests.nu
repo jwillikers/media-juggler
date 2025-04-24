@@ -5,6 +5,8 @@ use std log
 
 use media-juggler-lib *
 
+let test_data_dir = ([$env.FILE_PWD "test-data"] | path join)
+
 def test_round_to_second_using_cumulative_offset [] {
   let durations = [
     30069ms
@@ -1450,7 +1452,7 @@ def test_determine_releases_from_acoustid_fingerprint_matches [] {
 }
 
 def test_parse_narrators_from_musicbrainz_release_bakemonogatari_part_01 [] {
-  let input = open ($env.FILE_PWD | path join "bakemonogatari_part_01_release.json")
+  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = [
     "Cristina Vee"
     "Erica Mendez"

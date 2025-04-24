@@ -2866,6 +2866,7 @@ export def parse_narrators_from_musicbrainz_release []: record -> table {
 export def parse_musicbrainz_release []: record -> table {
   let metadata = $in
   let narrators = $metadata | parse_narrators_from_musicbrainz_release
+  # let title = $metadata |
 }
 
 # Using metadata from the audio tracks, search for a MusicBrainz release
