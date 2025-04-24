@@ -1,6 +1,7 @@
 #!/usr/bin/env nu
 
 use std assert
+use std log
 
 use media-juggler-lib *
 
@@ -1003,6 +1004,21 @@ def test_tracks_into_tone_format [] {
   test_tracks_into_tone_format_two_tracks
 }
 
+def test_parse_series_from_release_group_no_series [] {
+  let input = {
+    title: "The Rithmatist"
+    secondary-types: [Audiobook]
+    relations: []
+    id: "1bc6aeda-1b14-4968-adea-1e651d710a42"
+    secondary-type-ids: ["499a387e-6195-333e-91c0-9592bfec535e"]
+    primary-type: Other
+    disambiguation: ""
+    first-release-date: "2013-05-14"
+    primary-type-id: "4fc3be2b-de1e-396b-a933-beb8f1607a22"
+  }
+  assert equal ($input | parse_series_from_release_group) null
+}
+
 def test_parse_series_from_release_group_one_series_without_index [] {
   let input = {
     relations: [
@@ -1106,8 +1122,73 @@ def test_parse_series_from_release_group_two_series_with_indices [] {
 }
 
 def test_parse_series_from_release_group [] {
+  test_parse_series_from_release_group_no_series
   test_parse_series_from_release_group_one_series_without_index
   test_parse_series_from_release_group_two_series_with_indices
+}
+
+def test_parse_release_ids_from_acoustid_response_no_track [] {
+  let input = {
+    results: []
+    status: "ok"
+  }
+  assert equal ($input | parse_release_ids_from_acoustid_response) []
+}
+
+def test_parse_release_ids_from_acoustid_response_one_track_imperfect_score [] {
+  let input = {
+    results: [
+      [id releases score];
+      [
+        "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+        [
+          [id];
+          ["b2c93465-beb1-4037-92ca-eab9d63ccdda"]
+        ]
+        0.99
+      ]
+    ]
+    status: ok
+  }
+  let expected = [
+    [acoustid_track_id release_ids score];
+    [
+      "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+      [
+        "b2c93465-beb1-4037-92ca-eab9d63ccdda"
+      ]
+      0.99
+    ]
+  ]
+  assert equal ($input | parse_release_ids_from_acoustid_response) $expected
+}
+
+def test_parse_release_ids_from_acoustid_response_one_track_with_one_release [] {
+  let input = {
+    results: [
+      [id releases score];
+      [
+        "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+        [
+          [id];
+          ["b2c93465-beb1-4037-92ca-eab9d63ccdda"]
+        ]
+        1.0
+      ]
+    ]
+    status: ok
+  }
+  let expected = [
+    [acoustid_track_id release_ids score];
+    [
+      "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+      [
+        "b2c93465-beb1-4037-92ca-eab9d63ccdda"
+      ]
+      1.0
+    ]
+  ]
+  assert equal ($input | parse_release_ids_from_acoustid_response) $expected
 }
 
 def test_parse_release_ids_from_acoustid_response_one_track_with_two_releases [] {
@@ -1140,8 +1221,232 @@ def test_parse_release_ids_from_acoustid_response_one_track_with_two_releases []
   assert equal ($input | parse_release_ids_from_acoustid_response) $expected
 }
 
+def test_parse_release_ids_from_acoustid_response_two_tracks [] {
+  let input = {
+    results: [
+      [id releases score];
+      [
+        "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+        [
+          [id];
+          ["b2c93465-beb1-4037-92ca-eab9d63ccdda"]
+        ]
+        1.0
+      ]
+      [
+        "966dd29f-cb04-4149-811e-078aec5e5835"
+        [
+          [id];
+          ["8833a504-5703-4918-b44a-b82f7ce5eb8f"]
+          ["540db13d-c371-49a2-902a-1c1d8ff87dc4"]
+        ]
+        1.0
+      ]
+    ]
+    status: ok
+  }
+  let expected = [
+    [acoustid_track_id release_ids score];
+    [
+      "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+      [
+        "b2c93465-beb1-4037-92ca-eab9d63ccdda"
+      ]
+      1.0
+    ]
+    [
+      "966dd29f-cb04-4149-811e-078aec5e5835"
+      [
+        "8833a504-5703-4918-b44a-b82f7ce5eb8f"
+        "540db13d-c371-49a2-902a-1c1d8ff87dc4"
+      ]
+      1.0
+    ]
+  ]
+  assert equal ($input | parse_release_ids_from_acoustid_response) $expected
+}
+
 def test_parse_release_ids_from_acoustid_response [] {
+  test_parse_release_ids_from_acoustid_response_no_track
+  test_parse_release_ids_from_acoustid_response_one_track_imperfect_score
+  test_parse_release_ids_from_acoustid_response_one_track_with_one_release
   test_parse_release_ids_from_acoustid_response_one_track_with_two_releases
+  test_parse_release_ids_from_acoustid_response_two_tracks
+}
+
+def test_determine_releases_from_acoustid_fingerprint_matches_empty [] {
+  assert equal ([] | determine_releases_from_acoustid_fingerprint_matches) null
+}
+
+def test_determine_releases_from_acoustid_fingerprint_matches_one_track_one_release [] {
+  let input = [
+    [fingerprint duration matches];
+    [
+      "fingerprint"
+      25555sec
+      [[acoustid_track_id release_ids score];
+        [
+          "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+          ["b2c93465-beb1-4037-92ca-eab9d63ccdda"]
+          1.0
+        ]
+      ]
+    ]
+  ]
+  let expected = ["b2c93465-beb1-4037-92ca-eab9d63ccdda"]
+  assert equal ($input | determine_releases_from_acoustid_fingerprint_matches) $expected
+}
+
+def test_determine_releases_from_acoustid_fingerprint_matches_one_track_two_releases [] {
+  let input = [
+    [fingerprint duration matches];
+    [
+      "fingerprint"
+      25555sec
+      [[acoustid_track_id release_ids score];
+        [
+          "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+          [
+            "b2c93465-beb1-4037-92ca-eab9d63ccdda"
+            "b3c12345-beb1-4037-92ca-eab9d63bbcc1"
+          ]
+          1.0
+        ]
+      ]
+    ]
+  ]
+  let expected = [
+    "b2c93465-beb1-4037-92ca-eab9d63ccdda"
+    "b3c12345-beb1-4037-92ca-eab9d63bbcc1"
+  ]
+  assert equal ($input | determine_releases_from_acoustid_fingerprint_matches) $expected
+}
+
+def test_determine_releases_from_acoustid_fingerprint_matches_thirteen_tracks_one_release [] {
+  let input = [
+    [fingerprint duration matches];
+    [
+      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_01XB"
+      30090000000ns
+      [
+        [acoustid_track_id, release_ids, score];
+        [
+          "3640c01c-a763-404e-9ec4-c60d28820e01"
+          ["0425322c-c953-477a-9494-affb04314373"]
+          1.0
+        ]
+      ]
+    ]
+    [
+      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_02XB"
+      1350160000000ns
+      [
+        [acoustid_track_id, release_ids, score];
+        [
+          "30976711-0ae5-431e-8fa7-56aee9d50dd1"
+          [
+            "0425322c-c953-477a-9494-affb04314373"
+            "aaca2621-60fc-4534-98e1-494f9e006a49"
+          ]
+          1.0
+        ]
+      ]
+    ]
+    [
+      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_03XB"
+      509130000000ns
+      [
+        [acoustid_track_id, release_ids, score];
+        [
+          "91b44ea0-f078-4d1e-afee-b0b4a8772316"
+          [
+            "0425322c-c953-477a-9494-affb04314373"
+            "aaca2621-60fc-4534-98e1-494f9e006a49"
+          ]
+          1.0
+        ]
+      ]
+    ]
+    [
+      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_04XB"
+      4117130000000ns
+      [
+        [acoustid_track_id, release_ids, score];
+        [
+          "9dd90c27-94f5-4fa7-8ea6-dcd3b7f7d456"
+          [
+            "0425322c-c953-477a-9494-affb04314373"
+            "aaca2621-60fc-4534-98e1-494f9e006a49"
+          ]
+          1.0
+        ]
+      ]
+    ]
+    [
+      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_05XB"
+      4542270000000ns
+      [
+        [acoustid_track_id, release_ids, score];
+        [
+          "c88dcadb-328e-4a81-8e70-80177c9834c5"
+          [
+            "0425322c-c953-477a-9494-affb04314373"
+            "aaca2621-60fc-4534-98e1-494f9e006a49"
+          ]
+          1.0
+        ]
+      ]
+    ]
+    [
+      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_06XB"
+      1270650000000ns
+      [
+        [acoustid_track_id, release_ids, score];
+        [
+          "9f119955-0341-4d62-a6c5-137dbc99f214"
+          [
+            "0425322c-c953-477a-9494-affb04314373"
+            "aaca2621-60fc-4534-98e1-494f9e006a49"
+          ]
+          1.0
+        ]
+      ]
+    ]
+    [
+      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_07XB"
+      3357050000000ns
+      [
+        [acoustid_track_id, release_ids, score];
+        [
+          "120dc6ab-ef38-4ac9-a3d4-4e5052ecb7b8"
+          [
+            "0425322c-c953-477a-9494-affb04314373"
+            "aaca2621-60fc-4534-98e1-494f9e006a49"
+          ]
+          1.0
+        ]
+      ]
+    ]
+    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_08XB", 1545770000000ns, [[acoustid_track_id, release_ids, score]; ["95af01f0-1579-460b-998e-cf4b6c2e6f79", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
+    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_09XB", 4237770000000ns, [[acoustid_track_id, release_ids, score]; ["27b42309-c46b-450e-a05d-d5f17ae0dc88", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
+    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_10XB", 751600000000ns, [[acoustid_track_id, release_ids, score]; ["8f7cd0be-91ac-4d80-ad16-dca82020d6ff", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
+    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_11XB", 781190000000ns, [[acoustid_track_id, release_ids, score]; ["c2abc000-8ca0-4029-b8a7-89092d772767", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
+    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_12XB", 361820000000ns, [[acoustid_track_id, release_ids, score]; ["75cd8d2f-3931-45cc-b4be-23c74d1387b7", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
+    [
+      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_13XB", 131870000000ns, [[acoustid_track_id, release_ids, score]; ["e086eb93-e02b-41e6-b882-3ef59824da04", ["0425322c-c953-477a-9494-affb04314373"], 1.0]]
+    ]
+  ]
+  let expected = [
+    "0425322c-c953-477a-9494-affb04314373"
+  ]
+  assert equal ($input | determine_releases_from_acoustid_fingerprint_matches) $expected
+}
+
+def test_determine_releases_from_acoustid_fingerprint_matches [] {
+  test_determine_releases_from_acoustid_fingerprint_matches_empty
+  test_determine_releases_from_acoustid_fingerprint_matches_one_track_one_release
+  test_determine_releases_from_acoustid_fingerprint_matches_one_track_two_releases
+  test_determine_releases_from_acoustid_fingerprint_matches_thirteen_tracks_one_release
 }
 
 def main []: {
@@ -1157,5 +1462,6 @@ def main []: {
   test_tracks_into_tone_format
   test_parse_series_from_release_group
   test_parse_release_ids_from_acoustid_response
+  test_determine_releases_from_acoustid_fingerprint_matches
   echo "All tests passed!"
 }

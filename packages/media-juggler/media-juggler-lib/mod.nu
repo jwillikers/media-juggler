@@ -2580,11 +2580,15 @@ export def tracks_into_tone_format []: record -> list<record> {
 # fpcalc is part of the chromaprint package.
 #
 # Returns a record containing the duration and the fingerprint.
-export def fpcalc [...files: path]: nothing -> record {
-  ^fpcalc -json ...$files | from json | (
-    let input = $in;
-    $input | update duration ($input.duration | into duration --unit sec)
-  )
+export def fpcalc []: list<path> -> table<file: path, fingerprint: string, duration: duration> {
+  $in | par-each {|file|
+    let track = ^fpcalc -json $file | from json
+    (
+      $track
+      | update duration ($track.duration * 1000 | into int | into duration --unit ms)
+      | insert file $file
+    )
+  }
 }
 
 # Tag an audio file with tone using the provided metadata
@@ -2702,56 +2706,57 @@ export def fetch_release_ids_by_acoustid_fingerprint [
   let input = $in
   let url = "https://api.acoustid.org/v2/lookup"
   let response = (
-    $"format=json&meta=releaseids&client=($client_key)&fingerprint=($input.fingerprint)&duration=($input.duration | format duration sec | math round)"
+    $"format=json&meta=releaseids&client=($client_key)&fingerprint=($input.fingerprint)&duration=($input.duration | format duration sec | split row ' ' | first | into float | math round)"
     | ^gzip --stdout
     | http post --content-type application/x-www-form-urlencoded --headers [Content-Encoding gzip] $url
   )
+  # todo Check response status and retry as necessary
   $response | parse_release_ids_from_acoustid_response
+}
+
+# Find tracks linked to AcoustID fingerprints
+#
+# Requires an AcoustID application API key.
+export def fetch_release_ids_by_acoustid_fingerprints [
+  client_key: string # The application API key for the AcoustID server
+  threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
+  fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
+  api_requests_per_second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
+]: table<duration: duration, fingerprint: string> -> table<fingerprint: string, duration: duration, matches: table<acoustid_track_id: string, release_ids: list<string>, score: float>> {
+  $in | chunks $api_requests_per_second | each {|chunk|
+    let matches = (
+      $chunk | par-each {|fingerprint|
+        let match = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key | where score >= $threshold
+        if $fail_fast and ($match | is-empty) {
+          return null
+        }
+        {
+          fingerprint: $fingerprint.fingerprint
+          duration: $fingerprint.duration
+          matches: $match
+        }
+      }
+    )
+    sleep 1sec
+    $matches
+  } | flatten
 }
 
 # Attempt to find a release based on the AcoustID fingerprints of a set of tracks
 #
-# Takes as input a list of AcoustID fingerprints.
-# Requires an AcoustID application API key.
+# Takes as input a table of AcoustID fingerprints, track durations, and matches.
+# This is the output of the fetch_release_ids_by_acoustid_fingerprints function.
 #
 # Returns the releases to which all tracks belong.
-export def determine_release_from_acoustid_fingerprints [
-  client_key: string # The application API key for the AcoustID server
-]: table<duration: duration, fingerprint: string> -> list<string> {
-  let fingerprints = $in
-  let results = (
-    # Only 3 API requests per second
-    $fingerprints | chunks 3 | each {|chunk|
-      let matches = (
-        $chunk | par-each {|fingerprint|
-          # Require the matches to be exact
-          let match = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key | where score == 1.00
-          # If any track fails to match, a release can't be matched perfectly, so fail matching
-          if ($match | is-empty) {
-            return null
-          }
-          {
-            fingerprint: $fingerprint
-            matches: $match
-          }
-        }
-      )
-      sleep 1sec
-      $matches
-    } | flatten
-  )
-
-  # {
-  #   acoustid_track_id: $input.id
-  #   release_ids: ($input.releases | get id)
-  #   score: $input.score
-  # }
-
-  # A release is considered a match if there is only one release in common for each track each release is a 100% match
-  let all_possible_release_ids = $results | get matches | get release_ids | uniq
+export def determine_releases_from_acoustid_fingerprint_matches []: table<fingerprint: string, duration: duration, matches: table<acoustid_track_id: string, release_ids: list<string>, score: float>> -> list<string> {
+  let tracks = $in
+  if ($tracks | is-empty) {
+    return null
+  }
+  let all_possible_release_ids = $tracks | get matches | first | get release_ids | flatten | uniq
   $all_possible_release_ids | filter {|release_id|
-    $results | all {|result|
-      $release_id in $result.matches.release_ids
+    $tracks | all {|track|
+      $release_id in ($track.matches | first | get release_ids | flatten)
     }
   }
 }
