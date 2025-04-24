@@ -1449,6 +1449,29 @@ def test_determine_releases_from_acoustid_fingerprint_matches [] {
   test_determine_releases_from_acoustid_fingerprint_matches_thirteen_tracks_one_release
 }
 
+def test_parse_narrators_from_musicbrainz_release_bakemonogatari_part_01 [] {
+  let input = open ($env.FILE_PWD | path join "bakemonogatari_part_01_release.json")
+  let expected = [
+    "Cristina Vee"
+    "Erica Mendez"
+    "Erik Kimerer"
+    "Keith Silverstein"
+  ]
+  assert equal ($input | parse_narrators_from_musicbrainz_release | sort) $expected
+}
+
+def test_parse_narrators_from_musicbrainz_release [] {
+  test_parse_narrators_from_musicbrainz_release_bakemonogatari_part_01
+}
+
+# def test_parse_musicbrainz_release_baccano [] {
+#   let input = placeholder
+# }
+
+# def test_parse_musicbrainz_release [] {
+#   test_parse_musicbrainz_release_baccano
+# }
+
 def main []: {
   test_upsert_if_present
   test_upsert_if_value
@@ -1463,5 +1486,7 @@ def main []: {
   test_parse_series_from_release_group
   test_parse_release_ids_from_acoustid_response
   test_determine_releases_from_acoustid_fingerprint_matches
+  test_parse_narrators_from_musicbrainz_release
+  # test_parse_musicbrainz_release
   echo "All tests passed!"
 }

@@ -2673,6 +2673,26 @@ export def fetch_musicbrainz_release_group []: string -> record {
   http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"
 }
 
+# Get a Release with all of the gory details
+export def fetch_musicbrainz_release []: string -> table {
+  let release_id = $in
+  let url = "https://musicbrainz.org/ws/2/release"
+  let includes = [
+    artist-credits
+    labels
+    recordings
+    release-group-rels
+    work-rels
+    series-rels
+    genre-rels
+    artist-rels
+    recording-level-rels
+    release-group-level-rels
+    work-level-rels
+  ]
+  http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_id)/?inc=($includes | str join '+')"
+}
+
 # Parses release ids from an AcoustID server response
 #
 # Takes an AcoustID server response as input.
@@ -2814,9 +2834,39 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<finger
   }
 }
 
-# Search for a recording on MusicBrainz, using the AcoustID fingerprint
-# export def search_by_acoustid_fingerprint []: record -> table {
-# }
+# Parse narrators from MusicBrainz release data
+export def parse_narrators_from_musicbrainz_release []: record -> table {
+  let metadata = $in
+  (
+    $metadata
+    | get media
+    | get tracks
+    | flatten
+    | get recording
+    | get relations
+    | flatten
+    # Append the release relationships
+    | append ($metadata | get relations)
+    | where target-type == "artist"
+    | where type == "vocal"
+    | filter {|rel| "spoken vocals" in $rel.attributes}
+    # attribute-credits is used for specific characters, which isn't useful for tagging yet
+    | select artist target-credit # attribute-credits
+    | uniq
+    | par-each {|narrator|
+      if "target-credit" in $narrator and ($narrator.target-credit | is-not-empty) {
+        $narrator.target-credit
+      } else {
+        $narrator.artist.name
+      }
+    }
+  )
+}
+
+export def parse_musicbrainz_release []: record -> table {
+  let metadata = $in
+  let narrators = $metadata | parse_narrators_from_musicbrainz_release
+}
 
 # Using metadata from the audio tracks, search for a MusicBrainz release
 # export def search_for_musicbrainz_release []: record -> table {
@@ -2887,13 +2937,6 @@ export def round_to_second_using_cumulative_offset []: list<duration> -> list<du
             cumulative_offset: $duration_and_offset.cumulative_offset
         }
     } | get durations
-}
-
-# Fetch a release from MusicBrainz by ID
-export def fetch_musicbrainz_release []: string -> record {
-  let id = $in
-  let url = "https://musicbrainz.org/ws/2/release"
-  http get --headers [Accept "application/json"] $"($url)/($id)/?inc=artist-credits+labels+recordings"
 }
 
 # Parse chapters out of MusicBrainz recordings data.
