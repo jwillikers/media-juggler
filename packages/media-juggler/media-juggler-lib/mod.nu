@@ -2,6 +2,10 @@
 
 use std log
 
+export const media_juggler_version = "0.0.1"
+
+export const user_agent = $"MediaJuggler/($media_juggler_version) \( https://github.com/jwillikers/media-juggler \)"
+
 export const ereader_profiles = [
     [model height width disk_label];
     ["Kobo Elipsa 2E" 1872 1404 "KOBOeReader"]
@@ -2659,14 +2663,14 @@ export def fetch_musicbrainz_release_group_for_release []: string -> table {
   let release_id = $in
   let url = "https://musicbrainz.org/ws/2/release-group/"
   let query = $"reid:($release_id)" | url encode
-  http get --headers [Accept "application/json"] $"($url)/?query=($query)"
+  http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/?query=($query)"
 }
 
 # Fetch a release group from MusicBrainz by ID
 export def fetch_musicbrainz_release_group []: string -> record {
   let release_group_id = $in
   let url = "https://musicbrainz.org/ws/2/release-group"
-  http get --headers [Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"
+  http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"
 }
 
 # Parses release ids from an AcoustID server response

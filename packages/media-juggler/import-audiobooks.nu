@@ -151,7 +151,9 @@ export def get_audiobook_metadata_from_musicbrainz []: list<record> -> record {
   }
   let release_group = $release_groups | first | get id | fetch_musicbrainz_release_group
 
+  # todo Add work-series as well.
   let series = $release_group | parse_series_from_release_group
+
   let chapters = $release | get media | chapters_from_musicbrainz_release_media
 
   # todo
