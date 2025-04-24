@@ -2697,36 +2697,85 @@ export def parse_release_ids_from_acoustid_response []: record<results: table<id
   }
 }
 
+
+# Call a function, retrying up to the given number of retries
+export def retry [
+  request: closure # The function to call
+  should_retry: closure # A closure which determines whether to retry or not based on the result of the request closure. True means retry, false means stop.
+  retries: int # The number of retries to perform
+  delay: duration # The amount of time to wait between successive executions of the request closure
+] nothing -> any {
+  for attempt in 1..($retries - 1) {
+    let response = do $request
+    if not (do $should_retry $response) {
+      return $response
+    }
+    sleep $delay
+  }
+  do $request
+}
+
 # Find tracks linked to an AcoustID fingerprint
 #
 # Requires an AcoustID application API key.
 export def fetch_release_ids_by_acoustid_fingerprint [
   client_key: string # The application API key for the AcoustID server
-]: record<duration: duration, fingerprint: string> -> table<acoustid_track_id: string, release_ids: list<string>, score: float> {
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
+]: record<duration: duration, fingerprint: string> -> record<http_response: table, result: table<acoustid_track_id: string, release_ids: list<string>, score: float>> {
   let input = $in
   let url = "https://api.acoustid.org/v2/lookup"
-  let response = (
+
+  let request = {||
     $"format=json&meta=releaseids&client=($client_key)&fingerprint=($input.fingerprint)&duration=($input.duration | format duration sec | split row ' ' | first | into float | math round)"
     | ^gzip --stdout
-    | http post --content-type application/x-www-form-urlencoded --headers [Content-Encoding gzip] $url
-  )
-  # todo Check response status and retry as necessary
-  $response | parse_release_ids_from_acoustid_response
+    | http post --content-type application/x-www-form-urlencoded --full --headers [Content-Encoding gzip] $url
+  }
+  let should_retry = {|result|
+    $result.status in [408 429 500 502 503 504]
+  }
+
+  let response = retry $request $should_retry $retries $retry_delay
+
+  if ($response.status != 200) {
+    return {"http_response": $response, result: null}
+  }
+
+  {
+    http_response: $response
+    result: ($response | get body | parse_release_ids_from_acoustid_response)
+  }
 }
 
 # Find tracks linked to AcoustID fingerprints
 #
 # Requires an AcoustID application API key.
+# retries: int = 3 # The number of retries to attempt for a failed lookup request
 export def fetch_release_ids_by_acoustid_fingerprints [
   client_key: string # The application API key for the AcoustID server
   threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
   api_requests_per_second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
 ]: table<duration: duration, fingerprint: string> -> table<fingerprint: string, duration: duration, matches: table<acoustid_track_id: string, release_ids: list<string>, score: float>> {
   $in | chunks $api_requests_per_second | each {|chunk|
     let matches = (
       $chunk | par-each {|fingerprint|
-        let match = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key | where score >= $threshold
+        mut status = 200
+        for $retry in 1..$retries {
+
+        }
+        let result = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key --retries $retries --retry-delay $retry_delay
+        if $result.http_response.status != 200 {
+          if $result.http_response.status in [401 403] {
+            log error $"Failed to lookup AcoustID fingerprint on the AcoustID server. HTTP status code ($result.http_response.status). Check the client API key is correct."
+            return null
+          }
+          log error $"Failed to lookup AcoustID fingerprint on the AcoustID server. HTTP status code ($result.http_response.status)."
+          return null
+        }
+        let match = $result.result | where score >= $threshold
         if $fail_fast and ($match | is-empty) {
           return null
         }
