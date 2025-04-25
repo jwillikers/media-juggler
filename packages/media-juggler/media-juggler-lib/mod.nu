@@ -2943,6 +2943,12 @@ export def parse_writers_from_musicbrainz_release []: record -> table {
   )
 }
 
+# Parse the artist names and ids from the MusicBrainz artist credits
+export def parse_musicbrainz_artist_credit []: list -> table {
+  $in | select name artist.id | rename name id
+}
+
+# Parse the data of a MusicBrainz release
 export def parse_musicbrainz_release []: record -> table {
   let metadata = $in
 
@@ -2956,14 +2962,20 @@ export def parse_musicbrainz_release []: record -> table {
       #   }
       # );
 
-      # todo Use names as they appear in the artist credit
+      let artist_credits = (
+        if "artist-credit" in $track.recording and ($track.recording.artist-credit | is-not-empty) {
+          $track.recording.artist-credit | parse_musicbrainz_artist_credit
+        }
+      )
+      # todo Use names as they appear in the recording artist-credit
       let narrators = $track.recording.relations | parse_narrators_from_musicbrainz_relations | get --ignore-errors name
       let works = $track.recording.relations | parse_works_from_musicbrainz_relations;
       let musicbrainz_work_ids = (
         if ($works | is-not-empty) {
-          $works | get id
+          $works | get id | uniq
         }
       )
+      # todo Use names as they appear in the recording artist-credit
       let writers = (
         if ($works | is-not-empty) and "relations" in "works" {
           $works | get relations | parse_writers_from_musicbrainz_work_relations | get --ignore-errors name
@@ -2975,7 +2987,7 @@ export def parse_musicbrainz_release []: record -> table {
         }
         | upsert_if_present musicbrainz_track_id $track id
         | upsert_if_present title $track
-        # todo Handle these in input / output
+        # todo Handle these few in input / output
         | upsert_if_present musicbrainz_recording_id $track.recording id
         | upsert_if_present genres $track.recording
         | upsert_if_present tags $track.recording
@@ -2987,6 +2999,11 @@ export def parse_musicbrainz_release []: record -> table {
     }
   )
 
+  let artist_credits = (
+    if "artist-credit" in $metadata and ($metadata.artist-credit | is-not-empty) {
+      $metadata.artist-credit | parse_musicbrainz_artist_credit
+    }
+  )
   # todo Use names as they appear in the artist credit
   let narrators = $metadata | parse_narrators_from_musicbrainz_release | get --ignore-errors name
   let writers = $metadata | parse_writers_from_musicbrainz_release | get --ignore-errors name

@@ -1535,6 +1535,20 @@ def test_parse_writers_from_musicbrainz_release [] {
   test_parse_writers_from_musicbrainz_release_bakemonogatari_part_01
 }
 
+def test_parse_musicbrainz_artist_credit_bakemonogatari_part_01 [] {
+  let input = [{name: NISIOISIN, artist: {disambiguation: "Japanese novelist", id: "2c7b9427-6776-4969-8028-5de988724659", name: 西尾維新, country: JP, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", type: Person, sort-name: NISIOISIN}, joinphrase: " read by "}, {name: "Erik Kimerer", joinphrase: "", artist: {sort-name: "Kimerer, Erik", type: Person, name: "Erik Kimerer", country: US, disambiguation: "voice actor", id: "ac830008-5b9c-4f98-ae2b-cac499c40ad8", type-id: "b6e035f4-3ce9-331c-97df-83397230b0df"}}]
+  let expected = [
+    [name id];
+    ["Erik Kimerer" "ac830008-5b9c-4f98-ae2b-cac499c40ad8"]
+    ["NISIOISIN" "2c7b9427-6776-4969-8028-5de988724659"]
+  ]
+  assert equal ($input | parse_musicbrainz_artist_credit | sort-by name) $expected
+}
+
+def test_parse_musicbrainz_artist_credit [] {
+  test_parse_musicbrainz_artist_credit_bakemonogatari_part_01
+}
+
 # def test_parse_musicbrainz_release_baccano [] {
 #   let input = placeholder
 # }
@@ -1562,6 +1576,7 @@ def main []: {
   test_parse_writers_from_musicbrainz_work_relations
   test_parse_narrators_from_musicbrainz_release
   test_parse_writers_from_musicbrainz_release
+  test_parse_musicbrainz_artist_credit
   # test_parse_musicbrainz_release
   echo "All tests passed!"
 }
