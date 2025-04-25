@@ -2837,6 +2837,7 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<finger
   }
 }
 
+# Parse narrators from MusicBrainz recording and release relationship data
 export def parse_narrators_from_musicbrainz_relations []: list -> table {
   let relations = $in
   (
@@ -2863,6 +2864,7 @@ export def parse_narrators_from_musicbrainz_relations []: list -> table {
   )
 }
 
+# Parse the works from MusicBrainz recording relationships
 export def parse_works_from_musicbrainz_relations []: list -> table {
   let relations = $in
   (
@@ -2870,9 +2872,11 @@ export def parse_works_from_musicbrainz_relations []: list -> table {
     | where target-type == "work"
     | where type == "performance"
     | get work
+    | uniq
   )
 }
 
+# Parse writers from MusicBrainz work relationships
 export def parse_writers_from_musicbrainz_work_relations []: list -> table {
   let relations = $in
   let writers = (
@@ -2932,8 +2936,7 @@ export def parse_writers_from_musicbrainz_release []: record -> table {
     | get recording
     | get relations
     | flatten
-    | where target-type == "work"
-    | get work
+    | parse_works_from_musicbrainz_relations
     | get relations
     | flatten
     | parse_writers_from_musicbrainz_work_relations
@@ -2952,6 +2955,8 @@ export def parse_musicbrainz_release []: record -> table {
       #     $track.recording.length | into duration --unit sec
       #   }
       # );
+
+      # todo Use names as they appear in the artist credit
       let narrators = $track.recording.relations | parse_narrators_from_musicbrainz_relations | get --ignore-errors name
       let works = $track.recording.relations | parse_works_from_musicbrainz_relations;
       let musicbrainz_work_ids = (
@@ -2982,6 +2987,7 @@ export def parse_musicbrainz_release []: record -> table {
     }
   )
 
+  # todo Use names as they appear in the artist credit
   let narrators = $metadata | parse_narrators_from_musicbrainz_release | get --ignore-errors name
   let writers = $metadata | parse_writers_from_musicbrainz_release | get --ignore-errors name
   let publication_date = (
