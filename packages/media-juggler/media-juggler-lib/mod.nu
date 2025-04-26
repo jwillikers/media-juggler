@@ -2681,6 +2681,8 @@ export def fetch_musicbrainz_release []: string -> table {
     artist-credits
     labels
     recordings
+    release-groups
+    media
     genres
     tags
     release-group-rels
@@ -2943,6 +2945,82 @@ export def parse_writers_from_musicbrainz_release []: record -> table {
   )
 }
 
+# Parse series from MusicBrainz relationships
+#
+# Multiple series are sorted according to index, in descending order.
+# The goal of this is to order subseries after parent series.
+# Of course, this won't help where indices are missing or indices match.
+export def parse_series_from_musicbrainz_relations [] table -> table<id: string, name: string, index: string> {
+  let relations = $in
+  let series = (
+    $relations
+    | where target-type == "series"
+    | where type == "part of"
+  )
+  if ($series | is-empty) {
+    return null
+  }
+  $series | par-each {|s|
+    let name = (
+      if "target-credit" in $s and ($s.target-credit | is-not-empty) {
+        $s.target-credit
+      } else {
+        $s.series.name
+      }
+    )
+    {
+      name: $name
+      id: $s.series.id
+      index: ($s.attribute-values | get --ignore-errors number)
+    }
+  } | uniq | sort-by --reverse index
+}
+
+# Parse series from MusicBrainz release, release group, and works
+#
+# The series are returned in the order of relevance:
+# 1. release
+# 2. release group
+# 3. work
+#
+# Multiple series of the same type a further sorted according to index, in descending order.
+# The goal of this is to order subseries after parent series.
+# Of course, this won't help where indices are missing or indices match.
+# Unfortunately, separate lookups for each series are necessary to determine if a series is a subseries.
+export def parse_series_from_musicbrainz_release []: record -> table {
+  let metadata = $in
+  if ($metadata | is-empty) {
+    return null
+  }
+  (
+    []
+    | append (
+      $metadata
+      | get relations
+      | parse_series_from_musicbrainz_relations
+    )
+    | append (
+      $metadata
+      | get release-group
+      | get relations
+      | parse_series_from_musicbrainz_relations
+    )
+    | append (
+      $metadata
+      | get media
+      | get tracks
+      | flatten
+      | get recording
+      | get relations
+      | flatten
+      | parse_works_from_musicbrainz_relations
+      | get relations
+      | flatten
+      | parse_series_from_musicbrainz_relations
+    )
+  )
+}
+
 # Parse the artist names and ids from the MusicBrainz artist credits
 export def parse_musicbrainz_artist_credit []: list -> table {
   $in | select name artist.id | rename name id
@@ -2958,9 +3036,15 @@ export def parse_musicbrainz_release []: record -> table {
     }
   )
 
+  # todo Pull in translators, adapters, engineers, and producers?
+
   # Track metadata
   let tracks = (
-    $metadata | get media | get tracks | flatten | par-each {|track|
+    $metadata
+    | get media
+    | get tracks
+    | flatten
+    | par-each {|track|
       # We probably don't need the length since we have the actual tracks, probably
       # let length = (
       #   if "length" in $track.recording {
@@ -3078,6 +3162,18 @@ export def parse_musicbrainz_release []: record -> table {
     }
   )
 
+  let series = $metadata | parse_series_from_release
+
+  # Chapters can come from multi-track releases, otherwise, they need to found in another release
+  # todo Attempt to look up chapters from related release for m4b files
+  let chapters = (
+    if ($tracks | length) > 1 {
+      $metadata | get media | chapters_from_musicbrainz_release_media
+    }
+  )
+
+  # todo Cover art
+
   # Book metadata
   (
     {}
@@ -3091,6 +3187,8 @@ export def parse_musicbrainz_release []: record -> table {
     | upsert_if_present genres $metadata
     | upsert_if_present tags $metadata
     | upsert_if_value publication_date $publication_date
+    | upsert_if_value series $series
+    | upsert_if_value chapters $chapters
     | (
       let input = $in;
       if "text-representation" in $metadata {
