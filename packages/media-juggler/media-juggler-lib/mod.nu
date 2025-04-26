@@ -3027,7 +3027,7 @@ export def parse_musicbrainz_artist_credit []: list -> table {
 }
 
 # Parse the data of a MusicBrainz release
-export def parse_musicbrainz_release []: record -> table {
+export def parse_musicbrainz_release []: record -> record {
   let metadata = $in
 
   let release_artist_credits = (
@@ -3175,7 +3175,7 @@ export def parse_musicbrainz_release []: record -> table {
   # todo Cover art
 
   # Book metadata
-  (
+  let book = (
     {}
     | upsert_if_present musicbrainz_release_id $metadata id
     | upsert_if_present title $metadata
@@ -3200,6 +3200,11 @@ export def parse_musicbrainz_release []: record -> table {
       }
     )
   )
+
+  {
+    book: $book
+    tracks: $tracks
+  }
 }
 
 # Using metadata from the audio tracks, search for a MusicBrainz release
