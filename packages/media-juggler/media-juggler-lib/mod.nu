@@ -2952,6 +2952,12 @@ export def parse_musicbrainz_artist_credit []: list -> table {
 export def parse_musicbrainz_release []: record -> table {
   let metadata = $in
 
+  let release_artist_credits = (
+    if "artist-credit" in $metadata and ($metadata.artist-credit | is-not-empty) {
+      $metadata.artist-credit | parse_musicbrainz_artist_credit
+    }
+  )
+
   # Track metadata
   let tracks = (
     $metadata | get media | get tracks | flatten | par-each {|track|
@@ -2962,23 +2968,60 @@ export def parse_musicbrainz_release []: record -> table {
       #   }
       # );
 
-      let artist_credits = (
+      let track_artist_credits = (
         if "artist-credit" in $track.recording and ($track.recording.artist-credit | is-not-empty) {
           $track.recording.artist-credit | parse_musicbrainz_artist_credit
         }
       )
-      # todo Use names as they appear in the recording artist-credit
-      let narrators = $track.recording.relations | parse_narrators_from_musicbrainz_relations | get --ignore-errors name
+      let narrators = (
+        $track.recording.relations
+        | parse_narrators_from_musicbrainz_relations
+        # Prefer the name in the track artist credit here, followed by the name in the release artist credit.
+        | par-each {|narrator|
+          let track_artist_credit = $track_artist_credits | where id == $narrator.id
+          if ($track_artist_credit | is-not-empty) {
+            # If there is more than one artist credit for the same artist, that would be really bizarre.
+            # In that case, just going with the first one.
+            $track_artist_credit | first
+          } else {
+            let release_artist_credit = $release_artist_credits | where id == $narrator.id
+            if ($release_artist_credit | is-not-empty) {
+              $release_artist_credit | first
+            } else {
+              $narrator.name
+            }
+          }
+        }
+      )
       let works = $track.recording.relations | parse_works_from_musicbrainz_relations;
       let musicbrainz_work_ids = (
         if ($works | is-not-empty) {
           $works | get id | uniq
         }
       )
-      # todo Use names as they appear in the recording artist-credit
       let writers = (
         if ($works | is-not-empty) and "relations" in "works" {
-          $works | get relations | parse_writers_from_musicbrainz_work_relations | get --ignore-errors name
+          (
+            $works
+            | get relations
+            | parse_writers_from_musicbrainz_work_relations
+            # Prefer the name in the track artist credit here, followed by the name in the release artist credit.
+            | par-each {|writer|
+              let track_artist_credit = $track_artist_credits | where id == $writer.id
+              if ($track_artist_credit | is-not-empty) {
+                # If there is more than one artist credit for the same artist, that would be really bizarre.
+                # In that case, just going with the first one.
+                $track_artist_credit | first
+              } else {
+                let release_artist_credit = $release_artist_credits | where id == $writer.id
+                if ($release_artist_credit | is-not-empty) {
+                  $release_artist_credit | first
+                } else {
+                  $writer.name
+                }
+              }
+            }
+          )
         }
       )
       (
@@ -2999,14 +3042,30 @@ export def parse_musicbrainz_release []: record -> table {
     }
   )
 
-  let artist_credits = (
-    if "artist-credit" in $metadata and ($metadata.artist-credit | is-not-empty) {
-      $metadata.artist-credit | parse_musicbrainz_artist_credit
+  let narrators = (
+    $metadata
+    | parse_narrators_from_musicbrainz_release
+    | par-each {|narrator|
+      let release_artist_credit = $release_artist_credits | where id == $narrator.id
+      if ($release_artist_credit | is-not-empty) {
+        $release_artist_credit | first
+      } else {
+        $narrator.name
+      }
     }
   )
-  # todo Use names as they appear in the artist credit
-  let narrators = $metadata | parse_narrators_from_musicbrainz_release | get --ignore-errors name
-  let writers = $metadata | parse_writers_from_musicbrainz_release | get --ignore-errors name
+  let writers = (
+    $metadata
+    | parse_writers_from_musicbrainz_release
+    | par-each {|writer|
+      let release_artist_credit = $release_artist_credits | where id == $writer.id
+      if ($release_artist_credit | is-not-empty) {
+        $release_artist_credit | first
+      } else {
+        $writer.name
+      }
+    }
+  )
   let publication_date = (
     if "date" in $metadata {
       $metadata | get date | into datetime
