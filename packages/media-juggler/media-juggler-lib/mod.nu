@@ -2666,6 +2666,33 @@ export def fetch_musicbrainz_release_group_for_release []: string -> table {
   http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/?query=($query)"
 }
 
+# Fetch the front cover image of a release from the Cover Art Archive
+export def fetch_release_front_cover [
+  working_directory: directory
+  size: string = original # original, 1200, 500, or 250
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: string -> path {
+  let release_id = $in
+  let url = "https://coverartarchive.org/release"
+  let request = {http get --full --headers [User-Agent $user_agent] $"($url)/($release_id)"}
+  let response = retry_http $request $retries $retry_delay
+  let cover = $response | get body | get images | where front == true | select id image thumbnails | first
+
+  # thumbnail sizes are 1200, 500, and 250
+  let download_url = (
+    if $size == "original" {
+      $cover | get image
+    } else {
+      $cover | get thumbnails | get $size
+    }
+  )
+  let filename = $download_url | url parse | get path | path basename
+  let destination = $working_directory | path join $filename
+  http get --headers [User-Agent $user_agent] $download_url | save --force $destination
+  $destination
+}
+
 # Fetch a release group from MusicBrainz by ID
 export def fetch_musicbrainz_release_group []: string -> record {
   let release_group_id = $in
@@ -2744,6 +2771,19 @@ export def retry [
   do $request
 }
 
+# Make an http call, retrying up to the given number of retries
+export def retry_http [
+  request: closure # The function to call
+  retries: int # The number of retries to perform
+  delay: duration # The amount of time to wait between successive executions of the request closure
+  http_status_codes_to_retry: list<int> = [408 429 500 502 503 504] # HTTP status codes where the request will be retries
+] nothing -> any {
+  let should_retry = {|result|
+    $result.status in $http_status_codes_to_retry
+  }
+  retry $request $should_retry $retries $delay
+}
+
 # Find tracks linked to an AcoustID fingerprint
 #
 # Requires an AcoustID application API key.
@@ -2760,11 +2800,7 @@ export def fetch_release_ids_by_acoustid_fingerprint [
     | ^gzip --stdout
     | http post --content-type application/x-www-form-urlencoded --full --headers [Content-Encoding gzip] $url
   }
-  let should_retry = {|result|
-    $result.status in [408 429 500 502 503 504]
-  }
-
-  let response = retry $request $should_retry $retries $retry_delay
+  let response = retry_http $request $retries $retry_delay
 
   if ($response.status != 200) {
     return {"http_response": $response, result: null}
@@ -3173,6 +3209,10 @@ export def parse_musicbrainz_release []: record -> record {
   )
 
   # todo Cover art
+  # Save whether front cover art is
+  let front_cover_available = (
+    "cover-art-archive" in $metadata and $metadata.cover-art-archive.front
+  )
 
   # Book metadata
   let book = (
@@ -3189,6 +3229,7 @@ export def parse_musicbrainz_release []: record -> record {
     | upsert_if_value publication_date $publication_date
     | upsert_if_value series $series
     | upsert_if_value chapters $chapters
+    | upsert_if_value front_cover_available $front_cover_available
     | (
       let input = $in;
       if "text-representation" in $metadata {
