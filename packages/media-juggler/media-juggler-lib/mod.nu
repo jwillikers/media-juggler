@@ -2725,6 +2725,15 @@ export def fetch_musicbrainz_release []: string -> table {
   http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_id)/?inc=($includes | str join '+')"
 }
 
+# Parse the ASIN out of an Audible URL
+export def parse_audible_asin_from_url []: string -> string {
+  let url = $in
+  let parsed = $url | url parse
+  if ($parsed.host | str starts-with "www.audible.") {
+    $parsed | get path | path parse | get stem
+  }
+}
+
 # Parses release ids from an AcoustID server response
 #
 # Takes an AcoustID server response as input.
@@ -3062,6 +3071,28 @@ export def parse_musicbrainz_artist_credit []: list -> table {
   $in | select name artist.id | rename name id
 }
 
+# Parse an Audible ASIN from the URL relationships in a MusicBrainz Release
+export def parse_audible_asin_from_musicbrainz_release []: record -> list<string> {
+  let metadata = $in
+  if relations not-in $metadata {
+    return null
+  }
+  let purchase_urls = (
+    $metadata
+    | get relations
+    | where target-type == url
+    | filter {|r|
+      $r.type | str starts-with purchase
+    }
+  )
+  if ($purchase_urls | is-empty) {
+    return null
+  }
+  $purchase_urls | get url | get resource | par-each {|url|
+    $url | parse_audible_asin_from_url
+  }
+}
+
 # Parse the data of a MusicBrainz release
 export def parse_musicbrainz_release []: record -> record {
   let metadata = $in
@@ -3200,6 +3231,15 @@ export def parse_musicbrainz_release []: record -> record {
 
   let series = $metadata | parse_series_from_release
 
+  let audible_asin = (
+    let audible_asins = $metadata | parse_audible_asin_from_musicbrainz_release;
+    # We just kind of ignore all besides the first when there are multiple
+    # todo At least log when there are multiple.
+    if ($audible_asins | is-not-empty) {
+      $audible_asins | first
+    }
+  )
+
   # Chapters can come from multi-track releases, otherwise, they need to found in another release
   # todo Attempt to look up chapters from related release for m4b files
   let chapters = (
@@ -3208,8 +3248,6 @@ export def parse_musicbrainz_release []: record -> record {
     }
   )
 
-  # todo Cover art
-  # Save whether front cover art is
   let front_cover_available = (
     "cover-art-archive" in $metadata and $metadata.cover-art-archive.front
   )
@@ -3223,7 +3261,7 @@ export def parse_musicbrainz_release []: record -> record {
     | upsert_if_present isbn $metadata barcode
     | upsert_if_present country $metadata
     | upsert_if_present amazon_asin $metadata asin
-    # todo audible_asin
+    | upsert_if_value audible_asin $audible_asin
     | upsert_if_present genres $metadata
     | upsert_if_present tags $metadata
     | upsert_if_value publication_date $publication_date

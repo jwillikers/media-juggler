@@ -1583,6 +1583,45 @@ def test_parse_series_from_musicbrainz_release [] {
   test_parse_series_from_musicbrainz_release_bakemonogatari_part_01
 }
 
+def test_parse_audible_asin_from_url_non_audible_url [] {
+  let input = "https://www.inaudible.com/pd/B0CQ3759C3"
+  assert equal ($input | parse_audible_asin_from_url) null
+}
+
+def test_parse_audible_asin_from_url_short_url [] {
+  let input = "https://www.audible.com/pd/B0CQ3759C3"
+  let expected = "B0CQ3759C3"
+  assert equal ($input | parse_audible_asin_from_url) $expected
+}
+
+def test_parse_audible_asin_from_url_long_url [] {
+  let input = "https://www.audible.com/pd/Wind-and-Truth-Audiobook/B0CQ3759C3?eac_link=rtndJl"
+  let expected = "B0CQ3759C3"
+  assert equal ($input | parse_audible_asin_from_url) $expected
+}
+
+def test_parse_audible_asin_from_url [] {
+  test_parse_audible_asin_from_url_non_audible_url
+  test_parse_audible_asin_from_url_short_url
+  test_parse_audible_asin_from_url_long_url
+}
+
+def test_parse_audible_asin_from_musicbrainz_release_bakemonogatari_part_01 [] {
+  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
+  assert equal ($input | parse_audible_asin_from_musicbrainz_release) []
+}
+
+def test_parse_audible_asin_from_musicbrainz_release_baccano_vol_1 [] {
+  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
+  let expected = ["B0CRSPBW6X"]
+  assert equal ($input | parse_audible_asin_from_musicbrainz_release) $expected
+}
+
+def test_parse_audible_asin_from_musicbrainz_release [] {
+  test_parse_audible_asin_from_musicbrainz_release_baccano_vol_1
+  test_parse_audible_asin_from_musicbrainz_release_bakemonogatari_part_01
+}
+
 # def test_parse_musicbrainz_release_baccano [] {
 #   let input = placeholder
 # }
@@ -1613,6 +1652,9 @@ def main []: {
   test_parse_musicbrainz_artist_credit
   test_parse_series_from_musicbrainz_relations
   test_parse_series_from_musicbrainz_release
+  test_parse_audible_asin_from_url
+  test_parse_audible_asin_from_musicbrainz_release
+  # todo Add tests for Baccano! Vol. 1 for parsing things.
   # test_parse_musicbrainz_release
   echo "All tests passed!"
 }
