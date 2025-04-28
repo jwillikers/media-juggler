@@ -2946,7 +2946,9 @@ export def parse_writers_from_musicbrainz_work_relations []: list -> table {
       name: $name
       id: $writer.artist.id
     }
-  } | uniq
+  }
+  | sort-by name
+  | uniq
 }
 
 # Parse narrators from MusicBrainz release and track data
@@ -3102,9 +3104,7 @@ export def parse_tags_from_musicbrainz_release [
       )
       | get --ignore-errors name
       | uniq
-      | filter {|tag|
-        $tag != "unabridged"
-      }
+      | sort
     )
   } else {
     (
@@ -3133,13 +3133,14 @@ export def parse_tags_from_musicbrainz_release [
       | filter {|tag|
         $tag != "unabridged"
       }
+      | sort
     )
   }
 }
 
 # Parse the artist names and ids from the MusicBrainz artist credits
 export def parse_musicbrainz_artist_credit []: list -> table {
-  $in | select name artist.id | rename name id
+  $in | enumerate | select index item.artist.id item.name | rename index id name
 }
 
 # Parse an Audible ASIN from the URL relationships in a MusicBrainz Release
@@ -3199,19 +3200,25 @@ export def parse_musicbrainz_release []: record -> record {
         $track.recording.relations
         | parse_narrators_from_musicbrainz_relations
         # Prefer the name in the track artist credit here, followed by the name in the release artist credit.
-        | par-each {|narrator|
-          let track_artist_credit = $track_artist_credits | where id == $narrator.id
-          if ($track_artist_credit | is-not-empty) {
-            # If there is more than one artist credit for the same artist, that would be really bizarre.
-            # In that case, just going with the first one.
-            $track_artist_credit | first
-          } else {
-            let release_artist_credit = $release_artist_credits | where id == $narrator.id
-            if ($release_artist_credit | is-not-empty) {
-              $release_artist_credit | first
+        | join $track_artist_credits id
+        | join $release_artist_credits id
+        | rename name id track_artist_credit_index track_artist_credit release_artist_credit_index release_artist_credit
+        | sort-by track_artist_credit_index release_artist_credit_index name
+        | each {|narrator|
+          let name = (
+            if ($narrator.track_artist_credit | is-not-empty) {
+              $narrator.track_artist_credit
+            } else if ($narrator.release_artist_credit | is-not-empty) {
+              $narrator.release_artist_credit
             } else {
               $narrator.name
             }
+          )
+          # If there is more than one artist credit for the same artist, that would be really bizarre.
+          # In that case, just going with the first one.
+          {
+            id: $narrator.id
+            name: $name
           }
         }
       )
@@ -3222,25 +3229,32 @@ export def parse_musicbrainz_release []: record -> record {
         }
       )
       let writers = (
+        # Put orders in the order of the track credit, then release credit, then alphabetical by sort name
         if ($works | is-not-empty) and "relations" in "works" {
           (
             $works
             | get relations
             | parse_writers_from_musicbrainz_work_relations
             # Prefer the name in the track artist credit here, followed by the name in the release artist credit.
-            | par-each {|writer|
-              let track_artist_credit = $track_artist_credits | where id == $writer.id
-              if ($track_artist_credit | is-not-empty) {
-                # If there is more than one artist credit for the same artist, that would be really bizarre.
-                # In that case, just going with the first one.
-                $track_artist_credit | first
-              } else {
-                let release_artist_credit = $release_artist_credits | where id == $writer.id
-                if ($release_artist_credit | is-not-empty) {
-                  $release_artist_credit | first
+            | join $track_artist_credits id
+            | join $release_artist_credits id
+            | rename name id track_artist_credit_index track_artist_credit release_artist_credit_index release_artist_credit
+            | sort-by track_artist_credit_index release_artist_credit_index name
+            | each {|writer|
+              let name = (
+                if ($writer.track_artist_credit | is-not-empty) {
+                  $writer.track_artist_credit
+                } else if ($writer.release_artist_credit | is-not-empty) {
+                  $writer.release_artist_credit
                 } else {
                   $writer.name
                 }
+              )
+              # If there is more than one artist credit for the same artist, that would be really bizarre.
+              # In that case, just going with the first one.
+              {
+                id: $writer.id
+                name: $name
               }
             }
           )
@@ -3266,35 +3280,53 @@ export def parse_musicbrainz_release []: record -> record {
         | upsert_if_present musicbrainz_recording_id $track.recording id
         | upsert_if_value genres $genres
         | upsert_if_value musicbrainz_work_ids $musicbrainz_work_ids
-        | upsert_if_value musicbrainz_artist_ids $musicbrainz_work_ids
+        # This needs to just be the writers ids for audiobookshelf...
+        # | upsert_if_value musicbrainz_artist_ids $musicbrainz_artist_ids
         | upsert_if_value narrators $narrators
         | upsert_if_value writers $writers
         # | upsert_if_value duration $length
       )
     }
+    | sort-by index
   )
 
   let narrators = (
     $metadata
     | parse_narrators_from_musicbrainz_release
-    | par-each {|narrator|
-      let release_artist_credit = $release_artist_credits | where id == $narrator.id
-      if ($release_artist_credit | is-not-empty) {
-        $release_artist_credit | first
-      } else {
-        $narrator.name
+    | join $release_artist_credits id
+    | rename name id release_artist_credit_index release_artist_credit
+    | sort-by release_artist_credit_index name
+    | each {|narrator|
+      let name = (
+        if ($narrator.release_artist_credit | is-not-empty) {
+          $narrator.release_artist_credit
+        } else {
+          $narrator.name
+        }
+      )
+      {
+        id: $narrator.id
+        name: $name
       }
     }
   )
   let writers = (
     $metadata
     | parse_writers_from_musicbrainz_release
-    | par-each {|writer|
-      let release_artist_credit = $release_artist_credits | where id == $writer.id
-      if ($release_artist_credit | is-not-empty) {
-        $release_artist_credit | first
-      } else {
-        $writer.name
+    | join $release_artist_credits id
+    | rename name id release_artist_credit_index release_artist_credit
+    | sort-by release_artist_credit_index name
+    | each {|writer|
+      let name = (
+        if ($writer.release_artist_credit | is-not-empty) {
+          $writer.release_artist_credit
+        } else {
+          $writer.name
+        }
+      )
+      {
+        id: $writer.id
+        name: $name
       }
     }
   )
@@ -3310,7 +3342,7 @@ export def parse_musicbrainz_release []: record -> record {
     }
   )
 
-  let series = $metadata | parse_series_from_release
+  let series = $metadata | parse_series_from_musicbrainz_release
 
   let audible_asin = (
     let audible_asins = $metadata | parse_audible_asin_from_musicbrainz_release;
@@ -3365,7 +3397,8 @@ export def parse_musicbrainz_release []: record -> record {
     | upsert_if_value series $series
     | upsert_if_value chapters $chapters
     | upsert_if_value front_cover_available $front_cover_available
-    | upsert_if_value musicbrainz_artist_ids $musicbrainz_artist_ids
+    # This needs to just be the writers ids for audiobookshelf...
+    # | upsert_if_value musicbrainz_artist_ids $musicbrainz_artist_ids
     | (
       let input = $in;
       if "text-representation" in $metadata {

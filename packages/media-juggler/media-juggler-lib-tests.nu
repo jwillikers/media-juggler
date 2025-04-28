@@ -329,8 +329,8 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
         [13 image/jpeg]
       ]
       performers: ["Erik Jourgensen"]
-      musicbrainz_track_id: "a3a37da7-f2fa-4938-b827-d3c8d213d08c"
-      musicbrainz_release_track_id: "a442811c-582b-429c-b7d9-072736be42ac"
+      musicbrainz_recording_id: "a3a37da7-f2fa-4938-b827-d3c8d213d08c"
+      musicbrainz_track_id: "a442811c-582b-429c-b7d9-072736be42ac"
       musicbrainz_work_ids: ["e8eba2f2-cb32-4f55-82cc-b35aa1272b5a"]
       producers: ["Max Epstein" "Matt Flynn" "David Pace"]
       engineers: ["Anthony Cozzi" "Vincent Early" "Tom Pinkava" "Timothy Waldner"]
@@ -386,7 +386,7 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
     ]
     embeddedPictures: [
       [code mimetype];
-      [13, image/jpeg]
+      [13 image/jpeg]
     ]
     file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
   }
@@ -1538,11 +1538,11 @@ def test_parse_writers_from_musicbrainz_release [] {
 def test_parse_musicbrainz_artist_credit_bakemonogatari_part_01 [] {
   let input = [{name: NISIOISIN, artist: {disambiguation: "Japanese novelist", id: "2c7b9427-6776-4969-8028-5de988724659", name: 西尾維新, country: JP, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", type: Person, sort-name: NISIOISIN}, joinphrase: " read by "}, {name: "Erik Kimerer", joinphrase: "", artist: {sort-name: "Kimerer, Erik", type: Person, name: "Erik Kimerer", country: US, disambiguation: "voice actor", id: "ac830008-5b9c-4f98-ae2b-cac499c40ad8", type-id: "b6e035f4-3ce9-331c-97df-83397230b0df"}}]
   let expected = [
-    [name id];
-    ["Erik Kimerer" "ac830008-5b9c-4f98-ae2b-cac499c40ad8"]
-    ["NISIOISIN" "2c7b9427-6776-4969-8028-5de988724659"]
+    [index name id];
+    [0 "NISIOISIN" "2c7b9427-6776-4969-8028-5de988724659"]
+    [1 "Erik Kimerer" "ac830008-5b9c-4f98-ae2b-cac499c40ad8"]
   ]
-  assert equal ($input | parse_musicbrainz_artist_credit | sort-by name) $expected
+  assert equal ($input | parse_musicbrainz_artist_credit) $expected
 }
 
 def test_parse_musicbrainz_artist_credit [] {
@@ -1635,7 +1635,7 @@ def test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
     "supernatural"
     "vampire"
   ]
-  assert equal ($input | parse_tags_from_musicbrainz_release | sort) $expected
+  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
 }
 
 def test_parse_tags_from_musicbrainz_release_baccano_vol_1 [] {
@@ -1651,7 +1651,7 @@ def test_parse_tags_from_musicbrainz_release_baccano_vol_1 [] {
     "supernatural"
     "urban fantasy"
   ]
-  assert equal ($input | parse_tags_from_musicbrainz_release | sort) $expected
+  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
 }
 
 def test_parse_tags_from_musicbrainz_release_only_genres_baccano_vol_1 [] {
@@ -1666,16 +1666,185 @@ def test_parse_tags_from_musicbrainz_release [] {
   test_parse_tags_from_musicbrainz_release_only_genres_baccano_vol_1
 }
 
-# def test_parse_musicbrainz_release_baccano_vol_1 [] {
-# }
+def test_parse_musicbrainz_release_baccano_vol_1 [] {
+  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
+  let expected = {
+    book: {
+      musicbrainz_release_id: "64801f58-229a-49f9-9d2d-6a44684ebe38"
+      musicbrainz_release_group_id: "4b745bd7-49f7-46d7-bf47-52e9d27b121b"
+      musicbrainz_release_types: [
+        Other
+        Audiobook
+      ]
+      title: "Baccano! Vol. 1: The Rolling Bootlegs"
+      writers: [
+        [name id];
+        ["Ryohgo Narita" "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab"]
+      ]
+      musicbrainz_release_country: XW
+      musicbrainz_release_status: Official
+      amazon_asin: "B0CRSJ8RQV"
+      audible_asin: "B0CRSPBW6X"
+      genres: [
+        adventure
+        fantasy
+        fiction
+        "historical fantasy"
+        "light novel"
+        mystery
+        paranormal
+        supernatural
+        "urban fantasy"
+      ],
+      publication_date: 2024-05-14T00:00:00-05:00
+      series: [
+        [name id index];
+        [
+          "Baccano! read by Michael Butler Murray"
+          "762cd100-5319-4f9e-8a97-c7f71ae66ad7"
+          "1"
+        ]
+        [
+          Baccano!
+          "c7b56e90-fdc0-4324-a399-7a4c7b534c24"
+          "1"
+        ]
+      ]
+      front_cover_available: true
+      script: "Latn"
+      language: "eng"
+    }
+    tracks: [
+      [
+        index
+        musicbrainz_track_id
+        title
+        musicbrainz_recording_id
+        genres
+        musicbrainz_work_ids
+        narrators
+      ];
+      [
+        1
+        "81c1f9ae-d00d-4ac3-8dd4-058369c94ae3"
+        "Baccano! Vol. 1: The Rolling Bootlegs"
+        "7c7064d1-fd42-414c-a8d3-52cce1e58ad1"
+        [
+          adventure
+          fantasy
+          fiction
+          "historical fantasy"
+          "light novel"
+          mystery
+          paranormal
+          supernatural
+          "urban fantasy"
+        ]
+        ["4b5f1fcc-1765-43c3-89f9-a20998cfb5a4"]
+        [
+          [name id];
+          ["Michael Butler Murray", "22c39a37-28b7-4ff2-aa0b-67f93279a1ef"]
+        ]
+      ]
+    ]
+  }
+  assert equal ($input | parse_musicbrainz_release) $expected
+}
 
-# def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
-# }
+def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
+  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
+  let expected = {
+    book: {
+      musicbrainz_release_id: "b2c07b6e-0f22-44b1-a87a-99e0f9c9623b"
+      musicbrainz_release_group_id: "b931acdb-2292-4f34-9dfa-151e33ae17a7"
+      musicbrainz_release_types:
+      [
+        Other
+        Audiobook
+      ]
+      title: "Bakemonogatari: Monster Tale, Part 01"
+      writers: [
+        [name id];
+        [NISIOISIN "2c7b9427-6776-4969-8028-5de988724659"]
+      ]
+      isbn: "9781949980523"
+      musicbrainz_release_country: "XW"
+      musicbrainz_release_status: "Official"
+      genres: [
+        fiction
+        "light novel"
+        mystery
+        paranormal
+        psychological
+        romance
+        "school life"
+        supernatural
+        vampire
+      ]
+      publication_date: 2020-03-24T00:00:00-05:00
+      series: [
+        [name id index];
+        [
+          "Monogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein"
+          "2c867f6d-09db-477e-99f1-aa7725239720"
+          "3"
+        ] [
+          "Bakemonogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein"
+          "94b16acb-7f06-42e1-96ac-7ff970972238"
+          "1"
+        ] [
+          "Monogatari Series: First Season"
+          "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+          "1"
+        ] [
+          Monogatari
+          "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+          "1"
+        ] [
+          Bakemonogatari
+          "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+          "1"
+        ]
+      ]
+      chapters: "[00:00:00.000] Opening Credits
+[00:00:00.000] Copyright
+[00:00:00.000] Chapter One: Hitagi Crab, Chapter 001
+[00:00:00.000] Chapter One: Hitagi Crab, Chapter 002
+[00:00:00.000] Chapter One: Hitagi Crab, Chapter 003
+[00:00:00.000] Chapter One: Hitagi Crab, Chapter 004
+[00:00:00.000] Chapter One: Hitagi Crab, Chapter 005
+[00:00:00.000] Chapter One: Hitagi Crab, Chapter 006
+[00:00:00.000] Chapter One: Hitagi Crab, Chapter 007
+[00:00:00.000] Chapter One: Hitagi Crab, Chapter 008
+[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 001
+[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 002
+[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 003
+[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 004
+[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 005
+[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 006
+[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 007
+[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 008
+[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 009
+[00:00:00.000] Afterword
+[00:00:00.000] End Credits"
+      front_cover_available: true
+      script: "Latn"
+      language: "eng"
+    }
+    tracks: [
+      [index, musicbrainz_track_id, title, musicbrainz_recording_id, musicbrainz_work_ids, narrators];
+      [1, "1af64466-4b91-4d49-8c48-743c8bbdc542", "Opening Credits", "ddf19afa-8d0a-4d7d-95f5-c6f0ad6daaf5", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"]]], [2, "7a41a13e-18f2-48a2-943e-ab65e646800b", Copyright, "19af78c6-fa48-4b1d-b211-c916dbdb29cc", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"]]], [3, "ee624e13-4ba9-4ebb-ae65-f3bb4da8f09c", "Chapter One: Hitagi Crab, Chapter 001", "6a9b6fcf-bcdf-4077-9f92-21153773ae7c", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [4, "e54e6d65-a8ef-481a-b5cc-e1df1b34fd34", "Chapter One: Hitagi Crab, Chapter 002", "eff08c59-06fe-4b4c-8f12-923d8228fa45", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [5, "1fe66e7b-defe-4f6a-89ba-a63e46bd57d2", "Chapter One: Hitagi Crab, Chapter 003", "17cc0da0-ee32-4686-81b7-85202cc29775", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [6, "5790db34-a353-4648-9c90-b067f4c97b18", "Chapter One: Hitagi Crab, Chapter 004", "359596d6-213a-49e2-a0b4-1c01968ca660", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [7, "4a96c1b7-20a9-4e39-becf-56dfe96423a0", "Chapter One: Hitagi Crab, Chapter 005", "83fb8681-62eb-4b31-9269-bf2e2d3703d0", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [8, "f68880dd-fd54-459e-a3f6-32a0c405cc93", "Chapter One: Hitagi Crab, Chapter 006", "99a7fc25-4765-4df7-951e-7f6e870cab85", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [9, "46f366db-03b8-47e3-822b-e5088bdb6194", "Chapter One: Hitagi Crab, Chapter 007", "85176035-3856-443f-bb17-d602d0b6a4c0", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [10, "c2ee3a84-58c2-4152-a420-7d55d58bd05e", "Chapter One: Hitagi Crab, Chapter 008", "a201d5c4-a6f7-4609-abc2-dcb54052c7ea", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [11, "88981d2d-9af9-4bf9-a96a-e040b9afe48b", "Chapter Two: Mayoi Snail, Chapter 001", "59f48ed4-bfbf-4b4c-8df5-d5133366da4d", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [12, "c11d5faa-4893-4825-98b3-c1b200957800", "Chapter Two: Mayoi Snail, Chapter 002", "bda5b5e5-9ed2-4ce2-9221-c8797e1247d8", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [13, "ce379ad4-e31c-4ae8-83ea-c5ebe4ed57ec", "Chapter Two: Mayoi Snail, Chapter 003", "6dee17b8-2198-44df-8841-a0f311771623", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [14, "a6a8838d-4b2f-4e4c-8c3b-58b6aa2df200", "Chapter Two: Mayoi Snail, Chapter 004", "01aadb9b-055c-4839-b8da-b7f146493b23", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [15, "c688dcc3-5200-4fd7-8566-15fc29b75c09", "Chapter Two: Mayoi Snail, Chapter 005", "7feca352-c937-4220-8dee-28ebfaa3bc6d", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [16, "9822b36c-d3dc-4f4a-b200-5519c09fae62", "Chapter Two: Mayoi Snail, Chapter 006", "5798acc6-7724-4af8-9078-89c475a12ed2", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [17, "9e2f4206-f380-4a50-8d3f-43faf675e429", "Chapter Two: Mayoi Snail, Chapter 007", "d3396b1a-5896-4c39-b5d9-37d478a7f4f9", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [18, "85e22b41-9038-4fe0-acaa-adfd8d5d60c5", "Chapter Two: Mayoi Snail, Chapter 008", "60ee765c-41d4-477a-b6b4-85d280c953d5", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [19, "1948d583-f1c3-4997-9234-fe96479dd0a5", "Chapter Two: Mayoi Snail, Chapter 009", "88df0c01-8617-4796-a41b-ad4463fd0cc7", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [20, "0146128e-31d1-4e37-be88-cebc09f178dd", Afterword, "5b57067e-a537-4075-bb59-2240af0fcc97", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"]]], [21, "ab132164-d144-4c71-97f1-b35966da72a5", "End Credits", "3b927907-6b99-4437-920c-70f387a0437e", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]]
+    ]
+  }
+  assert equal ($input | parse_musicbrainz_release | get book) ($expected | get book)
+  assert equal ($input | parse_musicbrainz_release | get tracks) ($expected | get tracks)
+  assert equal ($input | parse_musicbrainz_release) $expected
+}
 
-# def test_parse_musicbrainz_release [] {
-#   test_parse_musicbrainz_release_baccano
-#   test_parse_musicbrainz_release_bakemonogatari_part_01
-# }
+def test_parse_musicbrainz_release [] {
+  test_parse_musicbrainz_release_baccano_vol_1
+  test_parse_musicbrainz_release_bakemonogatari_part_01
+}
 
 def main []: {
   test_upsert_if_present
@@ -1703,6 +1872,6 @@ def main []: {
   test_parse_audible_asin_from_musicbrainz_release
   test_parse_tags_from_musicbrainz_release
   # todo Add tests for Baccano! Vol. 1 for parsing things.
-  # test_parse_musicbrainz_release
+  test_parse_musicbrainz_release
   echo "All tests passed!"
 }
