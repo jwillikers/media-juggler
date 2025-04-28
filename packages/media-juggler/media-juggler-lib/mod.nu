@@ -2380,8 +2380,8 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
         if additionalFields in $metadata {
           $input
           | upsert_if_present acoustid_fingerprint $metadata.additionalFields "acoustid Fingerprint"
-          | upsert_if_present musicbrainz_track_id $metadata.additionalFields "musicBrainz Track Id"
-          | upsert_if_present musicbrainz_release_track_id $metadata.additionalFields "musicBrainz Release Track Id"
+          | upsert_if_present musicbrainz_recording_id $metadata.additionalFields "musicBrainz Track Id"
+          | upsert_if_present musicbrainz_track_id $metadata.additionalFields "musicBrainz Release Track Id"
         } else {
           $input
         }
@@ -2510,8 +2510,8 @@ export def into_tone_format []: record -> record {
     | upsert_if_present chapters $metadata.book
     # track metadata
     | upsert_if_present "acoustid Fingerprint" $metadata.track acoustid_fingerprint
-    | upsert_if_present "musicBrainz Track Id" $metadata.track musicbrainz_track_id
-    | upsert_if_present "musicBrainz Release Track Id" $metadata.track musicbrainz_release_track_id
+    | upsert_if_present "musicBrainz Track Id" $metadata.track musicbrainz_recording_id
+    | upsert_if_present "musicBrainz Release Track Id" $metadata.track musicbrainz_track_id
     | upsert_if_value "musicBrainz Artist Id" ($metadata.track | get --ignore-errors musicbrainz_artist_ids | str join ";")
     | upsert_if_value "musicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_work_ids | str join ";")
     | upsert_if_value producers ($metadata.track | get --ignore-errors producers | str join ";")
@@ -3066,6 +3066,77 @@ export def parse_series_from_musicbrainz_release []: record -> table {
   )
 }
 
+# Parse tags from a MusicBrainz release, release group, and recordings
+#
+# The genres should also be parsed from associated series and works, but these require separate API calls.
+#
+# MusicBrainz doesn't really provide genres for audiobooks yet, so most genres are directly imported from tags.
+export def parse_tags_from_musicbrainz_release [
+  --only-genres # Parse only genres instead of using tags
+]: record -> table {
+  let metadata = $in
+  if ($metadata | is-empty) {
+    return null
+  }
+  if $only_genres {
+    (
+      []
+      | append (
+        $metadata
+        | get --ignore-errors genres
+      )
+      | append (
+        $metadata
+        | get --ignore-errors release-group
+        | get --ignore-errors genres
+      )
+      # recordings
+      | append (
+        $metadata
+        | get media
+        | get tracks
+        | flatten
+        | get recording
+        | get --ignore-errors genres
+        | flatten
+      )
+      | get --ignore-errors name
+      | uniq
+      | filter {|tag|
+        $tag != "unabridged"
+      }
+    )
+  } else {
+    (
+      []
+      | append (
+        $metadata
+        | get --ignore-errors tags
+      )
+      | append (
+        $metadata
+        | get --ignore-errors release-group
+        | get --ignore-errors tags
+      )
+      # recordings
+      | append (
+        $metadata
+        | get media
+        | get tracks
+        | flatten
+        | get recording
+        | get --ignore-errors tags
+        | flatten
+      )
+      | get --ignore-errors name
+      | uniq
+      | filter {|tag|
+        $tag != "unabridged"
+      }
+    )
+  }
+}
+
 # Parse the artist names and ids from the MusicBrainz artist credits
 export def parse_musicbrainz_artist_credit []: list -> table {
   $in | select name artist.id | rename name id
@@ -3175,17 +3246,27 @@ export def parse_musicbrainz_release []: record -> record {
           )
         }
       )
+      let genres = (
+        $track
+        | get recording
+        | get --ignore-errors tags
+        | get --ignore-errors name
+        | uniq
+        | filter {|tag|
+          $tag != "unabridged"
+        }
+      )
+      let musicbrainz_artist_ids = $track | get --ignore-errors artist-credit.artist.id | uniq
       (
         {
           index: $track.position
         }
         | upsert_if_present musicbrainz_track_id $track id
         | upsert_if_present title $track
-        # todo Handle these few in input / output
         | upsert_if_present musicbrainz_recording_id $track.recording id
-        | upsert_if_present genres $track.recording
-        | upsert_if_present tags $track.recording
+        | upsert_if_value genres $genres
         | upsert_if_value musicbrainz_work_ids $musicbrainz_work_ids
+        | upsert_if_value musicbrainz_artist_ids $musicbrainz_work_ids
         | upsert_if_value narrators $narrators
         | upsert_if_value writers $writers
         # | upsert_if_value duration $length
@@ -3239,6 +3320,7 @@ export def parse_musicbrainz_release []: record -> record {
       $audible_asins | first
     }
   )
+  let genres = $metadata | parse_tags_from_musicbrainz_release
 
   # Chapters can come from multi-track releases, otherwise, they need to found in another release
   # todo Attempt to look up chapters from related release for m4b files
@@ -3252,22 +3334,38 @@ export def parse_musicbrainz_release []: record -> record {
     "cover-art-archive" in $metadata and $metadata.cover-art-archive.front
   )
 
+  let musicbrainz_artist_ids = $metadata | get --ignore-errors artist-credit.artist.id | uniq
+  let musicbrainz_release_types = (
+    []
+    | append (
+      $metadata
+      | get --ignore-errors release-group.primary-type
+    )
+    | append (
+      $metadata
+      | get --ignore-errors release-group.secondary-types
+    )
+  )
+
   # Book metadata
   let book = (
     {}
     | upsert_if_present musicbrainz_release_id $metadata id
+    | upsert_if_present musicbrainz_release_group_id $metadata.release-group id
+    | upsert_if_value musicbrainz_release_types $musicbrainz_release_types
     | upsert_if_present title $metadata
     | upsert_if_value writers $writers
     | upsert_if_present isbn $metadata barcode
-    | upsert_if_present country $metadata
+    | upsert_if_present musicbrainz_release_country $metadata country
+    | upsert_if_present musicbrainz_release_status $metadata status
     | upsert_if_present amazon_asin $metadata asin
     | upsert_if_value audible_asin $audible_asin
-    | upsert_if_present genres $metadata
-    | upsert_if_present tags $metadata
+    | upsert_if_value genres $genres
     | upsert_if_value publication_date $publication_date
     | upsert_if_value series $series
     | upsert_if_value chapters $chapters
     | upsert_if_value front_cover_available $front_cover_available
+    | upsert_if_value musicbrainz_artist_ids $musicbrainz_artist_ids
     | (
       let input = $in;
       if "text-representation" in $metadata {

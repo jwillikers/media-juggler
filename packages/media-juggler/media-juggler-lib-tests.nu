@@ -1485,7 +1485,7 @@ def test_parse_works_from_musicbrainz_relations_bakemonogatari_part_01 [] {
     | get relations
     | flatten
   )
-  let expected = [{type: Prose, languages: [eng], attributes: [], type-id: "78a8e727-edc2-35b9-8829-a46111ef6df9", disambiguation: "light novel, English", relations: [{attribute-ids: {}, begin: null, target-credit: "", target-type: artist, artist: {name: "Ko Ransom", sort-name: "Ransom, Ko", id: "3192a6d6-bf15-434e-bfea-827865a3cc0a", country: null, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", disambiguation: translator, type: Person}, ended: false, type-id: "da6c5d8a-ce13-474d-9375-61feb29039a5", source-credit: "", direction: backward, type: translator, end: null, attributes: [], attribute-values: {}}, {target-credit: NISIOISIN, begin: null, target-type: artist, artist: {name: 西尾維新, id: "2c7b9427-6776-4969-8028-5de988724659", sort-name: NISIOISIN, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", disambiguation: "Japanese novelist", type: Person, country: JP}, type-id: "a255bca1-b157-4518-9108-7b147dc3fc68", ended: false, attribute-ids: {}, end: null, type: writer, attributes: [], attribute-values: {}, source-credit: "", direction: backward}, {target-type: s, target-credit: "", begin: null, ended: false, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, attributes: [number], attribute-values: {number: "1"}, ordering-key: 1, end: null, type: "part of", source-credit: "", series: {disambiguation: "light novel, English", type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series", name: Bakemonogatari, id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"}, direction: backward}, {direction: backward, source-credit: "", series: {disambiguation: "light novel, English", type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series", name: Monogatari, id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"}, ordering-key: 1, attribute-values: {number: "1"}, attributes: [number], type: "part of", end: null, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", ended: false, target-type: series, begin: null, target-credit: ""}, {source-credit: "", series: {id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef", name: "Monogatari Series: First Season", type: "Work series", type-id: "b689f694-6305-3d78-954d-df6759a1877b", disambiguation: "light novel, English"}, direction: backward, ordering-key: 2, attribute-values: {number: "1"}, attributes: [number], type: "part of", end: null, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, target-type: series, begin: null, target-credit: "", type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", ended: false}, {attribute-values: {}, attributes: [], end: null, type: BookBrainz, url: {resource: "https://bookbrainz.org/work/ae3d4e16-7524-456d-a72f-318a1700b2ad", id: "817e90a9-f58e-48ce-8ea8-e3aed01ed308"}, direction: backward, source-credit: "", ended: false, type-id: "0ea7cf4e-93dd-4bc4-b748-0f1073cf951c", target-type: url, begin: null, target-credit: "", attribute-ids: {}}, {attribute-ids: {}, ended: false, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", target-credit: "", begin: null, target-type: url, direction: backward, source-credit: "", type: "other databases", end: null, attributes: [], attribute-values: {}, url: {resource: "https://openlibrary.org/works/OL19749568W", id: "da650123-1830-464d-ae2d-3063278a5430"}}, {direction: backward, source-credit: "", end: null, type: "other databases", attributes: [], attribute-values: {}, url: {id: "08766fc9-4f13-4a68-8070-1f8c76d8530b", resource: "https://www.librarything.com/work/18801353"}, attribute-ids: {}, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", ended: false, target-credit: "", begin: null, target-type: url}, {target-type: work, target-credit: "", begin: null, ended: false, type-id: "7440b539-19ab-4243-8c03-4f5942ca2218", attribute-ids: {translated: "ed11fcb1-5a18-4e1d-b12c-633ed19c8ee1"}, work: {title: 化物語（上）, language: null, iswcs: [], id: "35d328d1-7d5d-4c2c-a1e1-47dda806de3e", type-id: "78a8e727-edc2-35b9-8829-a46111ef6df9", attributes: [], disambiguation: "light novel", languages: [], type: Prose}, attributes: [translated], attribute-values: {}, type: "other version", end: null, source-credit: "", direction: backward}], title: "Bakemonogatari: Monster Tale, Part 01", id: "1f1a315c-49fe-4d4c-9c07-1903a113f984", iswcs: [], language: eng}, {languages: [eng], type: Prose, attributes: [], type-id: "78a8e727-edc2-35b9-8829-a46111ef6df9", disambiguation: "light novel, English", iswcs: [], id: "1f1a315c-49fe-4d4c-9c07-1903a113f984", language: eng, relations: [{source-credit: "", direction: backward, attributes: [], attribute-values: {}, end: null, type: translator, attribute-ids: {}, target-type: artist, target-credit: "", begin: null, type-id: "da6c5d8a-ce13-474d-9375-61feb29039a5", ended: false, artist: {country: null, disambiguation: translator, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", type: Person, name: "Ko Ransom", id: "3192a6d6-bf15-434e-bfea-827865a3cc0a", sort-name: "Ransom, Ko"}}, {direction: backward, source-credit: "", end: null, type: writer, attribute-values: {}, attributes: [], attribute-ids: {}, artist: {sort-name: NISIOISIN, id: "2c7b9427-6776-4969-8028-5de988724659", name: 西尾維新, type: Person, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", disambiguation: "Japanese novelist", country: JP}, ended: false, type-id: "a255bca1-b157-4518-9108-7b147dc3fc68", begin: null, target-credit: NISIOISIN, target-type: artist}, {series: {disambiguation: "light novel, English", type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series", name: Bakemonogatari, id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"}, source-credit: "", direction: backward, type: "part of", end: null, attributes: [number], attribute-values: {number: "1"}, ordering-key: 1, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, begin: null, target-credit: "", target-type: series, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", ended: false}, {ended: false, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", target-type: series, target-credit: "", begin: null, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, attribute-values: {number: "1"}, ordering-key: 1, attributes: [number], end: null, type: "part of", direction: backward, source-credit: "", series: {id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3", name: Monogatari, type: "Work series", type-id: "b689f694-6305-3d78-954d-df6759a1877b", disambiguation: "light novel, English"}}, {type: "part of", end: null, attributes: [number], ordering-key: 2, attribute-values: {number: "1"}, series: {type-id: "b689f694-6305-3d78-954d-df6759a1877b", disambiguation: "light novel, English", type: "Work series", name: "Monogatari Series: First Season", id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"}, source-credit: "", direction: backward, begin: null, target-credit: "", target-type: series, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", ended: false, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}}, {source-credit: "", direction: backward, url: {resource: "https://bookbrainz.org/work/ae3d4e16-7524-456d-a72f-318a1700b2ad", id: "817e90a9-f58e-48ce-8ea8-e3aed01ed308"}, attribute-values: {}, attributes: [], type: BookBrainz, end: null, attribute-ids: {}, target-type: url, begin: null, target-credit: "", type-id: "0ea7cf4e-93dd-4bc4-b748-0f1073cf951c", ended: false}, {attribute-ids: {}, target-type: url, begin: null, target-credit: "", type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", ended: false, source-credit: "", direction: backward, url: {resource: "https://openlibrary.org/works/OL19749568W", id: "da650123-1830-464d-ae2d-3063278a5430"}, attribute-values: {}, attributes: [], type: "other databases", end: null}, {ended: false, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", begin: null, target-credit: "", target-type: url, attribute-ids: {}, end: null, type: "other databases", attribute-values: {}, attributes: [], url: {id: "08766fc9-4f13-4a68-8070-1f8c76d8530b", resource: "https://www.librarything.com/work/18801353"}, direction: backward, source-credit: ""}, {work: {languages: [], type: Prose, type-id: "78a8e727-edc2-35b9-8829-a46111ef6df9", disambiguation: "light novel", attributes: [], iswcs: [], id: "35d328d1-7d5d-4c2c-a1e1-47dda806de3e", language: null, title: 化物語（上）}, attribute-values: {}, attributes: [translated], type: "other version", end: null, source-credit: "", direction: backward, target-type: work, begin: null, target-credit: "", ended: false, type-id: "7440b539-19ab-4243-8c03-4f5942ca2218", attribute-ids: {translated: "ed11fcb1-5a18-4e1d-b12c-633ed19c8ee1"}}], title: "Bakemonogatari: Monster Tale, Part 01"}]
+  let expected = [[iswcs, disambiguation, relations, type-id, languages, id, language, title, type, attributes]; [[], "light novel, English", [{artist: {type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", sort-name: "Ransom, Ko", disambiguation: translator, country: null, type: Person, id: "3192a6d6-bf15-434e-bfea-827865a3cc0a", name: "Ko Ransom"}, type-id: "da6c5d8a-ce13-474d-9375-61feb29039a5", ended: false, direction: backward, target-credit: "", begin: null, attribute-values: {}, attribute-ids: {}, target-type: artist, end: null, source-credit: "", attributes: [], type: translator}, {target-type: artist, end: null, type: writer, source-credit: "", attributes: [], attribute-ids: {}, attribute-values: {}, begin: null, artist: {id: "2c7b9427-6776-4969-8028-5de988724659", name: 西尾維新, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", sort-name: NISIOISIN, disambiguation: "Japanese novelist", country: JP, type: Person}, ended: false, type-id: "a255bca1-b157-4518-9108-7b147dc3fc68", target-credit: NISIOISIN, direction: backward}, {type: "part of", source-credit: "", attributes: [number], end: null, target-type: series, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, ordering-key: 1, attribute-values: {number: "1"}, begin: null, target-credit: "", direction: backward, ended: false, series: {disambiguation: "light novel, English", type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series", id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322", name: Bakemonogatari}, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0"}, {attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, ordering-key: 1, type: "part of", source-credit: "", attributes: [number], end: null, target-type: series, target-credit: "", direction: backward, ended: false, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", series: {type-id: "b689f694-6305-3d78-954d-df6759a1877b", disambiguation: "light novel, English", type: "Work series", id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3", name: Monogatari}, attribute-values: {number: "1"}, begin: null}, {attributes: [number], source-credit: "", type: "part of", end: null, target-type: series, ordering-key: 2, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, begin: null, attribute-values: {number: "1"}, direction: backward, target-credit: "", type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", series: {disambiguation: "light novel, English", type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series", id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef", name: "Monogatari Series: First Season"}, ended: false}, {attribute-ids: {}, target-type: url, url: {id: "817e90a9-f58e-48ce-8ea8-e3aed01ed308", resource: "https://bookbrainz.org/work/ae3d4e16-7524-456d-a72f-318a1700b2ad"}, end: null, attributes: [], source-credit: "", type: BookBrainz, type-id: "0ea7cf4e-93dd-4bc4-b748-0f1073cf951c", ended: false, direction: backward, target-credit: "", begin: null, attribute-values: {}}, {attribute-ids: {}, target-type: url, end: null, url: {id: "da650123-1830-464d-ae2d-3063278a5430", resource: "https://openlibrary.org/works/OL19749568W"}, type: "other databases", attributes: [], source-credit: "", ended: false, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", target-credit: "", direction: backward, attribute-values: {}, begin: null}, {attribute-ids: {}, target-type: url, type: "other databases", source-credit: "", attributes: [], url: {id: "08766fc9-4f13-4a68-8070-1f8c76d8530b", resource: "https://www.librarything.com/work/18801353"}, end: null, target-credit: "", direction: backward, ended: false, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", attribute-values: {}, begin: null}, {target-type: work, type: "other version", source-credit: "", attributes: [translated], end: null, attribute-ids: {translated: "ed11fcb1-5a18-4e1d-b12c-633ed19c8ee1"}, attribute-values: {}, begin: null, target-credit: "", work: {type: Prose, attributes: [], title: 化物語（上）, language: null, id: "35d328d1-7d5d-4c2c-a1e1-47dda806de3e", languages: [], disambiguation: "light novel", type-id: "78a8e727-edc2-35b9-8829-a46111ef6df9", iswcs: []}, direction: backward, ended: false, type-id: "7440b539-19ab-4243-8c03-4f5942ca2218"}], "78a8e727-edc2-35b9-8829-a46111ef6df9", [eng], "1f1a315c-49fe-4d4c-9c07-1903a113f984", eng, "Bakemonogatari: Monster Tale, Part 01", Prose, []]]
   assert equal ($input | parse_works_from_musicbrainz_relations) $expected
 }
 
@@ -1622,12 +1622,59 @@ def test_parse_audible_asin_from_musicbrainz_release [] {
   test_parse_audible_asin_from_musicbrainz_release_bakemonogatari_part_01
 }
 
-# def test_parse_musicbrainz_release_baccano [] {
-#   let input = placeholder
+def test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
+  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
+  let expected = [
+    "fiction"
+    "light novel"
+    "mystery"
+    "paranormal"
+    "psychological"
+    "romance"
+    "school life"
+    "supernatural"
+    "vampire"
+  ]
+  assert equal ($input | parse_tags_from_musicbrainz_release | sort) $expected
+}
+
+def test_parse_tags_from_musicbrainz_release_baccano_vol_1 [] {
+  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
+  let expected = [
+    "adventure"
+    "fantasy"
+    "fiction"
+    "historical fantasy"
+    "light novel"
+    "mystery"
+    "paranormal"
+    "supernatural"
+    "urban fantasy"
+  ]
+  assert equal ($input | parse_tags_from_musicbrainz_release | sort) $expected
+}
+
+def test_parse_tags_from_musicbrainz_release_only_genres_baccano_vol_1 [] {
+  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
+  let expected = []
+  assert equal ($input | parse_tags_from_musicbrainz_release --only-genres) $expected
+}
+
+def test_parse_tags_from_musicbrainz_release [] {
+  test_parse_tags_from_musicbrainz_release_baccano_vol_1
+  test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01
+  test_parse_tags_from_musicbrainz_release_only_genres_baccano_vol_1
+}
+
+# def test_parse_musicbrainz_release_baccano_vol_1 [] {
+# }
+
+# def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
 # }
 
 # def test_parse_musicbrainz_release [] {
 #   test_parse_musicbrainz_release_baccano
+#   test_parse_musicbrainz_release_bakemonogatari_part_01
 # }
 
 def main []: {
@@ -1654,6 +1701,7 @@ def main []: {
   test_parse_series_from_musicbrainz_release
   test_parse_audible_asin_from_url
   test_parse_audible_asin_from_musicbrainz_release
+  test_parse_tags_from_musicbrainz_release
   # todo Add tests for Baccano! Vol. 1 for parsing things.
   # test_parse_musicbrainz_release
   echo "All tests passed!"
