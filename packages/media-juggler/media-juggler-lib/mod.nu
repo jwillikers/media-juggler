@@ -2520,22 +2520,22 @@ export def into_tone_format []: record -> record {
     {}
     # book metadata
     | upsert_if_value tags ($metadata.book | get --ignore-errors tags | str join ";")
-    | upsert_if_value "musicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | str join ";")
-    | upsert_if_value "musicBrainz Album Artist Id" ($metadata.book | get --ignore-errors musicbrainz_artist_ids | str join ";")
-    | upsert_if_present "musicBrainz Release Group Id" $metadata.book musicbrainz_release_group_id
-    | upsert_if_present "musicBrainz Album Id" $metadata.book musicbrainz_release_id
-    | upsert_if_present "musicBrainz Album Release Country" $metadata.book musicbrainz_release_country
-    | upsert_if_present "musicBrainz Album Status" $metadata.book musicbrainz_release_status
+    | upsert_if_value "MusicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | str join ";")
+    | upsert_if_value "MusicBrainz Album Artist Id" ($metadata.book | get --ignore-errors musicbrainz_artist_ids | str join ";")
+    | upsert_if_present "MusicBrainz Release Group Id" $metadata.book musicbrainz_release_group_id
+    | upsert_if_present "MusicBrainz Album Id" $metadata.book musicbrainz_release_id
+    | upsert_if_present "MusicBrainz Album Release Country" $metadata.book musicbrainz_release_country
+    | upsert_if_present "MusicBrainz Album Status" $metadata.book musicbrainz_release_status
     | upsert_if_present script $metadata.book
     | upsert_if_present media $metadata.book
     | upsert_if_present chapters $metadata.book
     # track metadata
     | upsert_if_present "AcoustID Fingerprint" $metadata.track acoustid_fingerprint
     | upsert_if_present "AcoustID Id" $metadata.track acoustid_track_id
-    | upsert_if_present "musicBrainz Track Id" $metadata.track musicbrainz_recording_id
-    | upsert_if_present "musicBrainz Release Track Id" $metadata.track musicbrainz_track_id
-    | upsert_if_value "musicBrainz Artist Id" ($metadata.track | get --ignore-errors musicbrainz_artist_ids | str join ";")
-    | upsert_if_value "musicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_work_ids | str join ";")
+    | upsert_if_present "MusicBrainz Track Id" $metadata.track musicbrainz_recording_id
+    | upsert_if_present "MusicBrainz Release Track Id" $metadata.track musicbrainz_track_id
+    | upsert_if_value "MusicBrainz Artist Id" ($metadata.track | get --ignore-errors musicbrainz_artist_ids | str join ";")
+    | upsert_if_value "MusicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_work_ids | str join ";")
     | upsert_if_value producers ($metadata.track | get --ignore-errors producers | str join ";")
     | upsert_if_value engineers ($metadata.track | get --ignore-errors engineers | str join ";")
     | upsert_if_value performers ($metadata.track | get --ignore-errors performers | str join ";")
