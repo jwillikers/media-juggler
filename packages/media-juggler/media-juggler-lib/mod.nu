@@ -2521,26 +2521,27 @@ export def into_tone_format []: record -> record {
     # book metadata
     | upsert_if_value tags ($metadata.book | get --ignore-errors tags | str join ";")
     | upsert_if_value "MusicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | str join ";")
-    | upsert_if_value "MusicBrainz Album Artist Id" ($metadata.book | get --ignore-errors musicbrainz_artist_ids | str join ";")
+    | upsert_if_value "MusicBrainz Album Artist Id" ($metadata.book | get --ignore-errors writers | get --ignore-errors id | str join ";")
     | upsert_if_present "MusicBrainz Release Group Id" $metadata.book musicbrainz_release_group_id
     | upsert_if_present "MusicBrainz Album Id" $metadata.book musicbrainz_release_id
     | upsert_if_present "MusicBrainz Album Release Country" $metadata.book musicbrainz_release_country
     | upsert_if_present "MusicBrainz Album Status" $metadata.book musicbrainz_release_status
     | upsert_if_present script $metadata.book
-    | upsert_if_present media $metadata.book
+    | upsert_if_present Media $metadata.book
+    # todo Work (Work name)
     | upsert_if_present chapters $metadata.book
     # track metadata
     | upsert_if_present "AcoustID Fingerprint" $metadata.track acoustid_fingerprint
     | upsert_if_present "AcoustID Id" $metadata.track acoustid_track_id
     | upsert_if_present "MusicBrainz Track Id" $metadata.track musicbrainz_recording_id
     | upsert_if_present "MusicBrainz Release Track Id" $metadata.track musicbrainz_track_id
-    | upsert_if_value "MusicBrainz Artist Id" ($metadata.track | get --ignore-errors musicbrainz_artist_ids | str join ";")
+    | upsert_if_value "MusicBrainz Artist Id" ($metadata.track | get --ignore-errors writers | get --ignore-errors id | str join ";")
     | upsert_if_value "MusicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_work_ids | str join ";")
-    | upsert_if_value producers ($metadata.track | get --ignore-errors producers | str join ";")
-    | upsert_if_value engineers ($metadata.track | get --ignore-errors engineers | str join ";")
-    | upsert_if_value performers ($metadata.track | get --ignore-errors performers | str join ";")
-    # | upsert_if_value performers ($metadata.track | get --ignore-errors performers | str join ";")
-    # todo illustrators, translators, adapters, editors
+    | upsert_if_value Producer ($metadata.track | get --ignore-errors producers | get --ignore-errors name | str join ";")
+    | upsert_if_value Engineer ($metadata.track | get --ignore-errors engineers | get --ignore-errors name | str join ";")
+    | upsert_if_value Performer ($metadata.track | get --ignore-errors performers | get --ignore-errors name | str join ";")
+    | upsert_if_value Director ($metadata.track | get --ignore-errors directors | get --ignore-errors name | str join ";")
+    # todo illustrators, translators, adapters, editors, engineers, directors
   )
   {
     meta: (
@@ -2550,7 +2551,7 @@ export def into_tone_format []: record -> record {
       #
       | upsert_if_present album $metadata.book title
       | upsert_if_present subtitle $metadata.book
-      | upsert_if_value albumArtist ($metadata.book | get --ignore-errors writers | get name | str join ";")
+      | upsert_if_value albumArtist ($metadata.book | get --ignore-errors writers | get --ignore-errors name | str join ";")
       # | upsert_if_present artist_credit_sort $metadata.book
       | upsert_if_present language $metadata.book
       | upsert_if_present description $metadata.book
@@ -2563,6 +2564,7 @@ export def into_tone_format []: record -> record {
       | upsert_if_present asin $metadata.book amazon_asin
       | upsert_if_present audible_asin $metadata.book
       | upsert_if_present isbn $metadata.book
+      | upsert_if_present Barcode $metadata.book isbn
       #
       # track metadata
       #
@@ -2984,9 +2986,7 @@ export def parse_writers_from_musicbrainz_work_relations []: list -> table {
       name: $name
       id: $writer.artist.id
     }
-  }
-  | sort-by name
-  | uniq
+  } | sort-by name | uniq
 }
 
 # Parse narrators from MusicBrainz release and track data
@@ -3234,29 +3234,41 @@ export def parse_musicbrainz_release []: record -> record {
         }
       )
       let narrators = (
-        $track.recording.relations
-        | parse_narrators_from_musicbrainz_relations
-        # Prefer the name in the track artist credit here, followed by the name in the release artist credit.
-        | join $track_artist_credits id
-        | join $release_artist_credits id
-        | rename name id track_artist_credit_index track_artist_credit release_artist_credit_index release_artist_credit
-        | sort-by track_artist_credit_index release_artist_credit_index name
-        | each {|narrator|
-          let name = (
-            if ($narrator.track_artist_credit | is-not-empty) {
-              $narrator.track_artist_credit
-            } else if ($narrator.release_artist_credit | is-not-empty) {
-              $narrator.release_artist_credit
-            } else {
-              $narrator.name
+        if ($track.recording | is-not-empty) and "relations" in ($track.recording | columns) {
+          (
+            $track.recording.relations
+            | parse_narrators_from_musicbrainz_relations
+            # Prefer the name in the track artist credit here, followed by the name in the release artist credit.
+            | (
+              let input = $in;
+              # I think the track artist credit is empty if it matches the release artist credit.
+              if ($track_artist_credits | is-not-empty) {
+                $input | join $track_artist_credits id
+              } else {
+                $input
+              }
+            )
+            | join $release_artist_credits id
+            | rename name id track_artist_credit_index track_artist_credit release_artist_credit_index release_artist_credit
+            | sort-by track_artist_credit_index release_artist_credit_index name
+            | each {|narrator|
+              let name = (
+                if ($narrator.track_artist_credit | is-not-empty) {
+                  $narrator.track_artist_credit
+                } else if ($narrator.release_artist_credit | is-not-empty) {
+                  $narrator.release_artist_credit
+                } else {
+                  $narrator.name
+                }
+              )
+              # If there is more than one artist credit for the same artist, that would be really bizarre.
+              # In that case, just going with the first one.
+              {
+                id: $narrator.id
+                name: $name
+              }
             }
           )
-          # If there is more than one artist credit for the same artist, that would be really bizarre.
-          # In that case, just going with the first one.
-          {
-            id: $narrator.id
-            name: $name
-          }
         }
       )
       let works = $track.recording.relations | parse_works_from_musicbrainz_relations;
@@ -3267,13 +3279,22 @@ export def parse_musicbrainz_release []: record -> record {
       )
       let writers = (
         # Put orders in the order of the track credit, then release credit, then alphabetical by sort name
-        if ($works | is-not-empty) and "relations" in "works" {
+        if ($works | is-not-empty) and "relations" in ($works | columns) {
           (
             $works
             | get relations
+            | flatten
             | parse_writers_from_musicbrainz_work_relations
             # Prefer the name in the track artist credit here, followed by the name in the release artist credit.
-            | join $track_artist_credits id
+            | (
+              let input = $in;
+              # I think the track artist credit is empty if it matches the release artist credit.
+              if ($track_artist_credits | is-not-empty) {
+                $input | join $track_artist_credits id
+              } else {
+                $input
+              }
+            )
             | join $release_artist_credits id
             | rename name id track_artist_credit_index track_artist_credit release_artist_credit_index release_artist_credit
             | sort-by track_artist_credit_index release_artist_credit_index name
@@ -3514,7 +3535,7 @@ export def tag_audiobook_from_acoustid [
   let acoustid_fingerprints = (
     $audiobook_files | get_acoustid_fingerprint $ignore_existing_acoustid_fingerprints
   )
-  log info $"acoustid_fingerprints: ($acoustid_fingerprints)"
+  # log info $"acoustid_fingerprints: ($acoustid_fingerprints)"
   let acoustid_responses = (
     $acoustid_fingerprints
     | fetch_release_ids_by_acoustid_fingerprints $client_key $threshold $fail_fast $api_requests_per_second --retries $retries --retry-delay $retry_delay
@@ -3523,7 +3544,7 @@ export def tag_audiobook_from_acoustid [
     log error "AcoustID responses missing"
     return null
   }
-  log info $"acoustid_responses: ($acoustid_responses)"
+  # log info $"acoustid_responses: ($acoustid_responses)"
   let release_ids = $acoustid_responses | determine_releases_from_acoustid_fingerprint_matches
   if ($release_ids | is-empty) {
     log error "No common release ids found for the AcoustID fingerprints"
@@ -3555,7 +3576,7 @@ export def tag_audiobook_from_acoustid [
     ($track.recordings | length) == 1
   }
   if (not $each_track_has_exactly_one_recording_for_the_release) {
-    log info "Failed to link each AcoustID track to exactly one recording for the release"
+    log error "Failed to link each AcoustID track to exactly one recording for the release"
     return null
   }
   let file_metadata = (
@@ -3575,7 +3596,7 @@ export def tag_audiobook_from_acoustid [
       }
     }
   )
-  log info $"file_metadata: ($file_metadata)"
+  # log info $"file_metadata: ($file_metadata)"
   $file_metadata | tag_audiobook_files_by_musicbrainz_release_id ($release_ids | first) $working_directory
 }
 
