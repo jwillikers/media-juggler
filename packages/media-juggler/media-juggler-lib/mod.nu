@@ -2314,7 +2314,9 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     }
   )
 
-  let duration = $all_metadata | get audio.duration | into int | into duration --unit ms
+  let duration = (
+    $all_metadata | get audio.duration | into int | into duration --unit ms
+  )
 
   # todo Is it worth parsing additionalFields artists field?
 
@@ -2365,6 +2367,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     {
       # The path of the track on the filesystem is used internally
       file: $all_metadata.file
+      duration: $duration
     }
     | upsert_if_present title $metadata
     | upsert_if_present artist_credit $metadata artist
@@ -2378,12 +2381,12 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     | upsert_if_value producers $producers
     | upsert_if_value engineers $engineers
     | upsert_if_value performers $performers
-    | upsert_if_value duration $duration
     | (
       let input = $in;
       if additionalFields in $metadata {
         $input
         | upsert_if_present acoustid_fingerprint $metadata.additionalFields "acoustid Fingerprint"
+        | upsert_if_present acoustid_track_id $metadata.additionalFields "acoustid Id"
         | upsert_if_present musicbrainz_recording_id $metadata.additionalFields "musicBrainz Track Id"
         | upsert_if_present musicbrainz_track_id $metadata.additionalFields "musicBrainz Release Track Id"
       } else {
@@ -2397,11 +2400,25 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
   }
 }
 
+# Get metadata from a file with tone
+export def tone_dump []: path -> record {
+  let file = $in | path expand
+  let result = do {^tone dump --format json $file} | complete
+  if $result.exit_code != 0 {
+    log info $"Error running '^tone dump --format json ($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    return null
+  }
+  $result.stdout | from json
+}
+
 # Parse audiobook metadata for a single file into a standard format
 export def parse_audiobook_metadata_from_file []: path -> record {
-    let file = $in | path expand
-    let metadata = ^tone dump --format json $file | from json
-    $metadata | upsert file $file | parse_audiobook_metadata_from_tone
+  let file = $in | path expand
+  let tone_output = $file | tone_dump
+  if ($tone_output | is-empty) {
+    return null
+  }
+  $tone_output | upsert file $file | parse_audiobook_metadata_from_tone
 }
 
 # Parse audiobook metadata from a list of individual tracks' metadata
@@ -2513,7 +2530,8 @@ export def into_tone_format []: record -> record {
     | upsert_if_present media $metadata.book
     | upsert_if_present chapters $metadata.book
     # track metadata
-    | upsert_if_present "acoustid Fingerprint" $metadata.track acoustid_fingerprint
+    | upsert_if_present "AcoustID Fingerprint" $metadata.track acoustid_fingerprint
+    | upsert_if_present "AcoustID Id" $metadata.track acoustid_track_id
     | upsert_if_present "musicBrainz Track Id" $metadata.track musicbrainz_recording_id
     | upsert_if_present "musicBrainz Release Track Id" $metadata.track musicbrainz_track_id
     | upsert_if_value "musicBrainz Artist Id" ($metadata.track | get --ignore-errors musicbrainz_artist_ids | str join ";")
@@ -2521,44 +2539,46 @@ export def into_tone_format []: record -> record {
     | upsert_if_value producers ($metadata.track | get --ignore-errors producers | str join ";")
     | upsert_if_value engineers ($metadata.track | get --ignore-errors engineers | str join ";")
     | upsert_if_value performers ($metadata.track | get --ignore-errors performers | str join ";")
-    | upsert_if_value performers ($metadata.track | get --ignore-errors performers | str join ";")
+    # | upsert_if_value performers ($metadata.track | get --ignore-errors performers | str join ";")
     # todo illustrators, translators, adapters, editors
   )
-  (
-    {}
-    #
-    # book metadata
-    #
-    | upsert_if_present album $metadata.book title
-    | upsert_if_present subtitle $metadata.book
-    | upsert_if_value albumArtist ($metadata.book | get --ignore-errors writers | str join ";")
-    # | upsert_if_present artist_credit_sort $metadata.book
-    | upsert_if_present language $metadata.book
-    | upsert_if_present description $metadata.book
-    | upsert_if_present comment $metadata.book
-    | upsert_if_value group $group
-    | upsert_if_value genre ($metadata.book | get --ignore-errors genres | str join ";")
-    # todo I'm not sure audiobookshelf supports multiple values for the publisher
-    | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | str join ";")
-    | upsert_if_value publishingDate $publication_date
-    | upsert_if_present asin $metadata.book amazon_asin
-    | upsert_if_present audible_asin $metadata.book
-    | upsert_if_present isbn $metadata.book
-    #
-    # track metadata
-    #
-    | upsert_if_present title $metadata.track
-    | upsert_if_present trackNumber $metadata.track index
-    | upsert_if_value artist ($metadata.track | get --ignore-errors writers | str join ";")
-    | upsert_if_value narrator ($metadata.track | get --ignore-errors narrators | str join ";")
-    # Use the composer field for the narrators for audiobookshelf
-    | upsert_if_value composer ($metadata.track | get --ignore-errors narrators | str join ";")
-    | upsert_if_present embeddedPictures $metadata.track embedded_pictures
-    #
-    # additionalFields
-    #
-    | upsert_if_value additionalFields $additionalFields
-  )
+  {
+    meta: (
+      {}
+      #
+      # book metadata
+      #
+      | upsert_if_present album $metadata.book title
+      | upsert_if_present subtitle $metadata.book
+      | upsert_if_value albumArtist ($metadata.book | get --ignore-errors writers | get name | str join ";")
+      # | upsert_if_present artist_credit_sort $metadata.book
+      | upsert_if_present language $metadata.book
+      | upsert_if_present description $metadata.book
+      | upsert_if_present comment $metadata.book
+      | upsert_if_value group $group
+      | upsert_if_value genre ($metadata.book | get --ignore-errors genres | str join ";")
+      # todo I'm not sure audiobookshelf supports multiple values for the publisher
+      | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | str join ";")
+      | upsert_if_value publishingDate $publication_date
+      | upsert_if_present asin $metadata.book amazon_asin
+      | upsert_if_present audible_asin $metadata.book
+      | upsert_if_present isbn $metadata.book
+      #
+      # track metadata
+      #
+      | upsert_if_present title $metadata.track
+      | upsert_if_present trackNumber $metadata.track index
+      | upsert_if_value artist ($metadata.track | get --ignore-errors writers | get --ignore-errors name | str join ";")
+      | upsert_if_value narrator ($metadata.track | get --ignore-errors narrators | get --ignore-errors name | str join ";")
+      # Use the composer field for the narrators for audiobookshelf
+      | upsert_if_value composer ($metadata.track | get --ignore-errors narrators | get --ignore-errors name | str join ";")
+      | upsert_if_present embeddedPictures $metadata.track embedded_pictures
+      #
+      # additionalFields
+      #
+      | upsert_if_value additionalFields $additionalFields
+    )
+  }
 }
 
 # Convert the metadata for a set of tracks into a format suitable for tone
@@ -2566,7 +2586,7 @@ export def into_tone_format []: record -> record {
 # The input data should be in the form of a book and a list of tracks.
 # The returned records will contain the metadata for tone under the metadata key.
 # The other key, file, will contain the path to the track on disk.
-export def tracks_into_tone_format []: record -> list<record> {
+export def tracks_into_tone_format []: record<book: record, tracks: table> -> table<metadata: record<meta: record>, file: path> {
   let metadata = $in
   $metadata.tracks | par-each {|track|
     {
@@ -2590,39 +2610,50 @@ export def tracks_into_tone_format []: record -> list<record> {
 # Returns a record containing the duration and the fingerprint.
 export def fpcalc []: list<path> -> table<file: path, fingerprint: string, duration: duration> {
   $in | par-each {|file|
-    let track = ^fpcalc -json $file | from json
-    (
-      $track
-      | update duration ($track.duration * 1000 | into int | into duration --unit ms)
-      | insert file $file
-    )
+    let file = $file | path expand
+    let result = do {^fpcalc -json $file} | complete
+    if $result.exit_code != 0 {
+      log error $"Error running '^fpcalc -json ($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      return null
+    }
+    let track = $result.stdout | from json
+    {
+      file: $file
+      fingerprint: $track.fingerprint
+      duration: (($track.duration * 1000) | math round | into duration --unit ms)
+    }
   }
 }
 
 # Tag an audio file with tone using the provided metadata
 export def tone_tag [
-  audio_file: path
-  working_directory: directory
-  # chapters_file: path = ""
-  # cover_file: path = ""
+  file: path
   ...tone_args: string
 ]: record -> path {
   let metadata = $in
-  let tone_json = $working_directory | path join "tone.json"
+  let tone_json = mktemp --suffix ".json" --tmpdir
   $metadata | save --force $tone_json
-  (
-    ^tone tag
-        # todo When tone is new enough?
-        # --id $isbn | amazon_asin | audible_asin?
-        # --meta-chapters-file $chapters_file
-        # --meta-cover-file $cover_file
-        --meta-tone-json-file $tone_json
-        # --meta-remove-property "comment"
-        ...$tone_args
-        $audio_file
-  )
+  let result = do {
+    (
+      ^tone tag
+          # todo When tone is new enough?
+          # --id $isbn | amazon_asin | audible_asin?
+          # --meta-chapters-file $chapters_file
+          # --meta-cover-file $cover_file
+          --meta-tone-json-file $tone_json
+          # --meta-remove-property "comment"
+          ...$tone_args
+          $file
+    )
+  } | complete
+  if $result.exit_code != 0 {
+    log error $"Error running '^tone tag --meta-tone-json-file ($tone_json) (...$tone_args) ($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    return null
+  }
+
   rm $tone_json
-  $audio_file
+
+  $file
 }
 
 # Tag audio files with tone using the provided metadata
@@ -2630,9 +2661,8 @@ export def tone_tag_tracks [
   working_directory: directory
   ...tone_args: string
 ]: record -> list<path> {
-  let metadata = $in
-  $metadata | tracks_into_tone_format | par-each {|track|
-    $track.metadata | tone_tag $track.file $working_directory ...$tone_args
+  $in | tracks_into_tone_format | par-each {|track|
+    $track.metadata | tone_tag $track.file ...$tone_args
   }
 }
 
@@ -2800,12 +2830,22 @@ export def fetch_release_ids_by_acoustid_fingerprint [
   let input = $in
   let url = "https://api.acoustid.org/v2/lookup"
 
+  let duration_seconds = ($input.duration / 1sec) | math round
+  let payload = $"format=json&meta=recordingids+releaseids&client=($client_key)&fingerprint=($input.fingerprint)&duration=($duration_seconds)"
   let request = {||
-    $"format=json&meta=recordingids+releaseids&client=($client_key)&fingerprint=($input.fingerprint)&duration=($input.duration | format duration sec | split row ' ' | first | into float | math round)"
+    $payload
     | ^gzip --stdout
     | http post --content-type application/x-www-form-urlencoded --full --headers [Content-Encoding gzip] $url
   }
-  let response = retry_http $request $retries $retry_delay
+
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error looking up AcoustID fingerprint at ($url) with payload ($payload): ($error.debug.msg)"
+      return null
+    }
+  )
 
   if ($response.status != 200) {
     return {file: $input.file, "http_response": $response, result: null}
@@ -2833,11 +2873,11 @@ export def fetch_release_ids_by_acoustid_fingerprints [
   $in | chunks $api_requests_per_second | each {|chunk|
     let matches = (
       $chunk | par-each {|fingerprint|
-        mut status = 200
-        for $retry in 1..$retries {
-
-        }
         let result = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key --retries $retries --retry-delay $retry_delay
+        if $result == null {
+          log error $"Failed to lookup AcoustID fingerprint on the AcoustID server."
+          return null
+        }
         if $result.http_response.status != 200 {
           if $result.http_response.status in [401 403] {
             log error $"Failed to lookup AcoustID fingerprint on the AcoustID server. HTTP status code ($result.http_response.status). Check the client API key is correct."
@@ -3282,6 +3322,9 @@ export def parse_musicbrainz_release []: record -> record {
         | upsert_if_value narrators $narrators
         | upsert_if_value writers $writers
         | upsert_if_value duration $length
+        # AcoustID metadata may be supplemented in the provided track metadata
+        | upsert_if_present acoustid_fingerprint $track
+        | upsert_if_present acoustid_track_id $track
       )
     }
     | sort-by index
@@ -3423,26 +3466,34 @@ export def fetch_and_parse_musicbrainz_release [
 }
 
 
-# Calculate and embed the AcoustID fingerprints for the audio files which do not have one.
-export def embed_acoustid_fingerprint [
-  --ignore-existing # Recalculate the AcoustID even when the tag exists
-]: list<path> -> list<path> {
+# Get the embedded AcoustID fingerprint or calculate it for the audio files which do not have one.
+export def get_acoustid_fingerprint [
+  ignore_existing = false # Recalculate the AcoustID even when the tag exists
+]: list<path> -> table<file: path, fingerprint: string, duration: duration> {
   let files = $in
   $files | par-each {|file|
+    let metadata = $file | parse_audiobook_metadata_from_file
     let fingerprint = (
-      if not $ignore_existing {
-        $file
-        | parse_audiobook_metadata_from_file
-        | get --ignore-errors track.acoustid_fingerprint
+      if (
+        not $ignore_existing
+        and "acoustid_fingerprint" in $metadata.track
+        and ($metadata.track.acoustid_fingerprint | is-not-empty)
+        and "duration" in $metadata.track
+        and ($metadata.track.duration | is-not-empty)
+      ) {
+        {
+          file: $file
+          fingerprint: $metadata.track.acoustid_fingerprint
+          duration: $metadata.track.duration
+        }
       }
     )
     if ($fingerprint | is-empty) {
-      let fingerprint = [$file] | fpcalc
-      ^tone tag --meta-additional-field $"acoustid Fingerprint=($fingerprint)"
+      [$file] | fpcalc | first
+    } else {
+      $fingerprint
     }
   }
-
-  $files
 }
 
 # Tag the files of an audiobook using their AcoustID fingerprints.
@@ -3453,29 +3504,26 @@ export def tag_audiobook_from_acoustid [
   client_key: string # The application API key for the AcoustID server
   working_directory
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
+  --ignore-existing-acoustid-fingerprints # Recalculate AcoustID fingerprints for all files
   --threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
   --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
   # --working-directory: directory
 ]: nothing -> list<path> {
+  let acoustid_fingerprints = (
+    $audiobook_files | get_acoustid_fingerprint $ignore_existing_acoustid_fingerprints
+  )
+  log info $"acoustid_fingerprints: ($acoustid_fingerprints)"
   let acoustid_responses = (
-    $audiobook_files
-    | embed_acoustid_fingerprint
-    | each {|file|
-      let metadata = $file | parse_audiobook_metadata_from_file
-      {
-        file: $file
-        fingerprint: $metadata.track.acoustid_fingerprint
-        duration: $metadata.track.duration
-      }
-    }
+    $acoustid_fingerprints
     | fetch_release_ids_by_acoustid_fingerprints $client_key $threshold $fail_fast $api_requests_per_second --retries $retries --retry-delay $retry_delay
   )
   if ($acoustid_responses | is-empty) {
     log error "AcoustID responses missing"
     return null
   }
+  log info $"acoustid_responses: ($acoustid_responses)"
   let release_ids = $acoustid_responses | determine_releases_from_acoustid_fingerprint_matches
   if ($release_ids | is-empty) {
     log error "No common release ids found for the AcoustID fingerprints"
@@ -3510,20 +3558,41 @@ export def tag_audiobook_from_acoustid [
     log info "Failed to link each AcoustID track to exactly one recording for the release"
     return null
   }
-  let file_recording_pairs = $track_recordings_for_release | flatten | rename file acoustid_track_id musicbrainz_recording_id | select file musicbrainz_recording_id
-  $file_recording_pairs | tag_audiobook_files_by_musicbrainz_release_id ($release_ids | first) $working_directory
+  let file_metadata = (
+    $track_recordings_for_release
+    | flatten
+    | rename file acoustid_track_id musicbrainz_recording_id
+    | select file acoustid_track_id musicbrainz_recording_id
+    | join $acoustid_fingerprints file
+    | rename file acoustid_track_id musicbrainz_recording_id acoustid_fingerprint duration
+    | par-each {|track|
+      {
+        file: $track.file
+        acoustid_track_id: $track.acoustid_track_id
+        acoustid_fingerprint: $track.acoustid_fingerprint
+        musicbrainz_recording_id: $track.musicbrainz_recording_id
+        audio_duration: $track.duration
+      }
+    }
+  )
+  log info $"file_metadata: ($file_metadata)"
+  $file_metadata | tag_audiobook_files_by_musicbrainz_release_id ($release_ids | first) $working_directory
 }
 
 # Tag the given audio files using the given MusicBrainz release id
 #
 # The individual audio files should be provided in a table as input.
-# The key "file" should be used for the path of each file on disk.
+# The file key should be used for the path of each file on disk.
 #
-# The table can also include a MusicBrainz Recording ID using the "musicbrainz_recording_id" key.
+# The table can also include the MusicBrainz Recording ID using the musicbrainz_recording_id key.
 # This ensures that each track is associated with the correct recording.
 # It's particularly useful for associating files with recordings using AcoustID fingerprints.
 # Without the MusicBrainz Recording ID, tracks must be provided in the correct order as they appear on the release.
 # The tracks will be checked against their expected durations in this case to ensure correctness.
+#
+# In addition to the musicbrainz_recording_id key, the acoustid_fingerprint, audio_duration, and acoustid_track_id tags can also be included.
+# The acoustid_fingerprint and acoustid_track_id will be embedded in the files with the other metadata.
+# The audio_duration value is used to avoid recalculating the duration of the audio.
 export def tag_audiobook_files_by_musicbrainz_release_id [
   release_id: string
   working_directory: directory
@@ -3538,24 +3607,36 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
   let metadata = (
     $release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
   )
-  # Add the file paths for each track
+  # log info $"audiobook_files: ($audiobook_files)"
+  # log info $"audiobook_files.metadata.track: ($audiobook_files.metadata.track)"
   let tracks = (
-    if "musicbrainz_recording_id" in ($audiobook_files | columns) {
+    if (
+      "musicbrainz_recording_id" in ($audiobook_files | columns)
+      and ($audiobook_files.musicbrainz_recording_id | is-not-empty)
+    ) {
+      log info "Joining!!!"
       $metadata.tracks | join $audiobook_files musicbrainz_recording_id
     } else {
-      let audiobook_files = (
+      let enumerated_audiobook_files = (
         $audiobook_files | enumerate | each {|f|
           {
-            index: $f.index
+            index: ($f.index + 1)
             file: $f.item.file
           }
         }
       )
-      $metadata.tracks | join $audiobook_files index
+      $metadata.tracks | join $enumerated_audiobook_files index
     }
   )
+  log info $"tracks: ($tracks)"
   for track in $tracks {
-    let duration = (tone dump --format json --query '$.audio.duration' $track.file | into int | into duration --unit ms)
+    let duration = (
+      if "audio_duration" in $track and ($track.audio_duration | is-not-empty) {
+        $track.audio_duration
+      } else {
+        $track.file | tone_dump | get audio.duration | into int | into duration --unit ms
+      }
+    )
     if ($track.duration - $duration | math abs) > $duration_threshold {
       log error $"The (ansi green)($track)(ansi reset) is ($duration) long, but the MusicBrainz track is ($track.duration) long, which is outside the acceptable duration threshold of ($duration_threshold)"
       return null
