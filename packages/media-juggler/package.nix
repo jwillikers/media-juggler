@@ -2,6 +2,7 @@
   # beets,
   calibre,
   cbconvert,
+  chromaprint,
   ffmpeg,
   file,
   image_optim,
@@ -80,6 +81,7 @@ else
       wrapProgram $out/bin/import-audiobooks.nu \
         --prefix PATH : ${
           lib.makeBinPath [
+            chromaprint
             ffmpeg
             image_optim
             # m4b-tool

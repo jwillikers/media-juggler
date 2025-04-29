@@ -1,7 +1,6 @@
 #!/usr/bin/env nu
 
 # todo Consider using bragibooks instead: https://github.com/djdembeck/bragibooks
-# todo Use tone and a JS script to query Audible?
 # tone can rename files as needed
 
 use std log
@@ -27,48 +26,38 @@ export def mp3_directory_to_m4b [
     $m4b
 }
 
-# const audible_workarounds = [
-#     [match apply];
-#     [
-#         {
-#             key: series.name
-#             value: "Rascal Does Not Dream Series"
-#         }
-#         {
-#             authors: ["Hajime Kamoshida"]
-#             translators: ["Andrew Cunningham"]
-#             illustrators: ["Keji Mizoguchi"]
-#         }
-#     ],
-# ]
-
-# export def apply_workarounds []: record -> record {
-#     let tone_json = $in
-#     let tone_json = (
-#         $audible_workarounds
-#         | reduce --fold $tone_json {|it, acc|
-#             $acc
-#             | where $it.match.key == $it.match.value
-#             | update
-#         }
-#     )
-#     $tone_json
-# }
-
-# todo Support getting values from MusicBrainz first and then falling back to Audible.
-# Audible's data is not the most accurate...
-#
 # Can search based on details or use the id directly
 # http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/release/?query=('secondarytype:audiobook AND packaging:"None" AND artistname:\"Brandon Sanderson\" AND release:\"The Way of Kings\"' | url encode)" | get releases | sort-by --reverse score | first
 
-# Lookup a MusicBrainz release
-export def find_musicbrainz_release []: [record -> table] {
+# Lookup a MusicBrainz release given metadata for the tracks
+#
+#
+export def find_musicbrainz_release []: [list<record> -> table] {
   let metadata = $in
   let url = "https://musicbrainz.org/ws/2/release/"
-  let query = "primary-type:Other AND secondarytype:Audiobook"
+
+  # First, check if there is already a release MBID in the metadata.
+
+  # The release must be an Audiobook or Audio drama
+  let query = "primary-type:Other AND (secondarytype:Audiobook OR secondarytype:\"Audio drama\""
+
   let query = (
-    if "authors" in $metadata {
-      $query += $metadata.authors | reduce {|it, acc|
+    if "albumArtist" in $metadata {
+      $query += $" AND artist:\"($metadata.albumArtist)\""
+    } else {
+      $query
+    }
+  )
+  let query = (
+    let artists = (
+        ["artist" "composer" "narrator"] | each {|type|
+            if $type in $metadata {
+                $metadata | get $type | split row "," | str trim
+            }
+        }
+    );
+    if ($artists | is-not-empty) {
+      $query += $artists | reduce {|it, acc|
         $acc + $" AND artistname:\"($it)\""
       }
     } else {
@@ -76,15 +65,24 @@ export def find_musicbrainz_release []: [record -> table] {
     }
   )
   let query = (
-    if "country" in $metadata {
-      $query += $" AND country:($metadata.country)"
+    if "recordingDate" in $metadata {
+      $query += $" AND date:($metadata.data | into datetime | format date '%Y-%m-%d')"
+    } else if "originalyear" in $metadata.additionalFields {
+      $query += $" AND date:($metadata.additionalFields.originalyear)"
     } else {
       $query
     }
   )
   let query = (
-    if "isbn" in $metadata {
-      $query += $" AND barcode:($metadata.isbn)"
+    if "musicBrainz Album Release Country" in $metadata.additionalFields {
+      $query += $" AND country:($metadata.'musicBrainz Album Release Country')"
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "barcode" in $metadata.additionalFields {
+      $query += $" AND barcode:($metadata.additionalFields.barcode)"
     } else {
       $query
     }
@@ -97,66 +95,33 @@ export def find_musicbrainz_release []: [record -> table] {
     }
   )
   let query = (
-    if "title" in $metadata {
-      $query += $" AND release:\"($metadata.title)\""
+    if "album" in $metadata {
+      $query += $" AND release:\"($metadata.album)\""
     } else {
       $query
     }
   )
+
+  # Must search for recording using acoustid
+#   let query = (
+#     if "acoustid Fingerprint" in $metadata {
+#       $query += $" AND :\"($metadata.title)\""
+#     } else {
+#       $query
+#     }
+#   )
+
+  # todo Distributor = Libro.fm if in comment
+  # todo Number of tracks
+  # todo Track length
+  # todo Acoustid
+  # todo recordingDate == release Date
+
   let query = $query | url encode
 
   http get --headers [Accept "application/json"] $"($url)?query=($query)" | get releases | sort-by --reverse score
-}
 
-# Get the release groups to which a release belongs
-export def get_musicbrainz_release_groups_for_release []: string -> table {
-  let release_id = $in
-  let url = "https://musicbrainz.org/ws/2/release-group/"
-  let query = $"reid:($release_id)" | url encode
-  http get --headers [Accept "application/json"] $"($url)/?query=($query)"
-}
-
-# Fetch a release group from MusicBrainz by ID
-export def get_musicbrainz_release_group []: string -> record {
-  let release_group_id = $in
-  let url = "https://musicbrainz.org/ws/2/release-group"
-  http get --headers [Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"
-}
-
-# Get the Release series groups to which a release group belongs
-export def get_series_from_release_group []: record -> record {
-  # let release_group_id =
-  let release_group_series = (
-    $in
-    | get relations
-    | where series.type == "Release group series"
-    | where type == "part of"
-  )
-  if ($release_group_series | is-empty) {
-    return null
-  }
-  if ($release_group_series | length) > 1 {
-    log info "Parsed multiple release group series. Using the first one."
-  }
-
-  let release_group_series = $release_group_series | first
-  let series_name = $release_group_series.series.name
-  let series_name = (
-    if $series_name =~ '.+, read by .+' {
-      $series_name | str substring 0..(($series_name | str index-of ", read by ") - 1)
-    } else {
-      $series_name
-    }
-  )
-
-  if "ordering-key" not-in $release_group_series {
-    return {name: $series_name}
-  }
-
-  {
-    name: $series_name
-    number: $release_group_series.ordering-key
-  }
+    # filter based on distributor where $comment contains "Libro.fm"
 }
 
 # todo Add function to get series using the Work series from the work associated with a recording
@@ -164,7 +129,9 @@ export def get_series_from_release_group []: record -> record {
 # todo Get artist en alias?  http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/artist/616f49c8-b33a-4de9-80c6-d99a4a74184e/?inc=aliases"
 
 # Get the metadata for an Audiobook using MusicBrainz
-export def get_audiobook_metadata_from_musicbrainz []: record -> record {
+#
+# Takes a list of records where each record is the metadata of a track
+export def get_audiobook_metadata_from_musicbrainz []: list<record> -> record {
   let audiobook_metadata = $in
   let releases = $audiobook_metadata | find_musicbrainz_release | where score >= 90
   if ($releases | is-empty) {
@@ -176,32 +143,41 @@ export def get_audiobook_metadata_from_musicbrainz []: record -> record {
   }
   let release = $releases | first
 
-  let release_groups = $release.id | get_musicbrainz_release_groups_for_release
+  let release_groups = $release.id | fetch_musicbrainz_release_group_for_release
   if ($release_groups | is-empty) {
     log debug $"No release groups for release ($release.id)"
   } else if ($release_groups | length) > 1 {
     log warning $"Multiple release groups found for the release ($release.id). Using the first one."
   }
-  let release_group = $release_groups | first | get id | get_musicbrainz_release_group
+  let release_group = $release_groups | first | get id | fetch_musicbrainz_release_group
 
-  let series = $release_group | get_series_from_release_group
+  # todo Add work-series as well.
+  let series = $release_group | parse_series_from_release_group
+
   let chapters = $release | get media | chapters_from_musicbrainz_release_media
 
   # todo
-  # let authors =
-  # let narrators =
+  # let authors = authors_from release
+  # let narrators = narrators_from_release
 
   {
-    # authors: $authors from artist-credit
+    # https://www.audiobookshelf.org/docs#book-audio-metadata
+    # authors: $authors should be taken from associated works first, and if not that, then the from artist-credit
+    # Use name as it appears in the artist credit when present
     chapters: $chapters
-    # cover
+    # cover image from release
     date: $release.date
     # disambiguation?
+    # Assume the first label is the publisher... if there is no label, use the publisher relationship on the release if available
+    # publisher: $label
+    # narrators: narrators from spoken-vocal relationships on all recordings or parsed from artist-credit (narrated by, read by, performed by)
+    # year: release year, just parse this from the release date
     # labels (tags)
     # country
     # language?
+    # todo embed for Amazon releases the ASIN
     musicbrainz_id: $release.id
-    series: $series
+    series: $series # Can tone support multiple?
     title: $release.title
   } | (
     let i = $in;
@@ -390,8 +366,7 @@ export def tag_audiobook [
                 artist: ($authors | str join ";")
                 composer: ($r.narrators | get name | str join ";")
                 description: $r.description
-                # todo Is language used at all?
-                # language: $r.language
+                language: $r.language
                 narrator: ($r.narrators | get name | str join ";")
                 publisher: $r.publisherName
                 publishingDate: $r.releaseDate
@@ -703,10 +678,9 @@ export def embed_cover []: record<cover: path, m4b: path> -> path {
 #
 def main [
     ...files: string # The paths to M4A and M4B files to tag and upload. Prefix paths with "minio:" to download them from the MinIO instance
-    --asin: string
-    --beets-config: path # The Beets config file to use
-    --beets-directory: directory
-    --beets-library: path # The Beets library to use
+    # --asin: string
+    # --isbn: string
+    # --musicbrainz-release-id: string
     --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
     --delete # Delete the original file
     --minio-alias: string = "jwillikers" # The alias of the MinIO server used by the MinIO client application
@@ -738,17 +712,8 @@ def main [
 
     log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
-    let temporary_directory = (mktemp --directory "import-audiobooks.XXXXXXXXXX")
-    log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
-
-    let beets_directory = (
-        if $beets_directory == null {
-            [$env.HOME "Books" "Audiobooks"] | path join
-        } else {
-            $beets_directory
-        }
-    )
-    mkdir $beets_directory
+    let working_directory = (mktemp --directory "import-audiobooks.XXXXXXXXXX")
+    log info $"Using the temporary directory (ansi yellow)($working_directory)(ansi reset)"
 
     let audible_activation_bytes = (
         if $audible_activation_bytes != null {
@@ -765,11 +730,11 @@ def main [
     let file = (
         if ($original_file | str starts-with "minio:") {
             let file = ($original_file | str replace "minio:" "")
-            ^mc cp $file $"($temporary_directory)/($file | path basename)"
-            [$temporary_directory ($file | path basename)] | path join
+            ^mc cp $file $"($working_directory)/($file | path basename)"
+            [$working_directory ($file | path basename)] | path join
         } else {
-            cp $original_file $temporary_directory
-            [$temporary_directory ($original_file | path basename)] | path join
+            cp $original_file $working_directory
+            [$working_directory ($original_file | path basename)] | path join
         }
     )
 
@@ -787,16 +752,6 @@ def main [
         }
     )
 
-    let beets_library = (
-        if $beets_library == null {
-            let library_directory = [$env.HOME ".local" "share" "beets-audible"] | path join
-            mkdir $library_directory
-            [$library_directory "library.db"] | path join
-        } else {
-            $beets_library
-        }
-    )
-
     let audiobook = (
         # Assume AAX files are from Audible and require decryption.
         if $input_format == "aax" {
@@ -804,24 +759,24 @@ def main [
                 log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
                 exit 1
             }
-            $file | decrypt_audible $audible_activation_bytes --working-directory $temporary_directory
+            $file | decrypt_audible $audible_activation_bytes --working-directory $working_directory
         } else if $input_format in ["m4a", "m4b"] {
             $file
         } else if $input_format == "dir" {
-            $file | mp3_directory_to_m4b $temporary_directory
+            $file | mp3_directory_to_m4b $working_directory
         } else if $input_format == "zip" {
             $file
-            | unzip $temporary_directory
-            | mp3_directory_to_m4b $temporary_directory
+            | unzip $working_directory
+            | mp3_directory_to_m4b $working_directory
         } else {
             log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
             exit 1
         }
         | (
             if $asin == null {
-                tag_audiobook --tone-tag-args $tone_tag_args $temporary_directory
+                tag_audiobook --tone-tag-args $tone_tag_args $working_directory
             } else {
-                tag_audiobook --asin $asin --tone-tag-args $tone_tag_args $temporary_directory
+                tag_audiobook --asin $asin --tone-tag-args $tone_tag_args $working_directory
             }
         )
     )
@@ -844,7 +799,7 @@ def main [
     # let current_metadata = ^tone dump --format json $audiobook | from json | get meta
 
     let authors_subdirectory = (
-        $audiobook | path dirname | path relative-to $temporary_directory
+        $audiobook | path dirname | path relative-to $working_directory
     )
     let minio_target_directory =  [$minio_alias $minio_path $authors_subdirectory] | path join | sanitize_minio_filename
     let minio_target_destination = (
@@ -873,8 +828,8 @@ def main [
             rm $original_file
         }
     }
-    log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
-    rm --force --recursive $temporary_directory
+    log debug $"Removing the working directory (ansi yellow)($working_directory)(ansi reset)"
+    rm --force --recursive $working_directory
 
     # } catch {
     #     log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
