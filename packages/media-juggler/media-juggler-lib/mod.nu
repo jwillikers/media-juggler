@@ -2825,7 +2825,7 @@ export def retry_http [
 #
 # Requires an AcoustID application API key.
 export def fetch_release_ids_by_acoustid_fingerprint [
-  client_key: string # The application API key for the AcoustID server
+  client_key: string # The application API key for the AcoustID server. Stored in the environment variable MEDIA_JUGGLER_ACOUSTID_CLIENT_KEY
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
 ]: record<file: path, duration: duration, fingerprint: string> -> record<file: path, http_response: table, result: table<id: string, recordings: table<id: string, releases: table<id: string>>, score: float>> {
@@ -3635,7 +3635,6 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
       "musicbrainz_recording_id" in ($audiobook_files | columns)
       and ($audiobook_files.musicbrainz_recording_id | is-not-empty)
     ) {
-      log info "Joining!!!"
       $metadata.tracks | join $audiobook_files musicbrainz_recording_id
     } else {
       let enumerated_audiobook_files = (
@@ -3649,7 +3648,7 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
       $metadata.tracks | join $enumerated_audiobook_files index
     }
   )
-  log info $"tracks: ($tracks)"
+  # log info $"tracks: ($tracks)"
   for track in $tracks {
     let duration = (
       if "audio_duration" in $track and ($track.audio_duration | is-not-empty) {
