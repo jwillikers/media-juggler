@@ -1,89 +1,219 @@
 {
-  "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
-  "cover-art-archive": {
-    "artwork": true,
-    "darkened": false,
-    "back": false,
-    "count": 1,
-    "front": true
-  },
-  "country": "XW",
-  "disambiguation": "Audible aax",
-  "date": "2024-05-14",
-  "packaging": "None",
-  "asin": "B0CRSJ8RQV",
   "text-representation": {
-    "language": "eng",
-    "script": "Latn"
+    "script": "Latn",
+    "language": "eng"
   },
+  "relations": [
+    {
+      "ended": false,
+      "attribute-values": {},
+      "type-id": "a6029157-d96b-4dc3-9f73-f99f76423d11",
+      "target-type": "artist",
+      "attributes": [],
+      "type": "illustration",
+      "attribute-ids": {},
+      "target-credit": "Katsumi Enami",
+      "begin": null,
+      "direction": "backward",
+      "end": null,
+      "artist": {
+        "name": "エナミカツミ",
+        "sort-name": "Enami, Katsumi",
+        "type": "Person",
+        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+        "id": "9d82c45c-5383-4e19-b868-516ce05d3e60",
+        "country": "JP",
+        "disambiguation": "illustrator"
+      },
+      "source-credit": ""
+    },
+    {
+      "source-credit": "",
+      "label": {
+        "type": "Distributor",
+        "sort-name": "Audible Inc.",
+        "name": "Audible Inc.",
+        "label-code": null,
+        "type-id": "53ab8dcc-9946-3b62-966e-7634d78e5034",
+        "id": "926e2da3-af75-4571-8159-fcceb8a0aed3",
+        "disambiguation": "not an imprint"
+      },
+      "begin": null,
+      "target-credit": "",
+      "end": null,
+      "direction": "backward",
+      "attribute-ids": {},
+      "attributes": [],
+      "type": "distributed",
+      "target-type": "label",
+      "type-id": "4f89b0a1-e135-41e4-94a7-e3d2a95f31a1",
+      "ended": false,
+      "attribute-values": {}
+    },
+    {
+      "attribute-ids": {},
+      "source-credit": "",
+      "end": null,
+      "direction": "forward",
+      "target-credit": "",
+      "begin": null,
+      "attribute-values": {},
+      "ended": false,
+      "type": "amazon asin",
+      "attributes": [],
+      "url": {
+        "id": "f747d3f6-58cf-4a88-b168-20134648bd4f",
+        "resource": "https://www.amazon.com/gp/product/B0CRSJ8RQV"
+      },
+      "target-type": "url",
+      "type-id": "4f2e710d-166c-480c-a293-2e2c8d658d87"
+    },
+    {
+      "begin": null,
+      "target-credit": "",
+      "direction": "forward",
+      "end": null,
+      "source-credit": "",
+      "attribute-ids": {},
+      "target-type": "url",
+      "type-id": "63b84620-ba52-4630-9bfe-8ad3b5504dff",
+      "url": {
+        "resource": "https://bookbrainz.org/edition/455411e1-b665-425e-b33d-ea3e5eed5874",
+        "id": "3d290c21-a026-44eb-a8d0-c22998f0f031"
+      },
+      "attributes": [],
+      "type": "BookBrainz",
+      "ended": false,
+      "attribute-values": {}
+    },
+    {
+      "attribute-ids": {},
+      "source-credit": "",
+      "begin": null,
+      "target-credit": "",
+      "direction": "forward",
+      "end": null,
+      "ended": false,
+      "attribute-values": {},
+      "attributes": [],
+      "type": "other databases",
+      "type-id": "c74dee45-3c85-41e9-a804-92ab1c654446",
+      "target-type": "url",
+      "url": {
+        "id": "29269931-9291-4474-9b93-0a5405cec8a8",
+        "resource": "https://openlibrary.org/books/OL57508318M"
+      }
+    },
+    {
+      "source-credit": "",
+      "direction": "forward",
+      "end": null,
+      "target-credit": "",
+      "begin": null,
+      "attribute-ids": {},
+      "type": "other databases",
+      "attributes": [],
+      "url": {
+        "id": "907d5aff-fef9-4f46-a4d2-13e14a8999a3",
+        "resource": "https://www.goodreads.com/book/show/228770230"
+      },
+      "type-id": "c74dee45-3c85-41e9-a804-92ab1c654446",
+      "target-type": "url",
+      "attribute-values": {},
+      "ended": false
+    },
+    {
+      "attribute-values": {},
+      "ended": false,
+      "type": "purchase for download",
+      "attributes": [],
+      "url": {
+        "resource": "https://www.audible.com/pd/B0CRSPBW6X",
+        "id": "4fba5998-eea0-4101-9127-506ea92a6291"
+      },
+      "target-type": "url",
+      "type-id": "98e08c20-8402-4163-8970-53504bb6a1e4",
+      "attribute-ids": {},
+      "source-credit": "",
+      "direction": "forward",
+      "end": null,
+      "begin": null,
+      "target-credit": ""
+    }
+  ],
+  "id": "64801f58-229a-49f9-9d2d-6a44684ebe38",
   "media": [
     {
       "track-count": 1,
+      "title": "",
+      "format": "Digital Media",
+      "track-offset": 0,
+      "position": 1,
       "format-id": "907a28d9-b3b2-3ef6-89a8-7b18d91d4794",
       "tracks": [
         {
+          "position": 1,
+          "number": "1",
+          "id": "81c1f9ae-d00d-4ac3-8dd4-058369c94ae3",
           "recording": {
-            "video": false,
-            "genres": [],
             "length": 22996000,
-            "disambiguation": "",
-            "first-release-date": "2024-05-14",
-            "id": "7c7064d1-fd42-414c-a8d3-52cce1e58ad1",
+            "genres": [],
             "artist-credit": [
               {
-                "artist": {
-                  "name": "成田良悟",
-                  "id": "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab",
-                  "sort-name": "Narita, Ryōgo",
-                  "country": "JP",
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "disambiguation": "author",
-                  "type": "Person"
-                },
                 "joinphrase": " read by ",
+                "artist": {
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "name": "成田良悟",
+                  "sort-name": "Narita, Ryōgo",
+                  "type": "Person",
+                  "country": "JP",
+                  "disambiguation": "author",
+                  "id": "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab"
+                },
                 "name": "Ryohgo Narita"
               },
               {
                 "artist": {
-                  "sort-name": "Murray, Michael Butler",
-                  "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef",
-                  "name": "Michael Butler Murray",
-                  "type": "Person",
                   "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "type": "Person",
+                  "sort-name": "Murray, Michael Butler",
+                  "name": "Michael Butler Murray",
                   "disambiguation": "narrator",
-                  "country": null
+                  "country": null,
+                  "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef"
                 },
                 "joinphrase": "",
                 "name": "Michael Butler Murray"
               }
             ],
-            "title": "Baccano! Vol. 1: The Rolling Bootlegs",
+            "disambiguation": "",
+            "video": false,
             "relations": [
               {
+                "target-type": "artist",
+                "type-id": "68330a36-44cf-4fa2-84e8-533c6fe3fc23",
                 "attributes": [
                   "task"
                 ],
+                "type": "misc",
+                "ended": false,
                 "attribute-values": {
                   "task": "production supervised by"
                 },
-                "end": null,
-                "type": "misc",
-                "direction": "backward",
-                "source-credit": "",
-                "ended": false,
-                "type-id": "68330a36-44cf-4fa2-84e8-533c6fe3fc23",
-                "artist": {
-                  "country": "US",
-                  "type": "Person",
-                  "disambiguation": "audiobook director, producer",
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "id": "92d588fb-9bf9-4ba6-b33f-80e6a099a813",
-                  "sort-name": "Maitra, Deboleena",
-                  "name": "Deboleena Maitra"
-                },
-                "target-type": "artist",
                 "begin": null,
                 "target-credit": "",
+                "artist": {
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "name": "Deboleena Maitra",
+                  "sort-name": "Maitra, Deboleena",
+                  "type": "Person",
+                  "country": "US",
+                  "disambiguation": "audiobook director, producer",
+                  "id": "92d588fb-9bf9-4ba6-b33f-80e6a099a813"
+                },
+                "direction": "backward",
+                "end": null,
+                "source-credit": "",
                 "attribute-ids": {
                   "task": "39867b3b-0f1e-40d5-b602-4f3936b7f486"
                 }
@@ -92,217 +222,293 @@
                 "attribute-ids": {
                   "spoken vocals": "d3a36e62-a7c4-4eb9-839f-adfebe87ac12"
                 },
-                "type-id": "0fdbe3c6-7700-4a31-ae54-b53f06ae1cfa",
-                "ended": false,
+                "source-credit": "",
+                "direction": "backward",
+                "end": null,
                 "artist": {
-                  "name": "Michael Butler Murray",
-                  "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef",
-                  "sort-name": "Murray, Michael Butler",
-                  "disambiguation": "narrator",
                   "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
                   "type": "Person",
-                  "country": null
+                  "sort-name": "Murray, Michael Butler",
+                  "name": "Michael Butler Murray",
+                  "disambiguation": "narrator",
+                  "country": null,
+                  "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef"
                 },
-                "target-type": "artist",
-                "target-credit": "",
                 "begin": null,
-                "direction": "backward",
-                "attribute-credits": {},
-                "source-credit": "",
+                "target-credit": "",
                 "attribute-values": {},
+                "ended": false,
+                "type": "vocal",
                 "attributes": [
                   "spoken vocals"
                 ],
-                "type": "vocal",
-                "end": null
+                "type-id": "0fdbe3c6-7700-4a31-ae54-b53f06ae1cfa",
+                "attribute-credits": {},
+                "target-type": "artist"
               },
               {
-                "direction": "forward",
-                "source-credit": "",
-                "type": "performance",
+                "ended": false,
+                "attribute-values": {
+                  "task": "produced by and post-production by"
+                },
+                "target-type": "label",
+                "type-id": "57935ae5-9f21-47bc-9854-0fa5d1a56696",
+                "attributes": [
+                  "task"
+                ],
+                "type": "misc",
+                "attribute-ids": {
+                  "task": "39867b3b-0f1e-40d5-b602-4f3936b7f486"
+                },
+                "begin": null,
+                "target-credit": "",
+                "direction": "backward",
                 "end": null,
+                "source-credit": "",
+                "label": {
+                  "label-code": null,
+                  "type-id": "a2426aab-2dd4-339c-b47d-b4923a241678",
+                  "sort-name": "Lepton Productions",
+                  "type": "Production",
+                  "name": "Lepton Productions",
+                  "disambiguation": "",
+                  "id": "44667f89-6f68-4f43-8010-755a9fb91e63"
+                }
+              },
+              {
+                "source-credit": "",
+                "label": {
+                  "disambiguation": "",
+                  "id": "608ea796-44de-4cf2-9b2c-45a797bbabfb",
+                  "type-id": "b6285b2a-3514-3d43-80df-fcf528824ded",
+                  "label-code": null,
+                  "name": "Yen Audio",
+                  "type": "Imprint",
+                  "sort-name": "Yen Audio"
+                },
+                "end": "2024",
+                "direction": "backward",
+                "target-credit": "",
+                "begin": "2024",
+                "attribute-ids": {},
+                "type": "phonographic copyright",
                 "attributes": [],
+                "type-id": "fd841726-ba3c-47f7-af8e-6734ab6243ff",
+                "target-type": "label",
                 "attribute-values": {},
+                "ended": true
+              },
+              {
+                "attribute-ids": {},
+                "source-credit": "",
+                "direction": "forward",
+                "end": null,
+                "target-credit": "",
                 "work": {
-                  "attributes": [],
-                  "type-id": "78a8e727-edc2-35b9-8829-a46111ef6df9",
                   "disambiguation": "light novel, English",
-                  "languages": [
-                    "eng"
-                  ],
-                  "type": "Prose",
-                  "language": "eng",
                   "id": "4b5f1fcc-1765-43c3-89f9-a20998cfb5a4",
-                  "iswcs": [],
-                  "title": "Baccano!, Vol. 1: The Rolling Bootlegs",
                   "relations": [
                     {
+                      "source-credit": "",
                       "artist": {
                         "type": "Person",
-                        "disambiguation": "translator",
-                        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                        "country": null,
                         "sort-name": "Engel, Taylor",
+                        "name": "Taylor Engel",
+                        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
                         "id": "5cfde560-3992-4706-9fad-fc20c11c97fa",
-                        "name": "Taylor Engel"
+                        "disambiguation": "translator",
+                        "country": null
                       },
-                      "type-id": "da6c5d8a-ce13-474d-9375-61feb29039a5",
-                      "ended": false,
+                      "direction": "backward",
+                      "end": null,
                       "target-credit": "",
                       "begin": null,
-                      "target-type": "artist",
                       "attribute-ids": {},
-                      "end": null,
                       "type": "translator",
                       "attributes": [],
-                      "attribute-values": {},
-                      "direction": "backward",
-                      "source-credit": ""
-                    },
-                    {
-                      "begin": null,
-                      "target-credit": "Ryōgo Narita",
                       "target-type": "artist",
-                      "artist": {
-                        "country": "JP",
-                        "type": "Person",
-                        "disambiguation": "author",
-                        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                        "id": "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab",
-                        "sort-name": "Narita, Ryōgo",
-                        "name": "成田良悟"
-                      },
-                      "type-id": "a255bca1-b157-4518-9108-7b147dc3fc68",
-                      "ended": false,
-                      "attribute-ids": {},
-                      "end": null,
-                      "type": "writer",
+                      "type-id": "da6c5d8a-ce13-474d-9375-61feb29039a5",
                       "attribute-values": {},
-                      "attributes": [],
-                      "source-credit": "",
-                      "direction": "backward"
+                      "ended": false
                     },
                     {
+                      "target-credit": "Ryōgo Narita",
+                      "begin": null,
+                      "artist": {
+                        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                        "name": "成田良悟",
+                        "type": "Person",
+                        "sort-name": "Narita, Ryōgo",
+                        "country": "JP",
+                        "disambiguation": "author",
+                        "id": "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab"
+                      },
+                      "direction": "backward",
                       "end": null,
-                      "type": "part of",
+                      "source-credit": "",
+                      "attribute-ids": {},
+                      "target-type": "artist",
+                      "type-id": "a255bca1-b157-4518-9108-7b147dc3fc68",
+                      "attributes": [],
+                      "type": "writer",
+                      "ended": false,
+                      "attribute-values": {}
+                    },
+                    {
+                      "type-id": "05ee6f18-4517-342d-afdf-5897f64276e3",
+                      "target-type": "label",
+                      "type": "publishing",
+                      "attributes": [],
+                      "attribute-values": {},
+                      "ended": false,
+                      "end": null,
+                      "direction": "backward",
+                      "target-credit": "",
+                      "begin": null,
+                      "label": {
+                        "type-id": "b6285b2a-3514-3d43-80df-fcf528824ded",
+                        "label-code": null,
+                        "name": "Yen On",
+                        "sort-name": "Yen On",
+                        "type": "Imprint",
+                        "disambiguation": "",
+                        "id": "89365dfe-7345-4362-ad21-926890f42b71"
+                      },
+                      "source-credit": "",
+                      "attribute-ids": {}
+                    },
+                    {
+                      "ordering-key": 1,
                       "attribute-values": {
                         "number": "1"
                       },
-                      "ordering-key": 1,
+                      "ended": false,
+                      "type": "part of",
                       "attributes": [
                         "number"
                       ],
                       "series": {
-                        "type": "Work series",
-                        "disambiguation": "light novel, English",
                         "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+                        "disambiguation": "light novel, English",
+                        "name": "Baccano!",
                         "id": "c7b56e90-fdc0-4324-a399-7a4c7b534c24",
-                        "name": "Baccano!"
+                        "type": "Work series"
                       },
-                      "source-credit": "",
-                      "direction": "backward",
-                      "target-credit": "",
-                      "begin": null,
-                      "target-type": "series",
-                      "ended": false,
                       "type-id": "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0",
+                      "target-type": "series",
                       "attribute-ids": {
                         "number": "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"
-                      }
-                    },
-                    {
-                      "attribute-ids": {},
-                      "target-type": "url",
-                      "target-credit": "",
-                      "begin": null,
-                      "ended": false,
-                      "type-id": "0ea7cf4e-93dd-4bc4-b748-0f1073cf951c",
-                      "source-credit": "",
-                      "direction": "backward",
-                      "url": {
-                        "id": "9edfaf35-77dc-4ad5-aa15-d048f8609b17",
-                        "resource": "https://bookbrainz.org/work/7269bea2-8a0d-4290-85e8-84701d37e8df"
                       },
-                      "attributes": [],
-                      "attribute-values": {},
-                      "type": "BookBrainz",
-                      "end": null
-                    },
-                    {
-                      "attribute-ids": {},
-                      "type-id": "190ea031-4355-405d-a43e-53eb4c5c4ada",
-                      "ended": false,
-                      "begin": null,
-                      "target-credit": "",
-                      "target-type": "url",
-                      "direction": "backward",
                       "source-credit": "",
                       "end": null,
+                      "direction": "backward",
+                      "begin": null,
+                      "target-credit": ""
+                    },
+                    {
+                      "ended": false,
+                      "attribute-values": {},
+                      "attributes": [],
+                      "type": "BookBrainz",
+                      "target-type": "url",
+                      "type-id": "0ea7cf4e-93dd-4bc4-b748-0f1073cf951c",
+                      "url": {
+                        "resource": "https://bookbrainz.org/work/7269bea2-8a0d-4290-85e8-84701d37e8df",
+                        "id": "9edfaf35-77dc-4ad5-aa15-d048f8609b17"
+                      },
+                      "attribute-ids": {},
+                      "source-credit": "",
+                      "target-credit": "",
+                      "begin": null,
+                      "end": null,
+                      "direction": "backward"
+                    },
+                    {
+                      "source-credit": "",
+                      "end": null,
+                      "direction": "backward",
+                      "begin": null,
+                      "target-credit": "",
+                      "attribute-ids": {},
                       "type": "other databases",
                       "attributes": [],
-                      "attribute-values": {},
                       "url": {
                         "resource": "https://openlibrary.org/works/OL20063674W",
                         "id": "3af06e6d-abea-4a88-92ed-a31fa91de29e"
-                      }
+                      },
+                      "type-id": "190ea031-4355-405d-a43e-53eb4c5c4ada",
+                      "target-type": "url",
+                      "attribute-values": {},
+                      "ended": false
                     },
                     {
-                      "type-id": "190ea031-4355-405d-a43e-53eb4c5c4ada",
                       "ended": false,
-                      "target-credit": "",
-                      "begin": null,
-                      "target-type": "url",
-                      "attribute-ids": {},
-                      "end": null,
-                      "type": "other databases",
                       "attribute-values": {},
                       "attributes": [],
+                      "type": "other databases",
+                      "type-id": "190ea031-4355-405d-a43e-53eb4c5c4ada",
+                      "target-type": "url",
                       "url": {
-                        "id": "5793d54a-da24-4e88-815e-49feb9bc9cfd",
-                        "resource": "https://www.librarything.com/work/2912604"
+                        "resource": "https://www.librarything.com/work/2912604",
+                        "id": "5793d54a-da24-4e88-815e-49feb9bc9cfd"
                       },
+                      "attribute-ids": {},
+                      "source-credit": "",
+                      "target-credit": "",
+                      "begin": null,
                       "direction": "backward",
-                      "source-credit": ""
+                      "end": null
                     },
                     {
-                      "attribute-ids": {
-                        "translated": "ed11fcb1-5a18-4e1d-b12c-633ed19c8ee1"
-                      },
-                      "type-id": "7440b539-19ab-4243-8c03-4f5942ca2218",
-                      "ended": false,
-                      "begin": null,
-                      "target-credit": "",
-                      "target-type": "work",
-                      "direction": "backward",
-                      "source-credit": "",
-                      "end": null,
-                      "type": "other version",
                       "attribute-values": {},
+                      "ended": false,
+                      "type-id": "7440b539-19ab-4243-8c03-4f5942ca2218",
+                      "target-type": "work",
+                      "type": "other version",
                       "attributes": [
                         "translated"
                       ],
+                      "attribute-ids": {
+                        "translated": "ed11fcb1-5a18-4e1d-b12c-633ed19c8ee1"
+                      },
+                      "end": null,
+                      "direction": "backward",
                       "work": {
-                        "type": "Prose",
-                        "languages": [],
-                        "attributes": [],
-                        "type-id": "78a8e727-edc2-35b9-8829-a46111ef6df9",
                         "disambiguation": "light novel",
-                        "title": "バッカーノ！The Rolling Bootlegs",
                         "id": "50d14f23-c7ff-4810-ba16-c6bf1e0766dc",
+                        "type-id": "78a8e727-edc2-35b9-8829-a46111ef6df9",
+                        "title": "バッカーノ！The Rolling Bootlegs",
+                        "languages": [],
                         "iswcs": [],
-                        "language": null
-                      }
+                        "attributes": [],
+                        "language": null,
+                        "type": "Prose"
+                      },
+                      "target-credit": "",
+                      "begin": null,
+                      "source-credit": ""
                     }
-                  ]
+                  ],
+                  "iswcs": [],
+                  "title": "Baccano!, Vol. 1: The Rolling Bootlegs",
+                  "type-id": "78a8e727-edc2-35b9-8829-a46111ef6df9",
+                  "languages": [
+                    "eng"
+                  ],
+                  "type": "Prose",
+                  "attributes": [],
+                  "language": "eng"
                 },
-                "attribute-ids": {},
-                "ended": false,
-                "type-id": "a3005666-a872-32c3-ad06-98af558e99b0",
                 "begin": null,
-                "target-credit": "",
-                "target-type": "work"
+                "attribute-values": {},
+                "ended": false,
+                "type": "performance",
+                "attributes": [],
+                "target-type": "work",
+                "type-id": "a3005666-a872-32c3-ad06-98af558e99b0"
               }
             ],
+            "id": "7c7064d1-fd42-414c-a8d3-52cce1e58ad1",
             "tags": [
               {
                 "name": "adventure",
@@ -313,395 +519,133 @@
                 "name": "fantasy"
               },
               {
-                "count": 1,
-                "name": "fiction"
+                "name": "fiction",
+                "count": 1
               },
               {
-                "name": "historical fantasy",
-                "count": 1
+                "count": 1,
+                "name": "historical fantasy"
               },
               {
                 "count": 1,
                 "name": "light novel"
               },
               {
-                "name": "mystery",
-                "count": 1
+                "count": 1,
+                "name": "mystery"
               },
               {
                 "count": 1,
                 "name": "paranormal"
               },
               {
-                "name": "supernatural",
-                "count": 1
+                "count": 1,
+                "name": "supernatural"
               },
               {
                 "name": "unabridged",
                 "count": 1
               },
               {
-                "count": 1,
-                "name": "urban fantasy"
+                "name": "urban fantasy",
+                "count": 1
               }
-            ]
+            ],
+            "title": "Baccano! Vol. 1: The Rolling Bootlegs",
+            "first-release-date": "2024-05-14"
           },
-          "length": 22996000,
-          "number": "1",
-          "position": 1,
           "artist-credit": [
             {
+              "joinphrase": " read by ",
               "artist": {
-                "sort-name": "Narita, Ryōgo",
                 "id": "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab",
-                "name": "成田良悟",
-                "type": "Person",
                 "disambiguation": "author",
-                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                "country": "JP"
+                "country": "JP",
+                "type": "Person",
+                "sort-name": "Narita, Ryōgo",
+                "name": "成田良悟",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
               },
-              "name": "Ryohgo Narita",
-              "joinphrase": " read by "
+              "name": "Ryohgo Narita"
             },
             {
-              "joinphrase": "",
               "name": "Michael Butler Murray",
               "artist": {
                 "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                "disambiguation": "narrator",
-                "type": "Person",
-                "country": null,
                 "name": "Michael Butler Murray",
-                "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef",
-                "sort-name": "Murray, Michael Butler"
-              }
+                "type": "Person",
+                "sort-name": "Murray, Michael Butler",
+                "country": null,
+                "disambiguation": "narrator",
+                "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef"
+              },
+              "joinphrase": ""
             }
           ],
-          "id": "81c1f9ae-d00d-4ac3-8dd4-058369c94ae3",
+          "length": 22996000,
           "title": "Baccano! Vol. 1: The Rolling Bootlegs"
         }
-      ],
-      "format": "Digital Media",
-      "position": 1,
-      "track-offset": 0,
-      "title": ""
+      ]
     }
   ],
-  "release-group": {
-    "primary-type-id": "4fc3be2b-de1e-396b-a933-beb8f1607a22",
-    "secondary-type-ids": [
-      "499a387e-6195-333e-91c0-9592bfec535e"
-    ],
-    "secondary-types": [
-      "Audiobook"
-    ],
-    "primary-type": "Other",
-    "title": "Baccano! Vol. 1: The Rolling Bootlegs",
-    "tags": [
-      {
-        "name": "adventure",
-        "count": 1
-      },
-      {
-        "count": 1,
-        "name": "fantasy"
-      },
-      {
-        "name": "fiction",
-        "count": 1
-      },
-      {
-        "name": "historical fantasy",
-        "count": 1
-      },
-      {
-        "count": 1,
-        "name": "light novel"
-      },
-      {
-        "count": 1,
-        "name": "mystery"
-      },
-      {
-        "count": 1,
-        "name": "paranormal"
-      },
-      {
-        "name": "unabridged",
-        "count": 1
-      },
-      {
-        "count": 1,
-        "name": "urban fantasy"
-      }
-    ],
-    "first-release-date": "2024-05-14",
-    "id": "4b745bd7-49f7-46d7-bf47-52e9d27b121b",
-    "disambiguation": "light novel, English, unabridged",
-    "genres": [],
-    "relations": [
-      {
-        "ended": false,
-        "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
-        "target-type": "series",
-        "begin": null,
-        "target-credit": "",
-        "attribute-ids": {
-          "number": "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"
-        },
-        "attributes": [
-          "number"
-        ],
-        "ordering-key": 1,
-        "attribute-values": {
-          "number": "1"
-        },
-        "end": null,
-        "type": "part of",
-        "direction": "forward",
-        "source-credit": "",
-        "series": {
-          "type-id": "4c1c4949-7b6c-3a2d-9d54-a50a27e4fa77",
-          "disambiguation": "light novel, English, unabridged",
-          "type": "Release group series",
-          "name": "Baccano! read by Michael Butler Murray",
-          "id": "762cd100-5319-4f9e-8a97-c7f71ae66ad7"
-        }
-      },
-      {
-        "begin": null,
-        "target-credit": "",
-        "target-type": "url",
-        "ended": false,
-        "type-id": "5849de4a-78ae-4876-975d-2181107e70b7",
-        "attribute-ids": {},
-        "url": {
-          "resource": "https://yenpress.com/titles/9781975394127-baccano-vol-1",
-          "id": "1aba92d6-db72-4440-b1c2-5378ff55299f"
-        },
-        "type": "discography entry",
-        "end": null,
-        "attribute-values": {},
-        "attributes": [],
-        "source-credit": "",
-        "direction": "forward"
-      }
-    ],
-    "artist-credit": [
-      {
-        "artist": {
-          "type": "Person",
-          "disambiguation": "author",
-          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-          "country": "JP",
-          "sort-name": "Narita, Ryōgo",
-          "id": "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab",
-          "name": "成田良悟"
-        },
-        "name": "Ryohgo Narita",
-        "joinphrase": " read by "
-      },
-      {
-        "artist": {
-          "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef",
-          "sort-name": "Murray, Michael Butler",
-          "name": "Michael Butler Murray",
-          "type": "Person",
-          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-          "disambiguation": "narrator",
-          "country": null
-        },
-        "name": "Michael Butler Murray",
-        "joinphrase": ""
-      }
-    ]
-  },
-  "genres": [],
-  "quality": "normal",
-  "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+  "country": "XW",
+  "asin": "B0CRSJ8RQV",
   "barcode": null,
-  "status": "Official",
   "artist-credit": [
     {
       "name": "Ryohgo Narita",
-      "joinphrase": " read by ",
       "artist": {
         "tags": [],
-        "name": "成田良悟",
-        "sort-name": "Narita, Ryōgo",
-        "id": "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab",
-        "disambiguation": "author",
         "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-        "genres": [],
         "type": "Person",
-        "country": "JP"
-      }
+        "sort-name": "Narita, Ryōgo",
+        "name": "成田良悟",
+        "disambiguation": "author",
+        "genres": [],
+        "country": "JP",
+        "id": "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab"
+      },
+      "joinphrase": " read by "
     },
     {
-      "artist": {
-        "sort-name": "Murray, Michael Butler",
-        "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef",
-        "name": "Michael Butler Murray",
-        "tags": [],
-        "country": null,
-        "type": "Person",
-        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-        "disambiguation": "narrator",
-        "genres": []
-      },
       "name": "Michael Butler Murray",
+      "artist": {
+        "genres": [],
+        "country": null,
+        "disambiguation": "narrator",
+        "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef",
+        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+        "tags": [],
+        "name": "Michael Butler Murray",
+        "type": "Person",
+        "sort-name": "Murray, Michael Butler"
+      },
       "joinphrase": ""
     }
   ],
-  "relations": [
-    {
-      "attribute-ids": {},
-      "artist": {
-        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-        "disambiguation": "illustrator",
-        "type": "Person",
-        "country": "JP",
-        "name": "エナミカツミ",
-        "sort-name": "Enami, Katsumi",
-        "id": "9d82c45c-5383-4e19-b868-516ce05d3e60"
-      },
-      "type-id": "a6029157-d96b-4dc3-9f73-f99f76423d11",
-      "ended": false,
-      "begin": null,
-      "target-credit": "Katsumi Enami",
-      "target-type": "artist",
-      "direction": "backward",
-      "source-credit": "",
-      "type": "illustration",
-      "end": null,
-      "attributes": [],
-      "attribute-values": {}
-    },
-    {
-      "target-credit": "",
-      "begin": null,
-      "target-type": "url",
-      "type-id": "4f2e710d-166c-480c-a293-2e2c8d658d87",
-      "ended": false,
-      "attribute-ids": {},
-      "url": {
-        "id": "f747d3f6-58cf-4a88-b168-20134648bd4f",
-        "resource": "https://www.amazon.com/gp/product/B0CRSJ8RQV"
-      },
-      "type": "amazon asin",
-      "end": null,
-      "attributes": [],
-      "attribute-values": {},
-      "source-credit": "",
-      "direction": "forward"
-    },
-    {
-      "direction": "forward",
-      "source-credit": "",
-      "type": "BookBrainz",
-      "end": null,
-      "attributes": [],
-      "attribute-values": {},
-      "url": {
-        "id": "3d290c21-a026-44eb-a8d0-c22998f0f031",
-        "resource": "https://bookbrainz.org/edition/455411e1-b665-425e-b33d-ea3e5eed5874"
-      },
-      "attribute-ids": {},
-      "ended": false,
-      "type-id": "63b84620-ba52-4630-9bfe-8ad3b5504dff",
-      "begin": null,
-      "target-credit": "",
-      "target-type": "url"
-    },
-    {
-      "attribute-ids": {},
-      "ended": false,
-      "type-id": "c74dee45-3c85-41e9-a804-92ab1c654446",
-      "begin": null,
-      "target-credit": "",
-      "target-type": "url",
-      "direction": "forward",
-      "source-credit": "",
-      "type": "other databases",
-      "end": null,
-      "attribute-values": {},
-      "attributes": [],
-      "url": {
-        "resource": "https://openlibrary.org/books/OL57508318M",
-        "id": "29269931-9291-4474-9b93-0a5405cec8a8"
-      }
-    },
-    {
-      "type-id": "c74dee45-3c85-41e9-a804-92ab1c654446",
-      "ended": false,
-      "target-credit": "",
-      "begin": null,
-      "target-type": "url",
-      "attribute-ids": {},
-      "type": "other databases",
-      "end": null,
-      "attribute-values": {},
-      "attributes": [],
-      "url": {
-        "id": "907d5aff-fef9-4f46-a4d2-13e14a8999a3",
-        "resource": "https://www.goodreads.com/book/show/228770230"
-      },
-      "direction": "forward",
-      "source-credit": ""
-    },
-    {
-      "attribute-ids": {},
-      "target-credit": "",
-      "begin": null,
-      "target-type": "url",
-      "type-id": "98e08c20-8402-4163-8970-53504bb6a1e4",
-      "ended": false,
-      "source-credit": "",
-      "direction": "forward",
-      "url": {
-        "resource": "https://www.audible.com/pd/B0CRSPBW6X",
-        "id": "4fba5998-eea0-4101-9127-506ea92a6291"
-      },
-      "type": "purchase for download",
-      "end": null,
-      "attribute-values": {},
-      "attributes": []
-    }
-  ],
+  "cover-art-archive": {
+    "front": true,
+    "back": false,
+    "count": 1,
+    "artwork": true,
+    "darkened": false
+  },
   "label-info": [
     {
       "label": {
-        "label-code": null,
-        "type-id": "b6285b2a-3514-3d43-80df-fcf528824ded",
-        "disambiguation": "",
         "genres": [],
-        "type": "Imprint",
+        "disambiguation": "",
+        "id": "608ea796-44de-4cf2-9b2c-45a797bbabfb",
+        "tags": [],
+        "type-id": "b6285b2a-3514-3d43-80df-fcf528824ded",
+        "label-code": null,
         "name": "Yen Audio",
         "sort-name": "Yen Audio",
-        "id": "608ea796-44de-4cf2-9b2c-45a797bbabfb",
-        "tags": []
+        "type": "Imprint"
       },
       "catalog-number": null
     }
   ],
-  "release-events": [
-    {
-      "area": {
-        "type": null,
-        "iso-3166-1-codes": [
-          "XW"
-        ],
-        "disambiguation": "",
-        "type-id": null,
-        "sort-name": "[Worldwide]",
-        "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
-        "name": "[Worldwide]"
-      },
-      "date": "2024-05-14"
-    }
-  ],
-  "id": "64801f58-229a-49f9-9d2d-6a44684ebe38",
-  "title": "Baccano! Vol. 1: The Rolling Bootlegs",
   "tags": [
     {
       "name": "adventure",
@@ -724,12 +668,12 @@
       "count": 1
     },
     {
-      "name": "mystery",
-      "count": 1
+      "count": 1,
+      "name": "mystery"
     },
     {
-      "name": "paranormal",
-      "count": 1
+      "count": 1,
+      "name": "paranormal"
     },
     {
       "name": "unabridged",
@@ -739,5 +683,159 @@
       "count": 1,
       "name": "urban fantasy"
     }
-  ]
+  ],
+  "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+  "status": "Official",
+  "date": "2024-05-14",
+  "release-group": {
+    "artist-credit": [
+      {
+        "artist": {
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "sort-name": "Narita, Ryōgo",
+          "type": "Person",
+          "name": "成田良悟",
+          "disambiguation": "author",
+          "country": "JP",
+          "id": "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab"
+        },
+        "joinphrase": " read by ",
+        "name": "Ryohgo Narita"
+      },
+      {
+        "name": "Michael Butler Murray",
+        "joinphrase": "",
+        "artist": {
+          "id": "22c39a37-28b7-4ff2-aa0b-67f93279a1ef",
+          "disambiguation": "narrator",
+          "country": null,
+          "type": "Person",
+          "sort-name": "Murray, Michael Butler",
+          "name": "Michael Butler Murray",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+        }
+      }
+    ],
+    "primary-type": "Other",
+    "relations": [
+      {
+        "attribute-ids": {
+          "number": "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"
+        },
+        "begin": null,
+        "target-credit": "",
+        "end": null,
+        "direction": "forward",
+        "source-credit": "",
+        "ended": false,
+        "ordering-key": 1,
+        "attribute-values": {
+          "number": "1"
+        },
+        "type-id": "01018437-91d8-36b9-bf89-3f885d53b5bd",
+        "target-type": "series",
+        "series": {
+          "disambiguation": "light novel, English, unabridged",
+          "type-id": "4c1c4949-7b6c-3a2d-9d54-a50a27e4fa77",
+          "type": "Release group series",
+          "id": "762cd100-5319-4f9e-8a97-c7f71ae66ad7",
+          "name": "Baccano! read by Michael Butler Murray"
+        },
+        "attributes": [
+          "number"
+        ],
+        "type": "part of"
+      },
+      {
+        "type": "discography entry",
+        "attributes": [],
+        "url": {
+          "id": "1aba92d6-db72-4440-b1c2-5378ff55299f",
+          "resource": "https://yenpress.com/titles/9781975394127-baccano-vol-1"
+        },
+        "target-type": "url",
+        "type-id": "5849de4a-78ae-4876-975d-2181107e70b7",
+        "attribute-values": {},
+        "ended": false,
+        "source-credit": "",
+        "direction": "forward",
+        "end": null,
+        "target-credit": "",
+        "begin": null,
+        "attribute-ids": {}
+      }
+    ],
+    "id": "4b745bd7-49f7-46d7-bf47-52e9d27b121b",
+    "tags": [
+      {
+        "name": "adventure",
+        "count": 1
+      },
+      {
+        "name": "fantasy",
+        "count": 1
+      },
+      {
+        "count": 1,
+        "name": "fiction"
+      },
+      {
+        "count": 1,
+        "name": "historical fantasy"
+      },
+      {
+        "name": "light novel",
+        "count": 1
+      },
+      {
+        "count": 1,
+        "name": "mystery"
+      },
+      {
+        "count": 1,
+        "name": "paranormal"
+      },
+      {
+        "name": "unabridged",
+        "count": 1
+      },
+      {
+        "count": 1,
+        "name": "urban fantasy"
+      }
+    ],
+    "first-release-date": "2024-05-14",
+    "genres": [],
+    "disambiguation": "light novel, English, unabridged",
+    "title": "Baccano! Vol. 1: The Rolling Bootlegs",
+    "primary-type-id": "4fc3be2b-de1e-396b-a933-beb8f1607a22",
+    "secondary-type-ids": [
+      "499a387e-6195-333e-91c0-9592bfec535e"
+    ],
+    "secondary-types": [
+      "Audiobook"
+    ]
+  },
+  "genres": [],
+  "disambiguation": "Audible aax",
+  "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+  "packaging": "None",
+  "release-events": [
+    {
+      "date": "2024-05-14",
+      "area": {
+        "name": "[Worldwide]",
+        "sort-name": "[Worldwide]",
+        "type": null,
+        "type-id": null,
+        "iso-3166-1-codes": [
+          "XW"
+        ],
+        "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+        "disambiguation": ""
+      }
+    }
+  ],
+  "title": "Baccano! Vol. 1: The Rolling Bootlegs",
+  "quality": "normal"
 }

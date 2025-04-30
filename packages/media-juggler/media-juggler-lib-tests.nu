@@ -200,68 +200,73 @@ def test_upsert_if_value [] {
 
 def test_parse_audiobook_metadata_from_tone_picard [] {
   let input = {
-    album: "Dark One: Forgotten"
-    albumArtist: "Brandon Sanderson and Dan Wells performed by various narrators"
-    artist: "Brandon Sanderson; Dan Wells"
-    composer: "Mia Barron, Luis Bermudez, William Elsman, Kaleo Griffith, Roxanne Hernandez, Rachel L. Jacobs, John H. Mayer, Nan McNamara, Jim Meskimen, Sophie Oda, Keith Szarabajka, Kelli Tager, Avery Kidd Waddell"
-    comment: "Brandon Sanderson and Dan Wells Purchased from Libro.fm."
-    discNumber: 1
-    discTotal: 1
-    recordingDate: "2023-01-10T00:00:00"
-    sortArtist: "Sanderson, Brandon and Wells, Dan performed by various narrators"
-    sortAlbumArtist: "Sanderson, Brandon and Wells, Dan performed by various narrators"
-    sortComposer: "Jourgensen, Erik"
-    title: "Dark One: Forgotten"
-    trackNumber: 1
-    trackTotal: 1
-    chapters: [
-      [start length title];
-      [0 2708010 "Dark One - Track 001"]
-      [2708010 1712091 "Dark One - Track 002"]
-      [4420101 1679778 "Dark One - Track 003"]
-      [6099879 2120072 "Dark One - Track 004"]
-      [8219951 1921254 "Dark One - Track 005"]
-      [10141205 1691272 "Dark One - Track 006"]
-      [11832477 1800124 "Dark One - Track 007"]
-      [13632601 2100376 "Dark One - Track 008"]
-      [15732977 1866658 "Dark One - Track 009"]
-      [17599635 1747879 "Dark One - Track 010"]
-      [19347514 2095543 "Dark One - Track 011"]
-      [21443057 2044186 "Dark One - Track 012"]
-      [23487243 102452 "Dark One - Track 013"]
-    ]
-    embeddedPictures: [
-      [code mimetype];
-      [13 image/jpeg]
-    ]
-    additionalFields: {
-      "musicBrainz Album Release Country": "XW"
-      series: "Dark One, performed by various narrators"
-      "series-part": 1
-      originalyear: "2023"
-      script: "Latn"
-      "musicBrainz Album Status": "official"
-      originaldate: "2023-01-10"
-      barcode: "9781980062875"
-      media: "Digital Media"
-      performer: "Erik Jourgensen"
-      "musicBrainz Album Type": "other;audio drama"
-      writer: "Brandon Sanderson;Dan Wells"
-      artists: "Brandon Sanderson;Dan Wells"
-      "musicBrainz Release Group Id": "4220489d-2bd0-4618-84a8-bdac1b968b1c"
-      "musicBrainz Album Id": "549a0455-4698-472f-97f3-7bb75fbe7343"
-      "musicBrainz Track Id": "a3a37da7-f2fa-4938-b827-d3c8d213d08c"
-      "musicBrainz Release Track Id": "a442811c-582b-429c-b7d9-072736be42ac"
-      "musicBrainz Work Id": "e8eba2f2-cb32-4f55-82cc-b35aa1272b5a"
-      producer: "Max Epstein;Matt Flynn;David Pace"
-      label: "MAINFRAME;rb media RECORDED BOOKS ORIGINAL"
-      publisher: "MAINFRAME;rb media RECORDED BOOKS ORIGINAL"
-      engineer: "Anthony Cozzi;Vincent Early;Tom Pinkava;Timothy Waldner"
-      "musicBrainz Album Artist Id": "b7b9f742-8de0-44fd-afd3-fa536701d27e;f0e00197-4291-40cb-a448-c2f3c86f54c7"
-      "musicBrainz Artist Id": "b7b9f742-8de0-44fd-afd3-fa536701d27e;f0e00197-4291-40cb-a448-c2f3c86f54c7"
-      "acoustid Fingerprint": "XXXX"
-      "©work": "Dark One: Forgotten"
-      "©dir": "Max Epstein;David Pace"
+    meta: {
+      album: "Dark One: Forgotten"
+      albumArtist: "Brandon Sanderson and Dan Wells performed by various narrators"
+      artist: "Brandon Sanderson; Dan Wells"
+      composer: "Mia Barron, Luis Bermudez, William Elsman, Kaleo Griffith, Roxanne Hernandez, Rachel L. Jacobs, John H. Mayer, Nan McNamara, Jim Meskimen, Sophie Oda, Keith Szarabajka, Kelli Tager, Avery Kidd Waddell"
+      comment: "Brandon Sanderson and Dan Wells Purchased from Libro.fm."
+      discNumber: 1
+      discTotal: 1
+      recordingDate: "2023-01-10T00:00:00"
+      sortArtist: "Sanderson, Brandon and Wells, Dan performed by various narrators"
+      sortAlbumArtist: "Sanderson, Brandon and Wells, Dan performed by various narrators"
+      sortComposer: "Jourgensen, Erik"
+      title: "Dark One: Forgotten"
+      trackNumber: 1
+      trackTotal: 1
+      chapters: [
+        [start length title];
+        [0 2708010 "Dark One - Track 001"]
+        [2708010 1712091 "Dark One - Track 002"]
+        [4420101 1679778 "Dark One - Track 003"]
+        [6099879 2120072 "Dark One - Track 004"]
+        [8219951 1921254 "Dark One - Track 005"]
+        [10141205 1691272 "Dark One - Track 006"]
+        [11832477 1800124 "Dark One - Track 007"]
+        [13632601 2100376 "Dark One - Track 008"]
+        [15732977 1866658 "Dark One - Track 009"]
+        [17599635 1747879 "Dark One - Track 010"]
+        [19347514 2095543 "Dark One - Track 011"]
+        [21443057 2044186 "Dark One - Track 012"]
+        [23487243 102452 "Dark One - Track 013"]
+      ]
+      embeddedPictures: [
+        [code mimetype];
+        [13 image/jpeg]
+      ]
+      additionalFields: {
+        "musicBrainz Album Release Country": "XW"
+        series: "Dark One, performed by various narrators"
+        "series-part": 1
+        originalyear: "2023"
+        script: "Latn"
+        "musicBrainz Album Status": "official"
+        originaldate: "2023-01-10"
+        barcode: "9781980062875"
+        media: "Digital Media"
+        performer: "Erik Jourgensen"
+        "musicBrainz Album Type": "other;audio drama"
+        writer: "Brandon Sanderson;Dan Wells"
+        artists: "Brandon Sanderson;Dan Wells"
+        "musicBrainz Release Group Id": "4220489d-2bd0-4618-84a8-bdac1b968b1c"
+        "musicBrainz Album Id": "549a0455-4698-472f-97f3-7bb75fbe7343"
+        "musicBrainz Track Id": "a3a37da7-f2fa-4938-b827-d3c8d213d08c"
+        "musicBrainz Release Track Id": "a442811c-582b-429c-b7d9-072736be42ac"
+        "musicBrainz Work Id": "e8eba2f2-cb32-4f55-82cc-b35aa1272b5a"
+        producer: "Max Epstein;Matt Flynn;David Pace"
+        label: "MAINFRAME;rb media RECORDED BOOKS ORIGINAL"
+        publisher: "MAINFRAME;rb media RECORDED BOOKS ORIGINAL"
+        engineer: "Anthony Cozzi;Vincent Early;Tom Pinkava;Timothy Waldner"
+        "musicBrainz Album Artist Id": "b7b9f742-8de0-44fd-afd3-fa536701d27e;f0e00197-4291-40cb-a448-c2f3c86f54c7"
+        "musicBrainz Artist Id": "b7b9f742-8de0-44fd-afd3-fa536701d27e;f0e00197-4291-40cb-a448-c2f3c86f54c7"
+        "acoustid Fingerprint": "XXXX"
+        "©work": "Dark One: Forgotten"
+        "©dir": "Max Epstein;David Pace"
+      }
+    }
+    audio: {
+      duration: 1500
     }
     file: "/home/listener/audiobooks/Dark One: Forgotten/Dark One: Forgotten.m4b"
   }
@@ -336,6 +341,7 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
       engineers: ["Anthony Cozzi" "Vincent Early" "Tom Pinkava" "Timothy Waldner"]
       musicbrainz_artist_ids: ["b7b9f742-8de0-44fd-afd3-fa536701d27e" "f0e00197-4291-40cb-a448-c2f3c86f54c7"]
       acoustid_fingerprint: "XXXX"
+      duration: 1500000000ns
       file: "/home/listener/audiobooks/Dark One: Forgotten/Dark One: Forgotten.m4b"
     }
   }
@@ -355,39 +361,44 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
 
 def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
   let input = {
-    album: "My Happy Marriage, Vol. 2"
-    albumArtist: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
-    artist: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
-    composer: "Damien Haas, Miranda Parkin"
-    comment: "Akumi Agitogi Purchased from Libro.fm."
-    copyright: "Yen Audio"
-    description: "Akumi Agitogi Purchased from Libro.fm."
-    discNumber: 1
-    discTotal: 1
-    genre: "Fiction; Fantasy"
-    group: "My Happy Marriage #2; Test Series 2 #5"
-    itunesMediaType: "audiobook"
-    itunesPlayGap: "noGap"
-    recordingDate: "2025-01-01T00:00:00Z"
-    title: "My Happy Marriage, Vol. 2"
-    trackNumber: 1
-    chapters: [
-      [start length title];
-      [0, 27000, "Opening Credits"]
-      [27000, 454000, Prologue]
-      [481000, 3042000, "Chapter 1: Nightmares and Disquieting Shadows"]
-      [3523000, 3492000, "Chapter 2: The Chestnut-Haired Man"]
-      [7015000, 3052000, "Chapter 3: To the Usuba Household, Part 1"]
-      [10067000, 3406000, "Chapter 4: To the Usuba Household, Part 2"]
-      [13473000, 2567000, "Chapter 5: Light in the Darkness"]
-      [16040000, 2689000, "Chapter 6: Truth-Revealing Party"]
-      [18729000, 810000, Epilogue]
-      [19539000, 116992, "End Credits"]
-    ]
-    embeddedPictures: [
-      [code mimetype];
-      [13 image/jpeg]
-    ]
+    meta: {
+      album: "My Happy Marriage, Vol. 2"
+      albumArtist: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
+      artist: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
+      composer: "Damien Haas, Miranda Parkin"
+      comment: "Akumi Agitogi Purchased from Libro.fm."
+      copyright: "Yen Audio"
+      description: "Akumi Agitogi Purchased from Libro.fm."
+      discNumber: 1
+      discTotal: 1
+      genre: "Fiction; Fantasy"
+      group: "My Happy Marriage #2; Test Series 2 #5"
+      itunesMediaType: "audiobook"
+      itunesPlayGap: "noGap"
+      recordingDate: "2025-01-01T00:00:00Z"
+      title: "My Happy Marriage, Vol. 2"
+      trackNumber: 1
+      chapters: [
+        [start length title];
+        [0, 27000, "Opening Credits"]
+        [27000, 454000, Prologue]
+        [481000, 3042000, "Chapter 1: Nightmares and Disquieting Shadows"]
+        [3523000, 3492000, "Chapter 2: The Chestnut-Haired Man"]
+        [7015000, 3052000, "Chapter 3: To the Usuba Household, Part 1"]
+        [10067000, 3406000, "Chapter 4: To the Usuba Household, Part 2"]
+        [13473000, 2567000, "Chapter 5: Light in the Darkness"]
+        [16040000, 2689000, "Chapter 6: Truth-Revealing Party"]
+        [18729000, 810000, Epilogue]
+        [19539000, 116992, "End Credits"]
+      ]
+      embeddedPictures: [
+        [code mimetype];
+        [13 image/jpeg]
+      ]
+    }
+    audio: {
+      duration: 1500
+    }
     file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
   }
   let expected = {
@@ -431,6 +442,7 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
         [code mimetype];
         [13, image/jpeg]
       ]
+      duration: 1500000000ns
       file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
     }
   }
@@ -711,8 +723,9 @@ def test_into_tone_format_simple [] {
         [13 image/jpeg]
       ]
       narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+        [name id];
+        ["Damien Haas" "1"]
+        ["Miranda Parkin" "2"]
       ]
     }
     track: {
@@ -1282,35 +1295,55 @@ def test_determine_releases_from_acoustid_fingerprint_matches_empty [] {
 
 def test_determine_releases_from_acoustid_fingerprint_matches_one_track_one_release [] {
   let input = [
-    [fingerprint duration matches];
+    [file fingerprint duration matches];
     [
+      "/var/home/jordan/Downloads/musicbrainz/Monogatari/Bakemonogatari, Part 1/BAKEMONOGATARI part 1.m4b"
       "fingerprint"
-      25555sec
-      [[acoustid_track_id release_ids score];
+      24700730000000ns
+      [
+        [id recordings score];
         [
-          "85ccd755-283f-4d11-91fb-74ebdd3111e9"
-          ["b2c93465-beb1-4037-92ca-eab9d63ccdda"]
+          "ad5a8d74-6bc7-44ed-8435-7ec5b65b60e5"
+          [
+            [id releases];
+            [
+              "6e0a0c34-250a-4b13-a564-0072af584de9"
+              [
+                [id];
+                ["cf2bec53-6d2a-4be6-bb34-886e3cad7e07"]
+              ]
+            ]
+          ]
           1.0
         ]
       ]
     ]
   ]
-  let expected = ["b2c93465-beb1-4037-92ca-eab9d63ccdda"]
+  let expected = ["cf2bec53-6d2a-4be6-bb34-886e3cad7e07"]
   assert equal ($input | determine_releases_from_acoustid_fingerprint_matches) $expected
 }
 
 def test_determine_releases_from_acoustid_fingerprint_matches_one_track_two_releases [] {
   let input = [
-    [fingerprint duration matches];
+    [file fingerprint duration matches];
     [
+      "/var/home/jordan/Downloads/musicbrainz/Monogatari/Bakemonogatari, Part 1/BAKEMONOGATARI part 1.m4b"
       "fingerprint"
-      25555sec
-      [[acoustid_track_id release_ids score];
+      24700730000000ns
+      [
+        [id recordings score];
         [
-          "85ccd755-283f-4d11-91fb-74ebdd3111e9"
+          "ad5a8d74-6bc7-44ed-8435-7ec5b65b60e5"
           [
-            "b2c93465-beb1-4037-92ca-eab9d63ccdda"
-            "b3c12345-beb1-4037-92ca-eab9d63bbcc1"
+            [id releases];
+            [
+              "6e0a0c34-250a-4b13-a564-0072af584de9"
+              [
+                [id];
+                ["b2c93465-beb1-4037-92ca-eab9d63ccdda"]
+                ["cf2bec53-6d2a-4be6-bb34-886e3cad7e07"]
+              ]
+            ]
           ]
           1.0
         ]
@@ -1319,128 +1352,14 @@ def test_determine_releases_from_acoustid_fingerprint_matches_one_track_two_rele
   ]
   let expected = [
     "b2c93465-beb1-4037-92ca-eab9d63ccdda"
-    "b3c12345-beb1-4037-92ca-eab9d63bbcc1"
+    "cf2bec53-6d2a-4be6-bb34-886e3cad7e07"
   ]
   assert equal ($input | determine_releases_from_acoustid_fingerprint_matches) $expected
 }
 
 def test_determine_releases_from_acoustid_fingerprint_matches_thirteen_tracks_one_release [] {
-  let input = [
-    [fingerprint duration matches];
-    [
-      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_01XB"
-      30090000000ns
-      [
-        [acoustid_track_id, release_ids, score];
-        [
-          "3640c01c-a763-404e-9ec4-c60d28820e01"
-          ["0425322c-c953-477a-9494-affb04314373"]
-          1.0
-        ]
-      ]
-    ]
-    [
-      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_02XB"
-      1350160000000ns
-      [
-        [acoustid_track_id, release_ids, score];
-        [
-          "30976711-0ae5-431e-8fa7-56aee9d50dd1"
-          [
-            "0425322c-c953-477a-9494-affb04314373"
-            "aaca2621-60fc-4534-98e1-494f9e006a49"
-          ]
-          1.0
-        ]
-      ]
-    ]
-    [
-      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_03XB"
-      509130000000ns
-      [
-        [acoustid_track_id, release_ids, score];
-        [
-          "91b44ea0-f078-4d1e-afee-b0b4a8772316"
-          [
-            "0425322c-c953-477a-9494-affb04314373"
-            "aaca2621-60fc-4534-98e1-494f9e006a49"
-          ]
-          1.0
-        ]
-      ]
-    ]
-    [
-      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_04XB"
-      4117130000000ns
-      [
-        [acoustid_track_id, release_ids, score];
-        [
-          "9dd90c27-94f5-4fa7-8ea6-dcd3b7f7d456"
-          [
-            "0425322c-c953-477a-9494-affb04314373"
-            "aaca2621-60fc-4534-98e1-494f9e006a49"
-          ]
-          1.0
-        ]
-      ]
-    ]
-    [
-      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_05XB"
-      4542270000000ns
-      [
-        [acoustid_track_id, release_ids, score];
-        [
-          "c88dcadb-328e-4a81-8e70-80177c9834c5"
-          [
-            "0425322c-c953-477a-9494-affb04314373"
-            "aaca2621-60fc-4534-98e1-494f9e006a49"
-          ]
-          1.0
-        ]
-      ]
-    ]
-    [
-      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_06XB"
-      1270650000000ns
-      [
-        [acoustid_track_id, release_ids, score];
-        [
-          "9f119955-0341-4d62-a6c5-137dbc99f214"
-          [
-            "0425322c-c953-477a-9494-affb04314373"
-            "aaca2621-60fc-4534-98e1-494f9e006a49"
-          ]
-          1.0
-        ]
-      ]
-    ]
-    [
-      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_07XB"
-      3357050000000ns
-      [
-        [acoustid_track_id, release_ids, score];
-        [
-          "120dc6ab-ef38-4ac9-a3d4-4e5052ecb7b8"
-          [
-            "0425322c-c953-477a-9494-affb04314373"
-            "aaca2621-60fc-4534-98e1-494f9e006a49"
-          ]
-          1.0
-        ]
-      ]
-    ]
-    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_08XB", 1545770000000ns, [[acoustid_track_id, release_ids, score]; ["95af01f0-1579-460b-998e-cf4b6c2e6f79", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
-    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_09XB", 4237770000000ns, [[acoustid_track_id, release_ids, score]; ["27b42309-c46b-450e-a05d-d5f17ae0dc88", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
-    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_10XB", 751600000000ns, [[acoustid_track_id, release_ids, score]; ["8f7cd0be-91ac-4d80-ad16-dca82020d6ff", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
-    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_11XB", 781190000000ns, [[acoustid_track_id, release_ids, score]; ["c2abc000-8ca0-4029-b8a7-89092d772767", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
-    ["AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_12XB", 361820000000ns, [[acoustid_track_id, release_ids, score]; ["75cd8d2f-3931-45cc-b4be-23c74d1387b7", ["0425322c-c953-477a-9494-affb04314373", "aaca2621-60fc-4534-98e1-494f9e006a49"], 1.0]]]
-    [
-      "AQAA3ZOShVmSTAl8hjjzwUc3MYi74YFGH2FxPA_13XB", 131870000000ns, [[acoustid_track_id, release_ids, score]; ["e086eb93-e02b-41e6-b882-3ef59824da04", ["0425322c-c953-477a-9494-affb04314373"], 1.0]]
-    ]
-  ]
-  let expected = [
-    "0425322c-c953-477a-9494-affb04314373"
-  ]
+  let input = [[file, fingerprint, duration, matches]; ["Baccano! Vol. 1 (light novel) - Track 001.mp3", "1", 30090000000ns, [[id, recordings, score]; ["3640c01c-a763-404e-9ec4-c60d28820e01", [[id, releases]; ["a017ad86-9318-4688-93fc-67acd226c24b", [[id]; ["0425322c-c953-477a-9494-affb04314373"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 002.mp3", "2", 1350160000000ns, [[id, recordings, score]; ["30976711-0ae5-431e-8fa7-56aee9d50dd1", [[id, releases]; ["6a10103d-ec54-48f5-b6b2-f1d12938bb9b", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 003.mp3", "3", 509130000000ns, [[id, recordings, score]; ["91b44ea0-f078-4d1e-afee-b0b4a8772316", [[id, releases]; ["8b913142-4a8b-4be8-98f9-d25a2ff1537b", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 004.mp3", "4", 4117130000000ns, [[id, recordings, score]; ["9dd90c27-94f5-4fa7-8ea6-dcd3b7f7d456", [[id, releases]; ["b8655446-d779-4d1c-a8d3-e19b6a4e702f", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 005.mp3", "5", 4542270000000ns, [[id, recordings, score]; ["c88dcadb-328e-4a81-8e70-80177c9834c5", [[id, releases]; ["ee72646d-b260-4e5e-8b45-5de2b5d5daba", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 006.mp3", "6", 1270650000000ns, [[id, recordings, score]; ["9f119955-0341-4d62-a6c5-137dbc99f214", [[id, releases]; ["75486e2b-5cbd-4682-9f37-1f2404d3221a", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 007.mp3", "7", 3357050000000ns, [[id, recordings, score]; ["120dc6ab-ef38-4ac9-a3d4-4e5052ecb7b8", [[id, releases]; ["025f99e5-cde5-4753-ba0c-2391b357b021", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 008.mp3", "8", 1545770000000ns, [[id, recordings, score]; ["95af01f0-1579-460b-998e-cf4b6c2e6f79", [[id, releases]; ["5d80e2ed-8164-4336-869b-0edf82bd6225", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 009.mp3", "9", 4237770000000ns, [[id, recordings, score]; ["27b42309-c46b-450e-a05d-d5f17ae0dc88", [[id, releases]; ["87896433-746e-461d-995c-eb1002376905", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 010.mp3", "10", 751600000000ns, [[id, recordings, score]; ["8f7cd0be-91ac-4d80-ad16-dca82020d6ff", [[id, releases]; ["33137454-1d0b-47ba-8273-ffa3dde7e971", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 011.mp3", "11", 781190000000ns, [[id, recordings, score]; ["c2abc000-8ca0-4029-b8a7-89092d772767", [[id, releases]; ["617223b7-419e-4dfa-923e-21ba9655f39b", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 012.mp3", "12", 361820000000ns, [[id, recordings, score]; ["75cd8d2f-3931-45cc-b4be-23c74d1387b7", [[id, releases]; ["54227782-962c-4a14-825d-8057baf6e6cd", [[id]; ["0425322c-c953-477a-9494-affb04314373"], ["aaca2621-60fc-4534-98e1-494f9e006a49"]]]], 1.0]]], ["Baccano! Vol. 1 (light novel) - Track 013.mp3", "13", 131870000000ns, [[id, recordings, score]; ["e086eb93-e02b-41e6-b882-3ef59824da04", [[id, releases]; ["4f811dc2-3de0-47ce-afbb-3602a21c814c", [[id]; ["0425322c-c953-477a-9494-affb04314373"]]]], 1.0]]]]
+  let expected = ["0425322c-c953-477a-9494-affb04314373"]
   assert equal ($input | determine_releases_from_acoustid_fingerprint_matches) $expected
 }
 
@@ -1666,6 +1585,84 @@ def test_parse_tags_from_musicbrainz_release [] {
   test_parse_tags_from_musicbrainz_release_only_genres_baccano_vol_1
 }
 
+def test_parse_distributors_from_musicbrainz_release_bakemonogatari_part_01 [] {
+  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
+  let expected = [
+    [id name];
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Libro.fm"]
+  ]
+  assert equal ($input | parse_distributors_from_musicbrainz_release) $expected
+}
+
+def test_parse_distributors_from_musicbrainz_release_baccano_vol_1 [] {
+  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
+  let expected = [
+    [id name];
+    ["926e2da3-af75-4571-8159-fcceb8a0aed3" "Audible Inc."]
+  ]
+  assert equal ($input | parse_distributors_from_musicbrainz_release) $expected
+}
+
+def test_parse_distributors_from_musicbrainz_release [] {
+  test_parse_distributors_from_musicbrainz_release_baccano_vol_1
+  test_parse_distributors_from_musicbrainz_release_bakemonogatari_part_01
+}
+
+def test_parse_chapters_from_musicbrainz_release_baccano_vol_1 [] {
+  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
+  let expected = [
+    [index start length title];
+    [0 0ms 22996000ms "Baccano! Vol. 1: The Rolling Bootlegs"]
+  ]
+  assert equal ($input | parse_chapters_from_musicbrainz_release) $expected
+}
+
+def test_parse_chapters_from_musicbrainz_release_bakemonogatari_part_01 [] {
+  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
+  let expected = [
+    [index start length title];
+    [0 0ms 15000ms "Opening Credits"]
+  ]
+  assert equal ($input | parse_chapters_from_musicbrainz_release) $expected
+}
+
+def test_parse_chapters_from_musicbrainz_release [] {
+  test_parse_chapters_from_musicbrainz_release_baccano_vol_1
+  test_parse_chapters_from_musicbrainz_release_bakemonogatari_part_01
+}
+
+def test_parse_chapters_from_tone_baccano_vol_1 [] {
+  let input = [
+    [index start length title];
+    [0 0 15000 "Opening Credits"]
+  ]
+  let expected = [
+    [index start length title];
+    [0 0ms 15000ms "Opening Credits"]
+  ]
+  assert equal ($input | parse_chapters_from_tone) $expected
+}
+
+def test_parse_chapters_from_tone [] {
+  test_parse_chapters_from_tone_baccano_vol_1
+}
+
+def test_chapters_into_tone_format_baccano_vol_1 [] {
+  let input = [
+    [index start length title];
+    [0 0ms 15000ms "Opening Credits"]
+  ]
+  let expected = [
+    [index start length title];
+    [0 0 15000 "Opening Credits"]
+  ]
+  assert equal ($input | chapters_into_tone_format) $expected
+}
+
+def test_chapters_into_tone_format [] {
+  test_chapters_into_tone_format_baccano_vol_1
+}
+
 def test_parse_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = {
@@ -1871,6 +1868,10 @@ def main []: {
   test_parse_audible_asin_from_url
   test_parse_audible_asin_from_musicbrainz_release
   test_parse_tags_from_musicbrainz_release
+  test_parse_distributors_from_musicbrainz_release
+  test_parse_chapters_from_tone
+  test_chapters_into_tone_format
+  test_parse_chapters_from_musicbrainz_release
   # todo Add tests for Baccano! Vol. 1 for parsing things.
   test_parse_musicbrainz_release
   echo "All tests passed!"

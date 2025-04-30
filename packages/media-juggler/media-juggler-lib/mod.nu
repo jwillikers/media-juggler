@@ -2356,8 +2356,8 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     )
     | (
       let input = $in;
-      if chapters in $metadata and ($metadata.chapters | is-not-empty) {
-        $input | upsert chapters ($metadata.chapters | sort-by start)
+      if "chapters" in $metadata and ($metadata.chapters | is-not-empty) {
+        $input | upsert chapters ($metadata.chapters | parse_chapters_from_tone)
       } else {
         $input
       }
@@ -2512,8 +2512,13 @@ export def into_tone_format []: record -> record {
     }
   )
   let publication_date = (
-    if publication_date in $metadata.book and ($metadata.book.publication_date | is-not-empty) {
+    if "publication_date" in $metadata.book and ($metadata.book.publication_date | is-not-empty) {
       $metadata.book.publication_date | format date '%+'
+    }
+  )
+  let chapters = (
+    if "chapters" in $metadata.book and ($metadata.book.chapters | is-not-empty) {
+      $metadata.book.chapters | chapters_into_tone_format
     }
   )
   let additionalFields = (
@@ -2529,7 +2534,7 @@ export def into_tone_format []: record -> record {
     | upsert_if_present script $metadata.book
     | upsert_if_present Media $metadata.book
     # todo Work (Work name)
-    | upsert_if_present chapters $metadata.book
+    | upsert_if_value chapters $chapters
     # track metadata
     | upsert_if_present "AcoustID Fingerprint" $metadata.track acoustid_fingerprint
     | upsert_if_present "AcoustID Id" $metadata.track acoustid_track_id
@@ -2639,11 +2644,8 @@ export def tone_tag [
     (
       ^tone tag
           # todo When tone is new enough?
-          # --id $isbn | amazon_asin | audible_asin?
-          # --meta-chapters-file $chapters_file
-          # --meta-cover-file $cover_file
+          # --id $isbn | amazon_asin | audible_asin | mbid?
           --meta-tone-json-file $tone_json
-          # --meta-remove-property "comment"
           ...$tone_args
           $file
     )
@@ -2742,12 +2744,7 @@ export def fetch_musicbrainz_release_group [
 
 # Get a Release with all of the gory details
 export def fetch_musicbrainz_release [
-  --retries: int = 3
-  --retry-delay: duration = 5sec
-]: string -> table {
-  let release_id = $in
-  let url = "https://musicbrainz.org/ws/2/release"
-  let includes = [
+  includes: list<string> = [
     artist-credits
     labels
     recordings
@@ -2760,13 +2757,31 @@ export def fetch_musicbrainz_release [
     series-rels
     genre-rels
     artist-rels
+    label-rels
     recording-level-rels
     release-group-level-rels
     work-level-rels
     url-rels # for Audible ASIN
   ]
+  --retries: int = 3
+  --retry-delay: duration = 5sec
+]: string -> record {
+  let release_id = $in
+  let url = "https://musicbrainz.org/ws/2/release"
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_id)/?inc=($includes | str join '+')"}
-  retry_http $request $retries $retry_delay
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error fetching MusicBrainz Release: ($url): ($error.debug.msg)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP status code (ansi red)($response.status)(ansi reset) when fetching MusicBrainz Release: ($url)"
+    return null
+  }
+  $response.body
 }
 
 # Parse the ASIN out of an Audible URL
@@ -3203,6 +3218,35 @@ export def parse_audible_asin_from_musicbrainz_release []: record -> list<string
   }
 }
 
+# Parse distributors from the metadata of a release
+export def parse_distributors_from_musicbrainz_release []: record -> table<id: string, name: string> {
+  let metadata = $in
+  if ($metadata | is-empty) or "relations" not-in $metadata or ($metadata.relations | is-empty) {
+    return null
+  }
+  let labels = (
+    $metadata
+    | get relations
+    | where target-type == label
+  )
+  if ($labels | is-empty) {
+    return null
+  }
+  let distributors = (
+    $labels
+    | where type == distributed
+  )
+  if ($distributors | is-empty) {
+    return null
+  }
+  (
+    $distributors
+    | get label
+    | select id name
+    | sort-by name
+  )
+}
+
 # Parse the data of a MusicBrainz release
 export def parse_musicbrainz_release []: record -> record {
   let metadata = $in
@@ -3271,7 +3315,7 @@ export def parse_musicbrainz_release []: record -> record {
           )
         }
       )
-      let works = $track.recording.relations | parse_works_from_musicbrainz_relations;
+      let works = $track.recording.relations | parse_works_from_musicbrainz_relations
       let musicbrainz_work_ids = (
         if ($works | is-not-empty) {
           $works | get id | uniq
@@ -3326,6 +3370,13 @@ export def parse_musicbrainz_release []: record -> record {
         | uniq
         | filter {|tag|
           $tag != "unabridged"
+        }
+      )
+      let title = (
+        if "title" in $track and ($track.title | is-not-empty) {
+          $track.title
+        } else {
+          $metadata.title
         }
       )
       let musicbrainz_artist_ids = $track | get --ignore-errors artist-credit.artist.id | uniq
@@ -3403,6 +3454,8 @@ export def parse_musicbrainz_release []: record -> record {
     }
   )
 
+  let distributors = $metadata | parse_distributors_from_musicbrainz_release
+
   let series = $metadata | parse_series_from_musicbrainz_release
 
   let audible_asin = (
@@ -3419,7 +3472,7 @@ export def parse_musicbrainz_release []: record -> record {
   # todo Attempt to look up chapters from related release for m4b files
   let chapters = (
     if ($tracks | length) > 1 {
-      $metadata | get media | chapters_from_musicbrainz_release_media
+      $metadata | parse_chapters_from_musicbrainz_release
     }
   )
 
@@ -3458,6 +3511,7 @@ export def parse_musicbrainz_release []: record -> record {
     | upsert_if_value series $series
     | upsert_if_value chapters $chapters
     | upsert_if_value front_cover_available $front_cover_available
+    | upsert_if_value distributors $distributors
     # This needs to just be the writers ids for audiobookshelf...
     # | upsert_if_value musicbrainz_artist_ids $musicbrainz_artist_ids
     | (
@@ -3544,7 +3598,7 @@ export def tag_audiobook_from_acoustid [
     log error "AcoustID responses missing"
     return null
   }
-  # log info $"acoustid_responses: ($acoustid_responses)"
+  log info $"acoustid_responses: ($acoustid_responses | to nuon)"
   let release_ids = $acoustid_responses | determine_releases_from_acoustid_fingerprint_matches
   if ($release_ids | is-empty) {
     log error "No common release ids found for the AcoustID fingerprints"
@@ -3600,6 +3654,194 @@ export def tag_audiobook_from_acoustid [
   $file_metadata | tag_audiobook_files_by_musicbrainz_release_id ($release_ids | first) $working_directory
 }
 
+# Parse chapters from tone.
+#
+# The format is similar to tone's format.
+# Unlike the format tone uses, the start and length fields are durations.
+# For output via tone, these need to be converted back to milliseconds as integers.
+export def parse_chapters_from_tone []: table<index: int, start: int, length: int, title: string> -> table<index: int, start: duration, length: duration, title: string> {
+  $in | each {|chapter|
+    (
+      $chapter
+      | update start ($chapter.start | into duration --unit ms)
+      | update length ($chapter.length | into duration --unit ms)
+    )
+  }
+}
+
+# Convert chapters to the format used by tone.
+#
+# This format is similar to the internal format used for chapters.
+# The only difference is that the start and length fields are milliseconds represented by integers.
+export def chapters_into_tone_format []: table<index: int, start: duration, length: duration, title: string> -> table<index: int, start: int, length: int, title: string> {
+  $in | each {|chapter|
+    (
+      $chapter
+      | update start (($chapter.start / 1ms) | math round)
+      | update length (($chapter.length / 1ms) | math round)
+    )
+  }
+}
+
+# Parse chapters from a MusicBrainz Release into a format similar to the one used by tone.
+#
+# Unlike the format tone uses, the start and length fields are durations.
+# For tone, these need to be converted to milliseconds as integers.
+export def parse_chapters_from_musicbrainz_release []: record -> table<index: int, start: duration, length: duration, title: string> {
+  let metadata = $in
+  let chapters = (
+    $metadata
+    | get media
+    | get tracks
+    | flatten
+    | enumerate
+    | each {|recording|
+      {
+          index: $recording.index
+          title: $recording.item.title
+          duration: ($recording.item.length | into duration --unit ms)
+      }
+    }
+  )
+  let start_offsets = $chapters | get duration | lengths_to_start_offsets
+  $chapters | each {|c|
+    let start = $start_offsets | get $c.index
+    {
+      index: $c.index
+      start: $start
+      length: $c.duration
+      title: $c.title
+    }
+  }
+}
+
+# Given a release, attempt to find a release in the same release group that has more tracks.
+#
+# The chapters release must be within the duration threshold and must be from the same distributor if one is set.
+#
+# Input is the parsed metadata of the MusicBrainz release.
+# The output is the chapters in a table formatted for a tone JSON file
+export def look_up_chapters_from_similar_musicbrainz_release [
+  duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
+] table -> table<index: int, start: duration, length: duration, title: string> {
+  let release = $in
+  if "musicbrainz_release_group_id" not-in $release.book or ($release.book.musicbrainz_release_group_id | is-empty) {
+    return null
+  }
+
+  let num_tracks = ($release.tracks | length)
+
+  let allowed_statuses = ["official", "pseudo-release"]
+  let types = ["other / audio drama", "other / audiobook", "other / spokenword"]
+
+  # "https://musicbrainz.org/ws/2/release/?fmt=json&query="
+  let url = "https://musicbrainz.org/ws/2/release/"
+  let query = $"rgid:($release.book.musicbrainz_release_group_id) AND primary-type:Other AND \(secondarytype:Audiobook OR secondarytype:\"Audio drama\" OR secondarytype:Spokenword\) AND NOT tracks:1 AND \(status:official OR status: pseudo-release\) AND NOT reid:($release.book.musicbrainz_release_id)"
+
+  let query = (
+    if "country" in $release.book {
+      $query + $" AND country:\"($release.book.country)\""
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "amazon_asin" in $release.book {
+      $query + $" AND asin:\"($release.book.amazon_asin)\""
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "isbn" in $release.book {
+      $query + $" AND barcode:\"($release.book.isbn)\""
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "publication_date" in $release.book {
+      $query + $" AND date:\"($release.book.publication_date | format date '%Y-%m-%d')\""
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "script" in $release.book {
+      $query + $" AND script:\"($release.book.script)\""
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if "language" in $release.book {
+      $query + $" AND lang:\"($release.book.language)\""
+    } else {
+      $query
+    }
+  )
+  # todo "chapters" tag for releases to be used as a chapter source?
+  let query = $query | url encode
+  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)?query=($query)"}
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error searching for similar releases: ($url)?query=($query)\t($error.debug.msg)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP status code ($response.status) when searching for similar releases: ($url)?query=($query)"
+    return null
+  }
+
+  let candidates = $response | get body | get releases | where score == 1.0 | get --ignore-errors id
+  if ($candidates | is-empty) {
+    return null
+  }
+  # Don't parallelize for the sake of the MusicBrainz API
+  let candidates = $candidates | each {|candidate|
+    let received_metadata = fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels]
+    if ($received_metadata | is-empty) {
+      log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
+      return null
+    }
+    $received_metadata | parse_musicbrainz_release
+  }
+
+  let candidates = $candidates | filter {|candidate|
+    if "distributors" in $release.book and ($release.book.distributors | is-not-empty) {
+      if "distributors" not-in $candidate.book {
+        return false
+      }
+      let has_same_distributors = $release.book.distributors | all {|distributor|
+        $distributor in $candidate.book.distributors
+      }
+      if not $has_same_distributors {
+        return false
+      }
+    }
+    if ($release.tracks | length) <= ($candidate.tracks | length) {
+      return false
+    }
+    if ((($release.tracks | get duration | math sum) - ($candidate.tracks | get duration | math sum)) | math abs) > $duration_threshold {
+      return false
+    }
+    true
+  }
+  if ($candidates | is-empty) {
+    return null
+  }
+  if ($candidates | length) > 1 {
+    log info $"More than one MusicBrainz Release candidate for chapters found: ($candidates | get book.id)"
+    return null
+  }
+  $candidates | first | get book.chapters
+}
+
 # Tag the given audio files using the given MusicBrainz release id
 #
 # The individual audio files should be provided in a table as input.
@@ -3618,6 +3860,7 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
   release_id: string
   working_directory: directory
   duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
+  chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
   --retries: int = 3
   --retry-delay: duration = 5sec
 ]: table -> list<path> {
@@ -3662,13 +3905,32 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
       return null
     }
   }
+
+  let chapters = (
+    if "chapters" not-in $metadata or ($metadata.chapters | is-empty) {
+      $metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
+    }
+  )
+
   let front_cover = (
     if "front_cover_available" in $metadata.book and $metadata.book.front_cover_available {
       $metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
     }
   )
-  # todo Best effort to search for and find associated chapters for single track releases.
-  let files = $metadata | update tracks $tracks | tone_tag_tracks $working_directory "--meta-cover-file" $front_cover
+
+  let files = (
+    $metadata
+    | update tracks $tracks
+    | (
+      let input = $in;
+      if ($chapters | is-not-empty) {
+        $input | upsert book.chapters $chapters
+      } else {
+        $input
+      }
+    )
+    | tone_tag_tracks $working_directory "--meta-cover-file" $front_cover
+  )
 
   # Clean up
   if ($front_cover | is-not-empty) {
