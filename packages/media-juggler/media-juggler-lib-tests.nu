@@ -292,20 +292,20 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
       musicbrainz_artist_ids: ["b7b9f742-8de0-44fd-afd3-fa536701d27e" "f0e00197-4291-40cb-a448-c2f3c86f54c7"]
       publishers: ["MAINFRAME" "rb media RECORDED BOOKS ORIGINAL"]
       chapters: [
-        [start length title];
-        [0 2708010 "Dark One - Track 001"]
-        [2708010 1712091 "Dark One - Track 002"]
-        [4420101 1679778 "Dark One - Track 003"]
-        [6099879 2120072 "Dark One - Track 004"]
-        [8219951 1921254 "Dark One - Track 005"]
-        [10141205 1691272 "Dark One - Track 006"]
-        [11832477 1800124 "Dark One - Track 007"]
-        [13632601 2100376 "Dark One - Track 008"]
-        [15732977 1866658 "Dark One - Track 009"]
-        [17599635 1747879 "Dark One - Track 010"]
-        [19347514 2095543 "Dark One - Track 011"]
-        [21443057 2044186 "Dark One - Track 012"]
-        [23487243 102452 "Dark One - Track 013"]
+        [index start length title];
+        [0 0ms 2708010ms "Dark One - Track 001"]
+        [1 2708010ms 1712091ms "Dark One - Track 002"]
+        [2 4420101ms 1679778ms "Dark One - Track 003"]
+        [3 6099879ms 2120072ms "Dark One - Track 004"]
+        [4 8219951ms 1921254ms "Dark One - Track 005"]
+        [5 10141205ms 1691272ms "Dark One - Track 006"]
+        [6 11832477ms 1800124ms "Dark One - Track 007"]
+        [7 13632601ms 2100376ms "Dark One - Track 008"]
+        [8 15732977ms 1866658ms "Dark One - Track 009"]
+        [9 17599635ms 1747879ms "Dark One - Track 010"]
+        [10 19347514ms 2095543ms "Dark One - Track 011"]
+        [11 21443057ms 2044186ms "Dark One - Track 012"]
+        [12 23487243ms 102452ms "Dark One - Track 013"]
       ]
     }
     track: {
@@ -380,16 +380,16 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
       trackNumber: 1
       chapters: [
         [start length title];
-        [0, 27000, "Opening Credits"]
-        [27000, 454000, Prologue]
-        [481000, 3042000, "Chapter 1: Nightmares and Disquieting Shadows"]
-        [3523000, 3492000, "Chapter 2: The Chestnut-Haired Man"]
-        [7015000, 3052000, "Chapter 3: To the Usuba Household, Part 1"]
-        [10067000, 3406000, "Chapter 4: To the Usuba Household, Part 2"]
-        [13473000, 2567000, "Chapter 5: Light in the Darkness"]
-        [16040000, 2689000, "Chapter 6: Truth-Revealing Party"]
-        [18729000, 810000, Epilogue]
-        [19539000, 116992, "End Credits"]
+        [0 27000 "Opening Credits"]
+        [27000 454000 Prologue]
+        [481000 3042000 "Chapter 1: Nightmares and Disquieting Shadows"]
+        [3523000 3492000 "Chapter 2: The Chestnut-Haired Man"]
+        [7015000 3052000 "Chapter 3: To the Usuba Household, Part 1"]
+        [10067000 3406000 "Chapter 4: To the Usuba Household, Part 2"]
+        [13473000 2567000 "Chapter 5: Light in the Darkness"]
+        [16040000 2689000 "Chapter 6: Truth-Revealing Party"]
+        [18729000 810000 Epilogue]
+        [19539000 116992 "End Credits"]
       ]
       embeddedPictures: [
         [code mimetype];
@@ -417,17 +417,17 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
       genres: ["Fiction" "Fantasy"]
       publishers: ["Yen Audio"]
       chapters: [
-        [start length title];
-        [0, 27000, "Opening Credits"]
-        [27000, 454000, Prologue]
-        [481000, 3042000, "Chapter 1: Nightmares and Disquieting Shadows"]
-        [3523000, 3492000, "Chapter 2: The Chestnut-Haired Man"]
-        [7015000, 3052000, "Chapter 3: To the Usuba Household, Part 1"]
-        [10067000, 3406000, "Chapter 4: To the Usuba Household, Part 2"]
-        [13473000, 2567000, "Chapter 5: Light in the Darkness"]
-        [16040000, 2689000, "Chapter 6: Truth-Revealing Party"]
-        [18729000, 810000, Epilogue]
-        [19539000, 116992, "End Credits"]
+        [index start length title];
+        [0 0ms 27000ms "Opening Credits"]
+        [1 27000ms 454000ms Prologue]
+        [2 481000ms 3042000ms "Chapter 1: Nightmares and Disquieting Shadows"]
+        [3 3523000ms 3492000ms "Chapter 2: The Chestnut-Haired Man"]
+        [4 7015000ms 3052000ms "Chapter 3: To the Usuba Household, Part 1"]
+        [5 10067000ms 3406000ms "Chapter 4: To the Usuba Household, Part 2"]
+        [6 13473000ms 2567000ms "Chapter 5: Light in the Darkness"]
+        [7 16040000ms 2689000ms "Chapter 6: Truth-Revealing Party"]
+        [8 18729000ms 810000ms Epilogue]
+        [9 19539000ms 116992ms "End Credits"]
       ]
     }
     track: {
@@ -452,6 +452,7 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
   # for column in ($expected.book | columns) {
   #   assert equal ($actual.book | get $column) ($expected.book | get $column)
   # }
+  assert equal $actual.book.chapters $expected.book.chapters
   assert equal $actual.book $expected.book
   # for column in ($expected.track | columns) {
   #   assert equal ($actual.track | get $column) ($expected.track | get $column)
@@ -716,7 +717,11 @@ def test_into_tone_format_simple [] {
         name: "Test Series 2"
         index: "5"
       }]
-      genres: ["Fiction" "Fantasy"]
+      genres: [
+        [name count];
+        ["Fantasy" 1]
+        ["Fiction" 1]
+      ]
       publishers: ["Yen Audio"]
       embedded_pictures: [
         [code mimetype];
@@ -733,8 +738,9 @@ def test_into_tone_format_simple [] {
       artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
       comment: "Akumi Agitogi Purchased from Libro.fm."
       narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+        [name id];
+        ["Damien Haas" "1"]
+        ["Miranda Parkin" "2"]
       ]
       index: 1
       embedded_pictures: [
@@ -745,20 +751,22 @@ def test_into_tone_format_simple [] {
     }
   }
   let expected = {
-    album: "My Happy Marriage, Vol. 2"
-    comment: "Akumi Agitogi Purchased from Libro.fm."
-    group: "My Happy Marriage #2;Test Series 2 #5"
-    genre: "Fiction;Fantasy"
-    publisher: "Yen Audio"
-    publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
-    title: "My Happy Marriage, Vol. 2 - Track 001"
-    composer: "Damien Haas;Miranda Parkin"
-    narrator: "Damien Haas;Miranda Parkin"
-    trackNumber: 1
-    embeddedPictures: [
-      [code mimetype];
-      [13 image/jpeg]
-    ]
+    meta: {
+      album: "My Happy Marriage, Vol. 2"
+      comment: "Akumi Agitogi Purchased from Libro.fm."
+      group: "My Happy Marriage #2;Test Series 2 #5"
+      genre: "Fantasy;Fiction"
+      publisher: "Yen Audio"
+      publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
+      title: "My Happy Marriage, Vol. 2 - Track 001"
+      composer: "Damien Haas;Miranda Parkin"
+      narrator: "Damien Haas;Miranda Parkin"
+      trackNumber: 1
+      embeddedPictures: [
+        [code mimetype];
+        [13 image/jpeg]
+      ]
+    }
   }
   assert equal ($input | into_tone_format) $expected
 }
@@ -777,18 +785,24 @@ def test_into_tone_format_complex [] {
         name: "Test Series 2"
         index: "5"
       }]
-      genres: ["Fiction" "Fantasy"]
+      genres: [
+        [name count];
+        ["Fantasy" 1]
+        ["Fiction" 1]
+      ]
       publishers: ["Yen Audio"]
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
       ]
       narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+        [name id];
+        ["Damien Haas" "1"]
+        ["Miranda Parkin" "2"]
       ]
       writers: [
-        "Akumi Agitogi"
+        [name id];
+        ["Akumi Agitogi" "3"]
       ]
     }
     track: {
@@ -796,11 +810,13 @@ def test_into_tone_format_complex [] {
       artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
       comment: "Akumi Agitogi Purchased from Libro.fm."
       writers: [
-        "Akumi Agitogi"
+        [name id];
+        ["Akumi Agitogi" "3"]
       ]
       narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+        [name id];
+        ["Damien Haas" "1"]
+        ["Miranda Parkin" "2"]
       ]
       index: 1
       embedded_pictures: [
@@ -811,22 +827,28 @@ def test_into_tone_format_complex [] {
     }
   }
   let expected = {
-    album: "My Happy Marriage, Vol. 2"
-    albumArtist: "Akumi Agitogi"
-    comment: "Akumi Agitogi Purchased from Libro.fm."
-    group: "My Happy Marriage #2;Test Series 2 #5"
-    genre: "Fiction;Fantasy"
-    publisher: "Yen Audio"
-    publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
-    title: "My Happy Marriage, Vol. 2 - Track 001"
-    artist: "Akumi Agitogi"
-    composer: "Damien Haas;Miranda Parkin"
-    narrator: "Damien Haas;Miranda Parkin"
-    trackNumber: 1
-    embeddedPictures: [
-      [code mimetype];
-      [13 image/jpeg]
-    ]
+    meta: {
+      album: "My Happy Marriage, Vol. 2"
+      albumArtist: "Akumi Agitogi"
+      comment: "Akumi Agitogi Purchased from Libro.fm."
+      group: "My Happy Marriage #2;Test Series 2 #5"
+      genre: "Fantasy;Fiction"
+      publisher: "Yen Audio"
+      publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
+      title: "My Happy Marriage, Vol. 2 - Track 001"
+      artist: "Akumi Agitogi"
+      composer: "Damien Haas;Miranda Parkin"
+      narrator: "Damien Haas;Miranda Parkin"
+      trackNumber: 1
+      embeddedPictures: [
+        [code mimetype];
+        [13 image/jpeg]
+      ]
+      additionalFields: {
+        "MusicBrainz Album Artist Id": "3"
+        "MusicBrainz Artist Id": "3"
+      }
+    }
   }
   assert equal ($input | into_tone_format) $expected
 }
@@ -850,18 +872,24 @@ def test_tracks_into_tone_format_one_track [] {
         name: "Test Series 2"
         index: "5"
       }]
-      genres: ["Fiction" "Fantasy"]
+      genres: [
+        [name count];
+        ["Fantasy" 1]
+        ["Fiction" 1]
+      ]
       publishers: ["Yen Audio"]
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
       ]
       narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+        [name id];
+        ["Damien Haas" 1]
+        ["Miranda Parkin" 2]
       ]
       writers: [
-        "Akumi Agitogi"
+        [name id];
+        ["Akumi Agitogi" 3]
       ]
     }
     tracks: [{
@@ -869,40 +897,48 @@ def test_tracks_into_tone_format_one_track [] {
       artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
       comment: "Akumi Agitogi Purchased from Libro.fm."
       writers: [
-        "Akumi Agitogi"
+        [name id];
+        ["Akumi Agitogi" 3]
       ]
       narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+        [name id];
+        ["Damien Haas" 1]
+        ["Miranda Parkin" 2]
       ]
       index: 1
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
       ]
-      file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
+      file: "My Happy Marriage, Vol. 2/track 1.mp3"
     }]
   }
   let expected = [{
-    file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
     metadata: {
-      album: "My Happy Marriage, Vol. 2"
-      albumArtist: "Akumi Agitogi"
-      comment: "Akumi Agitogi Purchased from Libro.fm."
-      group: "My Happy Marriage #2;Test Series 2 #5"
-      genre: "Fiction;Fantasy"
-      publisher: "Yen Audio"
-      publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
-      title: "My Happy Marriage, Vol. 2 - Track 001"
-      artist: "Akumi Agitogi"
-      composer: "Damien Haas;Miranda Parkin"
-      narrator: "Damien Haas;Miranda Parkin"
-      trackNumber: 1
-      embeddedPictures: [
-        [code mimetype];
-        [13 image/jpeg]
-      ]
+      meta: {
+        album: "My Happy Marriage, Vol. 2"
+        albumArtist: "Akumi Agitogi"
+        comment: "Akumi Agitogi Purchased from Libro.fm."
+        group: "My Happy Marriage #2;Test Series 2 #5"
+        genre: "Fantasy;Fiction"
+        publisher: "Yen Audio"
+        publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
+        title: "My Happy Marriage, Vol. 2 - Track 001"
+        artist: "Akumi Agitogi"
+        composer: "Damien Haas;Miranda Parkin"
+        narrator: "Damien Haas;Miranda Parkin"
+        trackNumber: 1
+        embeddedPictures: [
+          [code mimetype];
+          [13 image/jpeg]
+        ]
+        additionalFields: {
+          "MusicBrainz Album Artist Id": "3"
+          "MusicBrainz Artist Id": "3"
+        }
+      }
     }
+    file: "My Happy Marriage, Vol. 2/track 1.mp3"
   }]
   assert equal ($input | tracks_into_tone_format) $expected
 }
@@ -921,18 +957,24 @@ def test_tracks_into_tone_format_two_tracks [] {
         name: "Test Series 2"
         index: "5"
       }]
-      genres: ["Fiction" "Fantasy"]
+      genres: [
+        [name count];
+        ["Fantasy" 1]
+        ["Fiction" 1]
+      ]
       publishers: ["Yen Audio"]
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
       ]
       narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+        [name id];
+        ["Damien Haas" 1]
+        ["Miranda Parkin" 2]
       ]
       writers: [
-        "Akumi Agitogi"
+        [name id];
+        ["Akumi Agitogi" 3]
       ]
     }
     tracks: [{
@@ -940,11 +982,13 @@ def test_tracks_into_tone_format_two_tracks [] {
       artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
       comment: "Akumi Agitogi Purchased from Libro.fm."
       writers: [
-        "Akumi Agitogi"
+        [name id];
+        ["Akumi Agitogi" 3]
       ]
       narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+        [name id];
+        ["Damien Haas" 1]
+        ["Miranda Parkin" 2]
       ]
       index: 1
       embedded_pictures: [
@@ -956,11 +1000,13 @@ def test_tracks_into_tone_format_two_tracks [] {
       title: "My Happy Marriage, Vol. 2 - Track 002"
       comment: "Akumi Agitogi Purchased from Libro.fm."
       writers: [
-        "Akumi Agitogi"
+        [name id];
+        ["Akumi Agitogi" 3]
       ]
       narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+        [name id];
+        ["Damien Haas" 1]
+        ["Miranda Parkin" 2]
       ]
       index: 2
       embedded_pictures: [
@@ -973,45 +1019,57 @@ def test_tracks_into_tone_format_two_tracks [] {
   let expected = [{
     file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
     metadata: {
-      album: "My Happy Marriage, Vol. 2"
-      albumArtist: "Akumi Agitogi"
-      comment: "Akumi Agitogi Purchased from Libro.fm."
-      group: "My Happy Marriage #2;Test Series 2 #5"
-      genre: "Fiction;Fantasy"
-      publisher: "Yen Audio"
-      publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
-      title: "My Happy Marriage, Vol. 2 - Track 001"
-      artist: "Akumi Agitogi"
-      composer: "Damien Haas;Miranda Parkin"
-      narrator: "Damien Haas;Miranda Parkin"
-      trackNumber: 1
-      embeddedPictures: [
-        [code mimetype];
-        [13 image/jpeg]
-      ]
+      meta: {
+        album: "My Happy Marriage, Vol. 2"
+        albumArtist: "Akumi Agitogi"
+        comment: "Akumi Agitogi Purchased from Libro.fm."
+        group: "My Happy Marriage #2;Test Series 2 #5"
+        genre: "Fantasy;Fiction"
+        publisher: "Yen Audio"
+        publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
+        title: "My Happy Marriage, Vol. 2 - Track 001"
+        artist: "Akumi Agitogi"
+        composer: "Damien Haas;Miranda Parkin"
+        narrator: "Damien Haas;Miranda Parkin"
+        trackNumber: 1
+        embeddedPictures: [
+          [code mimetype];
+          [13 image/jpeg]
+        ]
+        additionalFields: {
+          "MusicBrainz Album Artist Id": "3"
+          "MusicBrainz Artist Id": "3"
+        }
+      }
     }
   }, {
     file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 2.mp3"
     metadata: {
-      album: "My Happy Marriage, Vol. 2"
-      albumArtist: "Akumi Agitogi"
-      comment: "Akumi Agitogi Purchased from Libro.fm."
-      group: "My Happy Marriage #2;Test Series 2 #5"
-      genre: "Fiction;Fantasy"
-      publisher: "Yen Audio"
-      publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
-      title: "My Happy Marriage, Vol. 2 - Track 002"
-      artist: "Akumi Agitogi"
-      composer: "Damien Haas;Miranda Parkin"
-      narrator: "Damien Haas;Miranda Parkin"
-      trackNumber: 2
-      embeddedPictures: [
-        [code mimetype];
-        [13 image/jpeg]
-      ]
+      meta: {
+        album: "My Happy Marriage, Vol. 2"
+        albumArtist: "Akumi Agitogi"
+        comment: "Akumi Agitogi Purchased from Libro.fm."
+        group: "My Happy Marriage #2;Test Series 2 #5"
+        genre: "Fantasy;Fiction"
+        publisher: "Yen Audio"
+        publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
+        title: "My Happy Marriage, Vol. 2 - Track 002"
+        artist: "Akumi Agitogi"
+        composer: "Damien Haas;Miranda Parkin"
+        narrator: "Damien Haas;Miranda Parkin"
+        trackNumber: 2
+        embeddedPictures: [
+          [code mimetype];
+          [13 image/jpeg]
+        ]
+        additionalFields: {
+          "MusicBrainz Album Artist Id": "3"
+          "MusicBrainz Artist Id": "3"
+        }
+      }
     }
   }]
-  assert equal ($input | tracks_into_tone_format | sort-by metadata.trackNumber) $expected
+  assert equal ($input | tracks_into_tone_format | sort-by metadata.meta.trackNumber) $expected
 }
 
 def test_tracks_into_tone_format [] {
@@ -1544,15 +1602,18 @@ def test_parse_audible_asin_from_musicbrainz_release [] {
 def test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = [
-    "fiction"
-    "light novel"
-    "mystery"
-    "paranormal"
-    "psychological"
-    "romance"
-    "school life"
-    "supernatural"
-    "vampire"
+    [name count];
+    ["chapters" 1]
+    ["fiction" 1]
+    ["light novel" 1]
+    ["mystery" 1]
+    ["paranormal" 1]
+    ["psychological" 1]
+    ["romance" 1]
+    ["school life" 1]
+    ["supernatural" 1]
+    ["unabridged" 1]
+    ["vampire" 1]
   ]
   assert equal ($input | parse_tags_from_musicbrainz_release) $expected
 }
@@ -1560,29 +1621,70 @@ def test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
 def test_parse_tags_from_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = [
-    "adventure"
-    "fantasy"
-    "fiction"
-    "historical fantasy"
-    "light novel"
-    "mystery"
-    "paranormal"
-    "supernatural"
-    "urban fantasy"
+    [name count];
+    ["adventure" 1]
+    ["fantasy" 1]
+    ["fiction" 1]
+    ["historical fantasy" 1]
+    ["light novel" 1]
+    ["mystery" 1]
+    ["paranormal" 1]
+    ["supernatural" 1]
+    ["unabridged" 1]
+    ["urban fantasy" 1]
   ]
   assert equal ($input | parse_tags_from_musicbrainz_release) $expected
-}
-
-def test_parse_tags_from_musicbrainz_release_only_genres_baccano_vol_1 [] {
-  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
-  let expected = []
-  assert equal ($input | parse_tags_from_musicbrainz_release --only-genres) $expected
 }
 
 def test_parse_tags_from_musicbrainz_release [] {
   test_parse_tags_from_musicbrainz_release_baccano_vol_1
   test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01
-  test_parse_tags_from_musicbrainz_release_only_genres_baccano_vol_1
+}
+
+def test_parse_genres_from_musicbrainz_release_bakemonogatari_part_01 [] {
+  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
+  let expected = [
+    [name count];
+    ["fiction" 1]
+    ["light novel" 1]
+    ["mystery" 1]
+    ["paranormal" 1]
+    ["psychological" 1]
+    ["romance" 1]
+    ["school life" 1]
+    ["supernatural" 1]
+    ["vampire" 1]
+  ]
+  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
+}
+
+def test_parse_genres_from_musicbrainz_release_baccano_vol_1 [] {
+  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
+  let expected = [
+    [name count];
+    ["adventure" 1]
+    ["fantasy" 1]
+    ["fiction" 1]
+    ["historical fantasy" 1]
+    ["light novel" 1]
+    ["mystery" 1]
+    ["paranormal" 1]
+    ["supernatural" 1]
+    ["urban fantasy" 1]
+  ]
+  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
+}
+
+def test_parse_genres_from_musicbrainz_release_only_genres_baccano_vol_1 [] {
+  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
+  let expected = []
+  assert equal ($input | parse_genres --musicbrainz-genres-only) $expected
+}
+
+def test_parse_genres_from_musicbrainz_release [] {
+  test_parse_genres_from_musicbrainz_release_baccano_vol_1
+  test_parse_genres_from_musicbrainz_release_bakemonogatari_part_01
+  test_parse_genres_from_musicbrainz_release_only_genres_baccano_vol_1
 }
 
 def test_parse_distributors_from_musicbrainz_release_bakemonogatari_part_01 [] {
@@ -1622,6 +1724,26 @@ def test_parse_chapters_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let expected = [
     [index start length title];
     [0 0ms 15000ms "Opening Credits"]
+    [1, 15000000000ns, 55000000000ns, Copyright]
+    [2, 70000000000ns, 370000000000ns, "Chapter One: Hitagi Crab, Chapter 001"]
+    [3, 440000000000ns, 904000000000ns, "Chapter One: Hitagi Crab, Chapter 002"]
+    [4, 1344000000000ns, 1437000000000ns, "Chapter One: Hitagi Crab, Chapter 003"]
+    [5, 2781000000000ns, 1581000000000ns, "Chapter One: Hitagi Crab, Chapter 004"]
+    [6, 4362000000000ns, 2430000000000ns, "Chapter One: Hitagi Crab, Chapter 005"]
+    [7, 6792000000000ns, 1958000000000ns, "Chapter One: Hitagi Crab, Chapter 006"]
+    [8, 8750000000000ns, 692000000000ns, "Chapter One: Hitagi Crab, Chapter 007"]
+    [9, 9442000000000ns, 68000000000ns, "Chapter One: Hitagi Crab, Chapter 008"]
+    [10, 9510000000000ns, 439000000000ns, "Chapter Two: Mayoi Snail, Chapter 001"]
+    [11, 9949000000000ns, 2782000000000ns, "Chapter Two: Mayoi Snail, Chapter 002"]
+    [12, 12731000000000ns, 1420000000000ns, "Chapter Two: Mayoi Snail, Chapter 003"]
+    [13, 14151000000000ns, 1678000000000ns, "Chapter Two: Mayoi Snail, Chapter 004"]
+    [14, 15829000000000ns, 1863000000000ns, "Chapter Two: Mayoi Snail, Chapter 005"]
+    [15, 17692000000000ns, 3922000000000ns, "Chapter Two: Mayoi Snail, Chapter 006"]
+    [16, 21614000000000ns, 1354000000000ns, "Chapter Two: Mayoi Snail, Chapter 007"]
+    [17, 22968000000000ns, 1319000000000ns, "Chapter Two: Mayoi Snail, Chapter 008"]
+    [18, 24287000000000ns, 154000000000ns, "Chapter Two: Mayoi Snail, Chapter 009"]
+    [19, 24441000000000ns, 230000000000ns, Afterword]
+    [20, 24671000000000ns, 30000000000ns, "End Credits"]
   ]
   assert equal ($input | parse_chapters_from_musicbrainz_release) $expected
 }
@@ -1678,22 +1800,48 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
         [name id];
         ["Ryohgo Narita" "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab"]
       ]
-      musicbrainz_release_country: XW
-      musicbrainz_release_status: Official
+      musicbrainz_release_country: "XW"
+      musicbrainz_release_status: "Official"
       amazon_asin: "B0CRSJ8RQV"
       audible_asin: "B0CRSPBW6X"
       genres: [
-        adventure
-        fantasy
-        fiction
-        "historical fantasy"
-        "light novel"
-        mystery
-        paranormal
-        supernatural
-        "urban fantasy"
+        [name count];
+        [adventure 1]
+        [fantasy 1]
+        [fiction 1]
+        ["historical fantasy" 1]
+        ["light novel" 1]
+        [mystery 1]
+        [paranormal 1]
+        [supernatural 1]
+        ["urban fantasy" 1]
       ],
-      publication_date: 2024-05-14T00:00:00-05:00
+      tags: [
+        [name count];
+        [adventure 1]
+        [fantasy 1]
+        [fiction 1]
+        ["historical fantasy" 1]
+        ["light novel" 1]
+        [mystery 1]
+        [paranormal 1]
+        [supernatural 1]
+        [unabridged 1]
+        ["urban fantasy" 1]
+      ],
+      release_tags: [
+        [name count];
+        [adventure 1]
+        [fantasy 1]
+        [fiction 1]
+        ["historical fantasy" 1]
+        ["light novel" 1]
+        [mystery 1]
+        [paranormal 1]
+        [unabridged 1]
+        ["urban fantasy" 1]
+      ],
+      publication_date: ("2024-05-14T00:00:00-05:00" | into datetime)
       series: [
         [name id index];
         [
@@ -1708,6 +1856,10 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
         ]
       ]
       front_cover_available: true
+      distributors: [
+        [id name];
+        ["926e2da3-af75-4571-8159-fcceb8a0aed3" "Audible Inc."]
+      ]
       script: "Latn"
       language: "eng"
     }
@@ -1718,8 +1870,11 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
         title
         musicbrainz_recording_id
         genres
+        tags
         musicbrainz_work_ids
         narrators
+        writers
+        duration
       ];
       [
         1
@@ -1727,25 +1882,54 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
         "Baccano! Vol. 1: The Rolling Bootlegs"
         "7c7064d1-fd42-414c-a8d3-52cce1e58ad1"
         [
-          adventure
-          fantasy
-          fiction
-          "historical fantasy"
-          "light novel"
-          mystery
-          paranormal
-          supernatural
-          "urban fantasy"
+          [name count];
+          [adventure 1]
+          [fantasy 1]
+          [fiction 1]
+          ["historical fantasy" 1]
+          ["light novel" 1]
+          [mystery 1]
+          [paranormal 1]
+          [supernatural 1]
+          ["urban fantasy" 1]
+        ]
+        [
+          [name count];
+          [adventure 1]
+          [fantasy 1]
+          [fiction 1]
+          ["historical fantasy" 1]
+          ["light novel" 1]
+          [mystery 1]
+          [paranormal 1]
+          [supernatural 1]
+          [unabridged 1]
+          ["urban fantasy" 1]
         ]
         ["4b5f1fcc-1765-43c3-89f9-a20998cfb5a4"]
         [
-          [name id];
-          ["Michael Butler Murray", "22c39a37-28b7-4ff2-aa0b-67f93279a1ef"]
+          [id name];
+          ["22c39a37-28b7-4ff2-aa0b-67f93279a1ef" "Michael Butler Murray"]
         ]
+        [
+          [id name];
+          ["efc0e95e-2d3e-4219-8ebb-28ed3751e6ab" "Ryohgo Narita"]
+        ]
+        22996000000000ns
       ]
     ]
   }
-  assert equal ($input | parse_musicbrainz_release) $expected
+  let actual = ($input | parse_musicbrainz_release)
+  assert equal ($actual | get book | columns) ($expected | get book | columns)
+  assert equal ($actual | get book | get genres) ($expected | get book | get genres)
+  assert equal ($actual | get book | get tags) ($expected | get book | get tags)
+  assert equal ($actual | get book | get release_tags) ($expected | get book | get release_tags)
+  assert equal ($actual | get book | get series) ($expected | get book | get series)
+  assert equal ($actual | get book | get distributors) ($expected | get book | get distributors)
+  assert equal ($actual | get book | get writers) ($expected | get book | get writers)
+  assert equal ($actual | get book) ($expected | get book)
+  assert equal ($actual | get tracks) ($expected | get tracks)
+  assert equal $actual $expected
 }
 
 def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
@@ -1768,17 +1952,46 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
       musicbrainz_release_country: "XW"
       musicbrainz_release_status: "Official"
       genres: [
-        fiction
-        "light novel"
-        mystery
-        paranormal
-        psychological
-        romance
-        "school life"
-        supernatural
-        vampire
+        [name count];
+        [fiction 1]
+        ["light novel" 1]
+        [mystery 1]
+        [paranormal 1]
+        [psychological 1]
+        [romance 1]
+        ["school life" 1]
+        [supernatural 1]
+        [vampire 1]
       ]
-      publication_date: 2020-03-24T00:00:00-05:00
+      tags: [
+        [name count];
+        [chapters 1]
+        [fiction 1]
+        ["light novel" 1]
+        [mystery 1]
+        [paranormal 1]
+        [psychological 1]
+        [romance 1]
+        ["school life" 1]
+        [supernatural 1]
+        [unabridged 1]
+        [vampire 1]
+      ]
+      release_tags: [
+        [name count];
+        [chapters 1]
+        [fiction 1]
+        ["light novel" 1]
+        [mystery 1]
+        [paranormal 1]
+        [psychological 1]
+        [romance 1]
+        ["school life" 1]
+        [supernatural 1]
+        [unabridged 1]
+        [vampire 1]
+      ]
+      publication_date: ("2020-03-24T00:00:00-05:00" | into datetime)
       series: [
         [name id index];
         [
@@ -1803,39 +2016,31 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
           "1"
         ]
       ]
-      chapters: "[00:00:00.000] Opening Credits
-[00:00:00.000] Copyright
-[00:00:00.000] Chapter One: Hitagi Crab, Chapter 001
-[00:00:00.000] Chapter One: Hitagi Crab, Chapter 002
-[00:00:00.000] Chapter One: Hitagi Crab, Chapter 003
-[00:00:00.000] Chapter One: Hitagi Crab, Chapter 004
-[00:00:00.000] Chapter One: Hitagi Crab, Chapter 005
-[00:00:00.000] Chapter One: Hitagi Crab, Chapter 006
-[00:00:00.000] Chapter One: Hitagi Crab, Chapter 007
-[00:00:00.000] Chapter One: Hitagi Crab, Chapter 008
-[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 001
-[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 002
-[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 003
-[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 004
-[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 005
-[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 006
-[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 007
-[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 008
-[00:00:00.000] Chapter Two: Mayoi Snail, Chapter 009
-[00:00:00.000] Afterword
-[00:00:00.000] End Credits"
+      chapters: [[index, start, length, title]; [0, 0ns, 15000000000ns, "Opening Credits"], [1, 15000000000ns, 55000000000ns, Copyright], [2, 70000000000ns, 370000000000ns, "Chapter One: Hitagi Crab, Chapter 001"], [3, 440000000000ns, 904000000000ns, "Chapter One: Hitagi Crab, Chapter 002"], [4, 1344000000000ns, 1437000000000ns, "Chapter One: Hitagi Crab, Chapter 003"], [5, 2781000000000ns, 1581000000000ns, "Chapter One: Hitagi Crab, Chapter 004"], [6, 4362000000000ns, 2430000000000ns, "Chapter One: Hitagi Crab, Chapter 005"], [7, 6792000000000ns, 1958000000000ns, "Chapter One: Hitagi Crab, Chapter 006"], [8, 8750000000000ns, 692000000000ns, "Chapter One: Hitagi Crab, Chapter 007"], [9, 9442000000000ns, 68000000000ns, "Chapter One: Hitagi Crab, Chapter 008"], [10, 9510000000000ns, 439000000000ns, "Chapter Two: Mayoi Snail, Chapter 001"], [11, 9949000000000ns, 2782000000000ns, "Chapter Two: Mayoi Snail, Chapter 002"], [12, 12731000000000ns, 1420000000000ns, "Chapter Two: Mayoi Snail, Chapter 003"], [13, 14151000000000ns, 1678000000000ns, "Chapter Two: Mayoi Snail, Chapter 004"], [14, 15829000000000ns, 1863000000000ns, "Chapter Two: Mayoi Snail, Chapter 005"], [15, 17692000000000ns, 3922000000000ns, "Chapter Two: Mayoi Snail, Chapter 006"], [16, 21614000000000ns, 1354000000000ns, "Chapter Two: Mayoi Snail, Chapter 007"], [17, 22968000000000ns, 1319000000000ns, "Chapter Two: Mayoi Snail, Chapter 008"], [18, 24287000000000ns, 154000000000ns, "Chapter Two: Mayoi Snail, Chapter 009"], [19, 24441000000000ns, 230000000000ns, Afterword], [20, 24671000000000ns, 30000000000ns, "End Credits"]]
       front_cover_available: true
+      distributors: [
+        [id name];
+        ["158b7958-b872-4944-88a5-fd9d75c5d2e8", "Libro.fm"]
+      ]
       script: "Latn"
       language: "eng"
     }
     tracks: [
-      [index, musicbrainz_track_id, title, musicbrainz_recording_id, musicbrainz_work_ids, narrators];
-      [1, "1af64466-4b91-4d49-8c48-743c8bbdc542", "Opening Credits", "ddf19afa-8d0a-4d7d-95f5-c6f0ad6daaf5", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"]]], [2, "7a41a13e-18f2-48a2-943e-ab65e646800b", Copyright, "19af78c6-fa48-4b1d-b211-c916dbdb29cc", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"]]], [3, "ee624e13-4ba9-4ebb-ae65-f3bb4da8f09c", "Chapter One: Hitagi Crab, Chapter 001", "6a9b6fcf-bcdf-4077-9f92-21153773ae7c", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [4, "e54e6d65-a8ef-481a-b5cc-e1df1b34fd34", "Chapter One: Hitagi Crab, Chapter 002", "eff08c59-06fe-4b4c-8f12-923d8228fa45", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [5, "1fe66e7b-defe-4f6a-89ba-a63e46bd57d2", "Chapter One: Hitagi Crab, Chapter 003", "17cc0da0-ee32-4686-81b7-85202cc29775", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [6, "5790db34-a353-4648-9c90-b067f4c97b18", "Chapter One: Hitagi Crab, Chapter 004", "359596d6-213a-49e2-a0b4-1c01968ca660", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [7, "4a96c1b7-20a9-4e39-becf-56dfe96423a0", "Chapter One: Hitagi Crab, Chapter 005", "83fb8681-62eb-4b31-9269-bf2e2d3703d0", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [8, "f68880dd-fd54-459e-a3f6-32a0c405cc93", "Chapter One: Hitagi Crab, Chapter 006", "99a7fc25-4765-4df7-951e-7f6e870cab85", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [9, "46f366db-03b8-47e3-822b-e5088bdb6194", "Chapter One: Hitagi Crab, Chapter 007", "85176035-3856-443f-bb17-d602d0b6a4c0", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [10, "c2ee3a84-58c2-4152-a420-7d55d58bd05e", "Chapter One: Hitagi Crab, Chapter 008", "a201d5c4-a6f7-4609-abc2-dcb54052c7ea", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [11, "88981d2d-9af9-4bf9-a96a-e040b9afe48b", "Chapter Two: Mayoi Snail, Chapter 001", "59f48ed4-bfbf-4b4c-8df5-d5133366da4d", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [12, "c11d5faa-4893-4825-98b3-c1b200957800", "Chapter Two: Mayoi Snail, Chapter 002", "bda5b5e5-9ed2-4ce2-9221-c8797e1247d8", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [13, "ce379ad4-e31c-4ae8-83ea-c5ebe4ed57ec", "Chapter Two: Mayoi Snail, Chapter 003", "6dee17b8-2198-44df-8841-a0f311771623", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [14, "a6a8838d-4b2f-4e4c-8c3b-58b6aa2df200", "Chapter Two: Mayoi Snail, Chapter 004", "01aadb9b-055c-4839-b8da-b7f146493b23", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [15, "c688dcc3-5200-4fd7-8566-15fc29b75c09", "Chapter Two: Mayoi Snail, Chapter 005", "7feca352-c937-4220-8dee-28ebfaa3bc6d", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [16, "9822b36c-d3dc-4f4a-b200-5519c09fae62", "Chapter Two: Mayoi Snail, Chapter 006", "5798acc6-7724-4af8-9078-89c475a12ed2", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [17, "9e2f4206-f380-4a50-8d3f-43faf675e429", "Chapter Two: Mayoi Snail, Chapter 007", "d3396b1a-5896-4c39-b5d9-37d478a7f4f9", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [18, "85e22b41-9038-4fe0-acaa-adfd8d5d60c5", "Chapter Two: Mayoi Snail, Chapter 008", "60ee765c-41d4-477a-b6b4-85d280c953d5", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [19, "1948d583-f1c3-4997-9234-fe96479dd0a5", "Chapter Two: Mayoi Snail, Chapter 009", "88df0c01-8617-4796-a41b-ad4463fd0cc7", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]], [20, "0146128e-31d1-4e37-be88-cebc09f178dd", Afterword, "5b57067e-a537-4075-bb59-2240af0fcc97", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"]]], [21, "ab132164-d144-4c71-97f1-b35966da72a5", "End Credits", "3b927907-6b99-4437-920c-70f387a0437e", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]]]
+      [index, musicbrainz_track_id, title, musicbrainz_recording_id, musicbrainz_work_ids, narrators, writers, duration]; [1, "1af64466-4b91-4d49-8c48-743c8bbdc542", "Opening Credits", "ddf19afa-8d0a-4d7d-95f5-c6f0ad6daaf5", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 15000000000ns], [2, "7a41a13e-18f2-48a2-943e-ab65e646800b", Copyright, "19af78c6-fa48-4b1d-b211-c916dbdb29cc", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 55000000000ns], [3, "ee624e13-4ba9-4ebb-ae65-f3bb4da8f09c", "Chapter One: Hitagi Crab, Chapter 001", "6a9b6fcf-bcdf-4077-9f92-21153773ae7c", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 370000000000ns], [4, "e54e6d65-a8ef-481a-b5cc-e1df1b34fd34", "Chapter One: Hitagi Crab, Chapter 002", "eff08c59-06fe-4b4c-8f12-923d8228fa45", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 904000000000ns], [5, "1fe66e7b-defe-4f6a-89ba-a63e46bd57d2", "Chapter One: Hitagi Crab, Chapter 003", "17cc0da0-ee32-4686-81b7-85202cc29775", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 1437000000000ns], [6, "5790db34-a353-4648-9c90-b067f4c97b18", "Chapter One: Hitagi Crab, Chapter 004", "359596d6-213a-49e2-a0b4-1c01968ca660", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 1581000000000ns], [7, "4a96c1b7-20a9-4e39-becf-56dfe96423a0", "Chapter One: Hitagi Crab, Chapter 005", "83fb8681-62eb-4b31-9269-bf2e2d3703d0", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 2430000000000ns], [8, "f68880dd-fd54-459e-a3f6-32a0c405cc93", "Chapter One: Hitagi Crab, Chapter 006", "99a7fc25-4765-4df7-951e-7f6e870cab85", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 1958000000000ns], [9, "46f366db-03b8-47e3-822b-e5088bdb6194", "Chapter One: Hitagi Crab, Chapter 007", "85176035-3856-443f-bb17-d602d0b6a4c0", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 692000000000ns], [10, "c2ee3a84-58c2-4152-a420-7d55d58bd05e", "Chapter One: Hitagi Crab, Chapter 008", "a201d5c4-a6f7-4609-abc2-dcb54052c7ea", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 68000000000ns], [11, "88981d2d-9af9-4bf9-a96a-e040b9afe48b", "Chapter Two: Mayoi Snail, Chapter 001", "59f48ed4-bfbf-4b4c-8df5-d5133366da4d", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 439000000000ns], [12, "c11d5faa-4893-4825-98b3-c1b200957800", "Chapter Two: Mayoi Snail, Chapter 002", "bda5b5e5-9ed2-4ce2-9221-c8797e1247d8", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 2782000000000ns], [13, "ce379ad4-e31c-4ae8-83ea-c5ebe4ed57ec", "Chapter Two: Mayoi Snail, Chapter 003", "6dee17b8-2198-44df-8841-a0f311771623", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 1420000000000ns], [14, "a6a8838d-4b2f-4e4c-8c3b-58b6aa2df200", "Chapter Two: Mayoi Snail, Chapter 004", "01aadb9b-055c-4839-b8da-b7f146493b23", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 1678000000000ns], [15, "c688dcc3-5200-4fd7-8566-15fc29b75c09", "Chapter Two: Mayoi Snail, Chapter 005", "7feca352-c937-4220-8dee-28ebfaa3bc6d", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 1863000000000ns], [16, "9822b36c-d3dc-4f4a-b200-5519c09fae62", "Chapter Two: Mayoi Snail, Chapter 006", "5798acc6-7724-4af8-9078-89c475a12ed2", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 3922000000000ns], [17, "9e2f4206-f380-4a50-8d3f-43faf675e429", "Chapter Two: Mayoi Snail, Chapter 007", "d3396b1a-5896-4c39-b5d9-37d478a7f4f9", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 1354000000000ns], [18, "85e22b41-9038-4fe0-acaa-adfd8d5d60c5", "Chapter Two: Mayoi Snail, Chapter 008", "60ee765c-41d4-477a-b6b4-85d280c953d5", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 1319000000000ns], [19, "1948d583-f1c3-4997-9234-fe96479dd0a5", "Chapter Two: Mayoi Snail, Chapter 009", "88df0c01-8617-4796-a41b-ad4463fd0cc7", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee"], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez"], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 154000000000ns], [20, "0146128e-31d1-4e37-be88-cebc09f178dd", Afterword, "5b57067e-a537-4075-bb59-2240af0fcc97", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 230000000000ns], [21, "ab132164-d144-4c71-97f1-b35966da72a5", "End Credits", "3b927907-6b99-4437-920c-70f387a0437e", ["1f1a315c-49fe-4d4c-9c07-1903a113f984"], [[id, name]; ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein"]], [[id, name]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN]], 30000000000ns]
     ]
   }
-  assert equal ($input | parse_musicbrainz_release | get book) ($expected | get book)
-  assert equal ($input | parse_musicbrainz_release | get tracks) ($expected | get tracks)
-  assert equal ($input | parse_musicbrainz_release) $expected
+  let actual = ($input | parse_musicbrainz_release)
+  assert equal ($actual | get book | columns) ($expected | get book | columns)
+  assert equal ($actual | get book | get genres) ($expected | get book | get genres)
+  assert equal ($actual | get book | get tags) ($expected | get book | get tags)
+  assert equal ($actual | get book | get release_tags) ($expected | get book | get release_tags)
+  assert equal ($actual | get book | get chapters) ($expected | get book | get chapters)
+  assert equal ($actual | get book | get series) ($expected | get book | get series)
+  assert equal ($actual | get book | get distributors) ($expected | get book | get distributors)
+  assert equal ($actual | get book | get writers) ($expected | get book | get writers)
+  assert equal ($actual | get book) ($expected | get book)
+  assert equal ($actual | get tracks) ($expected | get tracks)
+  assert equal $actual $expected
 }
 
 def test_parse_musicbrainz_release [] {
@@ -1855,7 +2060,7 @@ def main []: {
   test_into_tone_format
   test_tracks_into_tone_format
   test_parse_series_from_release_group
-  test_parse_release_ids_from_acoustid_response
+  # test_parse_release_ids_from_acoustid_response
   test_determine_releases_from_acoustid_fingerprint_matches
   test_parse_narrators_from_musicbrainz_relations
   test_parse_works_from_musicbrainz_relations

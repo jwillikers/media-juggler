@@ -12317,6 +12317,10 @@
   "id": "b2c07b6e-0f22-44b1-a87a-99e0f9c9623b",
   "tags": [
     {
+      "name": "chapters",
+      "count": 1
+    },
+    {
       "name": "fiction",
       "count": 1
     },

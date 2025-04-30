@@ -2524,7 +2524,12 @@ export def into_tone_format []: record -> record {
   let additionalFields = (
     {}
     # book metadata
-    | upsert_if_value tags ($metadata.book | get --ignore-errors tags | str join ";")
+    | upsert_if_value tags (
+      if "tags" in $metadata.book and ($metadata.book.tags | is-not-empty) and "name" in ($metadata.book.tags | columns) {
+        $metadata.book.tags.name | uniq | str join ";"
+      }
+    )
+    | upsert_if_value tags ($metadata.book | get --ignore-errors tags | get --ignore-errors name | uniq | str join ";")
     | upsert_if_value "MusicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | str join ";")
     | upsert_if_value "MusicBrainz Album Artist Id" ($metadata.book | get --ignore-errors writers | get --ignore-errors id | str join ";")
     | upsert_if_present "MusicBrainz Release Group Id" $metadata.book musicbrainz_release_group_id
@@ -2562,7 +2567,11 @@ export def into_tone_format []: record -> record {
       | upsert_if_present description $metadata.book
       | upsert_if_present comment $metadata.book
       | upsert_if_value group $group
-      | upsert_if_value genre ($metadata.book | get --ignore-errors genres | str join ";")
+      | upsert_if_value genre (
+        if "genres" in $metadata.book and ($metadata.book.genres | is-not-empty) and "name" in ($metadata.book.genres | columns) {
+          $metadata.book.genres.name | uniq | str join ";"
+        }
+      )
       # todo I'm not sure audiobookshelf supports multiple values for the publisher
       | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | str join ";")
       | upsert_if_value publishingDate $publication_date
@@ -3121,19 +3130,21 @@ export def parse_series_from_musicbrainz_release []: record -> table {
   )
 }
 
-# Parse tags from a MusicBrainz release, release group, and recordings
+export const musicbrainz_non_genre_tags = ["abridged", "chapters", "unabridged"]
+
+# Parse genres from a MusicBrainz release, release group, and recordings
 #
 # The genres should also be parsed from associated series and works, but these require separate API calls.
 #
 # MusicBrainz doesn't really provide genres for audiobooks yet, so most genres are directly imported from tags.
-export def parse_tags_from_musicbrainz_release [
-  --only-genres # Parse only genres instead of using tags
+export def parse_genres_from_musicbrainz_release [
+  --musicbrainz-genres-only # Parse only official MusicBrainz genres instead of using tags
 ]: record -> table {
   let metadata = $in
   if ($metadata | is-empty) {
     return null
   }
-  if $only_genres {
+  if $musicbrainz_genres_only {
     (
       []
       | append (
@@ -3155,9 +3166,12 @@ export def parse_tags_from_musicbrainz_release [
         | get --ignore-errors genres
         | flatten
       )
-      | get --ignore-errors name
+      | select name count
       | uniq
-      | sort
+      # sort by the count, highest to lowest, and then name alphabetically
+      | sort-by --custom {|a, b|
+        $a.count >= $b.count and $a.name < $b.name
+      }
     )
   } else {
     (
@@ -3181,14 +3195,55 @@ export def parse_tags_from_musicbrainz_release [
         | get --ignore-errors tags
         | flatten
       )
-      | get --ignore-errors name
+      | select name count
       | uniq
       | filter {|tag|
-        $tag != "unabridged"
+        $tag.name not-in $musicbrainz_non_genre_tags
       }
-      | sort
+      # sort by the count, highest to lowest, and then name alphabetically
+      | sort-by --custom {|a, b|
+        $a.count >= $b.count and $a.name < $b.name
+      }
     )
   }
+}
+
+# Parse tags from a MusicBrainz release, release group, and recordings
+#
+# The tags should also be parsed from associated series and works, but these require separate API calls.
+export def parse_tags_from_musicbrainz_release []: record -> table {
+  let metadata = $in
+  if ($metadata | is-empty) {
+    return null
+  }
+  (
+    []
+    | append (
+      $metadata
+      | get --ignore-errors tags
+    )
+    | append (
+      $metadata
+      | get --ignore-errors release-group
+      | get --ignore-errors tags
+    )
+    # recordings
+    | append (
+      $metadata
+      | get media
+      | get tracks
+      | flatten
+      | get recording
+      | get --ignore-errors tags
+      | flatten
+    )
+    | select name count
+    | uniq
+    # sort by the count, highest to lowest, and then name alphabetically
+    | sort-by --custom {|a, b|
+      $a.count >= $b.count and $a.name < $b.name
+    }
+  )
 }
 
 # Parse the artist names and ids from the MusicBrainz artist credits
@@ -3366,10 +3421,25 @@ export def parse_musicbrainz_release []: record -> record {
         $track
         | get recording
         | get --ignore-errors tags
-        | get --ignore-errors name
+        | select name count
         | uniq
         | filter {|tag|
-          $tag != "unabridged"
+          $tag.name not-in $musicbrainz_non_genre_tags
+        }
+        # sort by the count, highest to lowest, and then name alphabetically
+        | sort-by --custom {|a, b|
+          $a.count >= $b.count and $a.name < $b.name
+        }
+      )
+      let tags = (
+        $track
+        | get recording
+        | get --ignore-errors tags
+        | select name count
+        | uniq
+        # sort by the count, highest to lowest, and then name alphabetically
+        | sort-by --custom {|a, b|
+          $a.count >= $b.count and $a.name < $b.name
         }
       )
       let title = (
@@ -3388,6 +3458,7 @@ export def parse_musicbrainz_release []: record -> record {
         | upsert_if_present title $track
         | upsert_if_present musicbrainz_recording_id $track.recording id
         | upsert_if_value genres $genres
+        | upsert_if_value tags $tags
         | upsert_if_value musicbrainz_work_ids $musicbrainz_work_ids
         # This needs to just be the writers ids for audiobookshelf...
         # | upsert_if_value musicbrainz_artist_ids $musicbrainz_artist_ids
@@ -3466,10 +3537,20 @@ export def parse_musicbrainz_release []: record -> record {
       $audible_asins | first
     }
   )
-  let genres = $metadata | parse_tags_from_musicbrainz_release
+  let genres = $metadata | parse_genres_from_musicbrainz_release
+  let tags = $metadata | parse_tags_from_musicbrainz_release
+  let release_tags = (
+    $metadata
+    | get --ignore-errors tags
+    | select name count
+    | uniq
+    # sort by the count, highest to lowest, and then name alphabetically
+    | sort-by --custom {|a, b|
+      $a.count >= $b.count and $a.name < $b.name
+    }
+  )
 
   # Chapters can come from multi-track releases, otherwise, they need to found in another release
-  # todo Attempt to look up chapters from related release for m4b files
   let chapters = (
     if ($tracks | length) > 1 {
       $metadata | parse_chapters_from_musicbrainz_release
@@ -3507,13 +3588,13 @@ export def parse_musicbrainz_release []: record -> record {
     | upsert_if_present amazon_asin $metadata asin
     | upsert_if_value audible_asin $audible_asin
     | upsert_if_value genres $genres
+    | upsert_if_value tags $tags
+    | upsert_if_value release_tags $release_tags
     | upsert_if_value publication_date $publication_date
     | upsert_if_value series $series
     | upsert_if_value chapters $chapters
     | upsert_if_value front_cover_available $front_cover_available
     | upsert_if_value distributors $distributors
-    # This needs to just be the writers ids for audiobookshelf...
-    # | upsert_if_value musicbrainz_artist_ids $musicbrainz_artist_ids
     | (
       let input = $in;
       if "text-representation" in $metadata {
@@ -3537,7 +3618,11 @@ export def fetch_and_parse_musicbrainz_release [
   --retries: int = 3
   --retry-delay: duration = 5sec
 ]: string -> record {
-  $in | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay | get body | parse_musicbrainz_release
+  let response = $in | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay
+  if ($response | is-empty) {
+    return null
+  }
+  $response | parse_musicbrainz_release
 }
 
 
@@ -3598,7 +3683,7 @@ export def tag_audiobook_from_acoustid [
     log error "AcoustID responses missing"
     return null
   }
-  log info $"acoustid_responses: ($acoustid_responses | to nuon)"
+  # log info $"acoustid_responses: ($acoustid_responses | to nuon)"
   let release_ids = $acoustid_responses | determine_releases_from_acoustid_fingerprint_matches
   if ($release_ids | is-empty) {
     log error "No common release ids found for the AcoustID fingerprints"
@@ -3660,12 +3745,13 @@ export def tag_audiobook_from_acoustid [
 # Unlike the format tone uses, the start and length fields are durations.
 # For output via tone, these need to be converted back to milliseconds as integers.
 export def parse_chapters_from_tone []: table<index: int, start: int, length: int, title: string> -> table<index: int, start: duration, length: duration, title: string> {
-  $in | each {|chapter|
-    (
-      $chapter
-      | update start ($chapter.start | into duration --unit ms)
-      | update length ($chapter.length | into duration --unit ms)
-    )
+  $in | enumerate | each {|chapter|
+    {
+      index: $chapter.index
+      start: ($chapter.item.start | into duration --unit ms)
+      length: ($chapter.item.length | into duration --unit ms)
+      title: $chapter.item.title
+    }
   }
 }
 
@@ -3812,6 +3898,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
     $received_metadata | parse_musicbrainz_release
   }
 
+  # todo Make this into a separate function.
   let candidates = $candidates | filter {|candidate|
     if "distributors" in $release.book and ($release.book.distributors | is-not-empty) {
       if "distributors" not-in $candidate.book {
@@ -3835,11 +3922,42 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   if ($candidates | is-empty) {
     return null
   }
+  # Use the chapters tag to decide between multiple remaining candidates
+  # todo Make into function.
+  let candidates = (
+    if ($candidates | length) > 1 {
+      let sorted_candidates = (
+        $candidates
+        | filter {|candidate|
+          if "release_tags" in $candidate.book {
+            "chapters" in ($candidate.book.release_tags | select name)
+          } else {
+            false
+          }
+        }
+        | sort-by {|a, b|
+          (
+            ($a.book.release_tags | where name == "chapters" | select count | first)
+            <
+            ($b.book.release_tags | where name == "chapters" | select count | first)
+          )
+        }
+      )
+      let highest_count = ($sorted_candidates | first | get book.release_tags | where name == "chapters" | select count | first)
+      $sorted_candidates | filter {|candidate|
+        $highest_count >= ($candidate.book.release_tags | where name == "chapters" | select count | first)
+      }
+    } else {
+      $candidates
+    }
+  )
   if ($candidates | length) > 1 {
-    log info $"More than one MusicBrainz Release candidate for chapters found: ($candidates | get book.id)"
+    log warning $"More than one MusicBrainz Release candidate for chapters found: ($candidates | get book.id). Please add or vote up the chapters tag on the desired release."
     return null
   }
-  $candidates | first | get book.chapters
+  let candidate = $candidates | first
+  log info $"Using the MusicBrainz Release (ansi yellow)($candidate.book.musicbrainz_release_id)(ansi reset) for chapters"
+  $candidate | get book.chapters
 }
 
 # Tag the given audio files using the given MusicBrainz release id
