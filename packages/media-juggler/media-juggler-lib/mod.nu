@@ -2507,15 +2507,30 @@ export def convert_series_for_group_tag []: table<name: string, index: string> -
 export def into_tone_format []: record -> record {
   let metadata = $in
   let group = (
-    if series in $metadata.book and $metadata.book.series != null {
+    if "series" in $metadata.book and $metadata.book.series != null {
       $metadata.book.series | convert_series_for_group_tag
     }
   )
   let publication_date = (
     if "publication_date" in $metadata.book and ($metadata.book.publication_date | is-not-empty) {
-      $metadata.book.publication_date | format date '%+'
+      $metadata.book.publication_date | format date '%Y-%m-%dT%H:%M:%SZ'
     }
   )
+  # let recording_date = (
+  #   if "publication_date" in $metadata.book and ($metadata.book.publication_date | is-not-empty) {
+  #     $metadata.book.publication_date | format date '%Y-%m-%dT%H:%M:%SZ'
+  #   }
+  # )
+  # let date = (
+  #   if "publication_date" in $metadata.book and ($metadata.book.publication_date | is-not-empty) {
+  #     $metadata.book.publication_date | format date '%Y-%m-%d'
+  #   }
+  # )
+  # let year = (
+  #   if "publication_date" in $metadata.book and ($metadata.book.publication_date | is-not-empty) {
+  #     $metadata.book.publication_date | format date '%Y'
+  #   }
+  # )
   let chapters = (
     if "chapters" in $metadata.book and ($metadata.book.chapters | is-not-empty) {
       $metadata.book.chapters | chapters_into_tone_format
@@ -2529,7 +2544,6 @@ export def into_tone_format []: record -> record {
         $metadata.book.tags.name | uniq | str join ";"
       }
     )
-    | upsert_if_value tags ($metadata.book | get --ignore-errors tags | get --ignore-errors name | uniq | str join ";")
     | upsert_if_value "MusicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | str join ";")
     | upsert_if_value "MusicBrainz Album Artist Id" ($metadata.book | get --ignore-errors writers | get --ignore-errors id | str join ";")
     | upsert_if_present "MusicBrainz Release Group Id" $metadata.book musicbrainz_release_group_id
@@ -2538,8 +2552,17 @@ export def into_tone_format []: record -> record {
     | upsert_if_present "MusicBrainz Album Status" $metadata.book musicbrainz_release_status
     | upsert_if_present script $metadata.book
     | upsert_if_present Media $metadata.book
+    # For audiobookshelf to be happy, publisher has to go in additionalFields for some reason.
+    | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
+    | upsert_if_present isbn $metadata.book
+    # For audiobookshelf to be happy, language has to go in additionalFields for some reason.
+    | upsert_if_present language $metadata.book
+    # | upsert_if_value year $year
+    # | upsert_if_value date $date
+    # | upsert_if_value year $date
+    # | upsert_if_value recordingDate $year
+    # | upsert_if_value year $year
     # todo Work (Work name)
-    | upsert_if_value chapters $chapters
     # track metadata
     | upsert_if_present "AcoustID Fingerprint" $metadata.track acoustid_fingerprint
     | upsert_if_present "AcoustID Id" $metadata.track acoustid_track_id
@@ -2553,7 +2576,10 @@ export def into_tone_format []: record -> record {
     | upsert_if_value Director ($metadata.track | get --ignore-errors directors | get --ignore-errors name | str join ";")
     # todo illustrators, translators, adapters, editors, engineers, directors
   )
-  {
+  let m = {
+    # audio: {
+    #   language:
+    # }
     meta: (
       {}
       #
@@ -2563,7 +2589,6 @@ export def into_tone_format []: record -> record {
       | upsert_if_present subtitle $metadata.book
       | upsert_if_value albumArtist ($metadata.book | get --ignore-errors writers | get --ignore-errors name | str join ";")
       # | upsert_if_present artist_credit_sort $metadata.book
-      | upsert_if_present language $metadata.book
       | upsert_if_present description $metadata.book
       | upsert_if_present comment $metadata.book
       | upsert_if_value group $group
@@ -2573,12 +2598,22 @@ export def into_tone_format []: record -> record {
         }
       )
       # todo I'm not sure audiobookshelf supports multiple values for the publisher
-      | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | str join ";")
+      # | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
+      # todo musicbrainz label ids
       | upsert_if_value publishingDate $publication_date
+      # | upsert_if_value date $date
+      # | upsert_if_value year $year
+      # | upsert_if_value year $year
+      # audiobookshelf uses recordingDate and not publishingDate for some reaso
+      | upsert_if_value recordingDate $publication_date
+      # | upsert_if_value originalyear $year
       | upsert_if_present asin $metadata.book amazon_asin
       | upsert_if_present audible_asin $metadata.book
-      | upsert_if_present isbn $metadata.book
-      | upsert_if_present Barcode $metadata.book isbn
+      # language has no effect here I guess?
+      # | upsert_if_present language $metadata.book
+      | upsert_if_present barcode $metadata.book isbn
+      # Put the publisher in here for good measure
+      | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
       #
       # track metadata
       #
@@ -2588,6 +2623,7 @@ export def into_tone_format []: record -> record {
       | upsert_if_value narrator ($metadata.track | get --ignore-errors narrators | get --ignore-errors name | str join ";")
       # Use the composer field for the narrators for audiobookshelf
       | upsert_if_value composer ($metadata.track | get --ignore-errors narrators | get --ignore-errors name | str join ";")
+      | upsert_if_value chapters $chapters
       | upsert_if_present embeddedPictures $metadata.track embedded_pictures
       #
       # additionalFields
@@ -2595,6 +2631,8 @@ export def into_tone_format []: record -> record {
       | upsert_if_value additionalFields $additionalFields
     )
   }
+  log info $"($m | to nuon)"
+  $m
 }
 
 # Convert the metadata for a set of tracks into a format suitable for tone
@@ -2616,7 +2654,7 @@ export def tracks_into_tone_format []: record<book: record, tracks: table> -> ta
         file: $track.file
       }
     )
-  } # | sort-by metadata.trackNumber
+  } | sort-by metadata.meta.trackNumber
 }
 
 # Calculate the AcoustID of an audio file or files with the fpcalc utility
@@ -2648,6 +2686,7 @@ export def tone_tag [
 ]: record -> path {
   let metadata = $in
   let tone_json = mktemp --suffix ".json" --tmpdir
+  log debug $"JSON file for tone: ($tone_json)"
   $metadata | save --force $tone_json
   let result = do {
     (
@@ -2659,13 +2698,13 @@ export def tone_tag [
           $file
     )
   } | complete
-  if $result.exit_code != 0 {
+  if $result.exit_code != 0 or "Could not update tags for file" in $result.stdout {
     log error $"Error running '^tone tag --meta-tone-json-file ($tone_json) (...$tone_args) ($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
 
   # Print the helpful output from tone
-  print --stderr $result.stderr
+  print $result.stdout
 
   rm $tone_json
 
@@ -2954,7 +2993,7 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<file: 
 # Parse narrators from MusicBrainz recording and release relationship data
 export def parse_narrators_from_musicbrainz_relations []: list -> table {
   let relations = $in
-  if ($relations | is-empty) or "target-type" not-in $relations or "type" not-in $relations {
+  if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
     return null
   }
   (
@@ -2984,7 +3023,7 @@ export def parse_narrators_from_musicbrainz_relations []: list -> table {
 # Parse the works from MusicBrainz recording relationships
 export def parse_works_from_musicbrainz_relations []: list -> table {
   let relations = $in
-  if ($relations | is-empty) or "target-type" not-in $relations or "type" not-in $relations {
+  if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
     return null
   }
   let work_relations = $relations | where target-type == "work" | where type == "performance"
@@ -3001,7 +3040,7 @@ export def parse_works_from_musicbrainz_relations []: list -> table {
 # Parse writers from MusicBrainz work relationships
 export def parse_writers_from_musicbrainz_work_relations []: list -> table {
   let relations = $in
-  if ($relations | is-empty) or "target-type" not-in $relations or "type" not-in $relations {
+  if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
     return null
   }
   let writers = (
@@ -3080,7 +3119,7 @@ export def parse_writers_from_musicbrainz_release []: record -> table {
 # Of course, this won't help where indices are missing or indices match.
 export def parse_series_from_musicbrainz_relations [] table -> table<id: string, name: string, index: string> {
   let relations = $in
-  if ($relations | is-empty) or "target-type" not-in $relations or "type" not-in $relations {
+  if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
     return null
   }
   let series = (
@@ -3189,7 +3228,7 @@ export def parse_genres_from_musicbrainz_release [
         | flatten
       )
     )
-    if ($genres | is-empty) or "name" not-in $genres or "count" not-in $genres {
+    if ($genres | is-empty) or "name" not-in ($genres | columns) or "count" not-in ($genres | columns) {
       return null
     }
     (
@@ -3224,7 +3263,7 @@ export def parse_genres_from_musicbrainz_release [
         | flatten
       )
     )
-    if ($genres | is-empty) or "name" not-in $genres or "count" not-in $genres {
+    if ($genres | is-empty) or "name" not-in ($genres | columns) or "count" not-in ($genres | columns) {
       return null
     }
     (
@@ -3272,7 +3311,7 @@ export def parse_tags_from_musicbrainz_release []: record -> table {
       | flatten
     )
   )
-  if ($tags | is-empty) or "name" not-in $tags or "count" not-in $tags {
+  if ($tags | is-empty) or "name" not-in ($tags | columns) or "count" not-in ($tags | columns) {
     return null
   }
   (
@@ -3466,7 +3505,7 @@ export def parse_musicbrainz_release []: record -> record {
       let genres = (
         if "recording" in $track and "tags" in $track.recording and ($track.recording.tags | is-not-empty) {
           $track
-          | get recording
+          | get --ignore-errors recording
           | get --ignore-errors tags
           | select name count
           | uniq
@@ -3482,7 +3521,7 @@ export def parse_musicbrainz_release []: record -> record {
       let tags = (
         if "recording" in $track and "tags" in $track.recording and ($track.recording.tags | is-not-empty) {
           $track
-          | get recording
+          | get --ignore-errors recording
           | get --ignore-errors tags
           | select name count
           | uniq
@@ -3575,8 +3614,8 @@ export def parse_musicbrainz_release []: record -> record {
   )
   let publishers = (
     # todo Also check for publishers in the release relationships.
-    if "label-info" in $metadata and "label" in $metadata.label-info {
-      $metadata.label-info.label.name
+    if "label-info" in $metadata and "label" in ($metadata.label-info | columns) {
+      $metadata.label-info.label | select id name
     }
   )
 
@@ -3596,7 +3635,7 @@ export def parse_musicbrainz_release []: record -> record {
   let tags = $metadata | parse_tags_from_musicbrainz_release
   let release_tags = (
     let tags = $metadata | get --ignore-errors tags;
-    if ($tags | is-not-empty) and "name" in $tags and "count" in $tags {
+    if ($tags | is-not-empty) and "name" in ($tags | columns) and "count" in ($tags | columns) {
       (
         $tags
         | select name count
@@ -3658,6 +3697,7 @@ export def parse_musicbrainz_release []: record -> record {
     | upsert_if_value chapters $chapters
     | upsert_if_value front_cover_available $front_cover_available
     | upsert_if_value distributors $distributors
+    | upsert_if_value publishers $publishers
     | (
       let input = $in;
       if "text-representation" in $metadata {
