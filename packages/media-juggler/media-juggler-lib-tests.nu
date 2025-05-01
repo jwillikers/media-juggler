@@ -204,7 +204,7 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
       album: "Dark One: Forgotten"
       albumArtist: "Brandon Sanderson and Dan Wells performed by various narrators"
       artist: "Brandon Sanderson; Dan Wells"
-      composer: "Mia Barron, Luis Bermudez, William Elsman, Kaleo Griffith, Roxanne Hernandez, Rachel L. Jacobs, John H. Mayer, Nan McNamara, Jim Meskimen, Sophie Oda, Keith Szarabajka, Kelli Tager, Avery Kidd Waddell"
+      composer: "Mia Barron; Luis Bermudez; William Elsman; Kaleo Griffith; Roxanne Hernandez; Rachel L. Jacobs; John H. Mayer; Nan McNamara; Jim Meskimen; Sophie Oda; Keith Szarabajka; Kelli Tager; Avery Kidd Waddell"
       comment: "Brandon Sanderson and Dan Wells Purchased from Libro.fm."
       discNumber: 1
       discTotal: 1
@@ -215,6 +215,9 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
       title: "Dark One: Forgotten"
       trackNumber: 1
       trackTotal: 1
+      label: "MAINFRAME;rb media RECORDED BOOKS ORIGINAL"
+      publisher: "MAINFRAME;rb media RECORDED BOOKS ORIGINAL"
+      media: "Digital Media"
       chapters: [
         [start length title];
         [0 2708010 "Dark One - Track 001"]
@@ -244,7 +247,6 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
         "musicBrainz Album Status": "official"
         originaldate: "2023-01-10"
         barcode: "9781980062875"
-        media: "Digital Media"
         performer: "Erik Jourgensen"
         "musicBrainz Album Type": "other;audio drama"
         writer: "Brandon Sanderson;Dan Wells"
@@ -255,8 +257,6 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
         "musicBrainz Release Track Id": "a442811c-582b-429c-b7d9-072736be42ac"
         "musicBrainz Work Id": "e8eba2f2-cb32-4f55-82cc-b35aa1272b5a"
         producer: "Max Epstein;Matt Flynn;David Pace"
-        label: "MAINFRAME;rb media RECORDED BOOKS ORIGINAL"
-        publisher: "MAINFRAME;rb media RECORDED BOOKS ORIGINAL"
         engineer: "Anthony Cozzi;Vincent Early;Tom Pinkava;Timothy Waldner"
         "musicBrainz Album Artist Id": "b7b9f742-8de0-44fd-afd3-fa536701d27e;f0e00197-4291-40cb-a448-c2f3c86f54c7"
         "musicBrainz Artist Id": "b7b9f742-8de0-44fd-afd3-fa536701d27e;f0e00197-4291-40cb-a448-c2f3c86f54c7"
@@ -273,24 +273,29 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
   let expected = {
     book: {
       title: "Dark One: Forgotten"
-      artist_credit: "Brandon Sanderson and Dan Wells performed by various narrators"
-      artist_credit_sort: "Sanderson, Brandon and Wells, Dan performed by various narrators"
+      contributors: [
+        [name role entity id];
+        [
+          "Brandon Sanderson and Dan Wells performed by various narrators"
+          "primary author"
+          "artist"
+          "b7b9f742-8de0-44fd-afd3-fa536701d27e"
+        ]
+      ]
       comment: "Brandon Sanderson and Dan Wells Purchased from Libro.fm."
       publication_date: ("2023-01-10T00:00:00" | into datetime)
       musicbrainz_release_country: "XW"
       musicbrainz_release_status: "official"
-      media: "Digital Media"
       script: "Latn"
       series: [{
         name: "Dark One, performed by various narrators"
         index: "1"
       }]
-      barcode: "9781980062875"
+      isbn: "9781980062875"
       musicbrainz_release_types: ["other" "audio drama"]
       musicbrainz_release_group_id: "4220489d-2bd0-4618-84a8-bdac1b968b1c"
       musicbrainz_release_id: "549a0455-4698-472f-97f3-7bb75fbe7343"
-      musicbrainz_artist_ids: ["b7b9f742-8de0-44fd-afd3-fa536701d27e" "f0e00197-4291-40cb-a448-c2f3c86f54c7"]
-      publishers: ["MAINFRAME" "rb media RECORDED BOOKS ORIGINAL"]
+      publishers: [[name]; ["MAINFRAME"] ["rb media RECORDED BOOKS ORIGINAL"]]
       chapters: [
         [index start length title];
         [0 0ms 2708010ms "Dark One - Track 001"]
@@ -310,51 +315,52 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
     }
     track: {
       title: "Dark One: Forgotten"
-      artist_credit: "Brandon Sanderson; Dan Wells"
-      artist_credit_sort: "Sanderson, Brandon and Wells, Dan performed by various narrators"
-      writers: ["Brandon Sanderson" "Dan Wells"]
-      narrators: [
-        "Mia Barron"
-        "Luis Bermudez"
-        "William Elsman"
-        "Kaleo Griffith"
-        "Roxanne Hernandez"
-        "Rachel L. Jacobs"
-        "John H. Mayer"
-        "Nan McNamara"
-        "Jim Meskimen"
-        "Sophie Oda"
-        "Keith Szarabajka"
-        "Kelli Tager"
-        "Avery Kidd Waddell"
+      contributors: [
+        [id, name, entity, role];
+        [null, "Mia Barron", artist, composer],
+        [null, "Luis Bermudez", artist, composer],
+        [null, "William Elsman", artist, composer],
+        [null, "Kaleo Griffith", artist, composer],
+        [null, "Roxanne Hernandez", artist, composer],
+        [null, "Rachel L. Jacobs", artist, composer],
+        [null, "John H. Mayer", artist, composer],
+        [null, "Nan McNamara", artist, composer],
+        [null, "Jim Meskimen", artist, composer],
+        [null, "Sophie Oda", artist, composer],
+        [null, "Keith Szarabajka", artist, composer],
+        [null, "Kelli Tager", artist, composer],
+        [null, "Avery Kidd Waddell", artist, composer],
+        ["b7b9f742-8de0-44fd-afd3-fa536701d27e", "Brandon Sanderson", artist, writer],
+        ["f0e00197-4291-40cb-a448-c2f3c86f54c7", "Dan Wells", artist, writer]
       ]
       index: 1
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
       ]
-      performers: ["Erik Jourgensen"]
+      media: "Digital Media"
       musicbrainz_recording_id: "a3a37da7-f2fa-4938-b827-d3c8d213d08c"
       musicbrainz_track_id: "a442811c-582b-429c-b7d9-072736be42ac"
-      musicbrainz_work_ids: ["e8eba2f2-cb32-4f55-82cc-b35aa1272b5a"]
-      producers: ["Max Epstein" "Matt Flynn" "David Pace"]
-      engineers: ["Anthony Cozzi" "Vincent Early" "Tom Pinkava" "Timothy Waldner"]
-      musicbrainz_artist_ids: ["b7b9f742-8de0-44fd-afd3-fa536701d27e" "f0e00197-4291-40cb-a448-c2f3c86f54c7"]
+      musicbrainz_works: [[id]; ["e8eba2f2-cb32-4f55-82cc-b35aa1272b5a"]]
       acoustid_fingerprint: "XXXX"
       duration: 1500000000ns
       file: "/home/listener/audiobooks/Dark One: Forgotten/Dark One: Forgotten.m4b"
+      disc_number: 1
     }
   }
   let actual = $input | parse_audiobook_metadata_from_tone
 
   # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
+  for column in ($expected.book | columns) {
+    assert equal ($actual.book | get $column) ($expected.book | get $column)
+  }
   assert equal $actual.book $expected.book
-  # for column in ($expected.track | columns) {
-  #   assert equal ($actual.track | get $column) ($expected.track | get $column)
-  # }
+  for column in ($expected.track | columns) {
+    assert equal ($actual.track | get $column) ($expected.track | get $column)
+  }
+  for column in ($actual.track | columns) {
+    assert equal ($actual.track | get $column) ($expected.track | get $column)
+  }
   assert equal $actual.track $expected.track
   assert equal $actual $expected
 }
@@ -444,19 +450,20 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
       ]
       duration: 1500000000ns
       file: "/home/listener/audiobooks/My Happy Marriage, Vol. 2/track 1.mp3"
+      disc_number: 1
     }
   }
   let actual = $input | parse_audiobook_metadata_from_tone
 
   # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
+  for column in ($expected.book | columns) {
+    assert equal ($actual.book | get $column) ($expected.book | get $column)
+  }
   assert equal $actual.book.chapters $expected.book.chapters
   assert equal $actual.book $expected.book
-  # for column in ($expected.track | columns) {
-  #   assert equal ($actual.track | get $column) ($expected.track | get $column)
-  # }
+  for column in ($expected.track | columns) {
+    assert equal ($actual.track | get $column) ($expected.track | get $column)
+  }
   assert equal $actual.track $expected.track
   assert equal $actual $expected
 }
@@ -473,15 +480,16 @@ def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
       artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
-      series: [{
-        name: "My Happy Marriage"
-        index: "2"
-      }, {
-        name: "Test Series 2"
-        index: "5"
-      }]
+      series: [
+        [name index];
+        ["My Happy Marriage", "2"]
+        ["Test Series 2", "5"]
+      ]
       genres: ["Fiction" "Fantasy"]
-      publishers: ["Yen Audio"]
+      publishers: [
+        [name id];
+        ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
+      ]
     }
     track: {
       title: "My Happy Marriage, Vol. 2 - Track 001"
@@ -503,15 +511,16 @@ def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
       artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
-      series: [{
-        name: "My Happy Marriage"
-        index: "2"
-      }, {
-        name: "Test Series 2"
-        index: "5"
-      }]
+      series: [
+        [name index];
+        ["My Happy Marriage", "2"]
+        ["Test Series 2", "5"]
+      ]
       genres: ["Fiction" "Fantasy"]
-      publishers: ["Yen Audio"]
+      publishers: [
+        [name id];
+        ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
+      ]
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
@@ -558,15 +567,16 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
       artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
-      series: [{
-        name: "My Happy Marriage"
-        index: "2"
-      }, {
-        name: "Test Series 2"
-        index: "5"
-      }]
+      series: [
+        [name index];
+        ["My Happy Marriage", "2"]
+        ["Test Series 2", "5"]
+      ]
       genres: ["Fiction" "Fantasy"]
-      publishers: ["Yen Audio"]
+      publishers: [
+        [name id];
+        ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
+      ]
     }
     track: {
       title: "My Happy Marriage, Vol. 2 - Track 001"
@@ -722,7 +732,10 @@ def test_into_tone_format_simple [] {
         ["Fantasy" 1]
         ["Fiction" 1]
       ]
-      publishers: ["Yen Audio"]
+      publishers: [
+        [name id];
+        ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
+      ]
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
@@ -757,7 +770,8 @@ def test_into_tone_format_simple [] {
       group: "My Happy Marriage #2;Test Series 2 #5"
       genre: "Fantasy;Fiction"
       publisher: "Yen Audio"
-      publishingDate: "2025-01-01T00:00:00+00:00" # todo Make UTC?
+      publishingDate: "2025-01-01T00:00:00Z"
+      recordingDate: "2025-01-01T00:00:00Z"
       title: "My Happy Marriage, Vol. 2 - Track 001"
       composer: "Damien Haas;Miranda Parkin"
       narrator: "Damien Haas;Miranda Parkin"
@@ -790,7 +804,10 @@ def test_into_tone_format_complex [] {
         ["Fantasy" 1]
         ["Fiction" 1]
       ]
-      publishers: ["Yen Audio"]
+      publishers: [
+        [name id];
+        ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
+      ]
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
@@ -877,7 +894,10 @@ def test_tracks_into_tone_format_one_track [] {
         ["Fantasy" 1]
         ["Fiction" 1]
       ]
-      publishers: ["Yen Audio"]
+      publishers: [
+        [name id];
+        ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
+      ]
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
@@ -962,7 +982,10 @@ def test_tracks_into_tone_format_two_tracks [] {
         ["Fantasy" 1]
         ["Fiction" 1]
       ]
-      publishers: ["Yen Audio"]
+      publishers: [
+        [name id];
+        ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
+      ]
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
