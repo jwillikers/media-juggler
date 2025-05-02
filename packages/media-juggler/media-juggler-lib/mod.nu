@@ -2135,6 +2135,8 @@ export def parse_series_from_group []: string -> table<name: string, index: stri
 }
 
 # Parse series from the series / series-part and mvnm / mvin tags from the additionalFields metadata
+#
+# todo audiobookshelf now supports multiple series in these tags, so this function should too.
 export def parse_series_from_series_tags []: record -> table<name: string, index: string> {
   let additionalFields = $in
   if "mvnm" in $additionalFields and $additionalFields.mvnm != null {
@@ -2142,7 +2144,11 @@ export def parse_series_from_series_tags []: record -> table<name: string, index
       [name index];
       [
         ($additionalFields.mvnm | into string)
-        (if "mvin" in $additionalFields and $additionalFields.mvin != null {$additionalFields.mvin | into string})
+        (
+          if "mvin" in $additionalFields and $additionalFields.mvin != null {
+            $additionalFields.mvin | into string
+          }
+        )
       ]
     ]
   } | append (
@@ -2151,7 +2157,11 @@ export def parse_series_from_series_tags []: record -> table<name: string, index
         [name index];
         [
           ($additionalFields.series | into string)
-          (if "series-part" in $additionalFields and $additionalFields.series-part != null {$additionalFields.series-part | into string})
+          (
+            if "series-part" in $additionalFields and $additionalFields.series-part != null {
+              $additionalFields.series-part | into string
+            }
+          )
         ]
       ]
     }
