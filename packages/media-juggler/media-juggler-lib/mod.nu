@@ -2654,7 +2654,11 @@ export def into_tone_format []: record -> record {
       $metadata.book.chapters | chapters_into_tone_format
     }
   )
-  let primary_authors = $metadata.book.contributors | where entity == "artist" | where role == "primary author"
+  let primary_authors = (
+    if "contributors" in $metadata.book and ($metadata.book.contributors | is-not-empty) {
+      $metadata.book.contributors | where entity == "artist" | where role == "primary author"
+    }
+  )
   let additionalFields = (
     {}
     # book metadata
@@ -2673,7 +2677,7 @@ export def into_tone_format []: record -> record {
     # For audiobookshelf to be happy, publisher has to go in additionalFields for some reason.
     # todo I'm not sure audiobookshelf supports multiple values for the publisher
     | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
-    | upsert_if_present isbn $metadata.book
+    | upsert_if_present ISBN $metadata.book isbn
     | upsert_if_present barcode $metadata.book isbn
     | upsert_if_present asin $metadata.book amazon_asin
     | upsert_if_present audible_asin $metadata.book
@@ -2685,27 +2689,34 @@ export def into_tone_format []: record -> record {
     | upsert_if_present "MusicBrainz Track Id" $metadata.track musicbrainz_recording_id
     | upsert_if_present "MusicBrainz Release Track Id" $metadata.track musicbrainz_track_id
     | upsert_if_value "MusicBrainz Artist Id" (
-      $metadata.track | get --ignore-errors contributors | where role == "writer" | get --ignore-errors id | str join ";"
+      if "contributors" in $metadata.track and ($metadata.track.contributors | is-not-empty) {
+        $metadata.track.contributors | where role == "writer" | get --ignore-errors id | str join ";"
+      }
     )
     | upsert_if_value "MusicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors id | str join ";")
     | upsert_if_value "MusicBrainz Label Id" ($metadata.track | get --ignore-errors publishers | get --ignore-errors id | str join ";")
     | upsert_if_value "work" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors name | str join ";")
     | (
       let input = $in;
-      let r = [adaptor editor illustrator translator writer] | par-each {|role|
-        {
-          $role: (
-            $metadata.track.collaborators
+      if "contributors" in $metadata.track and ($metadata.track.contributors | is-not-empty) {
+        let r = [adapter editor illustrator translator writer] | par-each {|role|
+          let contributors_for_role = (
+            $metadata.track.contributors
             | where role == $role
             | get name
             | uniq
             | str join ";"
           )
-        }
-      } | reduce {|it, acc|
-        $acc | merge_or_input $it
-      };
-      $input | merge_or_input $r
+          if ($contributors_for_role | is-not-empty) {
+            {$role: $contributors_for_role}
+          }
+        } | reduce {|it, acc|
+          $acc | merge_or_input $it
+        };
+        $input | merge_or_input $r
+      } else {
+        $input
+      }
     )
   )
   let m = {
@@ -2745,10 +2756,10 @@ export def into_tone_format []: record -> record {
       | upsert_if_present trackNumber $metadata.track index
       | (
         let input = $in;
-        let r = [arranger artist composer director engineer lyricist mixer narrator performer producer remixer] | par-each {|role|
-          {
-            $role: (
-              $metadata.track.collaborators
+        if "contributors" in $metadata.track and ($metadata.track.contributors | is-not-empty) {
+          let r = [arranger artist composer director engineer lyricist mixer narrator performer producer remixer] | par-each {|role|
+            let contributors_for_role = (
+              $metadata.track.contributors
               | (
                 let i = $in;
                 if $role == "artist" {
@@ -2764,11 +2775,16 @@ export def into_tone_format []: record -> record {
               | uniq
               | str join ";"
             )
-          }
-        } | reduce {|it, acc|
-          $acc | merge_or_input $it
-        };
-        $input | merge_or_input $r
+            if ($contributors_for_role | is-not-empty) {
+              {$role: $contributors_for_role}
+            }
+          } | reduce {|it, acc|
+            $acc | merge_or_input $it
+          };
+          $input | merge_or_input $r
+        } else {
+          $input
+        }
       )
       | upsert_if_present lyrics $metadata.track
       | upsert_if_present rating $metadata.track
@@ -2783,7 +2799,7 @@ export def into_tone_format []: record -> record {
       | upsert_if_value additionalFields $additionalFields
     )
   }
-  log info $"($m | to nuon)"
+  # log info $"($m | to nuon)"
   $m
 }
 
@@ -3143,7 +3159,7 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<file: 
 }
 
 # Parse the works from MusicBrainz recording relationships
-export def parse_works_from_musicbrainz_relations []: list -> table {
+export def parse_works_from_musicbrainz_relations []: table -> table {
   let relations = $in
   if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
     return null
@@ -3164,7 +3180,7 @@ export def parse_contributor_by_type_from_musicbrainz_relations [
   entity: string # The type of entity, i.e. artist or label
   type: string # vocal, engineer, director, producer, recording, etc.
   attribute: string = "" # attribute to filter on, i.e "spoken vocals"
-]: list -> table {
+]: list -> table<id: string, name: string> {
   let relations = $in
   if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
     return null
@@ -3173,7 +3189,13 @@ export def parse_contributor_by_type_from_musicbrainz_relations [
     $relations
     | where target-type == $entity
     | where type == $type
-    | filter {|rel| if ($attribute | is-not-empty) { $attribute in $rel.attributes } else { true }}
+    | filter {|relation|
+      if ($attribute | is-not-empty) {
+        $attribute in $relation.attributes
+      } else {
+        true
+      }
+    }
   )
   if ($relations | is-empty) {
     return null
@@ -3192,8 +3214,8 @@ export def parse_contributor_by_type_from_musicbrainz_relations [
         }
       )
       {
-        name: $name
         id: ($relation | get $entity | get id)
+        name: $name
       }
     }
   )
@@ -3231,7 +3253,10 @@ export def parse_contributors []: table -> table<id: string, name: string, entit
   ]
 
   $inputs | par-each {|input|
-    $relations | parse_contributor_by_type_from_musicbrainz_relations $input.entity $input.type $input.attribute | insert entity $input.entity | insert role $input.role
+    let contributors = $relations | parse_contributor_by_type_from_musicbrainz_relations $input.entity $input.type $input.attribute
+    if ($contributors | is-not-empty) {
+      $contributors | insert entity $input.entity | insert role $input.role
+    }
   } | flatten
 }
 
@@ -3475,35 +3500,6 @@ export def parse_audible_asin_from_musicbrainz_release []: record -> list<string
   }
 }
 
-# Parse distributors from the metadata of a release
-export def parse_distributors_from_musicbrainz_release []: record -> table<id: string, name: string> {
-  let metadata = $in
-  if ($metadata | is-empty) or "relations" not-in $metadata or ($metadata.relations | is-empty) {
-    return null
-  }
-  let labels = (
-    $metadata
-    | get relations
-    | where target-type == label
-  )
-  if ($labels | is-empty) {
-    return null
-  }
-  let distributors = (
-    $labels
-    | where type == distributed
-  )
-  if ($distributors | is-empty) {
-    return null
-  }
-  (
-    $distributors
-    | get label
-    | select id name
-    | sort-by name
-  )
-}
-
 # Parse the data of a MusicBrainz release
 export def parse_musicbrainz_release []: record -> record {
   let metadata = $in
@@ -3518,6 +3514,7 @@ export def parse_musicbrainz_release []: record -> record {
       $metadata.relations | parse_contributors
     }
   )
+  let release_only_contributor_roles = [distributor illustrator publisher]
 
   # Track metadata
   let tracks = (
@@ -3552,14 +3549,14 @@ export def parse_musicbrainz_release []: record -> record {
             let parsed_contributors = $track.recording.relations | append $work_relations | parse_contributors
             # If artist roles exist at the release level and not at the track level, use them for the track.
             let parsed_contributors = (
-              $release_contributors | append (
+              $parsed_contributors | append (
                 $release_contributors
-                | where entity == "artist"
-                | get --ignore-errors role
+                | where role not-in $release_only_contributor_roles
+                | get role
                 | uniq
                 | par-each {|role|
-                  if ($parsed_contributors | where entity == "artist" | where role == $role | is-empty) {
-                    $release_contributors | where entity == "artist" | where role == $role
+                  if ($parsed_contributors | where role == $role | is-empty) {
+                    $release_contributors | where role == $role
                   }
                 } | flatten
               )
@@ -3569,7 +3566,6 @@ export def parse_musicbrainz_release []: record -> record {
               $parsed_contributors
               | (
                 let input = $in;
-                # I think the track artist credit is empty if it matches the release artist credit.
                 if ($input | is-not-empty) and ($track_artist_credits | is-not-empty) {
                   $input | join --left $track_artist_credits id
                 } else {
@@ -3589,8 +3585,6 @@ export def parse_musicbrainz_release []: record -> record {
                     $contributor.name
                   }
                 )
-                # If there is more than one artist credit for the same artist, that would be really bizarre.
-                # In that case, just going with the first one.
                 {
                   id: $contributor.id
                   name: $name
@@ -3600,11 +3594,10 @@ export def parse_musicbrainz_release []: record -> record {
               }
             )
           }
-        )
-        # fallback to release level relationships when missing
+        ) | uniq
         let musicbrainz_works = (
           if ($works | is-not-empty) {
-            $works | select id name | uniq
+            $works | select id title | uniq
           }
         )
         let genres = (
@@ -3639,7 +3632,7 @@ export def parse_musicbrainz_release []: record -> record {
               let input = $in;
               if ($genres | is-not-empty) {
                 $input | filter {|tag|
-                  $tag.name | not-in $genres
+                  $tag.name not-in $genres.name
                 }
               } else {
                 $input
@@ -3655,12 +3648,17 @@ export def parse_musicbrainz_release []: record -> record {
           }
         )
         let musicbrainz_artist_ids = $track | get --ignore-errors artist-credit.artist.id | uniq
+        let disc_subtitle = (
+          if "title" in $media and ($media.title | is-not-empty) {
+            $media.title
+          }
+        )
         (
           {
             index: $track.position
           }
           | upsert_if_present disc_number $media position
-          | upsert_if_present disc_subtitle $media title
+          | upsert_if_value disc_subtitle $disc_subtitle
           | upsert_if_present media $media format
           | upsert_if_present musicbrainz_track_id $track id
           | upsert_if_present title $track
@@ -3669,19 +3667,6 @@ export def parse_musicbrainz_release []: record -> record {
           | upsert_if_value tags $tags
           | upsert_if_value musicbrainz_works $musicbrainz_works
           | upsert_if_value contributors $track_contributors
-          # | upsert_if_value narrators $narrators
-          # | upsert_if_value writers $writers
-          # | upsert_if_value adapters $adapters
-          # | upsert_if_value mixers $mixers
-          # | upsert_if_value remixers $remixers
-          # | upsert_if_value arrangers $arrangers
-          # | upsert_if_value lyricists $lyricists
-          # | upsert_if_value engineers $engineers
-          # | upsert_if_value producers $producers
-          # | upsert_if_value directors $directors
-          # | upsert_if_value adapters $adapters
-          # | upsert_if_value editors $editors
-          # | upsert_if_value translators $translators
           | upsert_if_value duration $length
           # AcoustID metadata may be supplemented in the provided track metadata
           | upsert_if_present acoustid_fingerprint $track
@@ -3692,52 +3677,60 @@ export def parse_musicbrainz_release []: record -> record {
   )
 
   let primary_authors = (
-    let writers = $tracks | get contributors | where entity == "artist" | where role == "writer";
-    if ($writers | is-not-empty) {
-      $writers
-      | join $release_artist_credits id
-      | rename id name entity role release_artist_credit_index release_artist_credit
-      | sort-by release_artist_credit_index name
-      # Be sure to use the name in the release artist credit and not the track artist credit
-      | each {|writer|
-        let name = (
-          if ($writer.release_artist_credit | is-not-empty) {
-            $writer.release_artist_credit
-          } else {
-            $writer.name
+    if "contributors" in ($tracks | columns) and ($tracks.contributors | is-not-empty) {
+      let writers = $tracks.contributors | flatten | where entity == "artist" | where role == "writer"
+      if ($writers | is-not-empty) {
+        $writers
+        | join $release_artist_credits id
+        | rename id name entity role release_artist_credit_index release_artist_credit
+        | sort-by release_artist_credit_index name
+        # Be sure to use the name in the release artist credit and not the track artist credit
+        | each {|writer|
+          let name = (
+            if ($writer.release_artist_credit | is-not-empty) {
+              $writer.release_artist_credit
+            } else {
+              $writer.name
+            }
+          )
+          {
+            id: $writer.id
+            name: $name
           }
+        }
+      # There are no writers associated with any works in the release credits.
+      # Try using any artists not attributed with a specific role as the primary authors.
+      } else {
+        let unassociated = (
+          $tracks
+          | get contributors
+          | where entity == "artist"
+          | join --right $release_artist_credits id
+          | where role == null
         )
-        {
-          id: $writer.id
-          name: $name
+        if ($unassociated | is-empty) {
+          # Give up and just use everyone in the artist credit
+          $release_artist_credits
+        } else {
+          $unassociated
         }
       }
-    # There are no writers associated with any works in the release credits.
-    # Try using any artists not attributed with a specific role as the primary authors.
-    } else {
-      let unassociated = (
-        $tracks
-        | get contributors
-        | where entity == "artist"
-        | join --right $release_artist_credits id
-        | where role == null
-      )
-      if ($unassociated | is-empty) {
-        # Give up and just use everyone in the artist credit
-        $release_artist_credits
-      } else {
-        $unassociated
+    }
+  ) | uniq
+  let contributors = (
+    $primary_authors
+    | each {|primary_author|
+      if ($primary_author | is-not-empty) {
+        {
+          name: $primary_author.name
+          id: $primary_author.id
+          role: "primary author"
+          entity: "artist"
+        }
       }
     }
-  )
-  let contributors = $primary_authors | each {|primary_author|
-    {
-      name: $primary_author.name
-      id: $primary_author.id
-      role: "primary author"
-      entity: "artist"
-    }
-  } | append $release_contributors
+    | append $release_contributors
+  ) | uniq
   let publication_date = (
     if "date" in $metadata {
       $metadata | get date | into datetime
@@ -3750,8 +3743,6 @@ export def parse_musicbrainz_release []: record -> record {
     }
   )
 
-  let distributors = $metadata | parse_distributors_from_musicbrainz_release
-
   let series = $metadata | parse_series_from_musicbrainz_release
 
   let audible_asin = (
@@ -3763,7 +3754,25 @@ export def parse_musicbrainz_release []: record -> record {
     }
   )
   let genres = $metadata | parse_genres_from_musicbrainz_release
-  let tags = $metadata | parse_tags_from_musicbrainz_release
+  let tags = (
+    $metadata
+    | parse_tags_from_musicbrainz_release
+    # Filter out genres from the tags
+    | (
+      let input = $in;
+      if ($genres | is-not-empty) {
+        $input | filter {|tag|
+          $tag.name not-in $genres.name
+        }
+      } else {
+        $input
+      }
+    )
+    # sort by the count, highest to lowest, and then name alphabetically
+    | sort-by --custom {|a, b|
+      $a.count >= $b.count and $a.name < $b.name
+    }
+  )
   let release_tags = (
     let tags = $metadata | get --ignore-errors tags;
     if ($tags | is-not-empty) and "name" in ($tags | columns) and "count" in ($tags | columns) {
@@ -3771,6 +3780,17 @@ export def parse_musicbrainz_release []: record -> record {
         $tags
         | select name count
         | uniq
+        # Filter out genres from the tags
+        | (
+          let input = $in;
+          if ($genres | is-not-empty) {
+            $input | filter {|tag|
+              $tag.name not-in $genres.name
+            }
+          } else {
+            $input
+          }
+        )
         # sort by the count, highest to lowest, and then name alphabetically
         | sort-by --custom {|a, b|
           $a.count >= $b.count and $a.name < $b.name
@@ -3845,7 +3865,6 @@ export def parse_musicbrainz_release []: record -> record {
     | upsert_if_value series $series
     | upsert_if_value chapters $chapters
     | upsert_if_value front_cover_available $front_cover_available
-    | upsert_if_value distributors $distributors
     | upsert_if_value publishers $publishers
     | upsert_if_value total_discs $total_discs
     | upsert_if_value total_tracks $total_tracks
@@ -4153,12 +4172,22 @@ export def look_up_chapters_from_similar_musicbrainz_release [
 
   # todo Make this into a separate function.
   let candidates = $candidates | filter {|candidate|
-    if "distributors" in $release.book and ($release.book.distributors | is-not-empty) {
-      if "distributors" not-in $candidate.book {
+    if (
+      "contributors" in $release.book
+      and ($release.book.contributors | is-not-empty)
+      and ($release.book.contributors | where role == "distributor" | is-not-empty)
+    ) {
+      if (
+        "contributors" not-in $candidate.book
+        or ($candidate.book.contributors | is-empty)
+        or ($candidate.book.contributors | where role == "distributor" | is-empty)
+      ) {
         return false
       }
-      let has_same_distributors = $release.book.distributors | all {|distributor|
-        $distributor in $candidate.book.distributors
+      let release_distributors = $release.book.contributors | where role == "distributor"
+      let candidate_distributors = $candidate.book.contributors | where role == "distributor"
+      let has_same_distributors = $release_distributors | all {|distributor|
+        $distributor in $candidate_distributors
       }
       if not $has_same_distributors {
         return false
