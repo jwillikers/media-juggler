@@ -3285,36 +3285,47 @@ export def parse_series_from_musicbrainz_relations [] table -> table<id: string,
 # The goal of this is to order subseries after parent series.
 # Of course, this won't help where indices are missing or indices match.
 # Unfortunately, separate lookups for each series are necessary to determine if a series is a subseries.
-export def parse_series_from_musicbrainz_release []: record -> table {
+export def parse_series_from_musicbrainz_release [
+  scopes: list<string> = ["release-group"] # Scopes to parse series from, i.e. "release", "release-group", and "works"
+]: record -> table {
   let metadata = $in
+  assert ($scopes | is-not-empty)
   if ($metadata | is-empty) {
     return null
   }
   (
     []
     | append (
-      $metadata
-      | get --ignore-errors relations
-      | parse_series_from_musicbrainz_relations
+      if "release" in $scopes {
+        $metadata | get --ignore-errors relations | parse_series_from_musicbrainz_relations
+      }
     )
     | append (
-      $metadata
-      | get --ignore-errors release-group
-      | get --ignore-errors relations
-      | parse_series_from_musicbrainz_relations
+      if "release-group" in $scopes {
+        (
+          $metadata
+          | get --ignore-errors release-group
+          | get --ignore-errors relations
+          | parse_series_from_musicbrainz_relations
+        )
+      }
     )
     | append (
-      $metadata
-      | get --ignore-errors media
-      | get --ignore-errors tracks
-      | flatten
-      | get --ignore-errors recording
-      | get --ignore-errors relations
-      | flatten
-      | parse_works_from_musicbrainz_relations
-      | get --ignore-errors relations
-      | flatten
-      | parse_series_from_musicbrainz_relations
+      if "works" in $scopes {
+        (
+          $metadata
+          | get --ignore-errors media
+          | get --ignore-errors tracks
+          | flatten
+          | get --ignore-errors recording
+          | get --ignore-errors relations
+          | flatten
+          | parse_works_from_musicbrainz_relations
+          | get --ignore-errors relations
+          | flatten
+          | parse_series_from_musicbrainz_relations
+        )
+      }
     )
   )
 }

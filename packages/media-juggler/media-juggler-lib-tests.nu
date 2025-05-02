@@ -1430,7 +1430,7 @@ def test_parse_series_from_musicbrainz_release_bakemonogatari_part_01 [] {
     ["Monogatari" "05ef20c8-9286-4b53-950f-eac8cbb32dc3" "1"]
     ["Monogatari Series: First Season" "6660f123-24a0-46c7-99bf-7ff5dc11ceef" "1"]
   ]
-  let actual = $input | parse_series_from_musicbrainz_release
+  let actual = $input | parse_series_from_musicbrainz_release ["release", "release-group", "works"]
   assert equal ($actual | take 2) ($expected | take 2)
   assert equal ($actual | skip 2 | sort-by name) ($expected | skip 2)
 }
@@ -1690,11 +1690,6 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
           "762cd100-5319-4f9e-8a97-c7f71ae66ad7"
           "1"
         ]
-        [
-          Baccano!
-          "c7b56e90-fdc0-4324-a399-7a4c7b534c24"
-          "1"
-        ]
       ]
       front_cover_available: true
       publishers: [
@@ -1829,18 +1824,6 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
         ] [
           "Bakemonogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein"
           "94b16acb-7f06-42e1-96ac-7ff970972238"
-          "1"
-        ] [
-          "Monogatari Series: First Season"
-          "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
-          "1"
-        ] [
-          Monogatari
-          "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
-          "1"
-        ] [
-          Bakemonogatari
-          "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
           "1"
         ]
       ]
