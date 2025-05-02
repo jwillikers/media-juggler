@@ -3148,6 +3148,47 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<file: 
   }
 }
 
+# Submit AcoustID fingerprints to the AcoustID server
+#
+# Requires an AcoustID application API key and an AcoustID user API key.
+export def submit_acoustid_fingerprints [
+  client_key: string # The application API key for the AcoustID server
+  user_key: string # The user's API key for the AcoustID server
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: table<musicbrainz_recording_id: string, duration: duration, fingerprint: string> -> table<index: int, submission_id: string, submission_status: string> {
+  let fingerprints = $in
+  let endpoint = "https://api.acoustid.org/v2/submit"
+  let submission_string = $fingerprints | enumerate | reduce {|it, acc|
+    let duration_seconds = ($it.item.duration / 1sec) | math round
+    $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($it.item.duration)&fingerprint.($it.index)=($it.item.fingerprint)"
+  }
+  # todo include fileformat and bitrate?
+  let submission_string = $"format=json&client=($client_key)&clientversion=($media_juggler_version)&user=($user_key)" + $submission_string
+
+  let request = {||
+    $submission_string
+    | ^gzip --stdout
+    | http post --content-type application/x-www-form-urlencoded --full --headers [Content-Encoding gzip] $endpoint
+  }
+
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error submitting AcoustID fingerprints to ($endpoint) with payload ($submission_string): ($error.debug.msg)"
+      return null
+    }
+  )
+
+  if ($response.status != 200) {
+    log error $"Error submitting AcoustID fingerprints to ($endpoint) with payload ($submission_string). HTTP error code: ($response.status). HTTP response: ($response)"
+    return null
+  }
+
+  $response.body.submissions
+}
+
 # Parse the works from MusicBrainz recording relationships
 export def parse_works_from_musicbrainz_relations []: table -> table {
   let relations = $in
