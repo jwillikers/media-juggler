@@ -1,6 +1,7 @@
 # A collection of helpful utility functions
 
 use std log
+use std assert
 
 export const media_juggler_version = "0.0.1"
 
@@ -2241,7 +2242,9 @@ export def parse_multi_value_tag [
 # todo Parse using a generic schema?
 export def parse_audiobook_metadata_from_tone []: record -> record {
   let all_metadata = $in
+  # log info $"all_metadata: ($all_metadata)"
   let metadata = $all_metadata | get meta
+  # log info $"metadata: ($metadata)"
   let narrators = (
     ["composer" "narrator"] | par-each {|type|
       if $type in $metadata {
@@ -2336,11 +2339,14 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
         $metadata.additionalFields."musicBrainz Album Artist Id" | parse_multi_value_tag | wrap id
       }
     );
-    let primary_authors = $names | merge_or_input $ids | insert role "primary author" | insert entity "artist";
-    if "id" not-in ($primary_authors | columns) {
-      $primary_authors | insert id null
-    } else {
-      $primary_authors
+    let primary_authors = $names | merge_or_input $ids;
+    if ($primary_authors | is-not-empty) {
+      $primary_authors | insert role "primary author" | insert entity "artist";
+      if "id" not-in ($primary_authors | columns) {
+        $primary_authors | insert id null
+      } else {
+        $primary_authors
+      }
     }
   )
 
@@ -2621,11 +2627,11 @@ export def parse_audiobook_metadata_from_tracks_metadata []: list<record> -> rec
 
 # Parse audiobook metadata from a list of audio files correlating to the tracks of the audiobook
 export def parse_audiobook_metadata_from_files []: list<path> -> record {
-    let files = $in
-    let metadata = $files | par-each {|file|
-        $file | parse_audiobook_metadata_from_file
-    }
-    $metadata | parse_audiobook_metadata_from_tracks_metadata
+  let files = $in
+  let metadata = $files | par-each {|file|
+    $file | parse_audiobook_metadata_from_file
+  }
+  $metadata | parse_audiobook_metadata_from_tracks_metadata
 }
 
 # Convert the series table to a value suitable for the group tag
@@ -3159,24 +3165,27 @@ export def submit_acoustid_fingerprints [
 ]: table<musicbrainz_recording_id: string, duration: duration, fingerprint: string> -> table<index: int, submission_id: string, submission_status: string> {
   let fingerprints = $in
   let endpoint = "https://api.acoustid.org/v2/submit"
-  let submission_string = $fingerprints | enumerate | reduce {|it, acc|
+  let submission_string = $fingerprints | enumerate | reduce --fold "" {|it, acc|
     let duration_seconds = ($it.item.duration / 1sec) | math round
-    $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($it.item.duration)&fingerprint.($it.index)=($it.item.fingerprint)"
+    $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&fingerprint.($it.index)=($it.item.fingerprint)"
   }
   # todo include fileformat and bitrate?
   let submission_string = $"format=json&client=($client_key)&clientversion=($media_juggler_version)&user=($user_key)" + $submission_string
+  log info $"submission_string: ($submission_string)"
 
   let request = {||
-    $submission_string
-    | ^gzip --stdout
-    | http post --content-type application/x-www-form-urlencoded --full --headers [Content-Encoding gzip] $endpoint
+    (
+      $submission_string
+      | ^gzip --stdout
+      | http post --content-type application/x-www-form-urlencoded --full --headers [Content-Encoding gzip] $endpoint
+    )
   }
 
   let response = (
     try {
       retry_http $request $retries $retry_delay
     } catch {|error|
-      log error $"Error submitting AcoustID fingerprints to ($endpoint) with payload ($submission_string): ($error.debug.msg)"
+      log error $"Error submitting AcoustID fingerprints to ($endpoint) with payload ($submission_string): ($error.debug)"
       return null
     }
   )
@@ -3811,9 +3820,16 @@ export def parse_musicbrainz_release []: record -> record {
       }
     )
     # sort by the count, highest to lowest, and then name alphabetically
-    | sort-by --custom {|a, b|
-      $a.count >= $b.count and $a.name < $b.name
-    }
+    | (
+        let input = $in;
+        if ($input | is-not-empty) {
+          $input | sort-by --custom {|a, b|
+            $a.count >= $b.count and $a.name < $b.name
+          }
+        } else {
+          $input
+        }
+    )
   )
   let release_tags = (
     let tags = $metadata | get --ignore-errors tags;
