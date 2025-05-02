@@ -1106,129 +1106,6 @@ def test_tracks_into_tone_format [] {
   test_tracks_into_tone_format_two_tracks
 }
 
-def test_parse_series_from_release_group_no_series [] {
-  let input = {
-    title: "The Rithmatist"
-    secondary-types: [Audiobook]
-    relations: []
-    id: "1bc6aeda-1b14-4968-adea-1e651d710a42"
-    secondary-type-ids: ["499a387e-6195-333e-91c0-9592bfec535e"]
-    primary-type: Other
-    disambiguation: ""
-    first-release-date: "2013-05-14"
-    primary-type-id: "4fc3be2b-de1e-396b-a933-beb8f1607a22"
-  }
-  assert equal ($input | parse_series_from_release_group) null
-}
-
-def test_parse_series_from_release_group_one_series_without_index [] {
-  let input = {
-    relations: [
-      [type end ordering-key attribute-values attributes direction series source-credit ended type-id begin target-credit target-type attribute-ids];
-      [
-        "part of"
-        null
-        2
-        {}
-        []
-        forward
-        {
-          id: "e3e2cf21-988e-4c2e-a849-3ea4e32f94bf"
-          name: "Mushoku Tensei: Jobless Reincarnation, read by Cliff Kirk"
-          type: "Release group series"
-          disambiguation: "unabridged"
-          "type-id": "4c1c4949-7b6c-3a2d-9d54-a50a27e4fa77"
-        }
-        ""
-        false
-        "01018437-91d8-36b9-bf89-3f885d53b5bd"
-        null
-        ""
-        series
-        {}
-      ]
-    ]
-    title: "Mushoku Tensei: Jobless Reincarnation – A Journey of Two Lifetimes"
-    id: "d2afbb83-ae96-4386-96a0-bfd0dc7cc94e"
-    "first-release-date": "2025-03-27"
-    "secondary-type-ids": [
-      "499a387e-6195-333e-91c0-9592bfec535e"
-    ]
-    disambiguation: "light novel, English"
-    "primary-type-id": "4fc3be2b-de1e-396b-a933-beb8f1607a22"
-    "primary-type": Other
-    "secondary-types": [Audiobook]
-  }
-  let expected = [[name index]; ["Mushoku Tensei: Jobless Reincarnation, read by Cliff Kirk" null]]
-  assert equal ($input | parse_series_from_release_group | sort-by name) $expected
-}
-
-def test_parse_series_from_release_group_two_series_with_indices [] {
-  let input = {
-    title: "The Final Empire"
-    primary-type-id: "4fc3be2b-de1e-396b-a933-beb8f1607a22"
-    secondary-type-ids: ["499a387e-6195-333e-91c0-9592bfec535e"]
-    id: "09fecc17-56bb-4ddc-8621-647eedfba3fc"
-    secondary-types: [Audiobook]
-    disambiguation: ""
-    relations: [
-      {
-        attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}
-        ordering-key: 1
-        target-type: series
-        end: null
-        type: "part of"
-        source-credit: ""
-        attributes: [number]
-        ended: false,
-        type-id: "01018437-91d8-36b9-bf89-3f885d53b5bd"
-        series: {
-          type-id: "4c1c4949-7b6c-3a2d-9d54-a50a27e4fa77"
-          disambiguation: ""
-          type: "Release group series"
-          id: "7af5299a-1bd8-4b7f-9039-3f140b8f27e7"
-          name: "Mistborn Original Trilogy, read by Michael Kramer"
-        }
-        target-credit: ""
-        direction: forward
-        attribute-values: {number: "1"}
-        begin: null
-      } {
-        target-type: series
-        end: null
-        type: "part of"
-        source-credit: ""
-        attributes: [number]
-        attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}
-        ordering-key: 1
-        attribute-values: {number: "1"}
-        begin: null
-        ended: false
-        type-id: "01018437-91d8-36b9-bf89-3f885d53b5bd"
-        series: {
-          id: "b32b354a-60a5-4563-932b-27cc354f3dac"
-          name: "Mistborn, read by Michael Kramer"
-          disambiguation: ""
-          type-id: "4c1c4949-7b6c-3a2d-9d54-a50a27e4fa77"
-          type: "Release group series"
-        }
-        target-credit: ""
-        direction: forward
-      }
-    ]
-    primary-type: Other
-    first-release-date: "2008-12-23"
-  }
-  let expected = [[name index]; ["Mistborn Original Trilogy, read by Michael Kramer" "1"] ["Mistborn, read by Michael Kramer", "1"]]
-  assert equal ($input | parse_series_from_release_group | sort-by name) $expected
-}
-
-def test_parse_series_from_release_group [] {
-  test_parse_series_from_release_group_no_series
-  test_parse_series_from_release_group_one_series_without_index
-  test_parse_series_from_release_group_two_series_with_indices
-}
-
 def test_parse_release_ids_from_acoustid_response_no_track [] {
   let input = {
     results: []
@@ -2053,7 +1930,6 @@ def main []: {
   test_convert_series_for_group_tag
   test_into_tone_format
   test_tracks_into_tone_format
-  test_parse_series_from_release_group
   # test_parse_release_ids_from_acoustid_response
   test_determine_releases_from_acoustid_fingerprint_matches
   test_parse_works_from_musicbrainz_relations

@@ -2895,26 +2895,6 @@ export def tone_tag_tracks [
 # Functions prefixed with "parse_" are used to parse responses from the MusicBrainz API without making any external calls.
 # This allows using unit tests for the functions prefixed with "parse_".
 
-# Get the Release Group Series to which a Release Group belongs
-export def parse_series_from_release_group []: record -> table<name: string, index: string> {
-  let release_group_series = (
-    $in
-    | get relations
-    | where series.type == "Release group series"
-    | where type == "part of"
-  )
-  if ($release_group_series | is-empty) {
-    return null
-  }
-
-  $release_group_series | par-each {|relation|
-    {
-      name: $relation.series.name
-      index: ($relation.attribute-values | get --ignore-errors number)
-    }
-  }
-}
-
 # Get the release group to which a release belongs
 export def fetch_musicbrainz_release_group_for_release []: string -> table {
   let release_id = $in
