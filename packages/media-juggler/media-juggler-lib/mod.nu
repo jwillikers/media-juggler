@@ -3069,9 +3069,19 @@ export def fetch_release_ids_by_acoustid_fingerprint [
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
 ]: record<file: path, duration: duration, fingerprint: string> -> record<file: path, http_response: table, result: table<id: string, recordings: table<id: string, releases: table<id: string>>, score: float>> {
   let input = $in
+
+  # Currently, the server doesn't accept durations longer than 32767 seconds.
+  # Issue: https://github.com/acoustid/acoustid-server/issues/43
+  # PR: https://github.com/acoustid/acoustid-server/pull/179
+  if ($input.duration > 32767sec) {
+    log error $""
+    return null
+  }
+
   let url = "https://api.acoustid.org/v2/lookup"
 
   let duration_seconds = ($input.duration / 1sec) | math round
+
   let payload = $"format=json&meta=recordingids+releaseids&client=($client_key)&fingerprint=($input.fingerprint)&duration=($duration_seconds)"
   let request = {||
     $payload
