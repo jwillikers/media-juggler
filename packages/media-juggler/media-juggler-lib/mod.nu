@@ -2470,6 +2470,17 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
   #   # }
   # )
 
+  let amazon_asin = (
+    if "additionalFields" in $metadata and ($metadata.additionalFields | is-not-empty) and "asin" in $metadata.additionalFields {
+      $metadata.additionalFields.asin | str upcase
+    }
+  )
+  let audible_asin = (
+    if "additionalFields" in $metadata and ($metadata.additionalFields | is-not-empty) and "audible_asin" in $metadata.additionalFields {
+      $metadata.additionalFields.audible_asin | str upcase
+    }
+  )
+
   let book = (
     {}
     | upsert_if_present title $metadata album
@@ -2492,8 +2503,8 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
         $input
         | upsert_if_present isbn $metadata.additionalFields barcode
         | upsert_if_present isbn $metadata.additionalFields
-        | upsert_if_present amazon_asin $metadata.additionalFields asin
-        | upsert_if_present audible_asin $metadata.additionalFields
+        | upsert_if_value amazon_asin $amazon_asin
+        | upsert_if_value audible_asin $audible_asin
         | upsert_if_present script $metadata.additionalFields
         | upsert_if_present musicbrainz_release_group_id $metadata.additionalFields "musicBrainz Release Group Id"
         | upsert_if_present musicbrainz_release_id $metadata.additionalFields "musicBrainz Album Id"
@@ -2875,8 +2886,6 @@ export def tone_tag [
   let result = do {
     (
       ^tone tag
-          # todo When tone is new enough?
-          # --id $isbn | amazon_asin | audible_asin | mbid?
           --meta-tone-json-file $tone_json
           ...$tone_args
           $file
@@ -3004,7 +3013,7 @@ export def parse_audible_asin_from_url []: string -> string {
   let url = $in
   let parsed = $url | url parse
   if ($parsed.host | str starts-with "www.audible.") {
-    $parsed | get path | path parse | get stem
+    $parsed | get path | path parse | get stem | str upcase
   }
 }
 
