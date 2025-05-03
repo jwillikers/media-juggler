@@ -189,360 +189,360 @@ export def get_audiobook_metadata_from_musicbrainz []: list<record> -> record {
   )
 }
 
-export def tag_audiobook [
-    output_directory: directory
-    --asin: string
-    --tone-tag-args: list<string> = []
-]: path -> path {
-    let m4b = $in
+# export def tag_audiobook [
+#     output_directory: directory
+#     --asin: string
+#     --tone-tag-args: list<string> = []
+# ]: path -> path {
+#     let m4b = $in
 
-    let current_metadata = ^tone dump --format json $m4b | from json | get meta
-    let asin = (
-        if $asin == null {
-            if "additionalFields" in $current_metadata and "asin" in $current_metadata.additionalFields {
-                $current_metadata.additionalFields.asin
-            } else if "title" in $current_metadata {
-                # todo Use additional fields to make this query more reliable.
-                http get $"https://api.audible.com/1.0/catalog/products?region=us&response_groups=series&title=($current_metadata.title | url encode)"  | get products | first | get asin
-            } else {
-                log error "Unable to determine the ASIN for the book!"
-                exit 1
-            }
-        } else {
-            $asin
-        }
-    )
+#     let current_metadata = ^tone dump --format json $m4b | from json | get meta
+#     let asin = (
+#         if $asin == null {
+#             if "additionalFields" in $current_metadata and "asin" in $current_metadata.additionalFields {
+#                 $current_metadata.additionalFields.asin
+#             } else if "title" in $current_metadata {
+#                 # todo Use additional fields to make this query more reliable.
+#                 http get $"https://api.audible.com/1.0/catalog/products?region=us&response_groups=series&title=($current_metadata.title | url encode)"  | get products | first | get asin
+#             } else {
+#                 log error "Unable to determine the ASIN for the book!"
+#                 exit 1
+#             }
+#         } else {
+#             $asin
+#         }
+#     )
 
-    log info $"ASIN is (ansi purple)($asin)(ansi reset)"
-    let r = (
-        let result = http get $"https://api.audnex.us/books/($asin)";
-        # Fix bad data
-        if "seriesPrimary" in $result {
-            if ($result.seriesPrimary.name | str contains --ignore-case "Eighty-Six") {
-                $result
-                # Just to be safe
-                | update seriesPrimary.name "86--EIGHTY-SIX"
-                | update authors [[name]; ["Asato Asato"] ["Roman Lempert - translator"] ["Shirabii - illustrator"]]
-            } else {
-                $result
-            }
-            if $result.seriesPrimary.name =~ "Rascal Does Not Dream" {
-                $result
-                # Series seems to now be Rascal Does Not Dream (light novel)
-                # todo Remove "(light novel)" and "Series" from the end of series names?
-                | update seriesPrimary.name "Rascal Does Not Dream"
-                | update authors [[name]; ["Hajime Kamoshida"] ["Andrew Cunningham - translator"] ["Keji Mizoguchi - illustrator"]]
-                | (
-                    let input = $in;
-                    if ($result.genres | is-empty) {
-                        $input | update genres [[name type]; ["Science Fiction & Fantasy" genre]]
-                    } else {
-                        $input
-                    }
-                )
-            } else {
-                $result
-            }
-            if $result.seriesPrimary.name =~ "Spice and Wolf" {
-                $result
-                | update authors [[name]; ["Isuna Hasekura"] ["Paul Starr - translator"]]
-            } else {
-                $result
-            }
-        } else {
-            $result
-        }
-    )
-    let r = (
-        if $r.title == "Arcanum Unbounded: The Cosmere Collection" {
-            $r
-            # Tries to put this under the Mistborn series, which isn't quite right
-            | reject seriesPrimary
-        } else {
-            $r
-        }
-    )
+#     log info $"ASIN is (ansi purple)($asin)(ansi reset)"
+#     let r = (
+#         let result = http get $"https://api.audnex.us/books/($asin)";
+#         # Fix bad data
+#         if "seriesPrimary" in $result {
+#             if ($result.seriesPrimary.name | str contains --ignore-case "Eighty-Six") {
+#                 $result
+#                 # Just to be safe
+#                 | update seriesPrimary.name "86--EIGHTY-SIX"
+#                 | update authors [[name]; ["Asato Asato"] ["Roman Lempert - translator"] ["Shirabii - illustrator"]]
+#             } else {
+#                 $result
+#             }
+#             if $result.seriesPrimary.name =~ "Rascal Does Not Dream" {
+#                 $result
+#                 # Series seems to now be Rascal Does Not Dream (light novel)
+#                 # todo Remove "(light novel)" and "Series" from the end of series names?
+#                 | update seriesPrimary.name "Rascal Does Not Dream"
+#                 | update authors [[name]; ["Hajime Kamoshida"] ["Andrew Cunningham - translator"] ["Keji Mizoguchi - illustrator"]]
+#                 | (
+#                     let input = $in;
+#                     if ($result.genres | is-empty) {
+#                         $input | update genres [[name type]; ["Science Fiction & Fantasy" genre]]
+#                     } else {
+#                         $input
+#                     }
+#                 )
+#             } else {
+#                 $result
+#             }
+#             if $result.seriesPrimary.name =~ "Spice and Wolf" {
+#                 $result
+#                 | update authors [[name]; ["Isuna Hasekura"] ["Paul Starr - translator"]]
+#             } else {
+#                 $result
+#             }
+#         } else {
+#             $result
+#         }
+#     )
+#     let r = (
+#         if $r.title == "Arcanum Unbounded: The Cosmere Collection" {
+#             $r
+#             # Tries to put this under the Mistborn series, which isn't quite right
+#             | reject seriesPrimary
+#         } else {
+#             $r
+#         }
+#     )
 
-    # todo Check for inconsistencies between the previous data and the current metadata, such as different authors.
+#     # todo Check for inconsistencies between the previous data and the current metadata, such as different authors.
 
-    let authors = (
-        $r.authors
-        | get name
-        | filter {|a|
-            (
-            not ($a | str ends-with "- afterword")
-            and not ($a | str ends-with "- contributor")
-            and not ($a | str ends-with "- editor")
-            and not ($a | str ends-with "- illustrator")
-            and not ($a | str ends-with "- translator")
-            )
-        }
-    )
-    let contributors = (
-        $r.authors
-        | get name
-        | filter {|a| $a | str ends-with "- contributor" }
-        | str replace "- contributor" ""
-        | str trim
-    )
-    let editors = (
-        $r.authors
-        | get name
-        | filter {|a| $a | str ends-with "- editor" }
-        | str replace "- editor" ""
-        | str trim
-    )
-    let illustrators = (
-        $r.authors
-        | get name
-        | filter {|a| $a | str ends-with "- illustrator" }
-        | str replace "- illustrator" ""
-        | str trim
-    )
-    let translators = (
-        $r.authors
-        | get name
-        | filter {|a| $a | str ends-with "- translator" }
-        | str replace "- translator" ""
-        | str trim
-    )
-    # let primary_authors = (
-    #     let authors_with_asin = (
-    #         $r.authors
-    #         | default null asin
-    #         | where asin != null
-    #         | get name
-    #         | filter {|a| not ($a | str ends-with " - translator") }
-    #     );
-    #     if ($authors_with_asin | is-empty) {
-    #         $authors
-    #     } else {
-    #         $authors_with_asin
-    #     }
-    # )
-    let series = (
-        if "seriesPrimary" in $r {
-            { name: $r.seriesPrimary.name } | (
-                let input = $in;
-                if "position" in $r.seriesPrimary {
-                    $input | insert position $r.seriesPrimary.position
-                } else {
-                    $input
-                }
-            )
-        } else {
-            null
-        }
-    )
-    # Normalize the title under weird circumstances where it doesn't match the title.
-    let title = (
-        if $series == null {
-            $r.title
-        } else {
-            if ($r.title | str contains --ignore-case ', vol. ') {
-                # 86 - Eighty-Six, Vol. 1 -> 86--EIGHTY-SIX, Vol. 1
-                [$series.name ($r.title | str substring ($r.title | str downcase | str index-of ', vol. ')..)] | str join
-            } else {
-                $r.title
-            }
-        }
-    )
-    let title = (
-        # Remove inconsistent use of " (light novel)" in titles
-        if ($title | str contains --ignore-case " (light novel)") {
-            $title | str replace --regex ' \([lL]ight [nN]ovel\)' ""
-        } else {
-            $title
-        }
-    )
-    log debug $"The title is (ansi yellow)($title)(ansi reset)"
-    # Audiobookshelf and Picard use a semicolon followed by a space to separate multiple values, I think.
-    # Technically, I think ID3v2.4 is supposed to use a null byte, but not sure whether that's just what is shown or what is actually used.
-    let tone_data = (
-        {
-            meta: {
-                album: $title
-                albumArtist: ($authors | str join ";")
-                artist: ($authors | str join ";")
-                composer: ($r.narrators | get name | str join ";")
-                description: $r.description
-                language: $r.language
-                narrator: ($r.narrators | get name | str join ";")
-                publisher: $r.publisherName
-                publishingDate: $r.releaseDate
-                title: $title
-                additionalFields: {
-                    asin: $r.asin
-                }
-            }
-        }
-        | (
-            let input = $in;
-            if "genres" in $r {
-                $input
-                | insert meta.genre ($r.genres | where type == "genre" | get name | str join ";")
-                | insert meta.additionalFields.tags ($r.genres | where type == "tag" | get name | str join ";")
-            } else {
-                $input
-            }
-        )
-        | (
-            let input = $in;
-            if "isbn" in $r {
-                $input | insert meta.additionalFields.isbn $r.isbn
-            } else {
-                $input
-            }
-        )
-        | (
-            let input = $in;
-            if "copyright" in $r {
-                $input | insert meta.copyright $r.copyright
-            } else {
-                $input
-            }
-        )
-        # | (
-        #     let input = $in;
-        #     if ($authors | is-empty) or ($authors == $primary_authors) {
-        #         $input
-        #     } else {
-        #         (
-        #             $input
-        #             | insert meta.additionalFields.authors ($authors | str join ";")
-        #         )
-        #     }
-        # )
-        | (
-            let input = $in;
-            if ($contributors | is-empty) {
-                $input
-            } else {
-                (
-                    $input
-                    | insert meta.additionalFields.contributors ($contributors | str join ";")
-                )
-            }
-        )
-        | (
-            let input = $in;
-            if ($editors | is-empty) {
-                $input
-            } else {
-                (
-                    $input
-                    | insert meta.additionalFields.editors ($editors | str join ";")
-                )
-            }
-        )
-        | (
-            let input = $in;
-            if ($illustrators | is-empty) {
-                $input
-            } else {
-                (
-                    $input
-                    | insert meta.additionalFields.illustrators ($illustrators | str join ";")
-                )
-            }
-        )
-        | (
-            let input = $in;
-            if ($translators | is-empty) {
-                $input
-            } else {
-                (
-                    $input
-                    | insert meta.additionalFields.translators ($translators | str join ";")
-                )
-            }
-        )
-        | (
-            let input = $in;
-            if $series == null {
-                $input
-            } else {
-                (
-                    $input
-                    | insert meta.movementName $series.name
-                )
-            }
-        )
-    )
-    let tone_json = $"($output_directory)/tone.json"
-    $tone_data | save --force $tone_json
-    let chapters = $"($output_directory)/chapters.txt"
-    (
-        http get $"https://api.audnex.us/books/($asin)/chapters"
-        | get chapters
-        | each {|chapter|
-            let time = ($chapter.startOffsetMs | into duration --unit ms | format_chapter_duration);
-            $"($time) ($chapter.title)"
-        }
-        | str join "\n"
-        | save --force $chapters
-    )
-    log debug $"Chapters: ($chapters)"
-    # let cover = $r.cover # "https://m.media-amazon.com/images/I/91rYWS09+AL.jpg"
-    let cover = ({ parent: $output_directory, stem: "cover", extension: ($r.image | path parse | get extension )} | path join)
-    # let ffmetadata = $"($output_directory)/ffmetadata.txt"
-    # ^ffprobe -loglevel error -show_entries stream_tags:format_tags $m4b | save --force $ffmetadata
-    http get --raw $r.image | save --force $cover
-    [$cover] | optimize_images
-    let args = (
-        []
-        | append (
-            if $series != null and "position" in $series {
-                $"--meta-part=($series.position)"
-            } else {
-                null
-            }
-        )
-    )
-    (
-        ^tone tag
-            # todo When tone is new enough:
-            # --id $r.asin
-            --meta-chapters-file $chapters
-            --meta-cover-file $cover
-            --meta-tone-json-file $tone_json
-            --meta-remove-property "comment"
-            ...$args
-            ...$tone_tag_args
-            $m4b
-    )
-    let renamed = (
-        let components = $m4b | path parse;
-        {
-            parent: (
-                [$output_directory]
-                | append (
-                    # Jellyfin can't handle having a bare audiobook file in the Audiobooks directory.
-                    # So, place it in a directory named after the book if it won't be in a subdirectory for the author and/or series.
-                    if ($authors | is-empty) and $series == null {
-                        $title
-                    } else {
-                        $authors | str join ", "
-                    }
-                )
-                | append (
-                    if $series == null {
-                        null
-                    } else {
-                        $series.name
-                    }
-                )
-                | path join
-            ),
-            stem: $title,
-            extension: $components.extension,
-        }
-        | path join
-    )
-    mkdir ($renamed | path dirname)
-    mv $m4b $renamed
-    $renamed
-}
+#     let authors = (
+#         $r.authors
+#         | get name
+#         | filter {|a|
+#             (
+#             not ($a | str ends-with "- afterword")
+#             and not ($a | str ends-with "- contributor")
+#             and not ($a | str ends-with "- editor")
+#             and not ($a | str ends-with "- illustrator")
+#             and not ($a | str ends-with "- translator")
+#             )
+#         }
+#     )
+#     let contributors = (
+#         $r.authors
+#         | get name
+#         | filter {|a| $a | str ends-with "- contributor" }
+#         | str replace "- contributor" ""
+#         | str trim
+#     )
+#     let editors = (
+#         $r.authors
+#         | get name
+#         | filter {|a| $a | str ends-with "- editor" }
+#         | str replace "- editor" ""
+#         | str trim
+#     )
+#     let illustrators = (
+#         $r.authors
+#         | get name
+#         | filter {|a| $a | str ends-with "- illustrator" }
+#         | str replace "- illustrator" ""
+#         | str trim
+#     )
+#     let translators = (
+#         $r.authors
+#         | get name
+#         | filter {|a| $a | str ends-with "- translator" }
+#         | str replace "- translator" ""
+#         | str trim
+#     )
+#     # let primary_authors = (
+#     #     let authors_with_asin = (
+#     #         $r.authors
+#     #         | default null asin
+#     #         | where asin != null
+#     #         | get name
+#     #         | filter {|a| not ($a | str ends-with " - translator") }
+#     #     );
+#     #     if ($authors_with_asin | is-empty) {
+#     #         $authors
+#     #     } else {
+#     #         $authors_with_asin
+#     #     }
+#     # )
+#     let series = (
+#         if "seriesPrimary" in $r {
+#             { name: $r.seriesPrimary.name } | (
+#                 let input = $in;
+#                 if "position" in $r.seriesPrimary {
+#                     $input | insert position $r.seriesPrimary.position
+#                 } else {
+#                     $input
+#                 }
+#             )
+#         } else {
+#             null
+#         }
+#     )
+#     # Normalize the title under weird circumstances where it doesn't match the title.
+#     let title = (
+#         if $series == null {
+#             $r.title
+#         } else {
+#             if ($r.title | str contains --ignore-case ', vol. ') {
+#                 # 86 - Eighty-Six, Vol. 1 -> 86--EIGHTY-SIX, Vol. 1
+#                 [$series.name ($r.title | str substring ($r.title | str downcase | str index-of ', vol. ')..)] | str join
+#             } else {
+#                 $r.title
+#             }
+#         }
+#     )
+#     let title = (
+#         # Remove inconsistent use of " (light novel)" in titles
+#         if ($title | str contains --ignore-case " (light novel)") {
+#             $title | str replace --regex ' \([lL]ight [nN]ovel\)' ""
+#         } else {
+#             $title
+#         }
+#     )
+#     log debug $"The title is (ansi yellow)($title)(ansi reset)"
+#     # Audiobookshelf and Picard use a semicolon followed by a space to separate multiple values, I think.
+#     # Technically, I think ID3v2.4 is supposed to use a null byte, but not sure whether that's just what is shown or what is actually used.
+#     let tone_data = (
+#         {
+#             meta: {
+#                 album: $title
+#                 albumArtist: ($authors | str join ";")
+#                 artist: ($authors | str join ";")
+#                 composer: ($r.narrators | get name | str join ";")
+#                 description: $r.description
+#                 language: $r.language
+#                 narrator: ($r.narrators | get name | str join ";")
+#                 publisher: $r.publisherName
+#                 publishingDate: $r.releaseDate
+#                 title: $title
+#                 additionalFields: {
+#                     asin: $r.asin
+#                 }
+#             }
+#         }
+#         | (
+#             let input = $in;
+#             if "genres" in $r {
+#                 $input
+#                 | insert meta.genre ($r.genres | where type == "genre" | get name | str join ";")
+#                 | insert meta.additionalFields.tags ($r.genres | where type == "tag" | get name | str join ";")
+#             } else {
+#                 $input
+#             }
+#         )
+#         | (
+#             let input = $in;
+#             if "isbn" in $r {
+#                 $input | insert meta.additionalFields.isbn $r.isbn
+#             } else {
+#                 $input
+#             }
+#         )
+#         | (
+#             let input = $in;
+#             if "copyright" in $r {
+#                 $input | insert meta.copyright $r.copyright
+#             } else {
+#                 $input
+#             }
+#         )
+#         # | (
+#         #     let input = $in;
+#         #     if ($authors | is-empty) or ($authors == $primary_authors) {
+#         #         $input
+#         #     } else {
+#         #         (
+#         #             $input
+#         #             | insert meta.additionalFields.authors ($authors | str join ";")
+#         #         )
+#         #     }
+#         # )
+#         | (
+#             let input = $in;
+#             if ($contributors | is-empty) {
+#                 $input
+#             } else {
+#                 (
+#                     $input
+#                     | insert meta.additionalFields.contributors ($contributors | str join ";")
+#                 )
+#             }
+#         )
+#         | (
+#             let input = $in;
+#             if ($editors | is-empty) {
+#                 $input
+#             } else {
+#                 (
+#                     $input
+#                     | insert meta.additionalFields.editors ($editors | str join ";")
+#                 )
+#             }
+#         )
+#         | (
+#             let input = $in;
+#             if ($illustrators | is-empty) {
+#                 $input
+#             } else {
+#                 (
+#                     $input
+#                     | insert meta.additionalFields.illustrators ($illustrators | str join ";")
+#                 )
+#             }
+#         )
+#         | (
+#             let input = $in;
+#             if ($translators | is-empty) {
+#                 $input
+#             } else {
+#                 (
+#                     $input
+#                     | insert meta.additionalFields.translators ($translators | str join ";")
+#                 )
+#             }
+#         )
+#         | (
+#             let input = $in;
+#             if $series == null {
+#                 $input
+#             } else {
+#                 (
+#                     $input
+#                     | insert meta.movementName $series.name
+#                 )
+#             }
+#         )
+#     )
+#     let tone_json = $"($output_directory)/tone.json"
+#     $tone_data | save --force $tone_json
+#     let chapters = $"($output_directory)/chapters.txt"
+#     (
+#         http get $"https://api.audnex.us/books/($asin)/chapters"
+#         | get chapters
+#         | each {|chapter|
+#             let time = ($chapter.startOffsetMs | into duration --unit ms | format_chapter_duration);
+#             $"($time) ($chapter.title)"
+#         }
+#         | str join "\n"
+#         | save --force $chapters
+#     )
+#     log debug $"Chapters: ($chapters)"
+#     # let cover = $r.cover # "https://m.media-amazon.com/images/I/91rYWS09+AL.jpg"
+#     let cover = ({ parent: $output_directory, stem: "cover", extension: ($r.image | path parse | get extension )} | path join)
+#     # let ffmetadata = $"($output_directory)/ffmetadata.txt"
+#     # ^ffprobe -loglevel error -show_entries stream_tags:format_tags $m4b | save --force $ffmetadata
+#     http get --raw $r.image | save --force $cover
+#     [$cover] | optimize_images
+#     let args = (
+#         []
+#         | append (
+#             if $series != null and "position" in $series {
+#                 $"--meta-part=($series.position)"
+#             } else {
+#                 null
+#             }
+#         )
+#     )
+#     (
+#         ^tone tag
+#             # todo When tone is new enough:
+#             # --id $r.asin
+#             --meta-chapters-file $chapters
+#             --meta-cover-file $cover
+#             --meta-tone-json-file $tone_json
+#             --meta-remove-property "comment"
+#             ...$args
+#             ...$tone_tag_args
+#             $m4b
+#     )
+#     let renamed = (
+#         let components = $m4b | path parse;
+#         {
+#             parent: (
+#                 [$output_directory]
+#                 | append (
+#                     # Jellyfin can't handle having a bare audiobook file in the Audiobooks directory.
+#                     # So, place it in a directory named after the book if it won't be in a subdirectory for the author and/or series.
+#                     if ($authors | is-empty) and $series == null {
+#                         $title
+#                     } else {
+#                         $authors | str join ", "
+#                     }
+#                 )
+#                 | append (
+#                     if $series == null {
+#                         null
+#                     } else {
+#                         $series.name
+#                     }
+#                 )
+#                 | path join
+#             ),
+#             stem: $title,
+#             extension: $components.extension,
+#         }
+#         | path join
+#     )
+#     mkdir ($renamed | path dirname)
+#     mv $m4b $renamed
+#     $renamed
+# }
 
 # Import Audiobooks with Beets.
 #

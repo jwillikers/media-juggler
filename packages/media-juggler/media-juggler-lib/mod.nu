@@ -2245,13 +2245,6 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
   # log info $"all_metadata: ($all_metadata)"
   let metadata = $all_metadata | get meta
   # log info $"metadata: ($metadata)"
-  let narrators = (
-    ["composer" "narrator"] | par-each {|type|
-      if $type in $metadata {
-        $metadata | get $type | parse_multi_value_tag
-      }
-    } | flatten | uniq
-  )
   let series = (
     let group_series = (
       if "group" in $metadata {
@@ -2341,7 +2334,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     );
     let primary_authors = $names | merge_or_input $ids;
     if ($primary_authors | is-not-empty) {
-      $primary_authors | insert role "primary author" | insert entity "artist";
+      let primary_authors = $primary_authors | insert role "primary author" | insert entity "artist";
       if "id" not-in ($primary_authors | columns) {
         $primary_authors | insert id null
       } else {
@@ -2585,50 +2578,28 @@ export def parse_audiobook_metadata_from_file []: path -> record {
 export def parse_audiobook_metadata_from_tracks_metadata []: list<record> -> record {
   let metadata = $in | sort-by track.index
   # The book metadata should match across all tracks.
-  # Narrators and writers for each track need to be combined to produce the narrators and writers for the book.
   let book = $metadata | get book | reduce {|it, acc|
-    # todo Log a warning here if the book data doesn't match?
-    # Or, just use the item with the most occurrences?
-    $acc | merge $it
-  }
-  # tracks are just the separate tracks brought together
-  let tracks = $metadata | get track # | sort-by index
-  let cumulative_tracks_metadata = (
-    $tracks | reduce --fold {narrators: [], writers: [], embedded_pictures: []} {|it, acc|
-      let embedded_pictures = (
-        if "embedded_pictures" in $it {
-          $acc.embedded_pictures | append $it.embedded_pictures | uniq
-        } else {
-          $acc.embedded_pictures
-        }
-      );
-      let narrators = (
-        if "narrators" in $it {
-          $acc.narrators | append $it.narrators | uniq
-        } else {
-          $acc.narrators
-        }
-      );
-      let writers = (
-        if "writers" in $it {
-          $acc.writers | append $it.writers | uniq
-        } else {
-          $acc.writers
-        }
-      );
-      {
-        narrators: $narrators
-        writers: $writers
-        embedded_pictures: $embedded_pictures
+    # todo Use metadata with the most occurrences when there is a conflict?
+    $acc | items {|key, value|
+      if $key not-in $it {
+        log warning $"Missing ($key) in track"
+      } else if $value != ($it | get $key) {
+        log warning $"Inconsistent metadata among files: ($value) != ($it | get $key)"
       }
     }
-  )
-
-  let book = (
-    $book
-    | upsert_if_value narrators $cumulative_tracks_metadata.narrators
-    | upsert_if_value writers $cumulative_tracks_metadata.writers
-    | upsert_if_value embedded_pictures $cumulative_tracks_metadata.embedded_pictures
+    $it | items {|key, value|
+      if $key not-in $acc {
+        log warning $"Missing ($key) in track"
+      }
+    }
+    $acc | merge $it
+  }
+  let tracks = (
+    if "index" in ($metadata.track | columns) {
+      $metadata.track | sort-by index
+    } else {
+      $metadata.track
+    }
   )
   {
       book: $book
@@ -2639,10 +2610,15 @@ export def parse_audiobook_metadata_from_tracks_metadata []: list<record> -> rec
 # Parse audiobook metadata from a list of audio files correlating to the tracks of the audiobook
 export def parse_audiobook_metadata_from_files []: list<path> -> record {
   let files = $in
-  let metadata = $files | par-each {|file|
-    $file | parse_audiobook_metadata_from_file
+  let tracks = $files | enumerate | par-each {|file|
+    let metadata = $file.item | parse_audiobook_metadata_from_file
+    if "index" in $metadata.track and ($metadata.track.index | is-not-empty) {
+      $metadata
+    } else {
+      $metadata | insert track.index ($file.index + 1)
+    }
   }
-  $metadata | parse_audiobook_metadata_from_tracks_metadata
+  $tracks | parse_audiobook_metadata_from_tracks_metadata
 }
 
 # Convert the series table to a value suitable for the group tag
@@ -3819,7 +3795,9 @@ export def parse_musicbrainz_release []: record -> record {
     let audible_asins = $metadata | parse_audible_asin_from_musicbrainz_release;
     # We just kind of ignore all besides the first when there are multiple
     if ($audible_asins | is-not-empty) {
-      log warning $"Multiple Audible ASINs found: ($audible_asins). Using the first one."
+      if ($audible_asins | length) > 1 {
+        log warning $"Multiple Audible ASINs found: ($audible_asins). Using the first one."
+      }
       $audible_asins | first
     }
   )
@@ -4006,27 +3984,53 @@ export def get_acoustid_fingerprint [
   }
 }
 
-# Tag the files of an audiobook using their AcoustID fingerprints.
-#
-#
-export def tag_audiobook_from_acoustid [
-  audiobook_files: list<path>
+# Get the embedded AcoustID fingerprint or calculate it for the tracks which do not have one.
+export def get_acoustid_fingerprint_tracks [
+  ignore_existing = false # Recalculate the AcoustID even when the tag exists
+]: table -> table {
+  let tracks = $in
+  $tracks | par-each {|track|
+    if (
+      not $ignore_existing
+      and "acoustid_fingerprint" in $track
+      and ($track.acoustid_fingerprint | is-not-empty)
+      and "duration" in $track
+      and ($track.duration | is-not-empty)
+    ) {
+      $track
+    } else {
+      let pair = [$track.file] | fpcalc | first
+      (
+        $track
+        | upsert acoustid_fingerprint $pair.fingerprint
+        | upsert duration $pair.duration
+      )
+    }
+  }
+}
+
+# Determine the MusicBrainz Recording IDs and the MusicBrainz Release ID of the given files using their AcoustID fingerprints
+export def get_musicbrainz_ids_by_acoustid [
   client_key: string # The application API key for the AcoustID server
-  working_directory
+  ignore_embedded_acoustid_fingerprints # Recalculate AcoustID fingerprints for all files
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
-  --ignore-existing-acoustid-fingerprints # Recalculate AcoustID fingerprints for all files
   --threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
   --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
-  # --working-directory: directory
-]: nothing -> list<path> {
-  let acoustid_fingerprints = (
-    $audiobook_files | get_acoustid_fingerprint $ignore_existing_acoustid_fingerprints
-  )
+]: record<book: record, tracks: table> -> record<book: record, tracks: table> {
+  let metadata = $in
+  if ($metadata | is-empty) or "tracks" not-in $metadata or ($metadata.tracks | is-empty) {
+    return null
+  }
+
+  let tracks = $metadata.tracks | get_acoustid_fingerprint_tracks $ignore_embedded_acoustid_fingerprints
+
   # log info $"acoustid_fingerprints: ($acoustid_fingerprints)"
   let acoustid_responses = (
-    $acoustid_fingerprints
+    $tracks
+    | select file duration acoustid_fingerprint
+    | rename file duration fingerprint
     | fetch_release_ids_by_acoustid_fingerprints $client_key $threshold $fail_fast $api_requests_per_second --retries $retries --retry-delay $retry_delay
   )
   if ($acoustid_responses | is-empty) {
@@ -4073,20 +4077,177 @@ export def tag_audiobook_from_acoustid [
     | flatten
     | rename file acoustid_track_id musicbrainz_recording_id
     | select file acoustid_track_id musicbrainz_recording_id
-    | join $acoustid_fingerprints file
-    | rename file acoustid_track_id musicbrainz_recording_id acoustid_fingerprint duration
-    | par-each {|track|
-      {
-        file: $track.file
-        acoustid_track_id: $track.acoustid_track_id
-        acoustid_fingerprint: $track.acoustid_fingerprint
-        musicbrainz_recording_id: $track.musicbrainz_recording_id
-        audio_duration: $track.duration
-      }
+    | join --right $tracks file
+    # | rename file acoustid_track_id musicbrainz_recording_id acoustid_fingerprint duration
+    # | par-each {|track|
+    #   {
+    #     file: $track.file
+    #     acoustid_track_id: $track.acoustid_track_id
+    #     acoustid_fingerprint: $track.acoustid_fingerprint
+    #     musicbrainz_recording_id: $track.musicbrainz_recording_id
+    #     audio_duration: $track.duration
+    #   }
+    # }
+  )
+
+  {
+    book: ($metadata.book | upsert musicbrainz_release_id $release_id)
+    tracks: $tracks
+  }
+}
+
+# Tag the files of an audiobook using their AcoustID fingerprints.
+# export def tag_audiobook_from_acoustid [
+#   audiobook_files: list<path>
+#   client_key: string # The application API key for the AcoustID server
+#   working_directory: directory
+#   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
+#   ignore_embedded_acoustid_fingerprints = false # Recalculate AcoustID fingerprints for all files
+#   ignore_embedded_musicbrainz_ids = false # Ignore existing MusicBrainz IDs embedded in the files
+#   --threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
+#   --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
+#   --retries: int = 3 # The number of retries to perform when a request fails
+#   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
+# ]: nothing -> list<path> {
+#   let acoustid_results = $audiobook_files | get_musicbrainz_ids_by_acoustid $client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
+#   if ($acoustid_results | is-empty) {
+#     log error $"Unable to determine MusicBrainz Recording and Release IDs using AcoustID fingerprints"
+#     return null
+#   }
+#   $acoustid_results.files | tag_audiobook_files_by_musicbrainz_release_id $acoustid_results.release_id $working_directory
+# }
+
+# Tag the files of an audiobook
+#
+# This function will attempt to identify audiobooks using available information in the following order.
+# 1. Embedded MusicBrainz Release and Recording IDs
+# 2. Embedded AcoustID fingerprints
+# 3. Calculated AcoustID fingerprints
+# 4. Via MusicBrainz search using the existing metadata
+#
+# If results for none of these methods is conclusive, it's recommended to provide the MusicBrainz Release ID.
+# AcoustID fingerprints will be submitted automatically.
+#
+# When an audiobook consists of multiple files, the caller must order the files correctly when the track number tag is missing and MusicBrainz Recording IDs can't be determined via AcoustID or embedded tags.
+# I might add logic here in the future to allow ordering recordings based on the natural order of the titles, but track number is usually embedded.
+export def tag_audiobook [
+  audiobook_files: list<path>
+  client_key: string # The application API key for the AcoustID server
+  working_directory: directory
+  ignore_embedded_acoustid_fingerprints = false # Recalculate AcoustID fingerprints for all files
+  ignore_embedded_musicbrainz_ids = false # Ignore existing MusicBrainz IDs embedded in the files
+  fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
+  --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
+  --musicbrainz-release-id: string # The MusicBrainz Release ID associated with the release
+  --threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
+  --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
+]: nothing -> record<book: record, tracks: table> {
+  if ($audiobook_files | is-empty) {
+    log error "No audiobook files provided!"
+    return null
+  }
+
+  let metadata = $audiobook_files | parse_audiobook_metadata_from_files
+  # log info $"$metadata: ($metadata)"
+
+  if "tracks" not-in $metadata or ($metadata.tracks | is-empty) {
+    # This shouldn't ever happen
+    log error "No track metadata!"
+    return null
+  }
+
+  let metadata = (
+    if ($musicbrainz_release_id | is-not-empty) {
+      # todo Wipe existing recording ids here to ensure they don't effect tagging
+      # Or otherwise ensure they won't be an issue when tagging
+      $metadata | upsert book.musicbrainz_release_id $musicbrainz_release_id
+    } else {
+      # If missing Release and/or Recording IDs, try using AcoustID
+      let metadata = (
+        if (
+          "musicbrainz_release_id" not-in $metadata.book
+          or ($metadata.book.musicbrainz_release_id | is-empty)
+          or (
+            $metadata.tracks
+            | any {|track|
+              "musicbrainz_recording_id" not-in $track or ($track.musicbrainz_recording_id | is-empty)
+            }
+          )
+        ) {
+          $metadata | get_musicbrainz_ids_by_acoustid $client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
+        } else {
+          $metadata
+        }
+      )
+      let metadata = (
+        if (
+          "musicbrainz_release_id" not-in $metadata.book
+          or ($metadata.book.musicbrainz_release_id | is-empty)
+          # or (
+          #   $metadata.book.tracks
+          #   | any {|track|
+          #     "musicbrainz_recording_id" not-in $track or ($track.musicbrainz_recording_id | is-empty)
+          #   }
+          )
+        {
+          log info $"Unable to determine MusicBrainz Recording and Release IDs using AcoustID fingerprints"
+          # todo Search for MusicBrainz Release using the available metadata
+        } else {
+          $metadata
+        }
+      )
+      $metadata
     }
   )
-  # log info $"file_metadata: ($file_metadata)"
-  $file_metadata | tag_audiobook_files_by_musicbrainz_release_id ($release_ids | first) $working_directory
+
+  # We need to keep metadata that isn't available from MusicBrainz like AcoustID fingerprint and AcoustID track ID.
+  # Passing on the duration is also good.
+  # todo Validate MBIDs when parsing them.
+
+  if ($metadata | is-empty) or "book" not-in $metadata or "musicbrainz_release_id" not-in $metadata.book or ($metadata.book.musicbrainz_release_id | is-empty) {
+    log error "Unable to determine the MusicBrainz Release ID. Aborting. Please supply the MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+    log debug $"$metadata: ($metadata | to nuon)"
+    return null
+  }
+
+  # Tag the files
+  let metadata = $metadata | tag_audiobook_tracks_by_musicbrainz_release_id $working_directory
+  if ($metadata | is-empty) {
+    log error "Failed to tag audio tracks!"
+    return null
+  }
+
+  # Submit AcoustID fingerprints
+  if ($acoustid_user_key | is-not-empty) {
+    let tracks = (
+      if (
+        $metadata.tracks
+        | all {|track|
+          "acoustid_fingerprint" in $track
+        }
+      ) {
+        $metadata.tracks
+      } else {
+        $metadata.tracks | get_acoustid_fingerprint_tracks $ignore_embedded_acoustid_fingerprints
+      }
+    )
+    # log info $"$tracks: ($tracks | reject embedded_pictures)"
+    let acoustid_submissions = (
+      $tracks
+      | select musicbrainz_recording_id duration acoustid_fingerprint
+      | rename musicbrainz_recording_id duration fingerprint
+      | submit_acoustid_fingerprints $client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
+    )
+    if ($acoustid_submissions | is-not-empty) {
+      log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
+    } else {
+      log error $"Failed to submit AcoustID fingerprints!"
+    }
+  }
+
+  $metadata
 }
 
 # Parse chapters from tone.
@@ -4115,6 +4276,8 @@ export def chapters_into_tone_format []: table<index: int, start: duration, leng
       $chapter
       | update start (($chapter.start / 1ms) | math round)
       | update length (($chapter.length / 1ms) | math round)
+      # To make Tone's output nicer
+      | insert subtitle ""
     )
   }
 }
@@ -4246,6 +4409,8 @@ export def look_up_chapters_from_similar_musicbrainz_release [
     }
     $received_metadata | parse_musicbrainz_release
   }
+
+  # log info $"$release ($release)"
 
   # todo Make this into a separate function.
   let candidates = $candidates | filter {|candidate|
@@ -4416,6 +4581,140 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
   }
 
   $files
+}
+
+
+# Tag the given audiobook tracks using the MusicBrainz Release ID and certain other metadata
+#
+# The individual audio files should be provided in a table as input.
+# The file key should be used for the path of each file on disk.
+#
+# The table can also include the MusicBrainz Recording ID using the musicbrainz_recording_id key.
+# This ensures that each track is associated with the correct recording.
+# It's particularly useful for associating files with recordings using AcoustID fingerprints.
+# Without the MusicBrainz Recording ID, tracks must be provided in the correct order as they appear on the release.
+# The tracks will be checked against their expected durations in this case to ensure correctness.
+#
+# In addition to the musicbrainz_recording_id key, the acoustid_fingerprint, audio_duration, and acoustid_track_id tags can also be included.
+# The acoustid_fingerprint and acoustid_track_id will be embedded in the files with the other metadata.
+# The audio_duration value is used to avoid recalculating the duration of the audio.
+export def tag_audiobook_tracks_by_musicbrainz_release_id [
+  working_directory: directory
+  duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
+  chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
+  --retries: int = 3
+  --retry-delay: duration = 5sec
+]: record<book: record, tracks: table> -> record<book: record, tracks: table> {
+  let existing_metadata = $in
+  if "book" not-in $existing_metadata or "musicbrainz_release_id" not-in $existing_metadata.book or ($existing_metadata.book.musicbrainz_release_id | is-empty) {
+    log error "Missing MusicBrainz Release ID"
+    return null
+  }
+  if "tracks" not-in $existing_metadata or ($existing_metadata.tracks | is-empty) {
+    log error "Missing tracks to tag"
+    return null
+  }
+  # let existing_track_metadata_keys_to_keep = [acoustid_track_id acoustid_fingerprint file duration]
+  # Keep / rename only the necessary columns
+  let existing_metadata = (
+    $existing_metadata | upsert tracks (
+      # Rename duration column to audio_duration
+      $existing_metadata.tracks | insert audio_duration {|track| $track.duration}
+    )
+    # $existing_metadata.tracks | each {|track|
+    #   {
+    #     index: $track.index
+    #     acoustid_fingerprint: $track.acoustid_fingerprint
+    #     acoustid_track_id: $track.acoustid_track_id
+    #     file: $track.file
+    #     audio_duration: $track.duration
+    #     musicbrainz_recording_id: $track.musicbrainz_recording_id
+    #   }
+    # }
+    # $existing_metadata | select index acoustid_fingerprint acoustid_track_id file duration musicbrainz_recording_id
+  )
+  let musicbrainz_metadata = (
+    $existing_metadata.book.musicbrainz_release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
+  )
+  # log info $"audiobook_files: ($audiobook_files)"
+  # log info $"musicbrainz_metadata: ($musicbrainz_metadata)"
+  let tracks = (
+    if (
+      "musicbrainz_recording_id" in ($existing_metadata.tracks | columns)
+      and ($existing_metadata.tracks.musicbrainz_recording_id | is-not-empty)
+    ) {
+      # todo Verify that no individual recording ids are missing?
+      $musicbrainz_metadata.tracks | join --right $existing_metadata.tracks musicbrainz_recording_id
+      # log info $"x: ($x | reject embedded_pictures | to nuon)"
+    } else {
+      let enumerated_tracks = (
+        $existing_metadata.tracks | enumerate | each {|t|
+          $t.item | upsert index ($t.index + 1)
+        }
+      )
+      $musicbrainz_metadata.tracks | join $enumerated_tracks index
+    }
+  )
+
+  # log info $"tracks: ($tracks)"
+  for track in $tracks {
+    let duration = (
+      if "audio_duration" in $track and ($track.audio_duration | is-not-empty) {
+        $track.audio_duration
+      } else {
+        log error "Missing track audio duration for some reason!"
+        return null
+        # $track.file | tone_dump | get audio.duration | into int | into duration --unit ms
+      }
+    )
+    if ($track.duration - $duration | math abs) > $duration_threshold {
+      log error $"The (ansi green)($track)(ansi reset) is ($duration) long, but the MusicBrainz track is ($track.duration) long, which is outside the acceptable duration threshold of ($duration_threshold)"
+      return null
+    }
+  }
+  # log info $"musicbrainz_metadata: ($musicbrainz_metadata)"
+  # log info $"tracks: ($tracks)"
+  let musicbrainz_metadata = $musicbrainz_metadata | upsert tracks $tracks
+
+  let musicbrainz_metadata = (
+    let chapters = (
+      if "chapters" not-in $musicbrainz_metadata.book or ($musicbrainz_metadata.book.chapters | is-empty) {
+        let chapters = $musicbrainz_metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
+        if ($chapters | is-not-empty) {
+          $chapters
+        } else {
+          if "chapters" in $existing_metadata.book and ($existing_metadata.book.chapters | is-not-empty) {
+            # todo Should probably add flag to select whether to lookup or reuse existing chapters
+            $existing_metadata.book.chapters
+          }
+        }
+      }
+    );
+    if ($chapters | is-not-empty) {
+      $musicbrainz_metadata | upsert book.chapters $chapters
+    } else {
+      $musicbrainz_metadata
+    }
+  )
+
+  let front_cover = (
+    if "front_cover_available" in $musicbrainz_metadata.book and $musicbrainz_metadata.book.front_cover_available {
+      $musicbrainz_metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
+    }
+  )
+
+  let files = (
+    $musicbrainz_metadata
+    # Remove all sort fields
+    | tone_tag_tracks $working_directory "--taggers" 'remove,*' "--meta-remove-property" "sortalbum" "--meta-remove-property" "sorttitle" "--meta-remove-property" "sortalbumartist" "--meta-remove-property" "sortartist" "--meta-remove-property" "sortcomposer" "--meta-cover-file" $front_cover
+  )
+
+  # Clean up
+  if ($front_cover | is-not-empty) {
+    rm $front_cover
+  }
+
+  $musicbrainz_metadata
 }
 
 # Using metadata from the audio tracks, search for a MusicBrainz release

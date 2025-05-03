@@ -351,17 +351,17 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
   let actual = $input | parse_audiobook_metadata_from_tone
 
   # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
-  # assert equal $actual.book $expected.book
-  # for column in ($expected.track | columns) {
-  #   assert equal ($actual.track | get $column) ($expected.track | get $column)
-  # }
-  # for column in ($actual.track | columns) {
-  #   assert equal ($actual.track | get $column) ($expected.track | get $column)
-  # }
-  # assert equal $actual.track $expected.track
+  for column in ($expected.book | columns) {
+    assert equal ($actual.book | get $column) ($expected.book | get $column)
+  }
+  assert equal $actual.book $expected.book
+  for column in ($expected.track | columns) {
+    assert equal ($actual.track | get $column) ($expected.track | get $column)
+  }
+  for column in ($actual.track | columns) {
+    assert equal ($actual.track | get $column) ($expected.track | get $column)
+  }
+  assert equal $actual.track $expected.track
   assert equal $actual $expected
 }
 
@@ -482,7 +482,10 @@ def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
   let input = [{
     book: {
       title: "My Happy Marriage, Vol. 2"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
+      contributors: [
+        [name, role, entity, id];
+        ["Akumi Agitogi read by Miranda Parkin, Damien Haas", "primary author", artist, null]
+      ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [
@@ -495,25 +498,28 @@ def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
         [name id];
         ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
       ]
-    }
-    track: {
-      title: "My Happy Marriage, Vol. 2 - Track 001"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
-      narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
-      ]
-      index: 1
       embedded_pictures: [
         [code mimetype];
         [13, image/jpeg]
+      ]
+    }
+    track: {
+      title: "My Happy Marriage, Vol. 2 - Track 001"
+      index: 1
+      contributors: [
+        [id name entity role];
+        [null "Damien Haas, Miranda Parkin" artist composer]
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist writer]
       ]
     }
   }]
   let expected = {
     book: {
       title: "My Happy Marriage, Vol. 2"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
+      contributors: [
+        [name, role, entity, id];
+        ["Akumi Agitogi read by Miranda Parkin, Damien Haas", "primary author", artist, null]
+      ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [
@@ -530,31 +536,23 @@ def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
         [code mimetype];
         [13 image/jpeg]
       ]
-      narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
-      ]
     }
     tracks: [{
       title: "My Happy Marriage, Vol. 2 - Track 001"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
-      narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+      contributors: [
+        [id name entity role];
+        [null "Damien Haas, Miranda Parkin" artist composer]
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist writer]
       ]
       index: 1
-      embedded_pictures: [
-        [code mimetype];
-        [13 image/jpeg]
-      ]
     }]
   }
   let actual = $input | parse_audiobook_metadata_from_tracks_metadata
 
   # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | first | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | first | get $column)
-  # }
+  for column in ($expected.book | columns) {
+    assert equal ($actual.book | get $column) ($expected.book | get $column)
+  }
   assert equal $actual.book $expected.book
   for expected_track in $expected.tracks {
     for column in ($expected_track | columns) {
@@ -569,7 +567,10 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
   let input = [{
     book: {
       title: "My Happy Marriage, Vol. 2"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
+      contributors: [
+        [name, role, entity, id];
+        ["Akumi Agitogi read by Miranda Parkin, Damien Haas", "primary author", artist, null]
+      ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
       series: [
@@ -582,97 +583,93 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
         [name id];
         ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
       ]
-    }
-    track: {
-      title: "My Happy Marriage, Vol. 2 - Track 001"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
-      narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
-      ]
-      index: 1
       embedded_pictures: [
         [code mimetype];
         [13, image/jpeg]
+      ]
+    }
+    track: {
+      title: "My Happy Marriage, Vol. 2 - Track 001"
+      index: 1
+      contributors: [
+        [id name entity role];
+        [null "Damien Haas, Miranda Parkin" artist composer]
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist writer]
       ]
     }
   }, {
     book: {
       title: "My Happy Marriage, Vol. 2"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
+      contributors: [
+        [name, role, entity, id];
+        ["Akumi Agitogi read by Miranda Parkin, Damien Haas", "primary author", artist, null]
+      ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
-      series: [{
-        name: "My Happy Marriage"
-        index: "2"
-      }, {
-        name: "Test Series 2"
-        index: "5"
-      }]
-      genres: ["Fiction" "Fantasy"]
-      publishers: ["Yen Audio"]
-    }
-    track: {
-      title: "My Happy Marriage, Vol. 2 - Track 002"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
-      narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
+      series: [
+        [name index];
+        ["My Happy Marriage", "2"]
+        ["Test Series 2", "5"]
       ]
-      index: 2
+      genres: ["Fiction" "Fantasy"]
+      publishers: [
+        [name id];
+        ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
+      ]
       embedded_pictures: [
         [code mimetype];
         [13, image/jpeg]
       ]
     }
+    track: {
+      title: "My Happy Marriage, Vol. 2 - Track 002"
+      contributors: [
+        [id name entity role];
+        [null "Damien Haas, Miranda Parkin" artist composer]
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist writer]
+      ]
+      index: 2
+    }
   }]
   let expected = {
     book: {
       title: "My Happy Marriage, Vol. 2"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
+      contributors: [
+        [name, role, entity, id];
+        ["Akumi Agitogi read by Miranda Parkin, Damien Haas", "primary author", artist, null]
+      ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
-      series: [{
-        name: "My Happy Marriage"
-        index: "2"
-      }, {
-        name: "Test Series 2"
-        index: "5"
-      }]
+      series: [
+        [name index];
+        ["My Happy Marriage", "2"]
+        ["Test Series 2", "5"]
+      ]
       genres: ["Fiction" "Fantasy"]
-      publishers: ["Yen Audio"]
+      publishers: [
+        [name id];
+        ["Yen Audio" "608ea796-44de-4cf2-9b2c-45a797bbabfb"]
+      ]
       embedded_pictures: [
         [code mimetype];
         [13 image/jpeg]
-      ]
-      narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
       ]
     }
     tracks: [{
       title: "My Happy Marriage, Vol. 2 - Track 001"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
-      narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
-      ]
       index: 1
-      embedded_pictures: [
-        [code mimetype];
-        [13 image/jpeg]
+      contributors: [
+        [id name entity role];
+        [null "Damien Haas, Miranda Parkin" artist composer]
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist writer]
       ]
     }, {
       title: "My Happy Marriage, Vol. 2 - Track 002"
-      artist_credit: "Akumi Agitogi read by Miranda Parkin, Damien Haas"
-      narrators: [
-        "Damien Haas"
-        "Miranda Parkin"
-      ]
       index: 2
-      embedded_pictures: [
-        [code mimetype];
-        [13 image/jpeg]
+      contributors: [
+        [id name entity role];
+        [null "Damien Haas, Miranda Parkin" artist composer]
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist writer]
       ]
     }]
   }
@@ -1631,8 +1628,8 @@ def test_chapters_into_tone_format_baccano_vol_1 [] {
     [0 0ms 15000ms "Opening Credits"]
   ]
   let expected = [
-    [index start length title];
-    [0 0 15000 "Opening Credits"]
+    [index start length title subtitle];
+    [0 0 15000 "Opening Credits" ""]
   ]
   assert equal ($input | chapters_into_tone_format) $expected
 }
