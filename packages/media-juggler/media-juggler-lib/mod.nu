@@ -3808,8 +3808,8 @@ export def parse_musicbrainz_release []: record -> record {
   let audible_asin = (
     let audible_asins = $metadata | parse_audible_asin_from_musicbrainz_release;
     # We just kind of ignore all besides the first when there are multiple
-    # todo At least log when there are multiple.
     if ($audible_asins | is-not-empty) {
+      log warning $"Multiple Audible ASINs found: ($audible_asins). Using the first one."
       $audible_asins | first
     }
   )
