@@ -3385,7 +3385,7 @@ export def parse_series_from_musicbrainz_release [
   )
 }
 
-export const musicbrainz_non_genre_tags = ["abridged", "chapters", "unabridged"]
+export const musicbrainz_non_genre_tags = ["abridged", "chapters", "explicit", "unabridged"]
 
 # Parse genres from a MusicBrainz release, release group, and recordings
 #
