@@ -202,16 +202,13 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
   let input = {
     meta: {
       album: "Dark One: Forgotten"
-      albumArtist: "Brandon Sanderson and Dan Wells performed by various narrators"
+      albumArtist: "Brandon Sanderson; Dan Wells"
       artist: "Brandon Sanderson; Dan Wells"
       composer: "Mia Barron; Luis Bermudez; William Elsman; Kaleo Griffith; Roxanne Hernandez; Rachel L. Jacobs; John H. Mayer; Nan McNamara; Jim Meskimen; Sophie Oda; Keith Szarabajka; Kelli Tager; Avery Kidd Waddell"
       comment: "Brandon Sanderson and Dan Wells Purchased from Libro.fm."
       discNumber: 1
       discTotal: 1
       recordingDate: "2023-01-10T00:00:00"
-      sortArtist: "Sanderson, Brandon and Wells, Dan performed by various narrators"
-      sortAlbumArtist: "Sanderson, Brandon and Wells, Dan performed by various narrators"
-      sortComposer: "Jourgensen, Erik"
       title: "Dark One: Forgotten"
       trackNumber: 1
       trackTotal: 1
@@ -274,13 +271,10 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
     book: {
       title: "Dark One: Forgotten"
       contributors: [
-        [name role entity id];
-        [
-          "Brandon Sanderson and Dan Wells performed by various narrators"
-          "primary author"
-          "artist"
-          "b7b9f742-8de0-44fd-afd3-fa536701d27e"
-        ]
+        [id name entity role];
+        ["b7b9f742-8de0-44fd-afd3-fa536701d27e", "Brandon Sanderson", artist, "primary author"]
+        ["f0e00197-4291-40cb-a448-c2f3c86f54c7", "Dan Wells", artist, "primary author"]
+        ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Libro.fm" "label" "distributor"]
       ]
       comment: "Brandon Sanderson and Dan Wells Purchased from Libro.fm."
       publication_date: ("2023-01-10T00:00:00" | into datetime)
@@ -317,21 +311,23 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
       title: "Dark One: Forgotten"
       contributors: [
         [id, name, entity, role];
-        [null, "Mia Barron", artist, composer],
-        [null, "Luis Bermudez", artist, composer],
-        [null, "William Elsman", artist, composer],
-        [null, "Kaleo Griffith", artist, composer],
-        [null, "Roxanne Hernandez", artist, composer],
-        [null, "Rachel L. Jacobs", artist, composer],
-        [null, "John H. Mayer", artist, composer],
-        [null, "Nan McNamara", artist, composer],
-        [null, "Jim Meskimen", artist, composer],
-        [null, "Sophie Oda", artist, composer],
-        [null, "Keith Szarabajka", artist, composer],
-        [null, "Kelli Tager", artist, composer],
-        [null, "Avery Kidd Waddell", artist, composer],
-        ["b7b9f742-8de0-44fd-afd3-fa536701d27e", "Brandon Sanderson", artist, writer],
+        [null, "Mia Barron", artist, composer]
+        [null, "Luis Bermudez", artist, composer]
+        [null, "William Elsman", artist, composer]
+        [null, "Kaleo Griffith", artist, composer]
+        [null, "Roxanne Hernandez", artist, composer]
+        [null, "Rachel L. Jacobs", artist, composer]
+        [null, "John H. Mayer", artist, composer]
+        [null, "Nan McNamara", artist, composer]
+        [null, "Jim Meskimen", artist, composer]
+        [null, "Sophie Oda", artist, composer]
+        [null, "Keith Szarabajka", artist, composer]
+        [null, "Kelli Tager", artist, composer]
+        [null, "Avery Kidd Waddell", artist, composer]
+        ["b7b9f742-8de0-44fd-afd3-fa536701d27e", "Brandon Sanderson", artist, writer]
         ["f0e00197-4291-40cb-a448-c2f3c86f54c7", "Dan Wells", artist, writer]
+        ["b7b9f742-8de0-44fd-afd3-fa536701d27e", "Brandon Sanderson", artist, "primary author"]
+        ["f0e00197-4291-40cb-a448-c2f3c86f54c7", "Dan Wells", artist, "primary author"]
       ]
       index: 1
       embedded_pictures: [
@@ -411,8 +407,9 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
     book: {
       title: "My Happy Marriage, Vol. 2"
       contributors: [
-        [name, role, entity, id];
-        ["Akumi Agitogi read by Miranda Parkin, Damien Haas", "primary author", artist, null]
+        [id name entity role];
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" "artist" "primary author"]
+        ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Libro.fm" "label" "distributor"]
       ]
       description: "Akumi Agitogi Purchased from Libro.fm."
       comment: "Akumi Agitogi Purchased from Libro.fm."
@@ -444,6 +441,7 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
         [id name entity role];
         [null "Damien Haas, Miranda Parkin" artist composer]
         [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist writer]
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist "primary author"]
       ]
       index: 1
       embedded_pictures: [
@@ -458,18 +456,18 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
   let actual = $input | parse_audiobook_metadata_from_tone
 
   # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
-  # for column in ($actual.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
-  # assert equal $actual.book.chapters $expected.book.chapters
-  # assert equal $actual.book $expected.book
-  # for column in ($expected.track | columns) {
-  #   assert equal ($actual.track | get $column) ($expected.track | get $column)
-  # }
-  # assert equal $actual.track $expected.track
+  for column in ($expected.book | columns) {
+    assert equal ($actual.book | get $column) ($expected.book | get $column)
+  }
+  for column in ($actual.book | columns) {
+    assert equal ($actual.book | get $column) ($expected.book | get $column)
+  }
+  assert equal $actual.book.chapters $expected.book.chapters
+  assert equal $actual.book $expected.book
+  for column in ($expected.track | columns) {
+    assert equal ($actual.track | get $column) ($expected.track | get $column)
+  }
+  assert equal $actual.track $expected.track
   assert equal $actual $expected
 }
 
@@ -536,6 +534,7 @@ def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
         [code mimetype];
         [13 image/jpeg]
       ]
+      total_tracks: 1
     }
     tracks: [{
       title: "My Happy Marriage, Vol. 2 - Track 001"
@@ -568,8 +567,8 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
     book: {
       title: "My Happy Marriage, Vol. 2"
       contributors: [
-        [name, role, entity, id];
-        ["Akumi Agitogi read by Miranda Parkin, Damien Haas", "primary author", artist, null]
+        [id name entity role];
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" "artist" "primary author"]
       ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
@@ -601,8 +600,8 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
     book: {
       title: "My Happy Marriage, Vol. 2"
       contributors: [
-        [name, role, entity, id];
-        ["Akumi Agitogi read by Miranda Parkin, Damien Haas", "primary author", artist, null]
+        [id name entity role];
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" "artist" "primary author"]
       ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
@@ -635,8 +634,8 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
     book: {
       title: "My Happy Marriage, Vol. 2"
       contributors: [
-        [name, role, entity, id];
-        ["Akumi Agitogi read by Miranda Parkin, Damien Haas", "primary author", artist, null]
+        [id name entity role];
+        [null "Akumi Agitogi read by Miranda Parkin, Damien Haas" "artist" "primary author"]
       ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       publication_date: ("2025-01-01T00:00:00Z" | into datetime)
@@ -654,6 +653,7 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
         [code mimetype];
         [13 image/jpeg]
       ]
+      total_tracks: 2
     }
     tracks: [{
       title: "My Happy Marriage, Vol. 2 - Track 001"
@@ -676,9 +676,12 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
   let actual = $input | parse_audiobook_metadata_from_tracks_metadata
 
   # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | first | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | first | get $column)
-  # }
+  for column in ($expected.book | columns) {
+    assert equal ($actual.book | get $column) ($expected.book | get $column)
+  }
+  for column in ($expected.book | columns) {
+    assert equal ($actual.book | get $column) ($expected.book | get $column)
+  }
   assert equal $actual.book $expected.book
   for expected_track in $expected.tracks {
     for column in ($expected_track | columns) {
@@ -1695,6 +1698,7 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
       ]
       total_discs: 1
       total_tracks: 1
+      packaging: "None"
       script: "Latn"
       language: "eng"
     }
@@ -1832,6 +1836,7 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
       ]
       total_discs: 1
       total_tracks: 21
+      packaging: "None"
       script: "Latn"
       language: "eng"
     }
