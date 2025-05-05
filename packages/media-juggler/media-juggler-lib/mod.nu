@@ -3021,7 +3021,7 @@ export def fetch_musicbrainz_release [
     try {
       retry_http $request $retries $retry_delay
     } catch {|error|
-      log error $"Error fetching MusicBrainz Release: ($url): ($error.debug.msg)"
+      log error $"Error fetching MusicBrainz Release: ($url): ($error.debug)"
       return null
     }
   )
@@ -4179,7 +4179,7 @@ export def get_musicbrainz_ids_by_acoustid [
 #
 # The chapters release must be within the duration threshold and must be from the same distributor if one is set.
 export def filter_musicbrainz_releases [
-  metadata: record<book: string, tracks: table>
+  metadata: record<book: record, tracks: table>
   duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
@@ -4195,7 +4195,7 @@ export def filter_musicbrainz_releases [
 
   # Don't parallelize for the sake of the MusicBrainz API
   let candidates = $candidates | each {|candidate|
-    let received_metadata = fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels]
+    let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels]
     if ($received_metadata | is-empty) {
       log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
       return null
@@ -4211,7 +4211,7 @@ export def filter_musicbrainz_releases [
     if ($metadata.tracks | length) == $metadata.book.total_tracks {
       $candidates | filter {|candidate|
         let same_number_of_tracks = ($candidate.tracks | length) == ($metadata.tracks | length)
-        let joined = ($candidate.tracks | select index duration | rename index candidate_duration) | join ($metadata.tracks | select index given_duration) index
+        let joined = ($candidate.tracks | select index duration | rename index candidate_duration) | join ($metadata.tracks | select index duration | rename index given_duration) index
         let same_track_indices = ($joined | length) == ($metadata.tracks | length)
         let track_lengths_within_duration = $joined | all {|track|
           (($track.given_duration - $track.candidate_duration) | math abs) <= $duration_threshold
@@ -4222,37 +4222,45 @@ export def filter_musicbrainz_releases [
       $candidates
     }
   )
-  if ($candidates <= 1) {
-    return $candidates
+  if ($candidates | is-empty) {
+    return null
+  } else if ($candidates | length) == 1 {
+    return $candidates | get id | first
   }
 
   # todo Make this into a separate function.
-  $candidates | filter {|candidate|
-    if (
-      ($metadata.book | get --ignore-errors contributors | is-not-empty)
-      and ($metadata.book.contributors | where role == "distributor" | is-not-empty)
-    ) {
+  let candidates = (
+    $candidates | filter {|candidate|
       if (
-        ($candidate.book | get --ignore-errors contributors | is-not-empty)
-        or ($candidate.book.contributors | where role == "distributor" | is-empty)
+        ($metadata.book | get --ignore-errors contributors | is-not-empty)
+        and ($metadata.book.contributors | where role == "distributor" | is-not-empty)
       ) {
-        false
-      } else {
-        let release_distributors = $metadata.book.contributors | where role == "distributor"
-        let candidate_distributors = $candidate.book.contributors | where role == "distributor"
-        $release_distributors | all {|distributor|
-          if "id" not-in $distributor {
-            $distributor in $candidate_distributors
-          } else {
-            # Match without the id
-            $distributor in ($candidate_distributors | reject id)
+        if (
+          ($candidate.book | get --ignore-errors contributors | is-not-empty)
+          or ($candidate.book.contributors | where role == "distributor" | is-empty)
+        ) {
+          false
+        } else {
+          let release_distributors = $metadata.book.contributors | where role == "distributor"
+          let candidate_distributors = $candidate.book.contributors | where role == "distributor"
+          $release_distributors | all {|distributor|
+            if "id" not-in $distributor {
+              $distributor in $candidate_distributors
+            } else {
+              # Match without the id
+              $distributor in ($candidate_distributors | reject id)
+            }
           }
         }
+      } else {
+        true
       }
-    } else {
-      true
     }
+  )
+  if ($candidates | is-empty) {
+    return null
   }
+  return $candidates | get id | first
 }
 
 # Tag the files of an audiobook
@@ -4345,18 +4353,18 @@ export def tag_audiobook [
               log error $"Found over 20 matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
               $metadata
             } else if ($release_candidates | length) == 1 {
-              let release_candidate = $release_candidates.id | first
+              let release_candidate = $release_candidates.id | first | get id
               log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset)"
               $metadata | upsert book.musicbrainz_release_id $release_candidate
             } else {
               log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
-              let $release_candidates = $release_candidates | filter_musicbrainz_releases --retries $retries --retry-delay $retry_delay $metadata $max_track_duration_difference
+              let $release_candidates = $release_candidates | get id | filter_musicbrainz_releases --retries $retries --retry-delay $retry_delay $metadata $max_track_duration_difference
               if ($release_candidates | is-empty) {
                 log error $"Unable to find any matching MusicBrainz releases after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
                 $metadata
               } else if ($release_candidates | length) == 1 {
-                let release_candidate = $release_candidates | first
-                log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset)"
+                let release_candidate = $release_candidates | first | get book.musicbrainz_release_id
+                log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset) after filtering"
                 $metadata | upsert book.musicbrainz_release_id $release_candidate
               } else {
                 # todo Interactively allow selecting an available release
@@ -4684,6 +4692,10 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
   let metadata = (
     $release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
   )
+  if ($metadata | is-empty) {
+    log error $"Failed to fetch MusicBrainz Release (ansi yellow)($release_id)(ansi reset)"
+    return null
+  }
   # log info $"audiobook_files: ($audiobook_files)"
   # log info $"audiobook_files.metadata.track: ($audiobook_files.metadata.track)"
   let tracks = (
@@ -4807,6 +4819,11 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   let musicbrainz_metadata = (
     $existing_metadata.book.musicbrainz_release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
   )
+  if ($musicbrainz_metadata | is-empty) {
+    log error $"Failed to fetch MusicBrainz Release (ansi yellow)($existing_metadata.book.musicbrainz_release_id)(ansi reset)"
+    return null
+  }
+
   # log info $"audiobook_files: ($audiobook_files)"
   # log info $"musicbrainz_metadata: ($musicbrainz_metadata)"
   let tracks = (
