@@ -3098,7 +3098,7 @@ export def fetch_release_ids_by_acoustid_fingerprint [
   # Issue: https://github.com/acoustid/acoustid-server/issues/43
   # PR: https://github.com/acoustid/acoustid-server/pull/179
   if ($input.duration > 32767sec) {
-    log error $""
+    log info "Duration longer than what is supported on the AcoustID Server"
     return null
   }
 
@@ -3209,9 +3209,21 @@ export def submit_acoustid_fingerprints [
   let fingerprints = $in
   let endpoint = "https://api.acoustid.org/v2/submit"
   let submission_string = $fingerprints | enumerate | reduce --fold "" {|it, acc|
-    let duration_seconds = ($it.item.duration / 1sec) | math round
-    $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&fingerprint.($it.index)=($it.item.fingerprint)"
+    # Currently, the server doesn't accept durations longer than 32767 seconds.
+    # Issue: https://github.com/acoustid/acoustid-server/issues/43
+    # PR: https://github.com/acoustid/acoustid-server/pull/179
+    if ($it.item.duration > 32767sec) {
+      log error "Duration longer than what is supported on the AcoustID Server. Skipping submission"
+      $acc
+    } else {
+      let duration_seconds = ($it.item.duration / 1sec) | math round
+      $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&fingerprint.($it.index)=($it.item.fingerprint)"
+    }
   }
+  if ($submission_string | is-empty) {
+    return null
+  }
+
   # todo include fileformat and bitrate?
   let submission_string = $"format=json&client=($client_key)&clientversion=($media_juggler_version)&user=($user_key)" + $submission_string
   log info $"submission_string: ($submission_string)"
@@ -4304,7 +4316,12 @@ export def tag_audiobook [
             }
           )
         ) {
-          $metadata | get_musicbrainz_ids_by_acoustid $client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $acoustid_score_threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
+          let retrieved = $metadata | get_musicbrainz_ids_by_acoustid $client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $acoustid_score_threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
+          if ($retrieved | is-empty) {
+            $metadata
+          } else {
+            $retrieved
+          }
         } else {
           $metadata
         }
@@ -4313,13 +4330,7 @@ export def tag_audiobook [
         if (
           "musicbrainz_release_id" not-in $metadata.book
           or ($metadata.book.musicbrainz_release_id | is-empty)
-          # or (
-          #   $metadata.book.tracks
-          #   | any {|track|
-          #     "musicbrainz_recording_id" not-in $track or ($track.musicbrainz_recording_id | is-empty)
-          #   }
-          )
-        {
+        ) {
           log info $"Unable to determine MusicBrainz Recording and Release IDs using AcoustID fingerprints"
           let release_candidates = $metadata | search_for_musicbrainz_release --retries $retries --retry-delay $retry_delay
           if ($release_candidates | is-empty) {
@@ -4921,6 +4932,9 @@ export def append_to_musicbrainz_query [
 
 export def escape_special_lucene_characters [] string -> string {
   let input = $in
+  if ($input | describe) != "string" {
+    return $input
+  }
   const special_lucene_characters = ['\' '+' '-' '&&' '||' '!' '(' ')' '{' '}' '[' ']' '^' '"' '~' '*' '?' ':' '/']
   $special_lucene_characters | reduce --fold $input {|character, acc|
     $acc | str replace --all $character ('\' + $character)
