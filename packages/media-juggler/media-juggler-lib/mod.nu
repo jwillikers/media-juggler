@@ -4175,15 +4175,34 @@ export def get_musicbrainz_ids_by_acoustid [
   }
 }
 
-# Given a list of MusicBrainz Releases and metadata of an audiobook, attempt to narrow down the matching releases
+# Determine whether the length of tracks in one set are within a given threshold compared to tracks in another set
+export def equivalent_track_durations [
+  right: table<index: int, duration: duration>
+  threshold: duration = 3sec # The allowed drift between the duration of tracks
+]: table<index: int, duration: duration> -> bool {
+  let left = $in
+  let joined = ($left | rename index left_duration) | join ($right | rename index right_duration) index
+  (
+    # Same number of tracks
+    ($left | length) == ($right | length)
+    # Same indices
+    and ($joined | length) == ($right | length)
+    # Difference is within threshold
+    and (
+      $joined | all {|track|
+        (($track.left_duration - $track.right_duration) | math abs) <= $threshold
+      }
+    )
+  )
+}
+
+# Given a list of MusicBrainz Release audiobook metadata records and metadata of an audiobook, attempt to narrow down the matching releases
 #
 # The chapters release must be within the duration threshold and must be from the same distributor if one is set.
 export def filter_musicbrainz_releases [
-  metadata: record<book: record, tracks: table>
-  duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
-  --retries: int = 3 # The number of retries to perform when a request fails
-  --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
-] list<string> -> list<string> {
+  metadata: record<book: record, tracks: table> # Audiobook metadata
+  duration_threshold: duration = 3sec # The allowed drift between the duration of tracks
+] table<book: record, tracks: table> -> list<string> {
   let candidates = $in
   if ($metadata | is-empty) or "book" not-in ($metadata) or "tracks" not-in ($metadata) or ($metadata.tracks | is-empty) {
     return null
@@ -4193,31 +4212,13 @@ export def filter_musicbrainz_releases [
     return [$metadata.book.musicbrainz_release_id]
   }
 
-  # Don't parallelize for the sake of the MusicBrainz API
-  let candidates = $candidates | each {|candidate|
-    let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels]
-    if ($received_metadata | is-empty) {
-      log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
-      return null
-    }
-    $received_metadata
-  }
-
-  # Filter based on track durations and then finally the release distributor based on the comment
+  # Filter based on track durations and then on the distributor
 
   let candidates = (
     # If for some reason tracks are missing from the audiobook, this won't filter anything
     # todo Make this into a separate function.
     if ($metadata.tracks | length) == $metadata.book.total_tracks {
-      $candidates | filter {|candidate|
-        let same_number_of_tracks = ($candidate.tracks | length) == ($metadata.tracks | length)
-        let joined = ($candidate.tracks | select index duration | rename index candidate_duration) | join ($metadata.tracks | select index duration | rename index given_duration) index
-        let same_track_indices = ($joined | length) == ($metadata.tracks | length)
-        let track_lengths_within_duration = $joined | all {|track|
-          (($track.given_duration - $track.candidate_duration) | math abs) <= $duration_threshold
-        }
-        $same_number_of_tracks and $same_track_indices and $track_lengths_within_duration
-      }
+      $candidates.tracks | select index duration | equivalent_track_durations ($metadata.tracks | select index duration) $duration_threshold
     } else {
       $candidates
     }
@@ -4358,7 +4359,19 @@ export def tag_audiobook [
               $metadata | upsert book.musicbrainz_release_id $release_candidate
             } else {
               log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
-              let $release_candidates = $release_candidates | get id | filter_musicbrainz_releases --retries $retries --retry-delay $retry_delay $metadata $max_track_duration_difference
+              let $release_candidates = $release_candidates | get id | each {|candidate|
+                let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels]
+                if ($received_metadata | is-empty) {
+                  log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
+                  null
+                } else {
+                  $received_metadata
+                }
+              }
+              if ($release_candidates | any {|r| $r == null}) {
+                return null
+              }
+              let release_candidates = $release_candidates | filter_musicbrainz_releases $metadata $max_track_duration_difference
               if ($release_candidates | is-empty) {
                 log error $"Unable to find any matching MusicBrainz releases after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
                 $metadata

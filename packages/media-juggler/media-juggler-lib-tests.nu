@@ -1904,6 +1904,165 @@ def test_parse_musicbrainz_release [] {
   test_parse_musicbrainz_release_bakemonogatari_part_01
 }
 
+def test_equivalent_track_durations_one_track_different [] {
+  let left = [
+    [index duration];
+    [1 3.9sec]
+  ]
+  let right = [
+    [index duration];
+    [1 0.005sec]
+  ]
+  assert equal ($left | equivalent_track_durations $right) false
+}
+
+def test_equivalent_track_durations_one_track_equivalent [] {
+  let left = [
+    [index duration];
+    [0 3sec]
+  ]
+  let right = [
+    [index duration];
+    [0 0.005sec]
+  ]
+  assert equal ($left | equivalent_track_durations $right) true
+}
+
+def test_equivalent_track_durations_two_tracks_equivalent [] {
+  let left = [
+    [index duration];
+    [0 3sec]
+    [1 15sec]
+  ]
+  let right = [
+    [index duration];
+    [0 0.005sec]
+    [1 15sec]
+  ]
+  assert equal ($left | equivalent_track_durations $right) true
+}
+
+def test_equivalent_track_durations_one_empty [] {
+  let left = []
+  let right = [
+    [index duration];
+    [0 1sec]
+    [1 2sec]
+  ]
+  assert equal ($left | equivalent_track_durations $right) false
+}
+
+def test_equivalent_track_durations_inconsistent_number_of_tracks [] {
+  let left = [
+    [index duration];
+    [0 1sec]
+    [1 2sec]
+    [2 4.5sec]
+  ]
+  let right = [
+    [index duration];
+    [0 1sec]
+    [1 2sec]
+  ]
+  assert equal ($left | equivalent_track_durations $right) false
+}
+
+def test_equivalent_track_durations_inconsistent_indices [] {
+  let left = [
+    [index duration];
+    [0 1sec]
+    [1 2sec]
+    [2 4.5sec]
+  ]
+  let right = [
+    [index duration];
+    [0 1sec]
+    [1 2sec]
+    [3 5sec]
+  ]
+  assert equal ($left | equivalent_track_durations $right) false
+}
+
+def test_equivalent_track_durations_several_tracks_within_threshold [] {
+  let left = [
+    [index duration];
+    [0 1sec]
+    [1 2sec]
+    [2 4.5sec]
+    [3 6sec]
+    [4 10sec]
+    [5 15sec]
+    [6 2sec]
+  ]
+  let right = [
+    [index duration];
+    [0 0.5sec]
+    [1 2sec]
+    [2 5sec]
+    [3 3sec]
+    [4 10sec]
+    [5 15sec]
+    [6 2sec]
+  ]
+  assert equal ($left | equivalent_track_durations $right) true
+}
+
+def test_equivalent_track_durations_several_tracks_one_outside_threshold [] {
+  let left = [
+    [index duration];
+    [0 1sec]
+    [1 2sec]
+    [2 4.5sec]
+    [3 6sec]
+    [4 10sec]
+    [5 15sec]
+    [6 2sec]
+  ]
+  let right = [
+    [index duration];
+    [0 0.5sec]
+    [0 2sec]
+    [0 5sec]
+    [0 2.99sec]
+    [0 10sec]
+    [0 15sec]
+    [0 2sec]
+  ]
+  assert equal ($left | equivalent_track_durations $right) false
+}
+
+def test_equivalent_track_durations_duplicate_indices [] {
+  let left = [
+    [index duration];
+    [0 1sec]
+    [1 2sec]
+    [2 4.5sec]
+    [2 6sec]
+    [3 10sec]
+  ]
+  let right = [
+    [index duration];
+    [0 0.5sec]
+    [1 2sec]
+    [2 5sec]
+    [2 3sec]
+    [3 10sec]
+  ]
+  assert equal ($left | equivalent_track_durations $right) false
+}
+
+def test_equivalent_track_durations [] {
+  test_equivalent_track_durations_one_track_different
+  test_equivalent_track_durations_one_track_equivalent
+  test_equivalent_track_durations_one_empty
+  test_equivalent_track_durations_two_tracks_equivalent
+  test_equivalent_track_durations_inconsistent_number_of_tracks
+  test_equivalent_track_durations_inconsistent_indices
+  test_equivalent_track_durations_several_tracks_within_threshold
+  test_equivalent_track_durations_several_tracks_one_outside_threshold
+  test_equivalent_track_durations_duplicate_indices
+}
+
 def main []: {
   test_upsert_if_present
   test_upsert_if_value
@@ -1931,5 +2090,6 @@ def main []: {
   test_parse_chapters_from_musicbrainz_release
   # todo Add tests for Baccano! Vol. 1 for parsing things.
   test_parse_musicbrainz_release
+  test_equivalent_track_durations
   echo "All tests passed!"
 }
