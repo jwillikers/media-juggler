@@ -2237,6 +2237,8 @@ export def parse_multi_value_tag [
   $in | split row ";" | str trim
 }
 
+export const release_only_contributor_roles = [distributor illustrator publisher]
+
 # Parse audiobook metadata from tone for a single file into a standard format
 #
 # todo Parse using a generic schema?
@@ -2304,14 +2306,14 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     let artist = $artist_names | merge_or_input $artist_ids;
     let artist = (
       if "id" not-in ($artist | columns) {
-        $artist | insert id null
+        $artist | insert id ""
       } else {
         $artist
       }
     );
     let artists = (
       if "additionalFields" in $metadata and "artists" in $metadata.additionalFields and ($metadata.additionalFields.artists | is-not-empty) {
-        $metadata.additionalFields.artists | parse_multi_value_tag | wrap name | insert id null
+        $metadata.additionalFields.artists | parse_multi_value_tag | wrap name | insert id ""
       }
     );
     let non_duplicate_artists = (
@@ -2336,7 +2338,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     if ($primary_authors | is-not-empty) {
       let primary_authors = $primary_authors | insert role "primary author" | insert entity "artist";
       if "id" not-in ($primary_authors | columns) {
-        $primary_authors | insert id null
+        $primary_authors | insert id ""
       } else {
         $primary_authors
       }
@@ -2420,8 +2422,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     }
   )
 
-  # Assume all contributors are track level, except album artist
-  let contributors = (
+  let all_contributors = (
     [adapter arranger composer director editor engineer illustrator lyricist mixer narrator performer producer remixer translator writer] | par-each {|role|
       let names = (
         $metadata
@@ -2439,7 +2440,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       if ($names | is-not-empty) {
         $names | par-each {|name|
           {
-            id: null
+            id: ""
             name: $name
             entity: "artist"
             role: $role
@@ -2449,19 +2450,57 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     } | flatten | filter {|contributor|
       # Drop writers that are in the artists table, as the ones there might also have the id
       not ($contributor.entity == "artist" and $contributor.role == "writer" and $contributor.name in ($artists | get name))
-    } | append $artists | uniq
+    } | append $artists | append $primary_authors | uniq
   )
-  # let contributors = (
-  #   $contributors
-  #   | where entity == artist
-  #   | where role == writer
-  #   | join --right ($artists | reject entity role) name
-  #   #par-each {|writer|
-  #   #   if $writer in $artists {
-  #   #     $artists | where name == $writer.name | get id | first
-  #   #   }
-  #   # }
-  # )
+  let all_contributors = $all_contributors | append (
+    [distributor] | par-each {|role|
+      let names = (
+        $metadata
+        | (
+          let input = $in;
+          if $role in [distributor] {
+            $input | get --ignore-errors additionalFields
+          } else {
+            $input
+          }
+        )
+        | get --ignore-errors $role
+        | parse_multi_value_tag
+      )
+      if ($names | is-not-empty) {
+        $names | par-each {|name|
+          {
+            id: ""
+            name: $name
+            entity: "label"
+            role: $role
+          }
+        }
+      }
+    } | uniq
+  )
+  # Attempt to parse the distributor from the comment
+  let all_contributors = (
+    if ($metadata | get --ignore-errors comment | is-not-empty) and ($all_contributors | where role == "distributor" | is-empty) {
+      if "Libro.fm" in $metadata.comment {
+        $all_contributors | append {
+          id: "158b7958-b872-4944-88a5-fd9d75c5d2e8"
+          name: "Libro.fm"
+          entity: "label"
+          role: "distributor"
+        }
+      } else {
+        $all_contributors
+      }
+    } else {
+      $all_contributors
+    }
+  )
+  # Assume all contributors are track level, except for primary authors, illustrators, and distributors
+  # Realistically, illustrators could be attributed to a single track, but that's probably more likely for music than it is for audibooks.
+  const book_contributor_roles = []
+  let book_contributors = $all_contributors | where role in (["primary author"] | append $release_only_contributor_roles)
+  let track_contributors = $all_contributors | where role not-in $release_only_contributor_roles
 
   let amazon_asin = (
     if "additionalFields" in $metadata and ($metadata.additionalFields | is-not-empty) and "asin" in $metadata.additionalFields {
@@ -2478,7 +2517,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     {}
     | upsert_if_present title $metadata album
     | upsert_if_present subtitle $metadata
-    | upsert_if_value contributors $primary_authors
+    | upsert_if_value contributors $book_contributors
     | upsert_if_present comment $metadata
     | upsert_if_present description $metadata
     | upsert_if_present long_description $metadata longDescription
@@ -2505,6 +2544,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
         | upsert_if_value musicbrainz_release_status $musicbrainz_release_status
         | upsert_if_value musicbrainz_release_types $musicbrainz_album_types
         | upsert_if_value tags $tags
+        | upsert_if_present packaging $metadata.additionalFields
       } else {
         $input
       }
@@ -2528,7 +2568,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     | upsert_if_present index $metadata trackNumber
     | upsert_if_present embedded_pictures $metadata embeddedPictures
     | upsert_if_value musicbrainz_works $musicbrainz_works
-    | upsert_if_value contributors $contributors
+    | upsert_if_value contributors $track_contributors
     | upsert_if_value lyrics $lyrics
     | upsert_if_value rating $rating
     | upsert_if_present disc_number $metadata discNumber
@@ -2594,6 +2634,13 @@ export def parse_audiobook_metadata_from_tracks_metadata []: list<record> -> rec
     }
     $acc | merge $it
   }
+  let book = (
+    if ($book | get --ignore-errors total_tracks | is-empty) {
+      $book | upsert total_tracks ($metadata.track | length)
+    } else {
+      $book
+    }
+  )
   let tracks = (
     if "index" in ($metadata.track | columns) {
       $metadata.track | sort-by index
@@ -2686,6 +2733,7 @@ export def into_tone_format []: record -> record {
     | upsert_if_present audible_asin $metadata.book
     # For audiobookshelf to be happy, language has to go in additionalFields for some reason.
     | upsert_if_present language $metadata.book
+    | upsert_if_present packaging $metadata.book
     # track metadata
     | upsert_if_present "AcoustID Fingerprint" $metadata.track acoustid_fingerprint
     | upsert_if_present "AcoustID Id" $metadata.track acoustid_track_id
@@ -2973,7 +3021,7 @@ export def fetch_musicbrainz_release [
     try {
       retry_http $request $retries $retry_delay
     } catch {|error|
-      log error $"Error fetching MusicBrainz Release: ($url): ($error.debug.msg)"
+      log error $"Error fetching MusicBrainz Release: ($url): ($error.debug)"
       return null
     }
   )
@@ -3024,18 +3072,6 @@ export def retry_http [
   retry $request $should_retry $retries $delay
 }
 
-# Parses release and recording ids from an AcoustID server response
-#
-# Takes an AcoustID server response as input.
-# export def parse_release_ids_from_acoustid_response []: record<results: table<id: string, releases: table<id: string>, score: float>, status: string> -> table<id: string, recordings: table<id: string, releases: table<id: string>>, score: float> {
-#   let response = $in
-#   if $response.status != "ok" {
-#     log error $"Received response with status (ansi red)($response.status)(ansi reset) querying the AcoustID server"
-#     return null
-#   }
-#   $response.results
-# }
-
 # Find release and recording ids linked to an AcoustID fingerprint
 #
 # Requires an AcoustID application API key.
@@ -3050,7 +3086,7 @@ export def fetch_release_ids_by_acoustid_fingerprint [
   # Issue: https://github.com/acoustid/acoustid-server/issues/43
   # PR: https://github.com/acoustid/acoustid-server/pull/179
   if ($input.duration > 32767sec) {
-    log error $""
+    log info "Duration longer than what is supported on the AcoustID Server"
     return null
   }
 
@@ -3161,12 +3197,24 @@ export def submit_acoustid_fingerprints [
   let fingerprints = $in
   let endpoint = "https://api.acoustid.org/v2/submit"
   let submission_string = $fingerprints | enumerate | reduce --fold "" {|it, acc|
-    let duration_seconds = ($it.item.duration / 1sec) | math round
-    $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&fingerprint.($it.index)=($it.item.fingerprint)"
+    # Currently, the server doesn't accept durations longer than 32767 seconds.
+    # Issue: https://github.com/acoustid/acoustid-server/issues/43
+    # PR: https://github.com/acoustid/acoustid-server/pull/179
+    if ($it.item.duration > 32767sec) {
+      log error "Duration longer than what is supported on the AcoustID Server. Skipping submission"
+      $acc
+    } else {
+      let duration_seconds = ($it.item.duration / 1sec) | math round
+      $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&fingerprint.($it.index)=($it.item.fingerprint)"
+    }
   }
+  if ($submission_string | is-empty) {
+    return null
+  }
+
   # todo include fileformat and bitrate?
   let submission_string = $"format=json&client=($client_key)&clientversion=($media_juggler_version)&user=($user_key)" + $submission_string
-  log info $"submission_string: ($submission_string)"
+  # log info $"submission_string: ($submission_string)"
 
   let request = {||
     (
@@ -3385,7 +3433,7 @@ export def parse_series_from_musicbrainz_release [
   )
 }
 
-export const musicbrainz_non_genre_tags = ["abridged", "chapters", "unabridged"]
+export const musicbrainz_non_genre_tags = ["abridged", "chapters", "explicit", "unabridged"]
 
 # Parse genres from a MusicBrainz release, release group, and recordings
 #
@@ -3560,7 +3608,6 @@ export def parse_musicbrainz_release []: record -> record {
       $metadata.relations | parse_contributors
     }
   )
-  let release_only_contributor_roles = [distributor illustrator publisher]
 
   # Track metadata
   let tracks = (
@@ -3768,10 +3815,10 @@ export def parse_musicbrainz_release []: record -> record {
     | each {|primary_author|
       if ($primary_author | is-not-empty) {
         {
-          name: $primary_author.name
           id: $primary_author.id
-          role: "primary author"
+          name: $primary_author.name
           entity: "artist"
+          role: "primary author"
         }
       }
     }
@@ -3879,7 +3926,7 @@ export def parse_musicbrainz_release []: record -> record {
     | str downcase
   )
   let total_discs = (
-    if "media" in $metadata and not ($metadata.media | is-empty) {
+    if "media" in $metadata and ($metadata.media | is-not-empty) {
       $metadata.media | length
     }
   )
@@ -3923,6 +3970,7 @@ export def parse_musicbrainz_release []: record -> record {
     | upsert_if_value publishers $publishers
     | upsert_if_value total_discs $total_discs
     | upsert_if_value total_tracks $total_tracks
+    | upsert_if_present packaging $metadata
     | (
       let input = $in;
       if "text-representation" in $metadata {
@@ -3943,10 +3991,29 @@ export def parse_musicbrainz_release []: record -> record {
 
 # Fetch the given release id from MusicBrainz and parse it into a normalized data structure
 export def fetch_and_parse_musicbrainz_release [
+  includes: list<string> = [
+    artist-credits
+    labels
+    recordings
+    release-groups
+    media
+    genres
+    tags
+    release-group-rels
+    work-rels
+    series-rels
+    genre-rels
+    artist-rels
+    label-rels
+    recording-level-rels
+    release-group-level-rels
+    work-level-rels
+    url-rels # for Audible ASIN
+  ]
   --retries: int = 3
   --retry-delay: duration = 5sec
 ]: string -> record {
-  let response = $in | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay
+  let response = $in | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay $includes
   if ($response | is-empty) {
     return null
   }
@@ -4096,26 +4163,136 @@ export def get_musicbrainz_ids_by_acoustid [
   }
 }
 
-# Tag the files of an audiobook using their AcoustID fingerprints.
-# export def tag_audiobook_from_acoustid [
-#   audiobook_files: list<path>
-#   client_key: string # The application API key for the AcoustID server
-#   working_directory: directory
-#   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
-#   ignore_embedded_acoustid_fingerprints = false # Recalculate AcoustID fingerprints for all files
-#   ignore_embedded_musicbrainz_ids = false # Ignore existing MusicBrainz IDs embedded in the files
-#   --threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
-#   --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
-#   --retries: int = 3 # The number of retries to perform when a request fails
-#   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
-# ]: nothing -> list<path> {
-#   let acoustid_results = $audiobook_files | get_musicbrainz_ids_by_acoustid $client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
-#   if ($acoustid_results | is-empty) {
-#     log error $"Unable to determine MusicBrainz Recording and Release IDs using AcoustID fingerprints"
-#     return null
-#   }
-#   $acoustid_results.files | tag_audiobook_files_by_musicbrainz_release_id $acoustid_results.release_id $working_directory
-# }
+# Determine whether the length of tracks in one set are within a given threshold compared to tracks in another set
+export def equivalent_track_durations [
+  right: table<index: int, duration: duration>
+  threshold: duration = 3sec # The allowed drift between the duration of tracks
+]: table<index: int, duration: duration> -> bool {
+  let left = $in
+  let joined = ($left | rename index left_duration) | join ($right | rename index right_duration) index
+  (
+    # Same number of tracks
+    ($left | length) == ($right | length)
+    # Same indices
+    and ($joined | length) == ($right | length)
+    # Difference is within threshold
+    and (
+      $joined | all {|track|
+        (($track.left_duration - $track.right_duration) | math abs) <= $threshold
+      }
+    )
+  )
+}
+
+# Determine if two sets of contributors have at least one distributor in common
+#
+# If both sets are empty, true is returned.
+export def has_distributor_in_common [
+  right: table<id: string, name: string, entity: string, role: string>
+]: table<id: string, name: string, entity: string, role: string> -> bool {
+  let left = $in
+  if ($right | is-empty) and ($left | is-empty) {
+    return true
+  }
+  if ($right | is-empty) or ($left | is-empty) {
+    return false
+  }
+  let left_distributors = $left | where role == "distributor"
+  let right_distributors = $right | where role == "distributor"
+  let joined_on_id = (
+    $left_distributors
+    | rename id left_name left_entity
+    | join ($right_distributors | rename id right_name right_entity) id
+    | filter {|distributor|
+      $distributor.left_entity == $distributor.right_entity
+    }
+  )
+  if ($joined_on_id | is-not-empty) {
+    return true
+  }
+  let joined_on_name = (
+    $left_distributors
+    | rename left_id name left_entity
+    | join ($right_distributors | rename right_id name right_entity) name
+  )
+  if ($joined_on_name | is-empty) {
+    return false
+  }
+  $joined_on_name | any {|distributor|
+    (
+      $distributor.left_entity == $distributor.right_entity
+      and (
+        ($distributor.left_id | is-empty)
+        or ($distributor.right_id | is-empty)
+      )
+    )
+  }
+}
+
+# Given a list of MusicBrainz Release audiobook metadata records and metadata of an audiobook, attempt to narrow down the matching releases
+#
+# The chapters release must be within the duration threshold and must be from the same distributor if one is set.
+export def filter_musicbrainz_releases [
+  metadata: record<book: record, tracks: table> # Audiobook metadata
+  duration_threshold: duration = 3sec # The allowed drift between the duration of tracks
+] table<book: record, tracks: table> -> list<string> {
+  let candidates = $in
+  # log info $"candidates: ($candidates | to nuon)"
+  # log info $"metadata: ($metadata | reject tracks.embedded_pictures | to nuon)"
+
+  if ($metadata | is-empty) or "book" not-in ($metadata) or "tracks" not-in ($metadata) or ($metadata.tracks | is-empty) {
+    return null
+  }
+
+  if "musicbrainz_release_id" in $metadata.book and ($metadata.book.musicbrainz_release_id | is-not-empty) {
+    return [$metadata.book.musicbrainz_release_id]
+  }
+
+  # Filter based on the Audible ASIN, track durations, and distributor
+
+  let candidates = (
+    if ($metadata.book | get --ignore-errors audible_asin | is-empty) {
+      $candidates
+    } else {
+      $candidates | filter {|candidate|
+        ($candidate.book | get --ignore-errors audible_asin) == $metadata.book.audible_asin
+      }
+    }
+  )
+  if ($candidates | is-empty) {
+    return null
+  }
+  if ($candidates | length) == 1 {
+    return $candidates.book.musicbrainz_release_id
+  }
+
+  let candidates = (
+    # If for some reason tracks are missing from the audiobook, this won't filter anything based on track lengths
+    if ($metadata.tracks | length) == $metadata.book.total_tracks {
+      $candidates | filter {|candidate|
+        $candidate.tracks | select index duration | equivalent_track_durations ($metadata.tracks | select index duration) $duration_threshold
+      }
+    } else {
+      $candidates
+    }
+  )
+  if ($candidates | is-empty) {
+    return null
+  }
+  if ($candidates | length) == 1 {
+    return $candidates.book.musicbrainz_release_id
+  }
+
+  let candidates = (
+    $candidates | filter {|candidate|
+      $candidate.book | get --ignore-errors contributors | has_distributor_in_common ($metadata.book | get --ignore-errors contributors)
+    }
+  )
+  if ($candidates | is-empty) {
+    return null
+  }
+  $candidates.book.musicbrainz_release_id
+}
 
 # Tag the files of an audiobook
 #
@@ -4137,9 +4314,11 @@ export def tag_audiobook [
   ignore_embedded_acoustid_fingerprints = false # Recalculate AcoustID fingerprints for all files
   ignore_embedded_musicbrainz_ids = false # Ignore existing MusicBrainz IDs embedded in the files
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
+  --search-score-threshold: int = 100 # An int value between zero and one hundred, the minimum score required to be considered a match when searching MusicBrainz
+  --max-track-duration-difference: duration = 3sec # The maximum allowable difference between track durations
+  --acoustid-score-threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match when searching AcoustID fingerprints
   --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
-  --musicbrainz-release-id: string # The MusicBrainz Release ID associated with the release
-  --threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
+  --musicbrainz-release-id: string = "" # The MusicBrainz Release ID associated with the release
   --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
@@ -4176,7 +4355,12 @@ export def tag_audiobook [
             }
           )
         ) {
-          $metadata | get_musicbrainz_ids_by_acoustid $client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
+          let retrieved = $metadata | get_musicbrainz_ids_by_acoustid $client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $acoustid_score_threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
+          if ($retrieved | is-empty) {
+            $metadata
+          } else {
+            $retrieved
+          }
         } else {
           $metadata
         }
@@ -4185,15 +4369,53 @@ export def tag_audiobook [
         if (
           "musicbrainz_release_id" not-in $metadata.book
           or ($metadata.book.musicbrainz_release_id | is-empty)
-          # or (
-          #   $metadata.book.tracks
-          #   | any {|track|
-          #     "musicbrainz_recording_id" not-in $track or ($track.musicbrainz_recording_id | is-empty)
-          #   }
-          )
-        {
+        ) {
           log info $"Unable to determine MusicBrainz Recording and Release IDs using AcoustID fingerprints"
-          # todo Search for MusicBrainz Release using the available metadata
+          let release_candidates = $metadata | search_for_musicbrainz_release --retries $retries --retry-delay $retry_delay
+          if ($release_candidates | is-empty) {
+            log error $"Unable to find any matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+            $metadata
+          } else {
+            let release_candidates = $release_candidates | where score >= $search_score_threshold
+            if ($release_candidates | is-empty) {
+              log error $"Unable to find any matching MusicBrainz releases with a perfect score. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+              $metadata
+            } else if ($release_candidates | length) > 20 {
+              log error $"Found over 20 matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+              $metadata
+            } else if ($release_candidates | length) == 1 {
+              let release_candidate = $release_candidates.id | first | get id
+              log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset)"
+              $metadata | upsert book.musicbrainz_release_id $release_candidate
+            } else {
+              log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
+              let $release_candidates = $release_candidates | get id | each {|candidate|
+                let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [label-rels recordings url-rels]
+                if ($received_metadata | is-empty) {
+                  log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
+                  null
+                } else {
+                  $received_metadata
+                }
+              }
+              if ($release_candidates | any {|r| $r == null}) {
+                return null
+              }
+              let release_candidates = $release_candidates | filter_musicbrainz_releases $metadata $max_track_duration_difference
+              if ($release_candidates | is-empty) {
+                log error $"Unable to find any matching MusicBrainz releases after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+                $metadata
+              } else if ($release_candidates | length) == 1 {
+                let release_candidate = $release_candidates | first
+                log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset) after filtering"
+                $metadata | upsert book.musicbrainz_release_id $release_candidate
+              } else {
+                # todo Interactively allow selecting an available release
+                log error $"Multiple matching MusicBrainz releases remaining after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+                $metadata
+              }
+            }
+          }
         } else {
           $metadata
         }
@@ -4314,6 +4536,86 @@ export def parse_chapters_from_musicbrainz_release []: record -> table<index: in
   }
 }
 
+# Filter and sort audiobooks based on the chapters tag, returning only the audiobooks which have the highest chapters count
+export def audiobooks_with_the_highest_voted_chapters_tag []: table<id: string, tags: table<name: string, count: int>> -> list<string> {
+  let candidates = $in
+  if ($candidates | is-empty) {
+    return null
+  }
+  let candidates_with_chapters_tag = $candidates | filter {|candidate|
+    "chapters" in $candidate.tags.name
+  }
+  if ($candidates_with_chapters_tag | is-empty) {
+    return null
+  }
+  if ($candidates_with_chapters_tag | length) == 1 {
+    return ($candidates_with_chapters_tag | get id)
+  }
+  let sorted_candidates = (
+    $candidates_with_chapters_tag
+    | sort-by --custom {|a, b|
+      (
+        ($a.tags | where name == "chapters" | get count | first)
+        >=
+        ($b.tags | where name == "chapters" | get count | first)
+      )
+    }
+  )
+  let highest_count = ($sorted_candidates | first | get tags | where name == "chapters" | get count | first)
+  $sorted_candidates | filter {|candidate|
+    ($candidate.tags | where name == "chapters" | get count | first) >= $highest_count
+  } | get --ignore-errors id | sort
+}
+
+# Given a number of audiobooks and a target audiobook, narrow down the audiobooks that can be used as chapters for the target audiobook
+export def filter_musicbrainz_chapters_releases [
+  release: record<book: record, tracks: table>
+  duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
+] table<book: record, tracks: table> -> table<book: record, tracks: table> {
+  let candidates = $in
+  # log info $"candidates: ($candidates | to nuon)"
+  # log info $"release: ($release | reject tracks.embedded_pictures | to nuon)"
+
+  let candidates = (
+    if ($release.book | get --ignore-errors audible_asin | is-empty) {
+      $candidates
+    } else {
+      $candidates | filter {|candidate|
+        ($candidate.book | get --ignore-errors audible_asin) == $release.book.audible_asin
+      }
+    }
+  )
+  if ($candidates | is-empty) {
+    return null
+  }
+
+  let candidates = $candidates | filter {|candidate|
+    if ($release.tracks | length) >= ($candidate.tracks | length) {
+      return false
+    }
+    if ((($release.tracks | get duration | math sum) - ($candidate.tracks | get duration | math sum)) | math abs) > $duration_threshold {
+      return false
+    }
+    if not ($candidate.book | get --ignore-errors contributors | has_distributor_in_common ($release.book | get --ignore-errors contributors)) {
+      return false
+    }
+    true
+  }
+  if ($candidates | is-empty) {
+    return null
+  }
+  if ($candidates | length) == 1 {
+    return $candidates
+  }
+  # Use the chapters tag to decide between multiple remaining candidates
+  if "release_tags" in ($candidates.book | columns) {
+    let highest_voted_chapters = $candidates.book | select musicbrainz_release_id release_tags | rename id tags | audiobooks_with_the_highest_voted_chapters_tag
+    $candidates | where book.musicbrainz_release_id in $highest_voted_chapters
+  } else {
+    return $candidates
+  }
+}
+
 # Given a release, attempt to find a release in the same release group that has more tracks.
 #
 # The chapters release must be within the duration threshold and must be from the same distributor if one is set.
@@ -4339,47 +4641,23 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   let query = $"rgid:($release.book.musicbrainz_release_group_id) AND NOT tracks:1 AND \(status:official OR status:pseudo-release\) AND NOT reid:($release.book.musicbrainz_release_id)"
 
   let query = (
-    if "musicbrainz_release_country" in $release.book {
-      $query + $" AND country:\"($release.book.musicbrainz_release_country)\""
-    } else {
-      $query
+    $query
+    | append_to_musicbrainz_query $release.book musicbrainz_release_country country
+    # todo Store year specially compared to full date?
+    | append_to_musicbrainz_query $release.book publication_date date --transform {|d|
+      let date = $d | format date '%Y-%m-%d'
+      if ($date | str ends-with "-01-01") {
+        $date | str replace "-01-01" ""
+      } else {
+        $date
+      }
     }
+    | append_to_musicbrainz_query $release.book amazon_asin asin
+    | append_to_musicbrainz_query $release.book isbn barcode
+    | append_to_musicbrainz_query $release.book language lang
+    | append_to_musicbrainz_query $release.book script script
   )
-  let query = (
-    if "amazon_asin" in $release.book {
-      $query + $" AND asin:\"($release.book.amazon_asin)\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "isbn" in $release.book {
-      $query + $" AND barcode:\"($release.book.isbn)\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "publication_date" in $release.book {
-      $query + $" AND date:\"($release.book.publication_date | format date '%Y-%m-%d')\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "script" in $release.book {
-      $query + $" AND script:\"($release.book.script)\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "language" in $release.book {
-      $query + $" AND lang:\"($release.book.language)\""
-    } else {
-      $query
-    }
-  )
+
   # log info $"query: ($query)"
   let query = $query | url encode
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)?query=($query)"}
@@ -4402,79 +4680,16 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   }
   # Don't parallelize for the sake of the MusicBrainz API
   let candidates = $candidates | each {|candidate|
-    let received_metadata = fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels]
+    let received_metadata = fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels tags url-rels]
     if ($received_metadata | is-empty) {
       log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
       return null
     }
-    $received_metadata | parse_musicbrainz_release
+    $received_metadata
   }
 
   # log info $"$release ($release)"
-
-  # todo Make this into a separate function.
-  let candidates = $candidates | filter {|candidate|
-    if (
-      "contributors" in $release.book
-      and ($release.book.contributors | is-not-empty)
-      and ($release.book.contributors | where role == "distributor" | is-not-empty)
-    ) {
-      if (
-        "contributors" not-in $candidate.book
-        or ($candidate.book.contributors | is-empty)
-        or ($candidate.book.contributors | where role == "distributor" | is-empty)
-      ) {
-        return false
-      }
-      let release_distributors = $release.book.contributors | where role == "distributor"
-      let candidate_distributors = $candidate.book.contributors | where role == "distributor"
-      let has_same_distributors = $release_distributors | all {|distributor|
-        $distributor in $candidate_distributors
-      }
-      if not $has_same_distributors {
-        return false
-      }
-    }
-    if ($release.tracks | length) >= ($candidate.tracks | length) {
-      return false
-    }
-    if ((($release.tracks | get duration | math sum) - ($candidate.tracks | get duration | math sum)) | math abs) > $duration_threshold {
-      return false
-    }
-    true
-  }
-  if ($candidates | is-empty) {
-    return null
-  }
-  # Use the chapters tag to decide between multiple remaining candidates
-  # todo Make into function.
-  let candidates = (
-    if ($candidates | length) > 1 {
-      let sorted_candidates = (
-        $candidates
-        | filter {|candidate|
-          if "release_tags" in $candidate.book {
-            "chapters" in ($candidate.book.release_tags | select name)
-          } else {
-            false
-          }
-        }
-        | sort-by {|a, b|
-          (
-            ($a.book.release_tags | where name == "chapters" | select count | first)
-            <
-            ($b.book.release_tags | where name == "chapters" | select count | first)
-          )
-        }
-      )
-      let highest_count = ($sorted_candidates | first | get book.release_tags | where name == "chapters" | select count | first)
-      $sorted_candidates | filter {|candidate|
-        $highest_count >= ($candidate.book.release_tags | where name == "chapters" | select count | first)
-      }
-    } else {
-      $candidates
-    }
-  )
+  let candidates = $candidates | filter_musicbrainz_chapters_releases $release $duration_threshold
   if ($candidates | length) > 1 {
     log warning $"More than one MusicBrainz Release candidate for chapters found: ($candidates | get book.id). Please add or vote up the chapters tag on the desired release."
     return null
@@ -4513,6 +4728,10 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
   let metadata = (
     $release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
   )
+  if ($metadata | is-empty) {
+    log error $"Failed to fetch MusicBrainz Release (ansi yellow)($release_id)(ansi reset)"
+    return null
+  }
   # log info $"audiobook_files: ($audiobook_files)"
   # log info $"audiobook_files.metadata.track: ($audiobook_files.metadata.track)"
   let tracks = (
@@ -4636,6 +4855,11 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   let musicbrainz_metadata = (
     $existing_metadata.book.musicbrainz_release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
   )
+  if ($musicbrainz_metadata | is-empty) {
+    log error $"Failed to fetch MusicBrainz Release (ansi yellow)($existing_metadata.book.musicbrainz_release_id)(ansi reset)"
+    return null
+  }
+
   # log info $"audiobook_files: ($audiobook_files)"
   # log info $"musicbrainz_metadata: ($musicbrainz_metadata)"
   let tracks = (
@@ -4717,9 +4941,204 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   $musicbrainz_metadata
 }
 
-# Using metadata from the audio tracks, search for a MusicBrainz release
-# export def search_for_musicbrainz_release []: record -> table {
-# }
+# Append the the value for the given key in the given metadata to a MusicBrainz search query for the given search term
+#
+# Uses the 'AND' conjunction when appending to a non-empty query.
+# Special lucene characters are properly escaped in the value.
+export def append_to_musicbrainz_query [
+  metadata: record
+  key: string
+  musicbrainz_search_term: string
+  --transform: closure
+]: string -> string {
+  let query = $in
+  let prefix = (
+    if ($query | is-empty) {
+      ""
+    } else {
+      " AND "
+    }
+  )
+  let transform = (
+    if $transform == null {
+      {|v| $v}
+    } else {
+      $transform
+    }
+  )
+  if ($metadata | get --ignore-errors $key | is-not-empty) {
+    let value = do $transform ($metadata | get $key) | escape_special_lucene_characters
+    if ($value | is-not-empty) {
+      $query + $"($prefix)($musicbrainz_search_term):\"($value)\""
+    } else {
+      $query
+    }
+  } else {
+    $query
+  }
+}
+
+# Escape special Lucene characters in a string with a backslash
+export def escape_special_lucene_characters [] string -> string {
+  let input = $in
+  if ($input | describe) != "string" {
+    return $input
+  }
+  const special_lucene_characters = ['\' '+' '-' '&&' '||' '!' '(' ')' '{' '}' '[' ']' '^' '"' '~' '*' '?' ':' '/']
+  $special_lucene_characters | reduce --fold $input {|character, acc|
+    $acc | str replace --all $character ('\' + $character)
+  }
+}
+
+# Using metadata from the audio tracks, search for a MusicBrainz Release
+export def search_for_musicbrainz_release [
+  use_tags: bool = false
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: record -> table {
+  let metadata = $in
+  if ($metadata | is-empty) {
+    return null
+  }
+
+  if ($metadata.book | get --ignore-errors musicbrainz_release_id | is-not-empty) {
+    return [[musicbrainz_release_id]; [$metadata.book.musicbrainz_release_id]]
+  }
+
+  let url = "https://musicbrainz.org/ws/2/release/"
+
+  let artists = (
+    if ($metadata.book | get --ignore-errors contributors | is-not-empty) {
+      let release_artists = $metadata.book.contributors | where entity == artist
+      let track_artists = (
+        if ($metadata.tracks | get --ignore-errors contributors | is-not-empty) {
+          let track_artists = $metadata.tracks.contributors | uniq | where entity == artist
+          if ($track_artists | is-not-empty) {
+            $track_artists | where type in [narrator, writer]
+          }
+        }
+      );
+      $release_artists | append $track_artists
+    }
+  );
+
+  # The release must be an Audiobook, Audio drama, or Spokenword
+  let query = "primarytype:Other AND (secondarytype:Audiobook OR secondarytype:\"Audio drama\" OR secondarytype:Spokenword)"
+
+  let query = (
+    if ($artists | is-not-empty) {
+      $query + $artists | get --ignore-errors id | reduce {|it, acc|
+        $acc + $" AND arid:\"($it | escape_special_lucene_characters)\""
+      }
+    } else {
+      $query
+    }
+  )
+  let query = (
+    if ($artists | is-not-empty) {
+      $query + $artists | get --ignore-errors name | reduce {|it, acc|
+        $acc + $" AND artistname:\"($it | escape_special_lucene_characters)\""
+      }
+    } else {
+      $query
+    }
+  )
+  let query = (
+    # Audiobooks should have either an ASIN or a barcode, likely an ISBN, set, but not both simultaneously.
+    # Prefer the ISBN if both are set.
+    # todo Maybe both should be included?
+    if ($metadata.book | get --ignore-errors isbn | is-not-empty) {
+      $query + $" AND barcode:\"($metadata.book.isbn | escape_special_lucene_characters)\""
+    } else if ($metadata.book | get --ignore-errors amazon_asin | is-not-empty) {
+      $query + $" AND asin:\"($metadata.book.amazon_asin | escape_special_lucene_characters)\""
+    } else {
+      $query
+    }
+  )
+
+  let tags = (
+    let genres = (
+      if ($metadata.book | get --ignore-errors genres | is-not-empty) {
+        $metadata.book.genres
+      }
+    );
+    let tags = (
+      if ($metadata.book | get --ignore-errors tags | is-not-empty) {
+        $metadata.book.tags
+      }
+    );
+    $genres | append $tags
+  )
+  let query = (
+    if $use_tags and ($tags | is-not-empty) {
+      $query + $tags | reduce {|it, acc|
+        $acc + $" AND tag:\"($it | escape_special_lucene_characters)\""
+      }
+    } else {
+      $query
+    }
+  )
+
+  let query = (
+    if ($metadata.book | get --ignore-errors title | is-not-empty) {
+      let title = $metadata.book.title | escape_special_lucene_characters
+      $query + $" AND \(release:\"($title)\" OR alias:\"($title)\"\)"
+    } else {
+      $query
+    }
+  )
+
+  let query = (
+    $query
+    | append_to_musicbrainz_query $metadata.book musicbrainz_release_country country
+    # todo Store year specially compared to full date?
+    | append_to_musicbrainz_query $metadata.book publication_date date --transform {|d|
+      let date = $d | format date '%Y-%m-%d'
+      if ($date | str ends-with "-01-01") {
+        $date | str replace "-01-01" ""
+      } else {
+        $date
+      }
+    }
+    | append_to_musicbrainz_query $metadata.book media format
+    | append_to_musicbrainz_query $metadata.book publishers laid --transform {|l| $l | get --ignore-errors id}
+    | append_to_musicbrainz_query $metadata.book publishers label --transform {|l| $l | get --ignore-errors name}
+    | append_to_musicbrainz_query $metadata.book language lang
+    | append_to_musicbrainz_query $metadata.book mediums total_discs
+    | append_to_musicbrainz_query $metadata.book packaging packaging
+    | append_to_musicbrainz_query $metadata.book script script
+    | append_to_musicbrainz_query $metadata.book musicbrainz_release_status status
+    | append_to_musicbrainz_query $metadata.book total_tracks tracks
+    | append_to_musicbrainz_query $metadata.book musicbrainz_release_group_id rgid
+  )
+  # todo discids, discidsmedium, and tracksmedium?
+
+  log info $"query: ($query)"
+
+  let query = $query | url encode
+
+  log info $"request: http get --full --headers [User-Agent ($user_agent) Accept \"application/json\"] ($url)?query=($query)"
+
+  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)?query=($query)"}
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error searching for a release: ($url)?&query=($query)\t($error.debug.msg)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP status code ($response.status) when searching for a release: ($url)?query=($query)"
+    return null
+  }
+
+  let releases = $response | get body | get releases
+  if ($releases | is-empty) {
+    return null
+  }
+  $releases | sort-by --reverse score
+}
 
 ##### chapterz.nu #####
 

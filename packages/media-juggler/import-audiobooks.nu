@@ -676,15 +676,16 @@ export def embed_cover []: record<cover: path, m4b: path> -> path {
 # The path for a book in a series will look like "<authors>/<series>/<series-position> - <title>.m4b".
 # The path for a standalone book will look like "<authors>/<title>.m4b".
 #
+# todo use JSON over ssh to run commands as necessary and retrieve output, i.e. ssh meerkat nu -c "\'ls | to json\'"
 def main [
-    ...files: string # The paths to M4A and M4B files to tag and upload. Prefix paths with "minio:" to download them from the MinIO instance
+    ...files: string # The paths to audio files or a directory containing audio files belonging to a single book to tag and upload. Prefix paths with "ssh:" to download them from the server via SSH
     # --asin: string
     # --isbn: string
-    # --musicbrainz-release-id: string
+    --musicbrainz-release-id: string
     --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
     --delete # Delete the original file
-    --minio-alias: string = "jwillikers" # The alias of the MinIO server used by the MinIO client application
-    --minio-path: string = "media/Books/Audiobooks" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
+    --server: string = "meerkat" # The server to which to copy files via SSH
+    --server-path: string = "/var/media/audiobooks" # The base directory to which to copy files.
     --output-directory: directory # Directory to place files when not being uploaded
     --skip-upload # Don't upload files to the server
     --tone-tag-args: list<string> = [] # Additional arguments to pass to the tone tag command
@@ -694,8 +695,8 @@ def main [
         exit 1
     }
 
-    if $asin != null and ($files | length) > 1 {
-        log error "Setting the ASIN for multiple files is not allowed as it can result in overwriting the final file"
+    if $musicbrainz_release_id != null and ($files | length) > 1 {
+        log error "Setting the MusicBrainz ID for multiple books is not allowed as it can result in overwriting the final file"
         exit 1
     }
 
@@ -728,9 +729,9 @@ def main [
     # try {
 
     let file = (
-        if ($original_file | str starts-with "minio:") {
-            let file = ($original_file | str replace "minio:" "")
-            ^mc cp $file $"($working_directory)/($file | path basename)"
+        if ($original_file | str starts-with "ssh:") {
+            let file = ($original_file | str replace "ssh:" "")
+            ^scp $"($server):$file" $"($working_directory)/($file | path basename)"
             [$working_directory ($file | path basename)] | path join
         } else {
             cp $original_file $working_directory
@@ -753,7 +754,7 @@ def main [
     )
 
     let audiobook = (
-        # Assume AAX files are from Audible and require decryption.
+        # Assume an AAX file is from Audible and require decryption.
         if $input_format == "aax" {
             if $audible_activation_bytes == null {
                 log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
@@ -762,6 +763,7 @@ def main [
             $file | decrypt_audible $audible_activation_bytes --working-directory $working_directory
         } else if $input_format in ["m4a", "m4b"] {
             $file
+        #
         } else if $input_format == "dir" {
             $file | mp3_directory_to_m4b $working_directory
         } else if $input_format == "zip" {

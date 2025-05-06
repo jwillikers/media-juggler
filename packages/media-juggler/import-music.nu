@@ -50,6 +50,7 @@ export def beet_import [
 }
 
 # Get the type of a path on MinIO
+# todo Convert to SSH: ssh meerkat nu -c "\'ls | to json\'"
 export def "mc path type" []: path -> string {
     ^mc stat --json $in | from json | get type | str replace "folder" "dir"
 }
