@@ -73,9 +73,9 @@ def test_beet_secrets_from_env_all [] {
 }
 
 def main [] [] {
-    test_beet_secrets_from_env_none
-    test_beet_secrets_from_env_all_empty
-    test_beet_secrets_from_env_one
-    test_beet_secrets_from_env_all
-    echo "All tests passed!"
+  test_beet_secrets_from_env_none
+  test_beet_secrets_from_env_all_empty
+  test_beet_secrets_from_env_one
+  test_beet_secrets_from_env_all
+  echo "All tests passed!"
 }

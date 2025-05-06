@@ -25,6 +25,70 @@ export const image_extensions = [
   webp
 ]
 
+# Get the type of a path via SSH
+export def "ssh path type" [
+  server: string
+]: path -> string {
+  ^ssh $server nu --commands $"\'($in) | path type | to json\'" | from json
+}
+
+# Delete a file over SSH
+export def "ssh rm" [
+  server: string
+]: path -> nothing {
+  let target = $in
+  ^ssh $server nu --commands $"\'rm ($target)\'"
+  # Prune empty directories
+  let parent_directory = $target | path dirname
+  ^ssh $server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($parent_directory)\'"
+}
+
+# Move a file over SSH
+export def "ssh mv" [
+  server: string
+  destination: path
+]: path -> nothing {
+  let source = $in
+  let target_directory = ($destination | path dirname)
+  if ($target_directory | is-not-empty) {
+    ^ssh $server nu --commands $"\'mkdir ($target_directory)\'"
+  }
+  ^ssh $server nu --commands $"\'mv ($source) ($destination)\'"
+  # Prune empty directories
+  if ($source | ssh path type $server) == "dir" {
+    ^ssh $server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($source)\'"
+  } else {
+    let parent_directory = $source | path dirname
+    ^ssh $server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($parent_directory)\'"
+  }
+}
+
+# Copy files over SSH
+export def "scp" [
+  server: string
+  destination: path
+  --recursive
+]: path -> nothing {
+  let source = $in
+  let target_directory = ($destination | path dirname)
+  if ($target_directory | is-not-empty) {
+    ^ssh $server nu --commands $"\'mkdir ($target_directory)\'"
+  }
+  if $recursive {
+    ^scp --recursive $source $"($server):($destination)"
+  } else {
+    ^scp $source $"($server):($destination)"
+  }
+}
+
+# List files over SSH
+export def "ssh ls" [
+  server: string
+  ...args: string
+]: path -> nothing {
+  ^ssh $server nu --commands $"\'ls (...$args) ($in) | to json\'" | from json
+}
+
 # Get the number of pages in a PDF
 export def pdf_page_count []: path -> int {
   let pdf = $in
