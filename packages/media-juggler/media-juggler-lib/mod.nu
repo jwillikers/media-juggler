@@ -2306,14 +2306,14 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     let artist = $artist_names | merge_or_input $artist_ids;
     let artist = (
       if "id" not-in ($artist | columns) {
-        $artist | insert id null
+        $artist | insert id ""
       } else {
         $artist
       }
     );
     let artists = (
       if "additionalFields" in $metadata and "artists" in $metadata.additionalFields and ($metadata.additionalFields.artists | is-not-empty) {
-        $metadata.additionalFields.artists | parse_multi_value_tag | wrap name | insert id null
+        $metadata.additionalFields.artists | parse_multi_value_tag | wrap name | insert id ""
       }
     );
     let non_duplicate_artists = (
@@ -2338,7 +2338,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     if ($primary_authors | is-not-empty) {
       let primary_authors = $primary_authors | insert role "primary author" | insert entity "artist";
       if "id" not-in ($primary_authors | columns) {
-        $primary_authors | insert id null
+        $primary_authors | insert id ""
       } else {
         $primary_authors
       }
@@ -2440,7 +2440,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       if ($names | is-not-empty) {
         $names | par-each {|name|
           {
-            id: null
+            id: ""
             name: $name
             entity: "artist"
             role: $role
@@ -2470,7 +2470,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       if ($names | is-not-empty) {
         $names | par-each {|name|
           {
-            id: null
+            id: ""
             name: $name
             entity: "label"
             role: $role
@@ -3072,18 +3072,6 @@ export def retry_http [
   retry $request $should_retry $retries $delay
 }
 
-# Parses release and recording ids from an AcoustID server response
-#
-# Takes an AcoustID server response as input.
-# export def parse_release_ids_from_acoustid_response []: record<results: table<id: string, releases: table<id: string>, score: float>, status: string> -> table<id: string, recordings: table<id: string, releases: table<id: string>>, score: float> {
-#   let response = $in
-#   if $response.status != "ok" {
-#     log error $"Received response with status (ansi red)($response.status)(ansi reset) querying the AcoustID server"
-#     return null
-#   }
-#   $response.results
-# }
-
 # Find release and recording ids linked to an AcoustID fingerprint
 #
 # Requires an AcoustID application API key.
@@ -3226,7 +3214,7 @@ export def submit_acoustid_fingerprints [
 
   # todo include fileformat and bitrate?
   let submission_string = $"format=json&client=($client_key)&clientversion=($media_juggler_version)&user=($user_key)" + $submission_string
-  log info $"submission_string: ($submission_string)"
+  # log info $"submission_string: ($submission_string)"
 
   let request = {||
     (
@@ -3827,10 +3815,10 @@ export def parse_musicbrainz_release []: record -> record {
     | each {|primary_author|
       if ($primary_author | is-not-empty) {
         {
-          name: $primary_author.name
           id: $primary_author.id
-          role: "primary author"
+          name: $primary_author.name
           entity: "artist"
+          role: "primary author"
         }
       }
     }
@@ -4196,6 +4184,51 @@ export def equivalent_track_durations [
   )
 }
 
+# Determine if two sets of contributors have at least one distributor in common
+#
+# If both sets are empty, true is returned.
+export def has_distributor_in_common [
+  right: table<id: string, name: string, entity: string, role: string>
+]: table<id: string, name: string, entity: string, role: string> -> bool {
+  let left = $in
+  if ($right | is-empty) and ($left | is-empty) {
+    return true
+  }
+  if ($right | is-empty) or ($left | is-empty) {
+    return false
+  }
+  let left_distributors = $left | where role == "distributor"
+  let right_distributors = $right | where role == "distributor"
+  let joined_on_id = (
+    $left_distributors
+    | rename id left_name left_entity
+    | join ($right_distributors | rename id right_name right_entity) id
+    | filter {|distributor|
+      $distributor.left_entity == $distributor.right_entity
+    }
+  )
+  if ($joined_on_id | is-not-empty) {
+    return true
+  }
+  let joined_on_name = (
+    $left_distributors
+    | rename left_id name left_entity
+    | join ($right_distributors | rename right_id name right_entity) name
+  )
+  if ($joined_on_name | is-empty) {
+    return false
+  }
+  $joined_on_name | any {|distributor|
+    (
+      $distributor.left_entity == $distributor.right_entity
+      and (
+        ($distributor.left_id | is-empty)
+        or ($distributor.right_id | is-empty)
+      )
+    )
+  }
+}
+
 # Given a list of MusicBrainz Release audiobook metadata records and metadata of an audiobook, attempt to narrow down the matching releases
 #
 # The chapters release must be within the duration threshold and must be from the same distributor if one is set.
@@ -4204,6 +4237,9 @@ export def filter_musicbrainz_releases [
   duration_threshold: duration = 3sec # The allowed drift between the duration of tracks
 ] table<book: record, tracks: table> -> list<string> {
   let candidates = $in
+  # log info $"candidates: ($candidates | to nuon)"
+  # log info $"metadata: ($metadata | reject tracks.embedded_pictures | to nuon)"
+
   if ($metadata | is-empty) or "book" not-in ($metadata) or "tracks" not-in ($metadata) or ($metadata.tracks | is-empty) {
     return null
   }
@@ -4212,56 +4248,50 @@ export def filter_musicbrainz_releases [
     return [$metadata.book.musicbrainz_release_id]
   }
 
-  # Filter based on track durations and then on the distributor
+  # Filter based on the Audible ASIN, track durations, and distributor
 
   let candidates = (
-    # If for some reason tracks are missing from the audiobook, this won't filter anything
-    # todo Make this into a separate function.
-    if ($metadata.tracks | length) == $metadata.book.total_tracks {
-      $candidates.tracks | select index duration | equivalent_track_durations ($metadata.tracks | select index duration) $duration_threshold
-    } else {
+    if ($metadata.book | get --ignore-errors audible_asin | is-empty) {
       $candidates
-    }
-  )
-  if ($candidates | is-empty) {
-    return null
-  } else if ($candidates | length) == 1 {
-    return $candidates | get id | first
-  }
-
-  # todo Make this into a separate function.
-  let candidates = (
-    $candidates | filter {|candidate|
-      if (
-        ($metadata.book | get --ignore-errors contributors | is-not-empty)
-        and ($metadata.book.contributors | where role == "distributor" | is-not-empty)
-      ) {
-        if (
-          ($candidate.book | get --ignore-errors contributors | is-not-empty)
-          or ($candidate.book.contributors | where role == "distributor" | is-empty)
-        ) {
-          false
-        } else {
-          let release_distributors = $metadata.book.contributors | where role == "distributor"
-          let candidate_distributors = $candidate.book.contributors | where role == "distributor"
-          $release_distributors | all {|distributor|
-            if "id" not-in $distributor {
-              $distributor in $candidate_distributors
-            } else {
-              # Match without the id
-              $distributor in ($candidate_distributors | reject id)
-            }
-          }
-        }
-      } else {
-        true
+    } else {
+      $candidates | filter {|candidate|
+        ($candidate.book | get --ignore-errors audible_asin) == $metadata.book.audible_asin
       }
     }
   )
   if ($candidates | is-empty) {
     return null
   }
-  return $candidates | get id | first
+  if ($candidates | length) == 1 {
+    return $candidates.book.musicbrainz_release_id
+  }
+
+  let candidates = (
+    # If for some reason tracks are missing from the audiobook, this won't filter anything based on track lengths
+    if ($metadata.tracks | length) == $metadata.book.total_tracks {
+      $candidates | filter {|candidate|
+        $candidate.tracks | select index duration | equivalent_track_durations ($metadata.tracks | select index duration) $duration_threshold
+      }
+    } else {
+      $candidates
+    }
+  )
+  if ($candidates | is-empty) {
+    return null
+  }
+  if ($candidates | length) == 1 {
+    return $candidates.book.musicbrainz_release_id
+  }
+
+  let candidates = (
+    $candidates | filter {|candidate|
+      $candidate.book | get --ignore-errors contributors | has_distributor_in_common ($metadata.book | get --ignore-errors contributors)
+    }
+  )
+  if ($candidates | is-empty) {
+    return null
+  }
+  $candidates.book.musicbrainz_release_id
 }
 
 # Tag the files of an audiobook
@@ -4283,10 +4313,10 @@ export def tag_audiobook [
   working_directory: directory
   ignore_embedded_acoustid_fingerprints = false # Recalculate AcoustID fingerprints for all files
   ignore_embedded_musicbrainz_ids = false # Ignore existing MusicBrainz IDs embedded in the files
-  search_score_threshold: int = 100 # An int value between zero and one hundred, the minimum score required to be considered a match when searching MusicBrainz
-  max_track_duration_difference: duration = 3sec # The maximum allowable difference between track durations
-  acoustid_score_threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match when searching AcoustID fingerprints
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
+  --search-score-threshold: int = 100 # An int value between zero and one hundred, the minimum score required to be considered a match when searching MusicBrainz
+  --max-track-duration-difference: duration = 3sec # The maximum allowable difference between track durations
+  --acoustid-score-threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match when searching AcoustID fingerprints
   --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
   --musicbrainz-release-id: string = "" # The MusicBrainz Release ID associated with the release
   --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
@@ -4360,7 +4390,7 @@ export def tag_audiobook [
             } else {
               log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
               let $release_candidates = $release_candidates | get id | each {|candidate|
-                let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels]
+                let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [label-rels recordings url-rels]
                 if ($received_metadata | is-empty) {
                   log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
                   null
@@ -4376,7 +4406,7 @@ export def tag_audiobook [
                 log error $"Unable to find any matching MusicBrainz releases after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
                 $metadata
               } else if ($release_candidates | length) == 1 {
-                let release_candidate = $release_candidates | first | get book.musicbrainz_release_id
+                let release_candidate = $release_candidates | first
                 log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset) after filtering"
                 $metadata | upsert book.musicbrainz_release_id $release_candidate
               } else {
@@ -4506,6 +4536,86 @@ export def parse_chapters_from_musicbrainz_release []: record -> table<index: in
   }
 }
 
+# Filter and sort audiobooks based on the chapters tag, returning only the audiobooks which have the highest chapters count
+export def audiobooks_with_the_highest_voted_chapters_tag []: table<id: string, tags: table<name: string, count: int>> -> list<string> {
+  let candidates = $in
+  if ($candidates | is-empty) {
+    return null
+  }
+  let candidates_with_chapters_tag = $candidates | filter {|candidate|
+    "chapters" in $candidate.tags.name
+  }
+  if ($candidates_with_chapters_tag | is-empty) {
+    return null
+  }
+  if ($candidates_with_chapters_tag | length) == 1 {
+    return ($candidates_with_chapters_tag | get id)
+  }
+  let sorted_candidates = (
+    $candidates_with_chapters_tag
+    | sort-by --custom {|a, b|
+      (
+        ($a.tags | where name == "chapters" | get count | first)
+        >=
+        ($b.tags | where name == "chapters" | get count | first)
+      )
+    }
+  )
+  let highest_count = ($sorted_candidates | first | get tags | where name == "chapters" | get count | first)
+  $sorted_candidates | filter {|candidate|
+    ($candidate.tags | where name == "chapters" | get count | first) >= $highest_count
+  } | get --ignore-errors id | sort
+}
+
+# Given a number of audiobooks and a target audiobook, narrow down the audiobooks that can be used as chapters for the target audiobook
+export def filter_musicbrainz_chapters_releases [
+  release: record<book: record, tracks: table>
+  duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
+] table<book: record, tracks: table> -> table<book: record, tracks: table> {
+  let candidates = $in
+  # log info $"candidates: ($candidates | to nuon)"
+  # log info $"release: ($release | reject tracks.embedded_pictures | to nuon)"
+
+  let candidates = (
+    if ($release.book | get --ignore-errors audible_asin | is-empty) {
+      $candidates
+    } else {
+      $candidates | filter {|candidate|
+        ($candidate.book | get --ignore-errors audible_asin) == $release.book.audible_asin
+      }
+    }
+  )
+  if ($candidates | is-empty) {
+    return null
+  }
+
+  let candidates = $candidates | filter {|candidate|
+    if ($release.tracks | length) >= ($candidate.tracks | length) {
+      return false
+    }
+    if ((($release.tracks | get duration | math sum) - ($candidate.tracks | get duration | math sum)) | math abs) > $duration_threshold {
+      return false
+    }
+    if not ($candidate.book | get --ignore-errors contributors | has_distributor_in_common ($release.book | get --ignore-errors contributors)) {
+      return false
+    }
+    true
+  }
+  if ($candidates | is-empty) {
+    return null
+  }
+  if ($candidates | length) == 1 {
+    return $candidates
+  }
+  # Use the chapters tag to decide between multiple remaining candidates
+  if "release_tags" in ($candidates.book | columns) {
+    let highest_voted_chapters = $candidates.book | select musicbrainz_release_id release_tags | rename id tags | audiobooks_with_the_highest_voted_chapters_tag
+    $candidates | where book.musicbrainz_release_id in $highest_voted_chapters
+  } else {
+    return $candidates
+  }
+}
+
 # Given a release, attempt to find a release in the same release group that has more tracks.
 #
 # The chapters release must be within the duration threshold and must be from the same distributor if one is set.
@@ -4531,47 +4641,23 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   let query = $"rgid:($release.book.musicbrainz_release_group_id) AND NOT tracks:1 AND \(status:official OR status:pseudo-release\) AND NOT reid:($release.book.musicbrainz_release_id)"
 
   let query = (
-    if "musicbrainz_release_country" in $release.book {
-      $query + $" AND country:\"($release.book.musicbrainz_release_country)\""
-    } else {
-      $query
+    $query
+    | append_to_musicbrainz_query $release.book musicbrainz_release_country country
+    # todo Store year specially compared to full date?
+    | append_to_musicbrainz_query $release.book publication_date date --transform {|d|
+      let date = $d | format date '%Y-%m-%d'
+      if ($date | str ends-with "-01-01") {
+        $date | str replace "-01-01" ""
+      } else {
+        $date
+      }
     }
+    | append_to_musicbrainz_query $release.book amazon_asin asin
+    | append_to_musicbrainz_query $release.book isbn barcode
+    | append_to_musicbrainz_query $release.book language lang
+    | append_to_musicbrainz_query $release.book script script
   )
-  let query = (
-    if "amazon_asin" in $release.book {
-      $query + $" AND asin:\"($release.book.amazon_asin)\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "isbn" in $release.book {
-      $query + $" AND barcode:\"($release.book.isbn)\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "publication_date" in $release.book {
-      $query + $" AND date:\"($release.book.publication_date | format date '%Y-%m-%d')\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "script" in $release.book {
-      $query + $" AND script:\"($release.book.script)\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "language" in $release.book {
-      $query + $" AND lang:\"($release.book.language)\""
-    } else {
-      $query
-    }
-  )
+
   # log info $"query: ($query)"
   let query = $query | url encode
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)?query=($query)"}
@@ -4594,7 +4680,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   }
   # Don't parallelize for the sake of the MusicBrainz API
   let candidates = $candidates | each {|candidate|
-    let received_metadata = fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels tags]
+    let received_metadata = fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels tags url-rels]
     if ($received_metadata | is-empty) {
       log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
       return null
@@ -4603,70 +4689,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   }
 
   # log info $"$release ($release)"
-
-  # todo Make this into a separate function.
-  let candidates = $candidates | filter {|candidate|
-    if (
-      "contributors" in $release.book
-      and ($release.book.contributors | is-not-empty)
-      and ($release.book.contributors | where role == "distributor" | is-not-empty)
-    ) {
-      if (
-        "contributors" not-in $candidate.book
-        or ($candidate.book.contributors | is-empty)
-        or ($candidate.book.contributors | where role == "distributor" | is-empty)
-      ) {
-        return false
-      }
-      let release_distributors = $release.book.contributors | where role == "distributor"
-      let candidate_distributors = $candidate.book.contributors | where role == "distributor"
-      let has_same_distributors = $release_distributors | all {|distributor|
-        $distributor in $candidate_distributors
-      }
-      if not $has_same_distributors {
-        return false
-      }
-    }
-    if ($release.tracks | length) >= ($candidate.tracks | length) {
-      return false
-    }
-    if ((($release.tracks | get duration | math sum) - ($candidate.tracks | get duration | math sum)) | math abs) > $duration_threshold {
-      return false
-    }
-    true
-  }
-  if ($candidates | is-empty) {
-    return null
-  }
-  # Use the chapters tag to decide between multiple remaining candidates
-  # todo Make into function.
-  let candidates = (
-    if ($candidates | length) > 1 {
-      let sorted_candidates = (
-        $candidates
-        | filter {|candidate|
-          if "release_tags" in $candidate.book {
-            "chapters" in ($candidate.book.release_tags | select name)
-          } else {
-            false
-          }
-        }
-        | sort-by {|a, b|
-          (
-            ($a.book.release_tags | where name == "chapters" | select count | first)
-            <
-            ($b.book.release_tags | where name == "chapters" | select count | first)
-          )
-        }
-      )
-      let highest_count = ($sorted_candidates | first | get book.release_tags | where name == "chapters" | select count | first)
-      $sorted_candidates | filter {|candidate|
-        $highest_count >= ($candidate.book.release_tags | where name == "chapters" | select count | first)
-      }
-    } else {
-      $candidates
-    }
-  )
+  let candidates = $candidates | filter_musicbrainz_chapters_releases $release $duration_threshold
   if ($candidates | length) > 1 {
     log warning $"More than one MusicBrainz Release candidate for chapters found: ($candidates | get book.id). Please add or vote up the chapters tag on the desired release."
     return null
@@ -4918,15 +4941,10 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   $musicbrainz_metadata
 }
 
-# Get an item from a record if it exists record
-# export def get_if_in_table [key: string]: table -> any {
-#   let input = $in
-#   if $key in $input {
-#     $key
-#   }
-# }
-
-# todo Test this function?
+# Append the the value for the given key in the given metadata to a MusicBrainz search query for the given search term
+#
+# Uses the 'AND' conjunction when appending to a non-empty query.
+# Special lucene characters are properly escaped in the value.
 export def append_to_musicbrainz_query [
   metadata: record
   key: string
@@ -4960,6 +4978,7 @@ export def append_to_musicbrainz_query [
   }
 }
 
+# Escape special Lucene characters in a string with a backslash
 export def escape_special_lucene_characters [] string -> string {
   let input = $in
   if ($input | describe) != "string" {
