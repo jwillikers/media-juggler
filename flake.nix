@@ -1,6 +1,14 @@
 {
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
+    m4b-tool = {
+      # url = "github:sandreas/m4b-tool";
+      url = "github:jwillikers/m4b-tool/jwillikers";
+      inputs = {
+        flake-utils.follows = "flake-utils";
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
     nix-update-scripts = {
       url = "github:jwillikers/nix-update-scripts";
       inputs = {
@@ -27,6 +35,8 @@
     {
       # deadnix: skip
       self,
+      # deadnix: skip
+      m4b-tool,
       nix-update-scripts,
       nixpkgs,
       # deadnix: skip
@@ -39,6 +49,7 @@
       overlays = import ./overlays { inherit inputs; };
       overlaysList = with overlays; [
         calibre-acsm-plugin-libcrypto
+        overlays.m4b-tool
         unstablePackages
       ];
     in

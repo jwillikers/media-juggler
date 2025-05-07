@@ -55,6 +55,30 @@
         "type": "github"
       }
     },
+    "m4b-tool": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1746640930,
+        "narHash": "sha256-D8m/HZWh8eqMKNOfoiIrFwz1uF7xLEImIcg2QGJilzc=",
+        "owner": "jwillikers",
+        "repo": "m4b-tool",
+        "rev": "48dca819966667c8847322b66935cd447b6615e7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jwillikers",
+        "ref": "jwillikers",
+        "repo": "m4b-tool",
+        "type": "github"
+      }
+    },
     "nix-update-scripts": {
       "inputs": {
         "flake-utils": [
@@ -141,6 +165,7 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
+        "m4b-tool": "m4b-tool",
         "nix-update-scripts": "nix-update-scripts",
         "nixpkgs": "nixpkgs",
         "nixpkgs-unstable": "nixpkgs-unstable",

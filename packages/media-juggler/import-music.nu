@@ -178,7 +178,7 @@ def main [
 
   for original_item in $items {
 
-  log info $"Importing the file (ansi purple)($original_item)(ansi reset)"
+  log info $"Importing (ansi purple)($original_item)(ansi reset)"
 
   let temporary_directory = (mktemp --directory "import-music.XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
@@ -246,11 +246,7 @@ def main [
   let item = (
     if ($original_item | str starts-with "ssh:") {
       let item = ($original_item | str replace "ssh:" "")
-      if $item_type == "dir" {
-        scp --recursive $item $"($import_directory)/($item | path basename)"
-      } else {
-        scp $item $"($import_directory)/($item | path basename)"
-      }
+      $item | scp $"($import_directory)/($item | path basename)"
       [$import_directory ($item | path basename)] | path join
     } else {
       if $item_type == "dir" {
@@ -321,7 +317,7 @@ def main [
             log debug $"(ansi red_bold)Not(ansi reset) deleting the original file (ansi yellow)($original)(ansi reset) since it was overwritten by the updated file"
           } else {
             log info $"Deleting the original file on the server (ansi yellow)($original)(ansi reset)"
-            ssh rm $original
+            $original | ssh rm
           }
         }
       )

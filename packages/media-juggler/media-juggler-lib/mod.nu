@@ -25,22 +25,72 @@ export const image_extensions = [
   webp
 ]
 
+export def remove_video_stream [
+  output_file: path = ""
+]: path -> path {
+  let input_file = $in
+  let the_output_file = (
+    if ($output_file | is-empty) {
+      mktemp --suffix ("." + ($input_file | path parse | get extension)) --tmpdir
+    } else {
+      $output_file
+    }
+  )
+  log info $"the_output_file: ($the_output_file)"
+  ^ffmpeg -y -i $input_file -codec:a copy -vn $the_output_file
+  if ($output_file | is-empty) {
+    mv $the_output_file $input_file
+    $input_file
+  } else {
+    $the_output_file
+  }
+}
+
+export def ffprobe []: path -> record {
+  ^ffprobe -v quiet -print_format json -show_format -show_streams $in | from json
+}
+
+export def convert_to_opus [
+  extension: string # file extension of the output container, i.e. ogg, m4b
+  ...args: string # ffmpeg args
+]: path -> path {
+  let input = $in
+  let output = $input | path parse | update extension $extension
+  ^ffmpeg -i $input -c:a libopus ...$args $output
+  # todo Use opusenc to keep embedded cover art
+  # ^opusenc
+  #  -b:a 128k
+  #  -map_metadata 0
+}
+
+# Replace forward slashes and reserved file names with Unicode characters for use as file names
+#
+# Thank you Unicode.
+export def sanitize_file_name []: path -> path {
+  let name = $in
+  if $name == "." {
+    '․'
+  } else if $name == ".." {
+    "‥"
+  } else {
+    $name | str replace --all '/' '⁄'
+  }
+}
+
 # Get the type of a path via SSH
-export def "ssh path type" [
-  server: string
-]: path -> string {
-  ^ssh $server nu --commands $"\'($in) | path type | to json\'" | from json
+export def "ssh_path_type" []: path -> string {
+  let input = $in
+  let ssh_path = $in | split_ssh_path
+  ^ssh $ssh_path.server nu --commands $"\'\"($ssh_path.path)\" | path type | to json\'" | from json
 }
 
 # Delete a file over SSH
-export def "ssh rm" [
-  server: string
-]: path -> nothing {
-  let target = $in
-  ^ssh $server nu --commands $"\'rm ($target)\'"
+export def "ssh rm" []: path -> nothing {
+  let target = $in | split_ssh_path
+  ^ssh $target.server nu --commands $"\'rm ($target)\'"
   # Prune empty directories
-  let parent_directory = $target | path dirname
-  ^ssh $server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($parent_directory)\'"
+  let parent_directory = $target.path | path dirname
+  ^ssh $target.server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($parent_directory)\'"
 }
 
 # Move a file over SSH
@@ -63,31 +113,109 @@ export def "ssh mv" [
   }
 }
 
+# Determine if a path is meant for SSH, i.e. it starts with "server:"
+export def is_ssh_path []: path -> bool {
+  let input = $in
+  if ($input | is-empty) {
+    return false
+  }
+  $input | path split | first | str trim --left --char ":" | str contains ":"
+  # if ($split | length) == 1 {
+  #   $split | first | str trim ":" | str contains ":"
+  # } else {
+  #   $split | first | str trim ":" | str contains ":"
+  # }
+}
+
+# Split an SSH path into the server and path elements
+export def split_ssh_path []: path -> record<server: string, path: path> {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+  let split = $input | path split
+  let server = (
+    $split | first | split row ':' | first
+  )
+  if ($server | is-empty) {
+    return null
+  }
+  let path = $input | str replace ($server + ":") ""
+  if ($path | is-empty) {
+    return null
+  }
+  {
+    server: $server
+    path: $path
+  }
+}
+
 # Copy files over SSH
 export def "scp" [
-  server: string
   destination: path
-  --recursive
-]: path -> nothing {
+]: path -> path {
   let source = $in
-  let target_directory = ($destination | path dirname)
-  if ($target_directory | is-not-empty) {
-    ^ssh $server nu --commands $"\'mkdir ($target_directory)\'"
+  let destination_path_type = (
+    if ($destination | is_ssh_path) {
+      $destination | ssh_path_type
+    } else {
+      $destination | path type
+    }
+  )
+  let destination_directory = (
+    if $destination_path_type == "file" {
+      $destination | path dirname
+    } else {
+      $destination
+    }
+  )
+  if ($destination_directory | is-not-empty) {
+    let ssh_path = $destination | split_ssh_path
+    ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
   }
-  if $recursive {
-    ^scp --recursive $source $"($server):($destination)"
+  let source_path_type = (
+    if ($source | is_ssh_path) {
+      $source | ssh_path_type
+    } else {
+      $source | path type
+    }
+  )
+  if $source_path_type == "dir" {
+    ^scp --recursive $source $destination
   } else {
-    ^scp $source $"($server):($destination)"
+    ^scp $source $destination
   }
+  [$destination ($source | path basename)] | path join
 }
 
 # List files over SSH
 export def "ssh ls" [
-  server: string
   ...args: string
-]: path -> nothing {
-  ^ssh $server nu --commands $"\'ls (...$args) ($in) | to json\'" | from json
+]: path -> table {
+  let input = $in
+  let ssh_path = $input | split_ssh_path
+  ^ssh $ssh_path.server nu --commands $"\'ls (...$args) ($ssh_path.path) | to json\'" | from json
 }
+
+# List files over SSH
+# export def "ssh_list_files_in_archive_with_extensions" [
+#   ...args: string
+# ]: path -> nothing {
+#   let input = $in
+#   let ssh_path = $input | split_ssh_path
+#   (
+#     ^unzip -l $archive
+#     | lines
+#     | drop nth 0 1
+#     | drop 2
+#     | str trim
+#     | parse "{length}  {date} {time}   {name}"
+#     | get name
+#     | uniq
+#     | sort
+#   )
+#   ^ssh $ssh_path.server nu --commands $"\'ls (...$args) ($ssh_path.path) | to json\'" | from json
+# }
 
 # Get the number of pages in a PDF
 export def pdf_page_count []: path -> int {
@@ -987,14 +1115,58 @@ export def title_from_metadata []: record -> string {
   }
 }
 
+# Extract files from a zip archive
+export def unzip [
+  destination: directory
+]: path -> path {
+  let archive = $in
+  let files = $archive | list_files_in_archive
+  ^unzip -q $archive -d $destination
+  $files | par-each {|file|
+    [($destination | path expand) $file] | path join
+  }
+}
+
 # Extract a file from a zip archive
 export def extract_file_from_archive [
-    file: path
-    working_directory: directory # The scratch-space directory to use
+  file: path
+  working_directory: directory # The scratch-space directory to use
 ]: path -> path {
-    let archive = $in
-    ^unzip $archive $file -d $working_directory
-    [$working_directory $file] | path join
+  let archive = $in
+  ^unzip $archive $file -d $working_directory
+  [$working_directory $file] | path join
+}
+
+# Combine a list of audio files into a single M4B file with m4b-tool
+export def merge_into_m4b [
+  output_directory: directory
+]: list<path> -> path {
+  let files = $in
+  let m4b = (
+    {
+      parent: $output_directory
+      stem: ($output_directory | path basename)
+      extension: "m4b"
+    }
+    | path join
+  )
+  # todo do complete and error checking
+  ^m4b-tool merge --jobs ((^nproc | into int) / 2) --no-interaction --output-file $m4b "--" ...$files
+  $m4b
+}
+
+# Decrypt and convert an AAX file from Audible to an M4B file.
+export def decrypt_audible_aax [
+  activation_bytes: string # Audible activation bytes
+  --working-directory: directory
+]: path -> path {
+  let aax = $in
+  let stem = $aax | path parse | get stem
+  let m4b = ({ parent: $working_directory, stem: $stem, extension: "m4b" } | path join)
+  # todo do complete and error checking
+  # ^ffmpeg -activation_bytes $activation_bytes -i $aax -c copy $m4b
+  ^ffmpeg -activation_bytes $activation_bytes -i $aax -c:a copy -vn $m4b
+  $m4b
 }
 
 # Extract the ComicInfo.xml file from an archive
@@ -1435,35 +1607,37 @@ export def comic_file_name_from_metadata [
 
 # List the files in a zip archive
 export def list_files_in_archive []: path -> list<path> {
-    let archive = $in
-    (
-      ^unzip -l $archive
-      | lines
-      | drop nth 0 1
-      | drop 2
-      | str trim
-      | parse "{length}  {date} {time}   {name}"
-      | get name
-      | uniq
-      | sort
-    )
+  let archive = $in
+  (
+    ^unzip -l $archive
+    | lines
+    | drop nth 0 1
+    | drop 2
+    | str trim
+    | parse "{length}  {date} {time}   {name}"
+    | get name
+    | uniq
+    | sort
+  )
 }
 
 # List the image files in a zip archive
-export def list_image_files_in_archive []: path -> list<path> {
-    let archive = $in
-    (
-      $archive
-        | list_files_in_archive
-        | path parse
-        | where extension in $image_extensions
-        | path join
-    )
+export def list_files_in_archive_with_extensions [
+  extensions: list<string>
+]: path -> list<path> {
+  let archive = $in
+  (
+    $archive
+    | list_files_in_archive
+    | path parse
+    | where extension in $extensions
+    | path join
+  )
 }
 
 # Get the image extension used in a comic book archive
 export def get_image_extension []: path -> string {
-    let cbz = $in
+  let cbz = $in
     let file_extensions = (
         $cbz
         | list_image_files_in_archive
@@ -4372,8 +4546,6 @@ export def filter_musicbrainz_releases [
 # When an audiobook consists of multiple files, the caller must order the files correctly when the track number tag is missing and MusicBrainz Recording IDs can't be determined via AcoustID or embedded tags.
 # I might add logic here in the future to allow ordering recordings based on the natural order of the titles, but track number is usually embedded.
 export def tag_audiobook [
-  audiobook_files: list<path>
-  client_key: string # The application API key for the AcoustID server
   working_directory: directory
   ignore_embedded_acoustid_fingerprints = false # Recalculate AcoustID fingerprints for all files
   ignore_embedded_musicbrainz_ids = false # Ignore existing MusicBrainz IDs embedded in the files
@@ -4381,12 +4553,14 @@ export def tag_audiobook [
   --search-score-threshold: int = 100 # An int value between zero and one hundred, the minimum score required to be considered a match when searching MusicBrainz
   --max-track-duration-difference: duration = 3sec # The maximum allowable difference between track durations
   --acoustid-score-threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match when searching AcoustID fingerprints
+  --acoustid-client-key: string # The application API key for the AcoustID server
   --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
   --musicbrainz-release-id: string = "" # The MusicBrainz Release ID associated with the release
   --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
-]: nothing -> record<book: record, tracks: table> {
+]: list<path> -> record<book: record, tracks: table> {
+  let audiobook_files = $in
   if ($audiobook_files | is-empty) {
     log error "No audiobook files provided!"
     return null
@@ -4419,7 +4593,7 @@ export def tag_audiobook [
             }
           )
         ) {
-          let retrieved = $metadata | get_musicbrainz_ids_by_acoustid $client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $acoustid_score_threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
+          let retrieved = $metadata | get_musicbrainz_ids_by_acoustid $acoustid_client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $acoustid_score_threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
           if ($retrieved | is-empty) {
             $metadata
           } else {
@@ -4448,7 +4622,7 @@ export def tag_audiobook [
               log error $"Found over 20 matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
               $metadata
             } else if ($release_candidates | length) == 1 {
-              let release_candidate = $release_candidates.id | first | get id
+              let release_candidate = $release_candidates.id | first
               log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset)"
               $metadata | upsert book.musicbrainz_release_id $release_candidate
             } else {
@@ -4524,7 +4698,7 @@ export def tag_audiobook [
       $tracks
       | select musicbrainz_recording_id duration acoustid_fingerprint
       | rename musicbrainz_recording_id duration fingerprint
-      | submit_acoustid_fingerprints $client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
+      | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
     )
     if ($acoustid_submissions | is-not-empty) {
       log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
@@ -4855,7 +5029,7 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
       }
     )
     # Remove all sort fields
-    | tone_tag_tracks $working_directory "--taggers" 'remove,*' "--meta-remove-property" "sortalbum" "--meta-remove-property" "sorttitle" "--meta-remove-property" "sortalbumartist" "--meta-remove-property" "sortartist" "--meta-remove-property" "sortcomposer" "--meta-cover-file" $front_cover
+    | tone_tag_tracks $working_directory "--taggers" 'remove,*' "--meta-remove-property" "sortalbum" "--meta-remove-property" "sorttitle" "--meta-remove-property" "sortalbumartist" "--meta-remove-property" "sortartist" "--meta-remove-property" "sortcomposer" "--meta-remove-property" "EmbeddedPictures" "--meta-cover-file" $front_cover
   )
 
   # Clean up
@@ -5091,18 +5265,22 @@ export def search_for_musicbrainz_release [
 
   let query = (
     if ($artists | is-not-empty) {
-      $query + $artists | get --ignore-errors id | reduce {|it, acc|
-        $acc + $" AND arid:\"($it | escape_special_lucene_characters)\""
-      }
+      $query + (
+        $artists | get --ignore-errors id | reduce {|it, acc|
+          $acc + $" AND arid:\"($it | escape_special_lucene_characters)\""
+        }
+      )
     } else {
       $query
     }
   )
   let query = (
     if ($artists | is-not-empty) {
-      $query + $artists | get --ignore-errors name | reduce {|it, acc|
-        $acc + $" AND artistname:\"($it | escape_special_lucene_characters)\""
-      }
+      $query + (
+        $artists | get --ignore-errors name | reduce {|it, acc|
+          $acc + $" AND artistname:\"($it | escape_special_lucene_characters)\""
+        }
+      )
     } else {
       $query
     }
