@@ -25,6 +25,24 @@ export const image_extensions = [
   webp
 ]
 
+# todo Write a test
+export def has_bad_video_stream []: record<streams: table, format: record> -> bool {
+  let ffprobe_output = $in
+  if ($ffprobe_output | is-empty) {
+    return false
+  }
+  let streams = $ffprobe_output | get --ignore-errors streams
+  if ($streams | is-empty) {
+    return false
+  }
+  let video_streams = $streams | where codec_type == "video"
+  if ($video_streams | is-empty) {
+    return false
+  }
+  # The problematic video streams have default disposition set to 1 instead of attached_pic
+  $video_streams | where disposition.default.attached_pic == 0 | is-not-empty
+}
+
 export def remove_video_stream [
   output_file: path = ""
 ]: path -> path {

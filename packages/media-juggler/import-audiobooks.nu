@@ -241,7 +241,19 @@ def main [
       }
       $audiobook | update files $files
     } else {
-      $audiobook
+      if ($audiobook.files | first | path parse | get extension) == "m4b" {
+        # Check for weird embedded video stream that needs removed
+        let files = $audiobook.files | each {|file|
+          if ($file | ffprobe | has_bad_video_stream) {
+            $file | remove_video_stream
+          } else {
+            $file
+          }
+        }
+        $audiobook | update files $files
+      } else {
+        $audiobook
+      }
     }
   )
 
