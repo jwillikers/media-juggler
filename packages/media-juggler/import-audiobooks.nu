@@ -487,7 +487,7 @@ def main [
   if ($target_destination | is_ssh_path) {
     log info $"Uploading (ansi yellow)($audiobook.file)(ansi reset) to (ansi yellow)($target_destination)(ansi reset)"
     # log info $"ls: (ls $audiobook.file)";
-    $audiobook.file | scp $target_destination
+    $audiobook.file | rsync $target_destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
   } else {
     mkdir ($target_destination | path dirname)
     mv $audiobook.file $target_destination
