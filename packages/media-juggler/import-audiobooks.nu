@@ -197,10 +197,21 @@ def main [
   let audiobook = $audiobook | update files (
     if ($audiobook.files | first | is_ssh_path) {
       $audiobook.files | each {|file|
+        mkdir ([$temporary_directory "downloads"] | path join)
         $file | scp ([$temporary_directory "downloads" ($file | path basename)] | path join)
       }
     } else {
-      $audiobook.files
+      # Copy to temp directory to avoid modifying the original file
+      $audiobook.files | each {|file|
+        if ($file | path parse | get extension) == "zip" {
+          $file
+        } else {
+          let new_file = [$temporary_directory "downloads" ($file | path basename)] | path join
+          mkdir ($new_file | path dirname)
+          cp $file $new_file
+          $new_file
+        }
+      }
     }
   )
 
