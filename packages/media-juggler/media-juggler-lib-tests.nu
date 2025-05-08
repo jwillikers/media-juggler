@@ -3439,6 +3439,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_aax []: {
   let expected = {
     audio_codec: "aac"
     container: "mov,mp4,m4a,3gp,3g2,mj2"
+    audio_channel_layout: null
   }
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
@@ -3448,6 +3449,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_flac []: {
   let expected = {
     audio_codec: "flac"
     container: "flac"
+    audio_channel_layout: "stereo"
   }
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
@@ -3457,6 +3459,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_m4b_aac []: {
   let expected = {
     audio_codec: "aac"
     container: "mov,mp4,m4a,3gp,3g2,mj2"
+    audio_channel_layout: "mono"
   }
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
@@ -3466,6 +3469,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_mp3 []: {
   let expected = {
     audio_codec: "mp3"
     container: "mp3"
+    audio_channel_layout: "mono"
   }
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
@@ -3475,6 +3479,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_oga_flac []: {
   let expected = {
     audio_codec: "flac"
     container: "ogg"
+    audio_channel_layout: "stereo"
   }
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
@@ -3484,6 +3489,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_opus []: {
   let expected = {
     audio_codec: "opus"
     container: "ogg"
+    audio_channel_layout: "stereo"
   }
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
@@ -3493,6 +3499,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_wav []: {
   let expected = {
     audio_codec: "pcm_s16le"
     container: "wav"
+    audio_channel_layout: null
   }
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }

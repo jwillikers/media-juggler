@@ -47,7 +47,7 @@ export def remove_video_stream [
 }
 
 # Parse the container and audio codec from ffprobe's output
-export def parse_container_and_audio_codec_from_ffprobe_output []: record<streams: table, format: record> -> record<audio_codec: string, container: string> {
+export def parse_container_and_audio_codec_from_ffprobe_output []: record<streams: table, format: record> -> record<audio_codec: string, container: string, audio_channel_layout: string> {
   let ffprobe_output = $in
   if ($ffprobe_output | is-empty) {
     log error "No ffprobe output"
@@ -80,6 +80,7 @@ export def parse_container_and_audio_codec_from_ffprobe_output []: record<stream
   {
     container: $format.format_name
     audio_codec: $audio_stream.codec_name
+    audio_channel_layout: ($audio_stream | get --ignore-errors channel_layout)
   }
 }
 
@@ -253,7 +254,7 @@ export def "scp" [
     }
   )
   if ($destination_directory | is-not-empty) {
-    let ssh_path = $destination | split_ssh_path
+    let ssh_path = $destination_directory | split_ssh_path
     ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
   }
   let source_path_type = (
@@ -1225,16 +1226,16 @@ export def merge_into_m4b [
   output_directory: directory
   ...args: string
   --audio-format: string = "m4b" # Use "opus" for opus-encoded audio and "oga" for lossless encoded audio, i.e. wav / flac.
-  # --audio-extension: string = "opus" # Use "opus" for opus-encoded audio and "oga" for lossless encoded audio, i.e. wav / flac.
+  --audio-extension: string = "m4b"
   # --audio-bitrate: string = "128k" # Use "opus" for opus-encoded audio and "oga" for lossless encoded audio, i.e. wav / flac.
   # --audio-codec: string = "opus" # Use "opus" for opus-encoded audio and "flac" for lossless encoded audio
 ]: list<path> -> path {
   let files = $in
-  let m4b = (
+  let output_file = (
     {
       parent: $output_directory
       stem: ($output_directory | path basename)
-      extension: "m4b"
+      extension: $audio_extension
     }
     | path join
   )
@@ -1242,14 +1243,15 @@ export def merge_into_m4b [
   (
     ^m4b-tool merge
     --audio-format $audio_format
+    --audio-extension $audio_extension
     --jobs ((^nproc | into int) / 2)
     --no-interaction
-    --output-file $m4b
+    --output-file $output_file
     ...$args
     "--"
     ...$files
   )
-  $m4b
+  $output_file
 }
 
 # Decrypt and convert an AAX file from Audible to an M4B file.
@@ -3448,6 +3450,30 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
   let parent_series = $parent_series_relations.series | select id name
   $series | upsert parent_series $parent_series
 }
+
+# Organize series into a hierarchy based on subseries relationships
+#
+# Parent series are at the top of the hierarchy.
+# Subseries are nested under their parent series.
+# Series are sorted by name when multiple are at the same tier.
+# export def organize_subseries []: table<id: string, name: string, index: string, parent_series: table<id: string, name: string>> -> table {
+#   let series = $in
+#   # This requires recursion
+#   # Base-case: No parent series are left
+#   if ($series | all {|s| $s | get --ignore-errors parent_series | is-empty}) {
+#     return $series
+#   }
+
+#   $series | each {|s|
+#     {
+#       id: $s.id
+#       name: $s.name
+#       index: $s.index
+#       children_series:
+#     }
+#     $s.parent_series | organize_subseries
+#   }
+# }
 
 # Parse the ASIN out of an Audible URL
 export def parse_audible_asin_from_url []: string -> string {

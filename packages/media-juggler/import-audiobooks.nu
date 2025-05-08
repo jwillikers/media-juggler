@@ -57,6 +57,8 @@ def main [
   --preferred-mp3-container: string = "m4b" # The preferred container for mp3 files. Can be either mp3 or m4b.
   --preferred-container: string = "ogg" # The preferred container for the output audio. Use either m4b or ogg.
   --tone-tag-args: list<string> = [] # Additional arguments to pass to the tone tag command
+  --transcode-bitrate: string = "" # The bitrate to use when transcoding audio. For opus, it defaults to 24k for mono and 32k for stereo recordings. For further details, see here: https://wiki.xiph.org/Opus_Recommended_Settings
+  --delay-between-imports: duration = 1min # When importing multiple books, pause for this amount between imports. This reduces load on various endpoints by spreading out workload over time. For metadata refreshes, this should probably be increased to as large a delay as you can tolerate.
 ] {
   if ($items | is-empty) {
     log error "No files provided"
@@ -247,6 +249,7 @@ def main [
         $audiobook
         | insert audio_codec $audio_codec_and_container.audio_codec
         | insert container $audio_codec_and_container.container
+        | insert audio_channel_layout $audio_codec_and_container.audio_channel_layout
       )
     } else {
       return {audiobook: $audiobook.directory, error: $"Not all audio files for the audiobook are of the same container and audio codec: ($audio_files). Skipping."}
@@ -321,6 +324,23 @@ def main [
               ["-c:a" $ffmpeg_audio_encoder]
             }
           )
+          | append (
+            if $audiobook.target.audio_codec == "opus" and $audiobook.audio_codec != $audiobook.target.audio_codec {
+              if ($transcode_bitrate | is-empty) {
+                if $audiobook.audio_channel_layout == "mono" {
+                  ["-b:a" "24k"]
+                } else if $audiobook.audio_channel_layout == "stereo" {
+                  ["-b:a" "32k"]
+                } else {
+                  # Not sure, so just use variable, which is the default
+                }
+              } else {
+                if $transcode_bitrate != "variable" {
+                  ["-b:a" $transcode_bitrate]
+                }
+              }
+            }
+          )
         )
         ^ffmpeg -i $audiobook_file ...$ffmpeg_args $output_file
         $audiobook | update files [$output_file]
@@ -335,7 +355,7 @@ def main [
         }
       )
       let ffmpeg_audio_encoder = (
-        if $audiobook.codec == $audiobook.target.audio_codec {
+        if $audiobook.audio_codec == $audiobook.target.audio_codec {
           "copy"
         } else if $audiobook.target.audio_codec == "opus" {
           "libopus"
@@ -351,14 +371,31 @@ def main [
       )
       let m4b_tool_args = (
         [
-          "--audio-extension" $audiobook.target.file_extension
           "--audio-codec" $ffmpeg_audio_encoder
         ]
+        | append (
+          if $audiobook.target.audio_codec == "opus" and $audiobook.audio_codec != $audiobook.target.audio_codec {
+            if ($transcode_bitrate | is-empty) {
+              if $audiobook.audio_channel_layout == "mono" {
+                ["--audio-bitrate" "24k"]
+              } else if $audiobook.audio_channel_layout == "stereo" {
+                ["--audio-bitrate" "32k"]
+              } else {
+                # Not sure, so just use variable, which is the default
+              }
+            } else {
+              if $transcode_bitrate != "variable" {
+                ["--audio-bitrate" $transcode_bitrate]
+              }
+            }
+          }
+        )
       )
       $audiobook | update files (
         $audiobook.files | (
           merge_into_m4b $temporary_directory
           --audio-format $m4b_tool_audio_format
+          --audio-extension $audiobook.target.file_extension
           ...$m4b_tool_args
         )
       )
@@ -454,6 +491,6 @@ def main [
   #     log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
   #     continue
   # }
-
+    sleep $delay_between_imports
   }
 }
