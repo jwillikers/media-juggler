@@ -132,16 +132,14 @@ def main [
             }
           )
           let server = $item | split_ssh_path | get server
+          # todo Probably need to glob here too
           $item | ssh ls | where type == "file" | get name | each {|file| $"($server):($file)"}
         } else {
-          let item = (
-            if $item_type == "dir" {
-              $"($item)/**/*"
-            } else {
-              $item
-            }
-          )
-          ls ($item | path expand) | where type == file | get name
+          if $item_type == "dir" {
+            glob --no-dir (($item | path expand | str replace ":" "\\:") + "/**/*")
+          } else {
+            [($item | path expand)]
+          }
         }
       )
       if ($files | is-empty) {
