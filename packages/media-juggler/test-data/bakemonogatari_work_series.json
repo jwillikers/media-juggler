@@ -1,0 +1,30 @@
+{
+  "name": "Bakemonogatari",
+  "relations": [
+    {
+      "type": "subseries",
+      "series": {
+        "name": "Monogatari Series: First Season",
+        "type": "Work series",
+        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+        "disambiguation": "light novel, English",
+        "id": "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+      },
+      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
+      "ended": false,
+      "attributes": [],
+      "direction": "backward",
+      "end": null,
+      "target-credit": "",
+      "attribute-ids": {},
+      "begin": null,
+      "attribute-values": {},
+      "target-type": "series",
+      "source-credit": ""
+    }
+  ],
+  "type": "Work series",
+  "disambiguation": "light novel, English",
+  "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+  "id": "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+}

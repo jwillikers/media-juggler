@@ -3507,6 +3507,45 @@ def test_parse_container_and_audio_codec_from_ffprobe_output []: {
   test_parse_container_and_audio_codec_from_ffprobe_output_wav
 }
 
+def test_parse_musicbrainz_series_monogatari_work []: {
+  let input = open ([$test_data_dir "monogatari_work_series.json"] | path join)
+  let expected = {
+    id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+    name: "Monogatari"
+    parent_series: []
+  }
+  assert equal ($input | parse_musicbrainz_series) $expected
+}
+
+def test_parse_musicbrainz_series_monogatari_first_season_work []: {
+  let input = open ([$test_data_dir "monogatari_first_season_work_series.json"] | path join)
+  let expected = {
+    id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+    name: "Monogatari Series: First Season"
+    parent_series: [[id name]; ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]]
+  }
+  assert equal ($input | parse_musicbrainz_series) $expected
+}
+
+def test_parse_musicbrainz_series_bakemonogatari_work []: {
+  let input = open ([$test_data_dir "bakemonogatari_work_series.json"] | path join)
+  let expected = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name];
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+    ]
+  }
+  assert equal ($input | parse_musicbrainz_series) $expected
+}
+
+def test_parse_musicbrainz_series []: {
+  test_parse_musicbrainz_series_monogatari_work
+  test_parse_musicbrainz_series_monogatari_first_season_work
+  test_parse_musicbrainz_series_bakemonogatari_work
+}
+
 def main []: {
   test_upsert_if_present
   test_upsert_if_value
@@ -3543,5 +3582,6 @@ def main []: {
   # todo test_is_ssh_path
   # todo test_split_ssh_path
   test_parse_container_and_audio_codec_from_ffprobe_output
+  test_parse_musicbrainz_series
   echo "All tests passed!"
 }

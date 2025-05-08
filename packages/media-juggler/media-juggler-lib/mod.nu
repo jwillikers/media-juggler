@@ -3431,6 +3431,7 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
   let series = {
     id: $input.id
     name: $input.name
+    parent_series: []
   }
   let relations = $input | get --ignore-errors relations
   if ($relations | is-empty) {
@@ -3445,7 +3446,7 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
     return $series
   }
   let parent_series = $parent_series_relations.series | select id name
-  $series | insert parent_series $parent_series
+  $series | upsert parent_series $parent_series
 }
 
 # Parse the ASIN out of an Audible URL
