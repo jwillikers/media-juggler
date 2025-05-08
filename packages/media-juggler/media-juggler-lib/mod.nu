@@ -36,7 +36,7 @@ export def remove_video_stream [
       $output_file
     }
   )
-  log info $"the_output_file: ($the_output_file)"
+  # log info $"the_output_file: ($the_output_file)"
   ^ffmpeg -y -i $input_file -codec:a copy -vn $the_output_file
   if ($output_file | is-empty) {
     mv $the_output_file $input_file
@@ -239,24 +239,6 @@ export def "scp" [
   destination: path
 ]: path -> path {
   let source = $in
-  let destination_path_type = (
-    if ($destination | is_ssh_path) {
-      $destination | ssh_path_type
-    } else {
-      $destination | path type
-    }
-  )
-  let destination_directory = (
-    if $destination_path_type == "file" {
-      $destination | path dirname
-    } else {
-      $destination
-    }
-  )
-  if ($destination_directory | is-not-empty) {
-    let ssh_path = $destination_directory | split_ssh_path
-    ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
-  }
   let source_path_type = (
     if ($source | is_ssh_path) {
       $source | ssh_path_type
@@ -264,6 +246,8 @@ export def "scp" [
       $source | path type
     }
   )
+  let ssh_path = $destination | path dirname | split_ssh_path
+  ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
   if $source_path_type == "dir" {
     ^scp --recursive $source $destination
   } else {
@@ -3067,11 +3051,12 @@ export def into_tone_format []: record -> record {
       $metadata.book.publication_date | format date '%Y-%m-%dT%H:%M:%SZ'
     }
   )
-  let chapters = (
-    if "chapters" in $metadata.book and ($metadata.book.chapters | is-not-empty) {
-      $metadata.book.chapters | chapters_into_tone_format
-    }
-  )
+  # Use chapters.txt file instead of using the chapters metadata
+  # let chapters = (
+  #   if "chapters" in $metadata.book and ($metadata.book.chapters | is-not-empty) {
+  #     $metadata.book.chapters | chapters_into_tone_format
+  #   }
+  # )
   let primary_authors = (
     if "contributors" in $metadata.book and ($metadata.book.contributors | is-not-empty) {
       $metadata.book.contributors | where entity == "artist" | where role == "primary author"
@@ -3207,8 +3192,9 @@ export def into_tone_format []: record -> record {
       )
       | upsert_if_present lyrics $metadata.track
       | upsert_if_present rating $metadata.track
-      | upsert_if_value chapters $chapters
-      | upsert_if_present embeddedPictures $metadata.track embedded_pictures
+      # | upsert_if_value chapters $chapters
+      # Use cover from file instead
+      # | upsert_if_present embeddedPictures $metadata.track embedded_pictures
       | upsert_if_present discNumber $metadata.track disc_number
       | upsert_if_present discSubtitle $metadata.track disc_subtitle
       | upsert_if_present media $metadata.track
@@ -4973,7 +4959,7 @@ export def tag_audiobook [
         }
       }
     )
-    log info $"tracks: ($tracks)"
+    # log info $"tracks: ($tracks)"
     if ($tracks | is-empty) {
       log info "No AcoustID fingerprints will be submitted since tracks already had corresponding AcoustID fingerprints and MusicBrainz Recording IDs embedded in their metadata."
     } else {
@@ -5024,6 +5010,14 @@ export def chapters_into_tone_format []: table<index: int, start: duration, leng
       # To make Tone's output nicer
       | insert subtitle ""
     )
+  }
+}
+
+# Convert chapters to the chapters.txt format used by tone.
+export def chapters_into_chapters_txt_format []: table<index: int, start: duration, length: duration, title: string> -> table<string> {
+  $in | each {|chapter|
+    let offset = $chapter.start | format_chapter_duration
+    $"($offset) ($chapter.title)"
   }
 }
 
@@ -5291,16 +5285,24 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
   }
 
   let chapters = (
-    if "chapters" not-in $metadata or ($metadata.chapters | is-empty) {
+    if ($metadata | get --ignore-errors chapters | is-empty) {
       $metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
+    } else {
+      $metadata.chapters
     }
   )
+  # log info $"Chapters: ($chapters)"
 
   let front_cover = (
     if "front_cover_available" in $metadata.book and $metadata.book.front_cover_available {
       $metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
     }
   )
+
+  let chapters_file = mktemp --suffix ".txt" --tmpdir
+  if ($chapters | is-not-empty) {
+    $chapters | chapters_into_chapters_txt_format | save --force $chapters_file
+  }
 
   let files = (
     $metadata
@@ -5313,13 +5315,25 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
         $input
       }
     )
-    # Remove all sort fields
-    | tone_tag_tracks $working_directory "--taggers" 'remove,*' "--meta-remove-property" "sortalbum" "--meta-remove-property" "sorttitle" "--meta-remove-property" "sortalbumartist" "--meta-remove-property" "sortartist" "--meta-remove-property" "sortcomposer" "--meta-remove-property" "EmbeddedPictures" "--meta-remove-property" "comment" "--meta-cover-file" $front_cover
+    | (
+      tone_tag_tracks $working_directory
+      "--taggers" 'remove,*'
+      # Remove all sort fields
+      "--meta-remove-property" "sortalbum"
+      "--meta-remove-property" "sorttitle"
+      "--meta-remove-property" "sortalbumartist"
+      "--meta-remove-property" "sortartist"
+      "--meta-remove-property" "sortcomposer"
+      "--meta-remove-property" "EmbeddedPictures"
+      "--meta-remove-property" "comment"
+      "--meta-cover-file" $front_cover
+      "--meta-chapters-file" $chapters_file
+    )
   )
 
   # Clean up
   if ($front_cover | is-not-empty) {
-    rm $front_cover
+    rm $front_cover $chapters_file
   }
 
   $files
@@ -5423,24 +5437,26 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   # log info $"tracks: ($tracks)"
   let musicbrainz_metadata = $musicbrainz_metadata | upsert tracks $tracks
 
-  let musicbrainz_metadata = (
-    let chapters = (
-      if "chapters" not-in $musicbrainz_metadata.book or ($musicbrainz_metadata.book.chapters | is-empty) {
-        let chapters = $musicbrainz_metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
-        if ($chapters | is-not-empty) {
-          $chapters
-        } else {
-          if "chapters" in $existing_metadata.book and ($existing_metadata.book.chapters | is-not-empty) {
-            # todo Should probably add flag to select whether to lookup or reuse existing chapters
-            $existing_metadata.book.chapters
-          }
+  let chapters = (
+    if "chapters" not-in $musicbrainz_metadata.book or ($musicbrainz_metadata.book.chapters | is-empty) {
+      let chapters = $musicbrainz_metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
+      if ($chapters | is-not-empty) {
+        $chapters
+      } else {
+        if "chapters" in $existing_metadata.book and ($existing_metadata.book.chapters | is-not-empty) {
+          # todo Should probably add flag to select whether to lookup or reuse existing chapters
+          $existing_metadata.book.chapters
         }
       }
-    );
+    }
+  )
+
+  let chapters_file = (
     if ($chapters | is-not-empty) {
-      $musicbrainz_metadata | upsert book.chapters $chapters
-    } else {
-      $musicbrainz_metadata
+      let chapters_file = mktemp --suffix ".txt" --tmpdir
+      $chapters | chapters_into_chapters_txt_format | save --force $chapters_file
+      $chapters_file
+      # log info $"Chapters: (open $chapters_file)"
     }
   )
 
@@ -5450,15 +5466,39 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     }
   )
 
+  let tone_args = (
+    [
+      "--taggers" 'remove,*'
+      # Remove all sort fields
+      "--meta-remove-property" "sortalbum"
+      "--meta-remove-property" "sorttitle"
+      "--meta-remove-property" "sortalbumartist"
+      "--meta-remove-property" "sortartist"
+      "--meta-remove-property" "sortcomposer"
+      "--meta-remove-property" "comment"
+    ]
+    | append (
+      if ($front_cover | is-not-empty) {
+        ["--meta-remove-property" "EmbeddedPictures" "--meta-cover-file" $front_cover]
+      }
+    )
+    | append (
+      if ($chapters_file | is-not-empty) {
+        ["--meta-chapters-file" $chapters_file]
+      }
+    )
+  )
+
   let files = (
-    $musicbrainz_metadata
-    # Remove all sort fields
-    | tone_tag_tracks $working_directory "--taggers" 'remove,*' "--meta-remove-property" "sortalbum" "--meta-remove-property" "sorttitle" "--meta-remove-property" "sortalbumartist" "--meta-remove-property" "sortartist" "--meta-remove-property" "sortcomposer" "--meta-cover-file" $front_cover
+    $musicbrainz_metadata | tone_tag_tracks $working_directory ...$tone_args
   )
 
   # Clean up
   if ($front_cover | is-not-empty) {
     rm $front_cover
+  }
+  if ($chapters_file | is-not-empty) {
+    rm $chapters_file
   }
 
   $musicbrainz_metadata
@@ -5640,11 +5680,11 @@ export def search_for_musicbrainz_release [
   )
   # todo discids, discidsmedium, and tracksmedium?
 
-  log info $"query: ($query)"
+  log debug $"query: ($query)"
 
   let query = $query | url encode
 
-  log info $"request: http get --full --headers [User-Agent ($user_agent) Accept \"application/json\"] ($url)?query=($query)"
+  log debug $"request: http get --full --headers [User-Agent ($user_agent) Accept \"application/json\"] ($url)?query=($query)"
 
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)?query=($query)"}
   let response = (

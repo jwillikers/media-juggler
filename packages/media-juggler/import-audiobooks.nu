@@ -123,7 +123,7 @@ def main [
       )
       let files = (
         if ($item | is_ssh_path) {
-          log info $"is_ssh_path: true for ($item)"
+          # log info $"is_ssh_path: true for ($item)"
           let item = (
             if $item_type == "dir" {
               $"($item)/**/*"
@@ -419,6 +419,7 @@ def main [
     return {audiobook: $audiobook.directory error: $"Missing contributors for the audiobook (ansi yellow)($audiobook.directory)(ansi clear)"}
   }
 
+  # todo Handle multiple output files, naming tracks appropriately with the index prefix as necessary
   let audiobook = $audiobook | insert file {|a| $a.files | first}
 
   # Rename M4B file using the title of the audiobook
@@ -462,6 +463,7 @@ def main [
 
   if ($target_destination | is_ssh_path) {
     log info $"Uploading (ansi yellow)($audiobook.file)(ansi reset) to (ansi yellow)($target_destination)(ansi reset)"
+    # log info $"ls: (ls $audiobook.file)";
     $audiobook.file | scp $target_destination
   } else {
     mkdir ($target_destination | path dirname)
