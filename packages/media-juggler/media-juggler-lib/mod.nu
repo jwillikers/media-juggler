@@ -5314,7 +5314,7 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
       }
     )
     # Remove all sort fields
-    | tone_tag_tracks $working_directory "--taggers" 'remove,*' "--meta-remove-property" "sortalbum" "--meta-remove-property" "sorttitle" "--meta-remove-property" "sortalbumartist" "--meta-remove-property" "sortartist" "--meta-remove-property" "sortcomposer" "--meta-remove-property" "EmbeddedPictures" "--meta-cover-file" $front_cover
+    | tone_tag_tracks $working_directory "--taggers" 'remove,*' "--meta-remove-property" "sortalbum" "--meta-remove-property" "sorttitle" "--meta-remove-property" "sortalbumartist" "--meta-remove-property" "sortartist" "--meta-remove-property" "sortcomposer" "--meta-remove-property" "EmbeddedPictures" "--meta-remove-property" "comment" "--meta-cover-file" $front_cover
   )
 
   # Clean up
