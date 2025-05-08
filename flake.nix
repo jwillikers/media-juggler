@@ -2,8 +2,7 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     m4b-tool = {
-      # url = "github:sandreas/m4b-tool";
-      url = "github:jwillikers/m4b-tool/jwillikers";
+      url = "github:sandreas/m4b-tool";
       inputs = {
         flake-utils.follows = "flake-utils";
         nixpkgs.follows = "nixpkgs";

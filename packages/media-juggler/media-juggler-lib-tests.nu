@@ -3434,6 +3434,79 @@ def test_filter_musicbrainz_releases []: {
   test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations
 }
 
+def test_parse_container_and_audio_codec_from_ffprobe_output_aax []: {
+  let input = open ([$test_data_dir "ffprobe_output_aax.json"] | path join)
+  let expected = {
+    audio_codec: "aac"
+    container: "mov,mp4,m4a,3gp,3g2,mj2"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_flac []: {
+  let input = open ([$test_data_dir "ffprobe_output_flac.json"] | path join)
+  let expected = {
+    audio_codec: "flac"
+    container: "flac"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_m4b_aac []: {
+  let input = open ([$test_data_dir "ffprobe_output_m4b_aac.json"] | path join)
+  let expected = {
+    audio_codec: "aac"
+    container: "mov,mp4,m4a,3gp,3g2,mj2"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_mp3 []: {
+  let input = open ([$test_data_dir "ffprobe_output_mp3.json"] | path join)
+  let expected = {
+    audio_codec: "mp3"
+    container: "mp3"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_oga_flac []: {
+  let input = open ([$test_data_dir "ffprobe_output_oga_flac.json"] | path join)
+  let expected = {
+    audio_codec: "flac"
+    container: "ogg"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_opus []: {
+  let input = open ([$test_data_dir "ffprobe_output_opus.json"] | path join)
+  let expected = {
+    audio_codec: "opus"
+    container: "ogg"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_wav []: {
+  let input = open ([$test_data_dir "ffprobe_output_wav.json"] | path join)
+  let expected = {
+    audio_codec: "pcm_s16le"
+    container: "wav"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output []: {
+  test_parse_container_and_audio_codec_from_ffprobe_output_aax
+  test_parse_container_and_audio_codec_from_ffprobe_output_flac
+  test_parse_container_and_audio_codec_from_ffprobe_output_m4b_aac
+  test_parse_container_and_audio_codec_from_ffprobe_output_mp3
+  test_parse_container_and_audio_codec_from_ffprobe_output_oga_flac
+  test_parse_container_and_audio_codec_from_ffprobe_output_opus
+  test_parse_container_and_audio_codec_from_ffprobe_output_wav
+}
+
 def main []: {
   test_upsert_if_present
   test_upsert_if_value
@@ -3467,5 +3540,8 @@ def main []: {
   # todo test_append_to_musicbrainz_query
   test_filter_musicbrainz_chapters_releases
   test_filter_musicbrainz_releases
+  # todo test_is_ssh_path
+  # todo test_split_ssh_path
+  test_parse_container_and_audio_codec_from_ffprobe_output
   echo "All tests passed!"
 }

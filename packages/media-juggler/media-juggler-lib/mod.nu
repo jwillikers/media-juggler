@@ -46,10 +46,93 @@ export def remove_video_stream [
   }
 }
 
-export def ffprobe []: path -> record {
-  ^ffprobe -v quiet -print_format json -show_format -show_streams $in | from json
+# Parse the container and audio codec from ffprobe's output
+export def parse_container_and_audio_codec_from_ffprobe_output []: record<streams: table, format: record> -> record<audio_codec: string, container: string> {
+  let ffprobe_output = $in
+  if ($ffprobe_output | is-empty) {
+    log error "No ffprobe output"
+    return null
+  }
+  let streams = $ffprobe_output | get --ignore-errors streams
+  if ($streams | is-empty) {
+    log error "Missing streams in ffprobe output"
+    return null
+  }
+  let audio_streams = $streams | where codec_type == "audio"
+  if ($audio_streams | is-empty) {
+    log error "No audio stream in ffprobe output"
+    return null
+  }
+  if ($audio_streams | length) > 1 {
+    log error $"The ffprobe output contains ($audio_streams | length) audio streams. Unsure what to do when there is more than one audio stream."
+    return null
+  }
+  let audio_stream = $audio_streams | first
+  if "codec_name" not-in $audio_stream {
+    log error "The ffprobe audio stream is missing the codec_name"
+    return null
+  }
+  let format = $ffprobe_output | get --ignore-errors format;
+  if ($format | is-empty) {
+    log error "The ffprobe output is missing the format field"
+    return null
+  }
+  {
+    container: $format.format_name
+    audio_codec: $audio_stream.codec_name
+  }
 }
 
+# Parse the output from the ffprobe command
+export def parse_ffprobe_output []: record<streams: table, format: record> -> record<audio_streams: table, video_streams: table, format: record<format_name: string, format_long_name: string>> {
+  let ffprobe_output = $in
+  let streams = $ffprobe_output | get --ignore-errors streams
+  if ($streams | is-empty) {
+    log error "Missing streams in ffprobe output"
+    return null
+  }
+  let audio_streams = (
+    let audio_streams = $streams | where codec_type == "audio";
+    if ($audio_streams | is-empty) {
+      []
+    } else {
+      $audio_streams
+      | select codec_name codec_long_name profile codec_tag_string sample_fmt sample_rate channels channel_layout time_base duration bit_rate nb_frames
+      | update duration {|audio_stream| $audio_stream.duration | into duration --unit sec}
+    }
+  )
+  let video_streams = (
+    let video_streams = $streams | where codec_type == "video";
+    if ($video_streams | is-empty) {
+      []
+    } else {
+      $video_streams
+      | select codec_name codec_long_name codec_type codec_tag_string width height coded_width coded_height pix_fmt color_range color_space
+    }
+  )
+  let format = (
+    let format = $ffprobe_output | get --ignore-errors format;
+    if ($format | is-empty) {
+      {}
+    } else {
+      $format | select format_name format_long_name
+    }
+  )
+  {
+    audio_streams: $audio_streams
+    video_streams: $video_streams
+    format: $format
+  }
+}
+
+# Get the audio data for a file using the ffprobe command
+export def ffprobe [
+  ...args: string # Arguments to pass to the ffprobe command
+]: path -> record {
+  ^ffprobe ...$args -v quiet -print_format json -show_format -show_streams $in | from json
+}
+
+# todo
 export def convert_to_opus [
   extension: string # file extension of the output container, i.e. ogg, m4b
   ...args: string # ffmpeg args
@@ -1140,6 +1223,11 @@ export def extract_file_from_archive [
 # Combine a list of audio files into a single M4B file with m4b-tool
 export def merge_into_m4b [
   output_directory: directory
+  ...args: string
+  --audio-format: string = "m4b" # Use "opus" for opus-encoded audio and "oga" for lossless encoded audio, i.e. wav / flac.
+  # --audio-extension: string = "opus" # Use "opus" for opus-encoded audio and "oga" for lossless encoded audio, i.e. wav / flac.
+  # --audio-bitrate: string = "128k" # Use "opus" for opus-encoded audio and "oga" for lossless encoded audio, i.e. wav / flac.
+  # --audio-codec: string = "opus" # Use "opus" for opus-encoded audio and "flac" for lossless encoded audio
 ]: list<path> -> path {
   let files = $in
   let m4b = (
@@ -1151,7 +1239,16 @@ export def merge_into_m4b [
     | path join
   )
   # todo do complete and error checking
-  ^m4b-tool merge --jobs ((^nproc | into int) / 2) --no-interaction --output-file $m4b "--" ...$files
+  (
+    ^m4b-tool merge
+    --audio-format $audio_format
+    --jobs ((^nproc | into int) / 2)
+    --no-interaction
+    --output-file $m4b
+    ...$args
+    "--"
+    ...$files
+  )
   $m4b
 }
 
@@ -1603,6 +1700,37 @@ export def comic_file_name_from_metadata [
     } else {
         $file | path parse | update stem $"($series) \(($series_year)\) #($issue) \(($issue_year)\)" | path join
     }
+}
+
+# Convert a FLAC to an OGA
+#
+# ffmpeg drops embedded cover art.
+export def flac_to_oga [
+  output_directory: directory
+  ...args: string # Arguments to pass to opusenc
+]: path -> path {
+  let flac = $in
+  let output_file = $flac | path parse | update parent $output_directory | update extension "oga" | path join
+  # ^opusenc $flac $output_file
+  ^ffmpeg -i $flac -c:a copy ...$args $output_file
+  $output_file
+}
+
+# Transcode a lossy audio format to OPUS
+#
+# Converting between lossy formats further degrades quality and can introduce artifacts.
+# ffmpeg drops embedded cover art.
+# For lossless formats, prefer using opusenc instead of ffmpeg.
+export def ffmpeg_transcode_to_opus [
+  output_directory: directory
+  # bitrate: string = "128k" # Audio bitrate with which to encode
+  ...args: string # Arguments to pass to opusenc
+]: path -> path {
+  let file = $in
+  let output_file = $file | path parse | update parent $output_directory | update extension "opus" | path join
+  # -b:a $bitrate
+  ^ffmpeg -i $file -vn -c:a libopus ...$args $output_file
+  $output_file
 }
 
 # List the files in a zip archive
@@ -3270,6 +3398,56 @@ export def fetch_musicbrainz_release [
   $response.body
 }
 
+# Get a Series
+export def fetch_musicbrainz_series [
+  includes: list<string> = [series-rels]
+  --retries: int = 3
+  --retry-delay: duration = 5sec
+]: string -> record {
+  let series_id = $in
+  let url = "https://musicbrainz.org/ws/2/series"
+  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($series_id)/?inc=($includes | str join '+')"}
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error fetching MusicBrainz Series: ($url): ($error.debug)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP status code (ansi red)($response.status)(ansi reset) when fetching MusicBrainz Series: ($url)"
+    return null
+  }
+  $response.body
+}
+
+# Parse a MusicBrainz series
+export def parse_musicbrainz_series []: record -> record<id: string, name: string, parent_series: table<id: string, name: string>> {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+  let series = {
+    id: $input.id
+    name: $input.name
+  }
+  let relations = $input | get --ignore-errors relations
+  if ($relations | is-empty) {
+    return $series
+  }
+  let series_relations = $relations | where target-type == "series"
+  if ($series_relations | is-empty) {
+    return $series
+  }
+  let parent_series_relations = $series_relations | where direction == "backward"
+  if ($parent_series_relations | is-empty) {
+    return $series
+  }
+  let parent_series = $parent_series_relations.series | select id name
+  $series | insert parent_series $parent_series
+}
+
 # Parse the ASIN out of an Audible URL
 export def parse_audible_asin_from_url []: string -> string {
   let url = $in
@@ -3583,9 +3761,10 @@ export def parse_contributors []: table -> table<id: string, name: string, entit
 
 # Parse series from MusicBrainz relationships
 #
-# Multiple series are sorted according to index, in descending order.
-# The goal of this is to order subseries after parent series.
-# Of course, this won't help where indices are missing or indices match.
+# Multiple series are sorted according to index, in descending order, followed by name length, and finally name.
+# The goal of this is to order parent series before subseries.
+# This is due to the limited series information available when querying a release from MusicBrainz.
+# Actually subseries information must be obtained through separate API calls to MusicBrainz.
 export def parse_series_from_musicbrainz_relations [] table -> table<id: string, name: string, index: string> {
   let relations = $in
   if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
@@ -3599,20 +3778,53 @@ export def parse_series_from_musicbrainz_relations [] table -> table<id: string,
   if ($series | is-empty) {
     return null
   }
-  $series | par-each {|s|
-    let name = (
-      if "target-credit" in $s and ($s.target-credit | is-not-empty) {
-        $s.target-credit
-      } else {
-        $s.series.name
+  (
+    $series | par-each {|s|
+      let name = (
+        if "target-credit" in $s and ($s.target-credit | is-not-empty) {
+          $s.target-credit
+        } else {
+          $s.series.name
+        }
+      )
+      {
+        name: $name
+        id: $s.series.id
+        index: ($s.attribute-values | get --ignore-errors number)
       }
-    )
-    {
-      name: $name
-      id: $s.series.id
-      index: ($s.attribute-values | get --ignore-errors number)
     }
-  } | uniq | sort-by --reverse index
+    | uniq
+    # Try to order the series with the top-level parent series followed by the subseries.
+    # Most entities that appear in both a parent series and a subseries will have indices in both.
+    # When a series has multiple subseries, the parent series will have the larger indices after the first subseries.
+    # Additionally, it can be cleverly deduced that most subseries will have names that are longer than their parent series.
+    # This owes to the pension of including the name of the parent series as part of the name of the subseries.
+    # The actual subseries relationships can and should be figured out later by making separate API calls to MusicBrainz to get the series relationships.
+    | sort-by --custom {|a, b|
+      if ($a.index == $b.index) {
+        let a_length = ($a.name | str length)
+        let b_length = ($b.name | str length)
+        if $a_length == $b_length {
+          # If they have the same name, that's really bizarre...
+          if ($a.name | str downcase) == ($b.name | str downcase) {
+            # Someone should probably fix this.
+            log warning $"Multiple series have the same name: ($a) and ($b). If this is a duplicate or erroneous, please correct it. Thanks!"
+            # Sort by ID I guess...
+            $a.id < $b.id
+          } else {
+            # Sort by the name itself.
+            ($a.name | str downcase) < ($b.name | str downcase)
+          }
+        } else {
+          # Sort by shortest to longest name.
+          $a_length < $b_length
+        }
+      } else {
+        # Sort by index in reverse.
+        $a.index >= $b.index
+      }
+    }
+  )
 }
 
 # Parse series from MusicBrainz release, release group, and works
@@ -4547,6 +4759,7 @@ export def filter_musicbrainz_releases [
 # I might add logic here in the future to allow ordering recordings based on the natural order of the titles, but track number is usually embedded.
 export def tag_audiobook [
   working_directory: directory
+  submit_all_acoustid_fingerprints = false # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
   ignore_embedded_acoustid_fingerprints = false # Recalculate AcoustID fingerprints for all files
   ignore_embedded_musicbrainz_ids = false # Ignore existing MusicBrainz IDs embedded in the files
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
@@ -4567,6 +4780,10 @@ export def tag_audiobook [
   }
 
   let metadata = $audiobook_files | parse_audiobook_metadata_from_files
+
+  # Create a copy of the original embedded metadata to see if AcoustID Fingerprints should be submitted at then end
+  let original_metadata = $metadata
+
   # log info $"$metadata: ($metadata)"
 
   if "tracks" not-in $metadata or ($metadata.tracks | is-empty) {
@@ -4681,6 +4898,7 @@ export def tag_audiobook [
 
   # Submit AcoustID fingerprints
   if ($acoustid_user_key | is-not-empty) {
+    # Calculate the AcoustID fingerprint if necessary
     let tracks = (
       if (
         $metadata.tracks
@@ -4693,17 +4911,57 @@ export def tag_audiobook [
         $metadata.tracks | get_acoustid_fingerprint_tracks $ignore_embedded_acoustid_fingerprints
       }
     )
-    # log info $"$tracks: ($tracks | reject embedded_pictures)"
-    let acoustid_submissions = (
-      $tracks
-      | select musicbrainz_recording_id duration acoustid_fingerprint
-      | rename musicbrainz_recording_id duration fingerprint
-      | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
+    let tracks = (
+      if $submit_all_acoustid_fingerprints {
+        $tracks
+      } else {
+        # Ignore tracks which already had the embedded AcoustID fingerprint and corresponding MusicBrainz Recording ID.
+        if (
+          ($original_metadata.tracks | get --ignore-errors acoustid_fingerprint | is-empty)
+          or ($original_metadata.tracks | get --ignore-errors musicbrainz_recording_id | is-empty)
+        ) {
+          $tracks
+        } else {
+          # We have both acoustid_fingerprint and musicbrainz_recording_id columns, but one or the other could be missing for individual tracks
+          (
+            $original_metadata.tracks
+            | rename --column {
+              acoustid_fingerprint: "original_acoustid_fingerprint"
+              musicbrainz_recording_id: "original_musicbrainz_recording_id"
+            }
+            | join $tracks file
+            # Filter out tracks with consistent fingerprints and recording ids
+            | filter {|track|
+              # Double check if original values are missing or empty for each individual track
+              if ($track | get --ignore-errors original_acoustid_fingerprint | is-empty) or ($track | get --ignore-errors original_musicbrainz_recording_id | is-empty) {
+                true
+              } else {
+                not (
+                  $track.original_acoustid_fingerprint == $track.acoustid_fingerprint
+                  and $track.original_musicbrainz_recording_id == $track.musicbrainz_recording_id
+                )
+              }
+            }
+          )
+        }
+      }
     )
-    if ($acoustid_submissions | is-not-empty) {
-      log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
+    log info $"tracks: ($tracks)"
+    if ($tracks | is-empty) {
+      log info "No AcoustID fingerprints will be submitted since tracks already had corresponding AcoustID fingerprints and MusicBrainz Recording IDs embedded in their metadata."
     } else {
-      log error $"Failed to submit AcoustID fingerprints!"
+      # log info $"$tracks: ($tracks | reject embedded_pictures)"
+      let acoustid_submissions = (
+        $tracks
+        | select musicbrainz_recording_id duration acoustid_fingerprint
+        | rename musicbrainz_recording_id duration fingerprint
+        | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
+      )
+      if ($acoustid_submissions | is-not-empty) {
+        log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
+      } else {
+        log error $"Failed to submit AcoustID fingerprints!"
+      }
     }
   }
 

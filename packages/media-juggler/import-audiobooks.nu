@@ -31,23 +31,31 @@ export const supported_file_extensions = ["aax" "flac" "m4a" "m4b" "mp3" "mp4" "
 # 3. Upload the audiobook to a server over SSH
 #
 # The path for a book in a series will look like "<primary authors>/<series>/<title>/<title>.m4b".
+# The path for a book in a subseries will look like "<primary authors>/<series>/<subseries>/<title>/<title>.m4b".
 # The path for a standalone book will look like "<primary authors>/<title>/<title>.m4b".
 #
-# Lossless FLACs will be stored in an OGG container using the ".oga" file extension.
-# Lossy AAC or MP3 files transcoded to OPUS will be stored in an OGG container using the ".opus" file extension.
+# This script will attempt to merge multiple files of an audiobook into a single file.
+# Additionally, it will try to use a container with proper chapters support if possible.
+# Lossless FLACs will be merged into one FLAC-encoded OGG file using the ".oga" file extension.
+# The OGG container has support for multiple chapters.
+# Lossy AAC or MP3 files will be transcoded to OPUS and stored in an OGG container using the ".opus" file extension.
+# I still need to implement all of this.
 def main [
   ...items: string # The paths to the audio files in a book or a directory containing the audio files belonging to a single book to tag and upload. Prefix paths with "ssh:" to download them from the server via SSH.
   # --asin: string
   # --isbn: string
   # --ignore-embedded-acoustid-fingerprints
-  --transcode-lossy-to-opus
   --acoustid-client-key: string # The application API key for the AcoustID server
   --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
+  --lossy-to-lossy # Allow transcoding lossy formats to other lossy formats. This is irreversible and has the potential to introduce artifacts and degrade quality. It's recommended to keep the original lossy files for archival purposes when doing this.
   --musicbrainz-release-id: string
   --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
   --delete # Delete the original file
   --destination: directory = "meerkat:/var/media/audiobooks" # The directory under which to copy files.
   --skip-combine # Don't combine multiple audio files for a book into a single M4B file
+  --submit-all-acoustid-fingerprints # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
+  --preferred-mp3-container: string = "m4b" # The preferred container for mp3 files. Can be either mp3 or m4b.
+  --preferred-container: string = "ogg" # The preferred container for the output audio. Use either m4b or ogg.
   --tone-tag-args: list<string> = [] # Additional arguments to pass to the tone tag command
 ] {
   if ($items | is-empty) {
@@ -151,50 +159,14 @@ def main [
     }
   )
 
-  # Check for errors
+  # Verify that audiobooks contain files with supported file extensions
   let audiobooks = $audiobooks | par-each {|audiobook|
     let audio_files = $audiobook.files | path parse | where extension in $supported_file_extensions
     if ($audiobook.files | is-empty) {
       log error $"No supported audio files in ($audiobook.directory). Skipping."
       null
     } else {
-      # All audio files for the audiobook must be the same type.
-      let zips = $audio_files | where extension == zip
-      let audio_files = $audio_files | where extension != zip | append (
-        $zips
-        | each {|zip|
-          if ($zip | is_ssh_path) {
-            let temporary_directory = (mktemp --directory $"import-audiobooks.($audiobook.directory | path basename).XXXXXXXXXX")
-            let downloaded_zip = $zip | scp $temporary_directory
-            let files = $downloaded_zip | list_files_in_archive_with_extensions (
-              # Zip archives inside of zip archives are not supported.
-              $supported_file_extensions | filter {|extension| $extension != "zip"}
-            )
-            rm --force --recursive $temporary_directory
-            $files
-          } else {
-            $zip | list_files_in_archive_with_extensions (
-            # Zip archives inside of zip archives are not supported.
-              $supported_file_extensions | filter {|extension| $extension != "zip"}
-            )
-          }
-        }
-        | path parse
-        | flatten
-        | uniq
-      )
-      let audio_file_extension = $audio_files.extension | first
-      if (
-        $audio_files
-        | all {|file|
-          $file.extension == $audio_file_extension
-        }
-      ) {
-        $audiobook | insert type $audio_file_extension
-      } else {
-        log error $"Not all audio files for the audiobook are of the same type: ($audio_files). Skipping."
-        null
-      }
+      $audiobook
     }
   }
   if ($audiobooks | is-empty) {
@@ -209,28 +181,6 @@ def main [
 
   # Copy files column to original_files
   let audiobooks = $audiobooks | rename directory original_files | insert files {|audiobook| $audiobook.original_files}
-
-  # Set target output type
-  let audiobooks = $audiobooks | insert output_type {|audiobook|
-    # todo I should probably improve this to properly account for the input/output codec/container
-    # Lossless or already in OGG container
-    # I guess we can keep using the FLAC container. Which one to use?
-    if $audiobook.type in ["flac" "oga" "wav"] {
-      "oga"
-    } else if $audiobook.type in ["opus"] {
-      "opus"
-    # Other lossy
-    } else {
-      if $transcode_lossy_to_opus {
-        "opus"
-      } else {
-        "m4b"
-      }
-    }
-  }
-
-  # todo WAV's should be encoded to FLAC
-  # -acodec flac audio.oga
 
   for audiobook in $audiobooks {
 
@@ -265,9 +215,9 @@ def main [
     | flatten
   )
 
-  # Next, decrypt any Audible AAX files and remove video stream from any M4B files
+  # Next, decrypt any Audible AAX files
   let audiobook = (
-    if $audiobook.type == "aax" {
+    if ($audiobook.files | first | path parse | get extension) == "aax" {
       if $audible_activation_bytes == null {
         log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
         exit 1
@@ -276,39 +226,150 @@ def main [
         log debug $"Decrypting Audible AAX file (ansi yellow)($file)(ansi reset) with ffmpeg"
         $file | decrypt_audible_aax $audible_activation_bytes --working-directory $temporary_directory
       }
-      $audiobook | update files $files | update type m4b
-    } else if $audiobook.type == "m4b" {
-      $audiobook | update files (
-        $audiobook.files | each {|file|
-          log info $"file: ($file)"
-          # todo Only remove this when it actually exists
-          $file | remove_video_stream
-        }
+      $audiobook | update files $files
+    } else {
+      $audiobook
+    }
+  )
+
+  # Check that the audio codecs and containers are consistent among all audiobook files
+  let audiobook = (
+    let audio_files = $audiobook.files | path parse | where extension in $supported_file_extensions | path join;
+    let audio_codec_and_container = $audio_files | first | ffprobe | parse_container_and_audio_codec_from_ffprobe_output;
+    if (
+      $audio_files
+      | skip 1
+      | all {|file|
+        ($file | ffprobe | parse_container_and_audio_codec_from_ffprobe_output) == $audio_codec_and_container
+      }
+    ) {
+      (
+        $audiobook
+        | insert audio_codec $audio_codec_and_container.audio_codec
+        | insert container $audio_codec_and_container.container
       )
     } else {
-      $audiobook
+      return {audiobook: $audiobook.directory, error: $"Not all audio files for the audiobook are of the same container and audio codec: ($audio_files). Skipping."}
     }
   )
 
-  # Combine multiple files into a single M4B file
-  # An individual file not in the M4B format will be wrapped into an MP4 container and renamed with the M4B file extension
+  # Set target output type
   let audiobook = (
-    if ($audiobook.files | length) == 1 and $audiobook.type == "m4b" {
-      $audiobook
+    let target = (
+      # Lossless
+      if $audiobook.audio_codec in ["flac"] or ($audiobook.audio_codec | str starts-with "pcm") {
+        if $preferred_container == "ogg" {
+          {audio_codec: "flac", container: "ogg", file_extension: "oga"}
+        } else {
+          {audio_codec: "flac", container: "mov,mp4,m4a,3gp,3g2,mj2", file_extension: "m4b"}
+        }
+      # Lossy
+      } else {
+        # Use opus
+        if $lossy_to_lossy or $audiobook.audio_codec == "opus" {
+          if $preferred_container == "ogg" {
+            {audio_codec: "opus", container: "ogg", file_extension: "opus"}
+          } else {
+            {audio_codec: "opus", container: "mov,mp4,m4a,3gp,3g2,mj2", file_extension: "m4b"}
+          }
+        # Keep the original audio codec
+        } else {
+          if $audiobook.audio_codec == "mp3" and $preferred_mp3_container == "mp3" {
+            {audio_codec: $audiobook.audio_codec, container: "mp3", file_extension: "mp3"}
+          } else {
+            {audio_codec: $audiobook.audio_codec, container: "mov,mp4,m4a,3gp,3g2,mj2", file_extension: "m4b"}
+          }
+        }
+      }
+    );
+    $audiobook | insert target $target
+  )
+  log debug $"Target: ($audiobook.target)"
+
+  # Convert and merge audio files
+  let audiobook = (
+    if ($audiobook.files | length) == 1 {
+      if (
+        $audiobook.container == $audiobook.target.container
+        and $audiobook.audio_codec == $audiobook.target.audio_codec
+      ) {
+        # No conversion necessary
+        $audiobook
+      } else {
+        let audiobook_file = $audiobook.files | first
+        log debug $"Converting ($audiobook_file) file to a ($audiobook.target.audio_codec) encoded ($audiobook.target.container) container"
+        let output_file = $audiobook_file | path parse | update parent $temporary_directory | update extension $audiobook.target.file_extension | path join
+        let ffmpeg_audio_encoder = (
+          if $audiobook.target.audio_codec == "opus" {
+            "libopus"
+          } else if $audiobook.target.audio_codec == "aac" {
+            "libfdk_aac"
+          } else if $audiobook.target.audio_codec == "mp3" {
+            "libmp3lame"
+          } else if $audiobook.target.audio_codec == "wav" {
+            "wavpack"
+          } else {
+            $audiobook.target.audio_codec
+          }
+        )
+        let ffmpeg_args = (
+          []
+          | append (
+            if $audiobook.audio_codec == $audiobook.target.audio_codec {
+              ["-c" "copy"]
+            } else {
+              ["-c:a" $ffmpeg_audio_encoder]
+            }
+          )
+        )
+        ^ffmpeg -i $audiobook_file ...$ffmpeg_args $output_file
+        $audiobook | update files [$output_file]
+      }
     } else {
-      log debug "Merging audio files into a single M4B file with m4b-tool"
+      log debug $"Merging ($audiobook.container) files into a single ($audiobook.target.file_extension) file with m4b-tool"
+      let m4b_tool_audio_format = (
+        if $audiobook.target.container == "mov,mp4,m4a,3gp,3g2,mj2" {
+          "m4b"
+        } else {
+          $audiobook.target.container
+        }
+      )
+      let ffmpeg_audio_encoder = (
+        if $audiobook.codec == $audiobook.target.audio_codec {
+          "copy"
+        } else if $audiobook.target.audio_codec == "opus" {
+          "libopus"
+        } else if $audiobook.target.audio_codec == "aac" {
+          "libfdk_aac"
+        } else if $audiobook.target.audio_codec == "mp3" {
+          "libmp3lame"
+        } else if $audiobook.target.audio_codec == "wav" {
+          "wavpack"
+        } else {
+          $audiobook.target.audio_codec
+        }
+      )
+      let m4b_tool_args = (
+        [
+          "--audio-extension" $audiobook.target.file_extension
+          "--audio-codec" $ffmpeg_audio_encoder
+        ]
+      )
       $audiobook | update files (
-        $audiobook.files | merge_into_m4b $temporary_directory
-      ) | rename --column {files: "file"}
+        $audiobook.files | (
+          merge_into_m4b $temporary_directory
+          --audio-format $m4b_tool_audio_format
+          ...$m4b_tool_args
+        )
+      )
     }
   )
-
-  # todo Convert the single M4B file into an OPUS / OGA file?
 
   let metadata = (
     $audiobook.files
     | (
       tag_audiobook $temporary_directory
+      $submit_all_acoustid_fingerprints
       --acoustid-client-key $acoustid_client_key
       --acoustid-user-key $acoustid_user_key
       --musicbrainz-release-id $musicbrainz_release_id
