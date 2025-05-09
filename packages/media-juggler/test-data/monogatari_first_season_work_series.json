@@ -1,51 +1,90 @@
 {
+  "genres": [],
+  "name": "Monogatari Series: First Season",
+  "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+  "disambiguation": "light novel, English",
   "id": "6660f123-24a0-46c7-99bf-7ff5dc11ceef",
-  "relations": [
+  "type": "Work series",
+  "tags": [
     {
-      "attribute-ids": {},
-      "ended": false,
-      "direction": "backward",
-      "begin": null,
-      "target-credit": "",
-      "type": "subseries",
-      "series": {
-        "id": "05ef20c8-9286-4b53-950f-eac8cbb32dc3",
-        "name": "Monogatari",
-        "disambiguation": "light novel, English",
-        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
-        "type": "Work series"
-      },
-      "attribute-values": {},
-      "target-type": "series",
-      "attributes": [],
-      "source-credit": "",
-      "end": null,
-      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe"
+      "count": 1,
+      "name": "fiction"
     },
     {
-      "end": null,
+      "name": "light novel",
+      "count": 1
+    },
+    {
+      "count": 1,
+      "name": "mystery"
+    },
+    {
+      "count": 1,
+      "name": "paranormal"
+    },
+    {
+      "name": "psychological",
+      "count": 1
+    },
+    {
+      "name": "romance",
+      "count": 1
+    },
+    {
+      "count": 1,
+      "name": "school life"
+    },
+    {
+      "name": "supernatural",
+      "count": 1
+    },
+    {
+      "name": "vampire",
+      "count": 1
+    }
+  ],
+  "relations": [
+    {
+      "direction": "backward",
+      "target-type": "series",
       "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
-      "source-credit": "",
-      "attributes": [],
       "begin": null,
-      "target-credit": "",
-      "ended": false,
-      "direction": "forward",
+      "source-credit": "",
       "attribute-ids": {},
       "series": {
-        "id": "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322",
-        "name": "Bakemonogatari",
         "type": "Work series",
+        "name": "Monogatari",
+        "id": "05ef20c8-9286-4b53-950f-eac8cbb32dc3",
         "disambiguation": "light novel, English",
         "type-id": "b689f694-6305-3d78-954d-df6759a1877b"
       },
-      "target-type": "series",
+      "type": "subseries",
+      "attributes": [],
+      "end": null,
       "attribute-values": {},
+      "target-credit": "",
+      "ended": false
+    },
+    {
+      "attribute-ids": {},
+      "series": {
+        "type": "Work series",
+        "name": "Bakemonogatari",
+        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+        "disambiguation": "light novel, English",
+        "id": "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+      },
+      "source-credit": "",
+      "begin": null,
+      "direction": "forward",
+      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
+      "target-type": "series",
+      "ended": false,
+      "end": null,
+      "target-credit": "",
+      "attribute-values": {},
+      "attributes": [],
       "type": "subseries"
     }
-  ],
-  "name": "Monogatari Series: First Season",
-  "type": "Work series",
-  "disambiguation": "light novel, English",
-  "type-id": "b689f694-6305-3d78-954d-df6759a1877b"
+  ]
 }

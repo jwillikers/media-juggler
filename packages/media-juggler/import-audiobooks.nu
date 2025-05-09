@@ -40,14 +40,14 @@ def main [
   --musicbrainz-release-id: string
   --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
   --delete # Delete the original file
+  --delay-between-imports: duration = 1min # When importing multiple books, pause for this amount between imports. This reduces load on various endpoints by spreading out workload over time. For metadata refreshes, this should probably be increased to as large a delay as you can tolerate.
   --destination: directory = "meerkat:/var/media/audiobooks" # The directory under which to copy files.
-  --skip-combine # Don't combine multiple audio files for a book into a single M4B file
+  --no-merge # Don't combine multiple audio files for a book into a single file
   --submit-all-acoustid-fingerprints # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
   --preferred-mp3-container: string = "m4b" # The preferred container for mp3 files. Can be either mp3 or m4b.
   --preferred-container: string = "ogg" # The preferred container for the output audio. Use either m4b or ogg.
   --tone-tag-args: list<string> = [] # Additional arguments to pass to the tone tag command
   --transcode-bitrate: string = "" # The bitrate to use when transcoding audio. For opus, it defaults to 24k for mono and 32k for stereo recordings. For further details, see here: https://wiki.xiph.org/Opus_Recommended_Settings
-  --delay-between-imports: duration = 1min # When importing multiple books, pause for this amount between imports. This reduces load on various endpoints by spreading out workload over time. For metadata refreshes, this should probably be increased to as large a delay as you can tolerate.
   --use-rsync # Use rsync instead of scp to transfer files
 ] {
   if ($items | is-empty) {
@@ -171,7 +171,7 @@ def main [
     let index = $audiobook.index
     let audiobook = $audiobook.item
 
-  log info $"Importing (ansi purple)($audiobook)(ansi reset)"
+  log info $"Importing audiobook files (ansi purple)($audiobook.files | path basename)(ansi reset) in directory (ansi purple)($audiobook.directory)(ansi reset)"
 
   let temporary_directory = (mktemp --directory $"import-audiobooks.($audiobook.directory | path basename).XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
@@ -357,7 +357,7 @@ def main [
         ^ffmpeg -i $audiobook_file ...$ffmpeg_args $output_file
         $audiobook | update files [$output_file]
       }
-    } else {
+    } else if not $no_merge {
       log debug $"Merging ($audiobook.container) files into a single ($audiobook.target.file_extension) file with m4b-tool"
       let m4b_tool_audio_format = (
         if $audiobook.target.container == "mov,mp4,m4a,3gp,3g2,mj2" {
@@ -411,6 +411,9 @@ def main [
           ...$m4b_tool_args
         )
       )
+    } else {
+      # If --no-merge is passed, don't worry about conversion either
+      $audiobook
     }
   )
 
@@ -430,40 +433,65 @@ def main [
   if ($metadata.book | get --ignore-errors contributors | is-empty) {
     return {audiobook: $audiobook.directory error: $"Missing contributors for the audiobook (ansi yellow)($audiobook.directory)(ansi clear)"}
   }
-
-  # todo Handle multiple output files, naming tracks appropriately with the index prefix as necessary
-  let audiobook = $audiobook | insert file {|a| $a.files | first}
+  # This issue should be caught before here, but check just to be safe.
+  if ($metadata.tracks | length) != ($audiobook.files | length) {
+    return {audiobook: $audiobook.directory error: $"Number of tracks doesn't match the number of files for (ansi yellow)($audiobook.directory)(ansi clear)"}
+  }
 
   # Rename M4B file using the title of the audiobook
-  let audiobook = $audiobook | update file (
-    # This is okay for single file outputs only.
-    let new_file = (
-      $audiobook.file
-      | path parse
-      | update stem ($metadata.book.title | sanitize_file_name)
-      | update parent $temporary_directory
-      | path join
-    );
-    mkdir ($new_file | path dirname);
-    cp --force $audiobook.file $new_file;
-    $new_file
+  let audiobook = (
+    # For a single file, just name the file exactly as the track
+    # if ($metadata.tracks | length) == 1 {
+    #   $audiobook | update files (
+    #     # This is okay for single file outputs only.
+    #     let new_file = (
+    #       $metadata.tracks.file
+    #       | first
+    #       | path parse
+    #       | update stem ()
+    #       | update parent $temporary_directory
+    #       | path join
+    #     );
+    #     mkdir ($new_file | path dirname);
+    #     cp --force ($metadata.tracks.file | first) $new_file;
+    #     [$new_file]
+    #   )
+    # } else {
+      # For multiple files, prefix the name with the index
+      # First, determine how many leading zeros are required for the track number.
+      let number_of_digits = (($metadata.tracks | length) - 1) | into string | str length;
+      $audiobook | update files (
+        $metadata.tracks
+        | each {|track|
+          let stem = (
+            if ($metadata.tracks | length) == 1 {
+              $track.title | sanitize_file_name
+            } else {
+              ($track.index | fill --alignment r --character '0' --width $number_of_digits) + " " + $track.title
+            }
+          )
+          let new_file = $track.file | path parse | update stem $stem | update parent $temporary_directory | path join
+          mkdir ($new_file | path dirname)
+          cp --force $track.file $new_file
+          $new_file
+        }
+      )
+    # }
   )
-
-  let audiobook = $audiobook | update files [$audiobook.file]
 
   let primary_authors = $metadata.book.contributors | where role == "primary author"
   if ($primary_authors | is-empty) {
     return {audiobook: $audiobook.directory error: $"Failed to find primary authors for the audiobook (ansi yellow)($audiobook.directory)(ansi clear). Contributors are ($metadata.book.contributors)"}
   }
 
-  let relative_destination = (
+  let relative_destination_directory = (
     [
-      ($audiobook.file | path parse | get stem)
-      ($audiobook.file | path basename)
+      ($metadata.book.title | sanitize_file_name)
     ]
     | prepend (
       if ($metadata.book | get --ignore-errors series | is-not-empty) {
         # First series is the primary series
+        # todo Nest subseries under the primary series
         $metadata.book.series.name | first | sanitize_file_name
       }
     )
@@ -471,19 +499,32 @@ def main [
     | path join
   )
 
-  let target_destination = [$destination $relative_destination] | path join
+  let target_destination_directory = [$destination $relative_destination_directory] | path join
 
-  if ($target_destination | is_ssh_path) {
-    log info $"Uploading (ansi yellow)($audiobook.file)(ansi reset) to (ansi yellow)($target_destination)(ansi reset)"
-    # log info $"ls: (ls $audiobook.file)";
-    if $use_rsync {
-      $audiobook.file | rsync $target_destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
-    } else {
-      $audiobook.file | scp $target_destination
+  let audiobook = $audiobook | update files (
+    $audiobook.files
+    | each {|file|
+      {
+        file: $file
+        destination: ([$target_destination_directory ($file | path basename)] | path join)
+      }
+    }
+  )
+
+  if ($target_destination_directory | is_ssh_path) {
+    $audiobook.files | each {|file|
+      log info $"Uploading (ansi yellow)($file.file)(ansi reset) to (ansi yellow)($file.destination)(ansi reset)"
+      if $use_rsync {
+        $file.file | rsync $file.destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
+      } else {
+        $file.file | scp --mkdir $file.destination
+      }
     }
   } else {
-    mkdir ($target_destination | path dirname)
-    mv $audiobook.file $target_destination
+    mkdir $target_destination_directory
+    $audiobook.files | each {|file|
+      mv $file.file $file.destination
+    }
   }
 
   if $delete {
@@ -491,7 +532,7 @@ def main [
     (
       $audiobook.original_files
       | filter {|file|
-        $file != $target_destination
+        $file not-in ($audiobook.files | get destination)
       }
       | each {|file|
         if ($file | is_ssh_path) {

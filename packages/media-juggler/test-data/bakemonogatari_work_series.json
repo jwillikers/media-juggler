@@ -1,30 +1,69 @@
 {
-  "name": "Bakemonogatari",
-  "relations": [
+  "type": "Work series",
+  "tags": [
     {
-      "type": "subseries",
-      "series": {
-        "name": "Monogatari Series: First Season",
-        "type": "Work series",
-        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
-        "disambiguation": "light novel, English",
-        "id": "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
-      },
-      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
-      "ended": false,
-      "attributes": [],
-      "direction": "backward",
-      "end": null,
-      "target-credit": "",
-      "attribute-ids": {},
-      "begin": null,
-      "attribute-values": {},
-      "target-type": "series",
-      "source-credit": ""
+      "count": 1,
+      "name": "fiction"
+    },
+    {
+      "name": "light novel",
+      "count": 1
+    },
+    {
+      "count": 1,
+      "name": "mystery"
+    },
+    {
+      "count": 1,
+      "name": "paranormal"
+    },
+    {
+      "name": "psychological",
+      "count": 1
+    },
+    {
+      "name": "romance",
+      "count": 1
+    },
+    {
+      "name": "school life",
+      "count": 1
+    },
+    {
+      "count": 1,
+      "name": "speculative fiction"
+    },
+    {
+      "count": 1,
+      "name": "vampire"
     }
   ],
-  "type": "Work series",
-  "disambiguation": "light novel, English",
+  "relations": [
+    {
+      "ended": false,
+      "attribute-values": {},
+      "target-credit": "",
+      "end": null,
+      "type": "subseries",
+      "attributes": [],
+      "series": {
+        "id": "6660f123-24a0-46c7-99bf-7ff5dc11ceef",
+        "disambiguation": "light novel, English",
+        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+        "name": "Monogatari Series: First Season",
+        "type": "Work series"
+      },
+      "attribute-ids": {},
+      "begin": null,
+      "source-credit": "",
+      "target-type": "series",
+      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
+      "direction": "backward"
+    }
+  ],
   "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
-  "id": "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+  "id": "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322",
+  "disambiguation": "light novel, English",
+  "genres": [],
+  "name": "Bakemonogatari"
 }

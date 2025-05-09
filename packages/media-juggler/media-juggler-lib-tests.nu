@@ -3520,6 +3520,25 @@ def test_parse_musicbrainz_series_monogatari_work []: {
     id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
     name: "Monogatari"
     parent_series: []
+    subseries: [
+      [id name];
+      ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+      ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+    ]
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      [supernatural, 1],
+      [vampire, 1]
+    ]
+    tags: []
   }
   assert equal ($input | parse_musicbrainz_series) $expected
 }
@@ -3529,7 +3548,27 @@ def test_parse_musicbrainz_series_monogatari_first_season_work []: {
   let expected = {
     id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
     name: "Monogatari Series: First Season"
-    parent_series: [[id name]; ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]]
+    parent_series: [
+      [id name];
+      ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+    ]
+    subseries: [
+      [id name];
+      ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+    ]
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      [supernatural, 1],
+      [vampire, 1]
+    ]
+    tags: []
   }
   assert equal ($input | parse_musicbrainz_series) $expected
 }
@@ -3543,6 +3582,20 @@ def test_parse_musicbrainz_series_bakemonogatari_work []: {
       [id name];
       ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
     ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
   }
   assert equal ($input | parse_musicbrainz_series) $expected
 }
@@ -3551,6 +3604,164 @@ def test_parse_musicbrainz_series []: {
   test_parse_musicbrainz_series_monogatari_work
   test_parse_musicbrainz_series_monogatari_first_season_work
   test_parse_musicbrainz_series_bakemonogatari_work
+}
+
+def test_organize_subseries_two_subseries []: {
+  let input = [
+    [id name parent_series subseries genres tags];
+    [
+      "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+      "Monogatari"
+      []
+      [
+        [id name];
+        ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+      ]
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+    [
+      "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+      "Monogatari Series: First Season"
+      [
+        [id name];
+        ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+      ]
+      [
+        [id name];
+        ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+      ]
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+    [
+      "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+      "Bakemonogatari"
+      [
+        [id name];
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+      ]
+      []
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        ["speculative fiction", 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+  ]
+  let expected = [
+    [id name parent_series subseries genres tags];
+    [
+      "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+      "Monogatari"
+      []
+      [
+        [id name];
+        ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+      ]
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+    [
+      "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+      "Monogatari Series: First Season"
+      [
+        [id name];
+        ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+      ]
+      [
+        [id name];
+        ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+      ]
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+    [
+      "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+      "Bakemonogatari"
+      [
+        [id name];
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+      ]
+      []
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        ["speculative fiction", 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+  ]
+  assert equal ($input | organize_subseries) $expected
+}
+
+def test_organize_subseries []: {
+  # test_organize_subseries_one_series
+  # test_organize_subseries_one_subseries
+  test_organize_subseries_two_subseries
 }
 
 def main []: {
@@ -3590,5 +3801,6 @@ def main []: {
   # todo test_split_ssh_path
   test_parse_container_and_audio_codec_from_ffprobe_output
   test_parse_musicbrainz_series
+  test_organize_subseries
   echo "All tests passed!"
 }

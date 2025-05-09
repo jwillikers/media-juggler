@@ -25,6 +25,8 @@ export const image_extensions = [
   webp
 ]
 
+export const musicbrainz_non_genre_tags = ["abridged", "chapters", "explicit", "unabridged"]
+
 # Surround special characters in a string with square brackets
 #
 # Use this on strings before adding glob characters.
@@ -270,9 +272,15 @@ export def split_ssh_path []: path -> record<server: string, path: path> {
   }
 }
 
-# Copy files over SSH
+# Copy files over SSH using the scp program
 export def "scp" [
-  destination: path
+  destination: path # The destination on the server to which to copy the file
+  ...args: string # Arguments to pass to the scp program
+  --mkdir # Create the destination directory and any parent directories on the server
+  # --mkdir-permissions # Set the permissions
+  # --mkdir-group
+  # --file-group
+  # --file-permissions
 ]: path -> path {
   let source = $in
   let source_path_type = (
@@ -282,12 +290,14 @@ export def "scp" [
       $source | path type
     }
   )
-  let ssh_path = $destination | path dirname | split_ssh_path
-  ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
+  if $mkdir {
+    let ssh_path = $destination | path dirname | split_ssh_path
+    ^ssh $ssh_path.server nu --commands $"\'^mkdir \"($ssh_path.path)\"\'"
+  }
   if $source_path_type == "dir" {
-    ^scp --recursive $source $destination
+    ^scp --recursive ...$args $source $destination
   } else {
-    ^scp $source $destination
+    ^scp ...$args $source $destination
   }
   [$destination ($source | path basename)] | path join
 }
@@ -3128,12 +3138,11 @@ export def into_tone_format []: record -> record {
       $metadata.book.publication_date | format date '%Y-%m-%dT%H:%M:%SZ'
     }
   )
-  # Use chapters.txt file instead of using the chapters metadata
-  # let chapters = (
-  #   if "chapters" in $metadata.book and ($metadata.book.chapters | is-not-empty) {
-  #     $metadata.book.chapters | chapters_into_tone_format
-  #   }
-  # )
+  let chapters = (
+    if "chapters" in $metadata.book and ($metadata.book.chapters | is-not-empty) {
+      $metadata.book.chapters | chapters_into_tone_format
+    }
+  )
   let primary_authors = (
     if "contributors" in $metadata.book and ($metadata.book.contributors | is-not-empty) {
       $metadata.book.contributors | where entity == "artist" | where role == "primary author"
@@ -3269,9 +3278,8 @@ export def into_tone_format []: record -> record {
       )
       | upsert_if_present lyrics $metadata.track
       | upsert_if_present rating $metadata.track
-      # | upsert_if_value chapters $chapters
-      # Use cover from file instead
-      # | upsert_if_present embeddedPictures $metadata.track embedded_pictures
+      | upsert_if_value chapters $chapters
+      | upsert_if_present embeddedPictures $metadata.track embedded_pictures
       | upsert_if_present discNumber $metadata.track disc_number
       | upsert_if_present discSubtitle $metadata.track disc_subtitle
       | upsert_if_present media $metadata.track
@@ -3465,7 +3473,7 @@ export def fetch_musicbrainz_release [
 
 # Get a Series
 export def fetch_musicbrainz_series [
-  includes: list<string> = [series-rels]
+  includes: list<string> = [series-rels genres tags]
   --retries: int = 3
   --retry-delay: duration = 5sec
 ]: string -> record {
@@ -3488,15 +3496,86 @@ export def fetch_musicbrainz_series [
 }
 
 # Parse a MusicBrainz series
-export def parse_musicbrainz_series []: record -> record<id: string, name: string, parent_series: table<id: string, name: string>> {
+export def parse_musicbrainz_series []: record -> record<id: string, name: string, subseries: table<id: string, name: string>, parent_series: table<id: string, name: string>, genres: table<name: string, count: int>, tags: table<name: string, count: int>> {
   let input = $in
   if ($input | is-empty) {
     return null
   }
+  let genres = (
+    let genres = $input | get --ignore-errors genres;
+    let tags = $input | get --ignore-errors tags;
+    if ($genres | is-empty) {
+      if ($tags | is-empty) {
+        $genres
+      } else {
+        $tags
+        | select name count
+        | uniq
+        | filter {|tag|
+          $tag.name not-in $musicbrainz_non_genre_tags
+        }
+        # sort by the count, highest to lowest, and then name alphabetically
+        | sort-by --custom {|a, b|
+          if $a.count == $b.count {
+            $a.name < $b.name
+          } else {
+            $a.count > $b.count
+          }
+        }
+      }
+    } else {
+      $genres
+      | select name count
+      | uniq
+      | filter {|tag|
+        $tag.name not-in $musicbrainz_non_genre_tags
+      }
+      # sort by the count, highest to lowest, and then name alphabetically
+      | sort-by --custom {|a, b|
+        if $a.count == $b.count {
+          $a.name < $b.name
+        } else {
+          $a.count > $b.count
+        }
+      }
+    }
+  )
+  let tags = (
+    let tags = $input | get --ignore-errors tags;
+    if ($tags | is-empty) {
+      $tags
+    } else {
+      $tags
+      | select name count
+      | uniq
+      # sort by the count, highest to lowest, and then name alphabetically
+      | sort-by --custom {|a, b|
+        if $a.count == $b.count {
+          $a.name < $b.name
+        } else {
+          $a.count > $b.count
+        }
+      }
+      # Filter out genres from the tags
+      | (
+        let tags_in = $in;
+        if ($genres | is-not-empty) {
+          $tags_in | filter {|tag|
+            $tag.name not-in $genres.name
+          }
+        } else {
+          $tags_in
+        }
+      )
+    }
+  )
   let series = {
     id: $input.id
     name: $input.name
     parent_series: []
+    subseries: []
+    genres: $genres
+    tags: $tags
   }
   let relations = $input | get --ignore-errors relations
   if ($relations | is-empty) {
@@ -3507,36 +3586,217 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
     return $series
   }
   let parent_series_relations = $series_relations | where direction == "backward"
-  if ($parent_series_relations | is-empty) {
+  let parent_series = (
+    if ($parent_series_relations | is-empty) {
+      []
+    } else {
+      $parent_series_relations.series | select id name
+    }
+  )
+  let subseries_relations = $series_relations | where direction == "forward"
+  let subseries = (
+    if ($subseries_relations | is-empty) {
+      []
+    } else {
+      $subseries_relations.series | select id name
+    }
+  )
+  $series | upsert parent_series $parent_series | upsert subseries $subseries
+}
+
+# Fetch and parse a MusicBrainz Series by ID
+export def fetch_and_parse_musicbrainz_series [
+  cache: directory # Cache directory where parsed series are stored in files named according to mbid, i.e. mbid.json.
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: string -> record {
+  let musicbrainz_series_id = $in
+  let cached_series_file = {parent: $cache, stem: $musicbrainz_series_id, extension: "json"} | path join
+  if ($cached_series_file | path exists) {
+    open $cached_series_file
+  } else {
+    let series = $musicbrainz_series_id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay | parse_musicbrainz_series
+    $series | save $cached_series_file
+    $series
+  }
+}
+
+# Build a tree of subseries going up through the parent series
+export def build_series_tree_up [
+  depth: int
+  cache: directory # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
+  --required-series: list<string>
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: record -> record {
+  let series = $in
+
+  # Base case: No parent series
+  if ($series | get --ignore-errors parent_series | is-empty) {
     return $series
   }
-  let parent_series = $parent_series_relations.series | select id name
-  $series | upsert parent_series $parent_series
+
+  # Alternate base case, this is the last required series.
+  if ($required_series != null and ($required_series | length) == 1) and ($required_series | first) == $series.id {
+    return $series
+  }
+
+  # Hit max depth
+  if ($depth <= 0) {
+    log error $"Reached max depth at series: ($series). Unwinding!"
+    # I could return null here to signal the error.
+    return $series
+  }
+
+  $series | upsert parent_series (
+    $series.parent_series | each {|parent_series|
+      if $required_series == null {
+        $parent_series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree_up ($depth - 1) $cache
+      } else {
+        $parent_series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree_up ($depth - 1) $cache --required-series ($required_series | filter {|id| $id != $series.id})
+      }
+    }
+  )
 }
+
+# Build a tree of subseries under a series
+export def build_series_tree [
+  depth: int
+  cache: directory # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
+  --required-series: list<string>
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: record -> record {
+  let series = $in
+
+  # Base case: No subseries (leaf node)
+  if ($series | get --ignore-errors subseries | is-empty) {
+    return $series
+  }
+
+  # Alternate base case, this is the last required series.
+  if ($required_series != null and ($required_series | length) == 1) and ($required_series | first) == $series.id {
+    return $series
+  }
+
+  # Hit max depth
+  if ($depth <= 0) {
+    log error $"Reached max depth at series: ($series). Unwinding!"
+    # I could return null here to signal the error.
+    return $series
+  }
+
+  $series | upsert subseries (
+    $series.subseries | each {|subseries|
+      if $required_series == null {
+        $subseries.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree ($depth - 1) $cache
+      } else {
+        $subseries.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree ($depth - 1) $cache --required-series ($required_series | filter {|id| $id != $series.id})
+      }
+    }
+  )
+}
+
+# # Nest one subseries in another
+# export def nest_subseries [
+#   series_to_nest: table
+# ]: record -> record {
+#   let series = $in
+#   # Base case: No subseries (leaf node)
+#   # if ($series | all {|s| $s | get --ignore-errors subseries | is-empty}) {
+#   if ($series | get --ignore-errors subseries | is-empty) {
+#     let s = $series_to_nest | where id == $series.id
+#     if ($s | is-empty) {
+#       return {}
+#       # return $series
+#     }
+#     return ($s | first)
+#   }
+
+#   $series | upsert nested_subseries (
+#     $series.subseries | each {|s|
+#       $s | nest_subseries $series_to_nest
+#     }
+#   )
+# }
+
+export def series_is_in_series [
+  id: string
+]: record -> bool {
+  let series = $in
+  # Base case: No subseries (leaf node)
+  # if ($series | all {|s| $s | get --ignore-errors subseries | is-empty}) {
+  if ($series | get --ignore-errors nested_subseries | is-empty) {
+    return ($series.id == $id)
+  }
+
+  $series.nested_subseries | any {|s|
+    $s | series_is_in_series $id
+  }
+}
+
 
 # Organize series into a hierarchy based on subseries relationships
 #
 # Parent series are at the top of the hierarchy.
 # Subseries are nested under their parent series.
 # Series are sorted by name when multiple are at the same tier.
-# export def organize_subseries []: table<id: string, name: string, index: string, parent_series: table<id: string, name: string>> -> table {
-#   let series = $in
-#   # This requires recursion
-#   # Base-case: No parent series are left
-#   if ($series | all {|s| $s | get --ignore-errors parent_series | is-empty}) {
-#     return $series
-#   }
+export def create_series_tree [
+  cache: directory # todo Use a cache closure to allow unit testing
+  max_depth: int = 10
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: table -> table {
+  let all_series = $in
 
-#   $series | each {|s|
-#     {
-#       id: $s.id
-#       name: $s.name
-#       index: $s.index
-#       children_series:
-#     }
-#     $s.parent_series | organize_subseries
-#   }
-# }
+  # let all_series_and_subseries = $all_series | append (
+  #   # Recursively traverse the series relationships, calling fetch_musicbrainz_series as necessary to fill in missing series
+  #   # Need to call out to MusicBrainz for all series data
+  # ) | uniq-by id
+
+  # let all_series = $all_series_and_subseries | each {|s|
+  #   $s | nest_subseries $all_series_and_subseries
+  # }
+  # let top_level_series = $all_series | filter {|s|
+  #   not ($s | series_is_in_series $s.id)
+  # }
+
+  # $top_level_series
+
+  let ancestors_and_series = $all_series | each {|series|
+    {
+      ancestors: (
+        $series
+        | build_series_tree_up $max_depth $cache --required-series ($all_series | get id) --retries $retries --retry-delay $retry_delay
+        | get_top_parents
+        | sort-by name
+      )
+      series: $series
+    }
+  # Group by shared ancestor(s)
+  } | group-by ancestors --to-table | each {|ancestors_and_series_group|
+    {
+      # Could try merging here maybe...
+      ancestors: ($ancestors_and_series_group.items | first | get ancestors)
+      series: ($ancestors_and_series_group.items | get series)
+    }
+  } | each {|ancestors_and_series|
+    let full_series_tree = $ancestors_and_series.ancestors | build_series_tree $max_depth $cache --required-series ($ancestors_and_series.series | get id) --retries $retries --retry-delay $retry_delay
+    # Finally, calculate the degrees of separation between the common ancestor
+    let series = $ancestors_and_series.series | each {|s|
+      let depth = $ancestors_and_series.ancestors | distance_to_top $s
+      $s | upsert depth $depth
+    }
+    {
+      ancestor: $full_series_tree
+      series: ($series | sort-by depth)
+    }
+  } | sort-by --custom {|pair|
+    # When there are multiple top-level series, the primary series is assumed to be the one with the shortest depth between it and it's common ancestor.
+    # Each group will be sorted by the min depth of its series, followed by series without any depth, and any ties will be sorted based on the name of the ancestral series
+  }
+  # todo Take into account series which have an index vs. those that don't.
+}
 
 # Parse the ASIN out of an Audible URL
 export def parse_audible_asin_from_url []: string -> string {
@@ -3973,8 +4233,6 @@ export def parse_series_from_musicbrainz_release [
   )
 }
 
-export const musicbrainz_non_genre_tags = ["abridged", "chapters", "explicit", "unabridged"]
-
 # Parse genres from a MusicBrainz release, release group, and recordings
 #
 # The genres should also be parsed from associated series and works, but these require separate API calls.
@@ -4019,7 +4277,11 @@ export def parse_genres_from_musicbrainz_release [
       | uniq
       # sort by the count, highest to lowest, and then name alphabetically
       | sort-by --custom {|a, b|
-        $a.count >= $b.count and $a.name < $b.name
+        if $a.count == $b.count {
+          $a.name < $b.name
+        } else {
+          $a.count > $b.count
+        }
       }
     )
   } else {
@@ -4057,7 +4319,11 @@ export def parse_genres_from_musicbrainz_release [
       }
       # sort by the count, highest to lowest, and then name alphabetically
       | sort-by --custom {|a, b|
-        $a.count >= $b.count and $a.name < $b.name
+        if $a.count == $b.count {
+          $a.name < $b.name
+        } else {
+          $a.count > $b.count
+        }
       }
     )
   }
@@ -4102,7 +4368,11 @@ export def parse_tags_from_musicbrainz_release []: record -> table {
     | uniq
     # sort by the count, highest to lowest, and then name alphabetically
     | sort-by --custom {|a, b|
-      $a.count >= $b.count and $a.name < $b.name
+      if $a.count == $b.count {
+        $a.name < $b.name
+      } else {
+        $a.count > $b.count
+      }
     }
   )
 }
@@ -4245,7 +4515,11 @@ export def parse_musicbrainz_release []: record -> record {
             }
             # sort by the count, highest to lowest, and then name alphabetically
             | sort-by --custom {|a, b|
-              $a.count >= $b.count and $a.name < $b.name
+              if $a.count == $b.count {
+                $a.name < $b.name
+              } else {
+                $a.count > $b.count
+              }
             }
           }
         )
@@ -4258,7 +4532,11 @@ export def parse_musicbrainz_release []: record -> record {
             | uniq
             # sort by the count, highest to lowest, and then name alphabetically
             | sort-by --custom {|a, b|
-              $a.count >= $b.count and $a.name < $b.name
+              if $a.count == $b.count {
+                $a.name < $b.name
+              } else {
+                $a.count > $b.count
+              }
             }
             # Filter out genres from the tags
             | (
@@ -4408,7 +4686,11 @@ export def parse_musicbrainz_release []: record -> record {
         let input = $in;
         if ($input | is-not-empty) {
           $input | sort-by --custom {|a, b|
-            $a.count >= $b.count and $a.name < $b.name
+            if $a.count == $b.count {
+              $a.name < $b.name
+            } else {
+              $a.count > $b.count
+            }
           }
         } else {
           $input
@@ -4435,7 +4717,11 @@ export def parse_musicbrainz_release []: record -> record {
         )
         # sort by the count, highest to lowest, and then name alphabetically
         | sort-by --custom {|a, b|
-          $a.count >= $b.count and $a.name < $b.name
+          if $a.count == $b.count {
+            $a.name < $b.name
+          } else {
+            $a.count > $b.count
+          }
         }
       )
     }
@@ -5376,14 +5662,15 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
     }
   )
 
-  let chapters_file = mktemp --suffix ".txt" --tmpdir
-  if ($chapters | is-not-empty) {
-    $chapters | chapters_into_chapters_txt_format | save --force $chapters_file
-  }
+  # let chapters_file = mktemp --suffix ".txt" --tmpdir
+  # if ($chapters | is-not-empty) {
+  #   $chapters | chapters_into_chapters_txt_format | save --force $chapters_file
+  # }
 
   let files = (
     $metadata
     | update tracks $tracks
+    | reject --ignore-errors book.embedded_pictures
     | (
       let input = $in;
       if ($chapters | is-not-empty) {
@@ -5404,14 +5691,17 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
       "--meta-remove-property" "EmbeddedPictures"
       "--meta-remove-property" "comment"
       "--meta-cover-file" $front_cover
-      "--meta-chapters-file" $chapters_file
+      # "--meta-chapters-file" $chapters_file
     )
   )
 
   # Clean up
   if ($front_cover | is-not-empty) {
-    rm $front_cover $chapters_file
+    rm $front_cover
   }
+  # if ($chapters_file | is-not-empty) {
+  #   rm $chapters_file
+  # }
 
   $files
 }
@@ -5528,15 +5818,6 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     }
   )
 
-  let chapters_file = (
-    if ($chapters | is-not-empty) {
-      let chapters_file = mktemp --suffix ".txt" --tmpdir
-      $chapters | chapters_into_chapters_txt_format | save --force $chapters_file
-      $chapters_file
-      # log info $"Chapters: (open $chapters_file)"
-    }
-  )
-
   let front_cover = (
     if "front_cover_available" in $musicbrainz_metadata.book and $musicbrainz_metadata.book.front_cover_available {
       $musicbrainz_metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
@@ -5556,26 +5837,37 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     ]
     | append (
       if ($front_cover | is-not-empty) {
+        # Drop any embedded pictures, only using the downloaded cover file
         ["--meta-remove-property" "EmbeddedPictures" "--meta-cover-file" $front_cover]
-      }
-    )
-    | append (
-      if ($chapters_file | is-not-empty) {
-        ["--meta-chapters-file" $chapters_file]
       }
     )
   )
 
   let files = (
-    $musicbrainz_metadata | tone_tag_tracks $working_directory ...$tone_args
+    $musicbrainz_metadata
+    | (
+      let input = $in;
+      if ($chapters | is-empty) {
+        $input
+      } else {
+        $input | upsert book.chapters $chapters
+      }
+    )
+    | (
+      let input = $in;
+      if ($front_cover | is-empty) {
+        $input
+      } else {
+      # Drop any embedded pictures, only using the downloaded cover file
+        $input | reject --ignore-errors book.embedded_pictures
+      }
+    )
+    | tone_tag_tracks $working_directory ...$tone_args
   )
 
   # Clean up
   if ($front_cover | is-not-empty) {
     rm $front_cover
-  }
-  if ($chapters_file | is-not-empty) {
-    rm $chapters_file
   }
 
   $musicbrainz_metadata
