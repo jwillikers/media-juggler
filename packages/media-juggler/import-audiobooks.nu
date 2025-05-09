@@ -167,7 +167,9 @@ def main [
   # Copy files column to original_files
   let audiobooks = $audiobooks | rename directory original_files | insert files {|audiobook| $audiobook.original_files}
 
-  for audiobook in $audiobooks {
+  for audiobook in ($audiobooks | enumerate) {
+    let index = $audiobook.index
+    let audiobook = $audiobook.item
 
   log info $"Importing (ansi purple)($audiobook)(ansi reset)"
 
@@ -507,6 +509,8 @@ def main [
   #     log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
   #     continue
   # }
-    sleep $delay_between_imports
+    if $index < ($audiobooks | length) - 1 {
+      sleep $delay_between_imports
+    }
   }
 }
