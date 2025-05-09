@@ -48,6 +48,7 @@ def main [
   --tone-tag-args: list<string> = [] # Additional arguments to pass to the tone tag command
   --transcode-bitrate: string = "" # The bitrate to use when transcoding audio. For opus, it defaults to 24k for mono and 32k for stereo recordings. For further details, see here: https://wiki.xiph.org/Opus_Recommended_Settings
   --delay-between-imports: duration = 1min # When importing multiple books, pause for this amount between imports. This reduces load on various endpoints by spreading out workload over time. For metadata refreshes, this should probably be increased to as large a delay as you can tolerate.
+  --use-rsync # Use rsync instead of scp to transfer files
 ] {
   if ($items | is-empty) {
     log error "No files provided"
@@ -114,7 +115,7 @@ def main [
         if ($item | is_ssh_path) {
           let server = $item | split_ssh_path | get server
           if $item_type == "dir" {
-            $"($item | escape_special_glob_characters)/**/*" | ssh glob --no-dir --no-symlink | each {|file| $"($server):($file)"}
+            $"($item | escape_special_glob_characters)/**/*" | ssh glob "--no-dir" "--no-symlink" | each {|file| $"($server):($file)"}
           } else {
             $item | ssh ls --expand-path | get name | each {|file| $"($server):($file)"}
           }
@@ -180,7 +181,11 @@ def main [
     if ($audiobook.files | first | is_ssh_path) {
       $audiobook.files | each {|file|
         mkdir ([$temporary_directory "downloads"] | path join)
-        $file | scp ([$temporary_directory "downloads" ($file | path basename)] | path join)
+        if $use_rsync {
+          $file | rsync ([$temporary_directory "downloads" ($file | path basename)] | path join) "--mkpath"
+        } else {
+          $file | scp ([$temporary_directory "downloads" ($file | path basename)] | path join)
+        }
       }
     } else {
       # Copy to temp directory to avoid modifying the original file
@@ -469,7 +474,11 @@ def main [
   if ($target_destination | is_ssh_path) {
     log info $"Uploading (ansi yellow)($audiobook.file)(ansi reset) to (ansi yellow)($target_destination)(ansi reset)"
     # log info $"ls: (ls $audiobook.file)";
-    $audiobook.file | rsync $target_destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
+    if $use_rsync {
+      $audiobook.file | rsync $target_destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
+    } else {
+      $audiobook.file | scp $target_destination
+    }
   } else {
     mkdir ($target_destination | path dirname)
     mv $audiobook.file $target_destination

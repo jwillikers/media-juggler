@@ -284,7 +284,6 @@ export def "scp" [
   )
   let ssh_path = $destination | path dirname | split_ssh_path
   ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
-  ^ssh $ssh_path.server nu --commands $"\'chmod 2770 \"($ssh_path.path)\"\'"
   if $source_path_type == "dir" {
     ^scp --recursive $source $destination
   } else {
