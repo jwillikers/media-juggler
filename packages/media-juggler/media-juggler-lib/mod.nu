@@ -25,6 +25,24 @@ export const image_extensions = [
   webp
 ]
 
+# Surround special characters in a string with square brackets
+#
+# Use this on strings before adding glob characters.
+# Not that I can't actually escape backslashes, so those will cause the glob expression to fail outright.
+# Maybe this will be fixed in Nushell at some point?
+#
+# todo test
+export def escape_special_glob_characters []: string -> string {
+  let input = $in
+  if ($input | describe) != "string" {
+    return $input
+  }
+  const special_glob_characters = ['(' ')' '{' '}' '[' ']' '*' '?' ':' "$"]
+  $special_glob_characters | reduce --fold $input {|character, acc|
+    $acc | str replace --all $character ('\' + $character)
+  }
+}
+
 # todo Write a test
 export def has_bad_video_stream []: record<streams: table, format: record> -> bool {
   let ffprobe_output = $in
@@ -301,13 +319,28 @@ export def "rsync" [
   [$destination ($source | path basename)] | path join
 }
 
-# List files over SSH
-export def "ssh ls" [
-  ...args: string
+# Glob files over SSH
+export def "ssh glob" [
+  ...glob_args: string
 ]: path -> table {
   let input = $in
   let ssh_path = $input | split_ssh_path
-  ^ssh $ssh_path.server nu --commands $"\'ls (...$args) ($ssh_path.path) | to json\'" | from json
+  ^ssh $ssh_path.server nu --commands $"\'glob (...$glob_args) ($ssh_path.path) | to json\'" | from json
+}
+
+# List files over SSH
+export def "ssh ls" [
+  ...args: string
+  --expand-path
+]: path -> table {
+  let input = $in
+  let ssh_path = $input | split_ssh_path
+  let path = $ssh_path.path
+  if $expand_path {
+    ^ssh $ssh_path.server nu --commands $"\'ls (...$args) ($path | path expand) | to json\'" | from json
+  } else {
+    ^ssh $ssh_path.server nu --commands $"\'ls (...$args) ($path) | to json\'" | from json
+  }
 }
 
 # List files over SSH

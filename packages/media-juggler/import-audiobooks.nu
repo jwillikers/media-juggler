@@ -6,17 +6,6 @@
 use std log
 use media-juggler-lib *
 
-# Embed the cover art to an M4B file
-export def embed_cover []: record<cover: path, m4b: path> -> path {
-  let audiobook = $in
-  if $audiobook.cover == null {
-    ^tone tag --auto-import=covers $audiobook.m4b
-  } else {
-    ^tone tag --meta-cover-file $audiobook.cover $audiobook.m4b
-  }
-  $audiobook
-}
-
 export const supported_file_extensions = ["aax" "flac" "m4a" "m4b" "mp3" "mp4" "oga" "ogg" "opus" "wav" "zip"]
 
 # Import an audiobook to my collection.
@@ -123,20 +112,15 @@ def main [
       )
       let files = (
         if ($item | is_ssh_path) {
-          # log info $"is_ssh_path: true for ($item)"
-          let item = (
-            if $item_type == "dir" {
-              $"($item)/**/*"
-            } else {
-              $item
-            }
-          )
           let server = $item | split_ssh_path | get server
-          # todo Probably need to glob here too
-          $item | ssh ls | where type == "file" | get name | each {|file| $"($server):($file)"}
+          if $item_type == "dir" {
+            $"($item | escape_special_glob_characters)/**/*" | ssh glob --no-dir --no-symlink | each {|file| $"($server):($file)"}
+          } else {
+            $item | ssh ls --expand-path | get name | each {|file| $"($server):($file)"}
+          }
         } else {
           if $item_type == "dir" {
-            glob --no-dir (($item | path expand | str replace ":" "\\:") + "/**/*")
+            glob --no-dir --no-symlink (($item | path expand | escape_special_glob_characters) + "/**/*")
           } else {
             [($item | path expand)]
           }
