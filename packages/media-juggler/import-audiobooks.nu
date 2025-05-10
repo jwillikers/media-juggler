@@ -42,7 +42,7 @@ def main [
   --delete # Delete the original file
   --delay-between-imports: duration = 1min # When importing multiple books, pause for this amount between imports. This reduces load on various endpoints by spreading out workload over time. For metadata refreshes, this should probably be increased to as large a delay as you can tolerate.
   --destination: directory = "meerkat:/var/media/audiobooks" # The directory under which to copy files.
-  --no-merge # Don't combine multiple audio files for a book into a single file
+  --merge # Combine multiple audio files for a book into a single file
   --submit-all-acoustid-fingerprints # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
   --preferred-mp3-container: string = "m4b" # The preferred container for mp3 files. Can be either mp3 or m4b.
   --preferred-container: string = "ogg" # The preferred container for the output audio. Use either m4b or ogg.
@@ -171,7 +171,7 @@ def main [
     let index = $audiobook.index
     let audiobook = $audiobook.item
 
-  log info $"Importing audiobook files (ansi purple)($audiobook.files | path basename)(ansi reset) in directory (ansi purple)($audiobook.directory)(ansi reset)"
+  log info $"Importing audiobook files in directory (ansi purple)($audiobook.directory)(ansi reset)"
 
   let temporary_directory = (mktemp --directory $"import-audiobooks.($audiobook.directory | path basename).XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
@@ -357,7 +357,7 @@ def main [
         ^ffmpeg -i $audiobook_file ...$ffmpeg_args $output_file
         $audiobook | update files [$output_file]
       }
-    } else if not $no_merge {
+    } else if $merge {
       log debug $"Merging ($audiobook.container) files into a single ($audiobook.target.file_extension) file with m4b-tool"
       let m4b_tool_audio_format = (
         if $audiobook.target.container == "mov,mp4,m4a,3gp,3g2,mj2" {

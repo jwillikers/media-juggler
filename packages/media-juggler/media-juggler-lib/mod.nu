@@ -36,12 +36,16 @@ export const musicbrainz_non_genre_tags = ["abridged", "chapters", "explicit", "
 # todo test
 export def escape_special_glob_characters []: string -> string {
   let input = $in
-  if ($input | describe) != "string" {
+  if ($input | describe) not-in ["glob" "string"] {
     return $input
   }
-  const special_glob_characters = ['(' ')' '{' '}' '[' ']' '*' '?' ':' "$"]
+  const special_glob_characters = ['[' ']' '(' ')' '{' '}' '*' '?' ':' "$" ","]
   $special_glob_characters | reduce --fold $input {|character, acc|
-    $acc | str replace --all $character ('\' + $character)
+    if $character in ["[" "]"] {
+      $acc | str replace --all $character ('\' + $character)
+    } else {
+      $acc | str replace --all $character ('[' + $character + ']')
+    }
   }
 }
 
@@ -4877,28 +4881,34 @@ export def get_acoustid_fingerprint [
   }
 }
 
+# Get the embedded AcoustID fingerprint or calculate it for a track which does not have one.
+export def get_acoustid_fingerprint_track [
+  ignore_existing = false # Recalculate the AcoustID even when the tag exists
+]: record -> record {
+  let track = $in
+  if (
+    not $ignore_existing
+    and ($track | get --ignore-errors acoustid_fingerprint | is-not-empty)
+    and ($track | get --ignore-errors duration | is-not-empty)
+  ) {
+    $track
+  } else {
+    let pair = [$track.file] | fpcalc | first
+    (
+      $track
+      | upsert acoustid_fingerprint $pair.fingerprint
+      | upsert duration $pair.duration
+    )
+  }
+}
+
 # Get the embedded AcoustID fingerprint or calculate it for the tracks which do not have one.
 export def get_acoustid_fingerprint_tracks [
   ignore_existing = false # Recalculate the AcoustID even when the tag exists
 ]: table -> table {
   let tracks = $in
   $tracks | par-each {|track|
-    if (
-      not $ignore_existing
-      and "acoustid_fingerprint" in $track
-      and ($track.acoustid_fingerprint | is-not-empty)
-      and "duration" in $track
-      and ($track.duration | is-not-empty)
-    ) {
-      $track
-    } else {
-      let pair = [$track.file] | fpcalc | first
-      (
-        $track
-        | upsert acoustid_fingerprint $pair.fingerprint
-        | upsert duration $pair.duration
-      )
-    }
+    $track | get_acoustid_fingerprint_track $ignore_existing
   }
 }
 
@@ -4940,7 +4950,7 @@ export def get_musicbrainz_ids_by_acoustid [
     return null
   }
   let release_id = $release_ids | first
-  let track_recordings_for_release = (
+  let track_recording_ids_for_release = (
     $acoustid_responses | flatten | each {|track|
       let recording_ids = (
         $track
@@ -4953,34 +4963,32 @@ export def get_musicbrainz_ids_by_acoustid [
       );
       {
         file: $track.file
-        id: $track.matches.id
-        recordings: $recording_ids
+        acoustid_track_id: $track.matches.id
+        musicbrainz_recording_ids: $recording_ids
       }
     }
   )
-  let each_track_has_exactly_one_recording_for_the_release = $track_recordings_for_release | all {|track|
-    ($track.recordings | length) == 1
+  let each_track_has_exactly_one_recording_for_the_release = $track_recording_ids_for_release | all {|track|
+    ($track.musicbrainz_recording_ids | length) == 1
   }
   if (not $each_track_has_exactly_one_recording_for_the_release) {
     log error "Failed to link each AcoustID track to exactly one recording for the release"
     return null
   }
-  let file_metadata = (
-    $track_recordings_for_release
-    | flatten
-    | rename file acoustid_track_id musicbrainz_recording_id
-    | select file acoustid_track_id musicbrainz_recording_id
-    | join --right $tracks file
-    # | rename file acoustid_track_id musicbrainz_recording_id acoustid_fingerprint duration
-    # | par-each {|track|
-    #   {
-    #     file: $track.file
-    #     acoustid_track_id: $track.acoustid_track_id
-    #     acoustid_fingerprint: $track.acoustid_fingerprint
-    #     musicbrainz_recording_id: $track.musicbrainz_recording_id
-    #     audio_duration: $track.duration
-    #   }
-    # }
+  let track_recording_ids_for_release = each {|track|
+    (
+      $track
+      | insert musicbrainz_recording_id ($track.musicbrainz_recording_ids | first)
+      | reject musicbrainz_recording_ids
+    )
+  }
+
+  # Add the AcoustID Track IDs and MusicBrainz Recording IDs for each track.
+  let tracks = (
+    $tracks
+    | reject --ignore-errors acoustid_track_id musicbrainz_recording_id
+    # | flatten
+    | join --left $track_recording_ids_for_release file
   )
 
   {
@@ -5129,7 +5137,8 @@ export def filter_musicbrainz_releases [
 # 4. Via MusicBrainz search using the existing metadata
 #
 # If results for none of these methods is conclusive, it's recommended to provide the MusicBrainz Release ID.
-# AcoustID fingerprints will be submitted automatically.
+# AcoustID fingerprints will be submitted automatically when they are not already embedded in the file along with the corresponding MusicBrainz Recording IDs.
+# AcoustID fingerprints are also not submitted when they are successfully retrieved from the server.
 #
 # When an audiobook consists of multiple files, the caller must order the files correctly when the track number tag is missing and MusicBrainz Recording IDs can't be determined via AcoustID or embedded tags.
 # I might add logic here in the future to allow ordering recordings based on the natural order of the titles, but track number is usually embedded.
@@ -5174,89 +5183,106 @@ export def tag_audiobook [
       # Or otherwise ensure they won't be an issue when tagging
       $metadata | upsert book.musicbrainz_release_id $musicbrainz_release_id
     } else {
-      # If missing Release and/or Recording IDs, try using AcoustID
-      let metadata = (
-        if (
-          "musicbrainz_release_id" not-in $metadata.book
-          or ($metadata.book.musicbrainz_release_id | is-empty)
-          or (
-            $metadata.tracks
-            | any {|track|
-              "musicbrainz_recording_id" not-in $track or ($track.musicbrainz_recording_id | is-empty)
-            }
-          )
-        ) {
-          let retrieved = $metadata | get_musicbrainz_ids_by_acoustid $acoustid_client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $acoustid_score_threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
-          if ($retrieved | is-empty) {
-            $metadata
-          } else {
-            $retrieved
+      $metadata
+    }
+  )
+
+  # If missing MusicBrainz Release and/or Recording IDs, try using AcoustID
+  let acoustid_metadata = (
+    if (
+      ($musicbrainz_release_id | is-empty)
+      and (
+        ($metadata.book | get --ignore-errors musicbrainz_release_id | is-empty)
+        or (
+          $metadata.tracks
+          | any {|track|
+            "musicbrainz_recording_id" not-in $track or ($track.musicbrainz_recording_id | is-empty)
           }
-        } else {
-          $metadata
-        }
+        )
       )
-      let metadata = (
-        if (
-          "musicbrainz_release_id" not-in $metadata.book
-          or ($metadata.book.musicbrainz_release_id | is-empty)
-        ) {
-          log info $"Unable to determine MusicBrainz Recording and Release IDs using AcoustID fingerprints"
-          let release_candidates = $metadata | search_for_musicbrainz_release --retries $retries --retry-delay $retry_delay
-          if ($release_candidates | is-empty) {
-            log error $"Unable to find any matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-            $metadata
-          } else {
-            let release_candidates = $release_candidates | where score >= $search_score_threshold
-            if ($release_candidates | is-empty) {
-              log error $"Unable to find any matching MusicBrainz releases with a perfect score. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-              $metadata
-            } else if ($release_candidates | length) > 20 {
-              log error $"Found over 20 matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-              $metadata
-            } else if ($release_candidates | length) == 1 {
-              let release_candidate = $release_candidates.id | first
-              log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset)"
-              $metadata | upsert book.musicbrainz_release_id $release_candidate
+    ) {
+      (
+        $metadata
+        | (
+          get_musicbrainz_ids_by_acoustid
+          $acoustid_client_key
+          $ignore_embedded_acoustid_fingerprints
+          $fail_fast
+          --threshold $acoustid_score_threshold
+          --api-requests-per-second $api_requests_per_second
+          --retries $retries
+          --retry-delay $retry_delay
+        )
+      )
+    }
+  )
+  let metadata = (
+    if ($acoustid_metadata | is-empty) {
+      $metadata
+    } else {
+      $acoustid_metadata
+    }
+  )
+
+  let metadata = (
+    if (
+      ($musicbrainz_release_id | is-empty)
+      and ($metadata.book | get --ignore-errors musicbrainz_release_id | is-empty)
+    ) {
+      log info $"Unable to determine MusicBrainz Recording and Release IDs using AcoustID fingerprints"
+      let release_candidates = $metadata | search_for_musicbrainz_release --retries $retries --retry-delay $retry_delay
+      if ($release_candidates | is-empty) {
+        log error $"Unable to find any matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+        $metadata
+      } else {
+        let release_candidates = $release_candidates | where score >= $search_score_threshold
+        if ($release_candidates | is-empty) {
+          log error $"Unable to find any matching MusicBrainz releases with a perfect score. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+          $metadata
+        } else if ($release_candidates | length) > 20 {
+          log error $"Found over 20 matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+          $metadata
+        } else if ($release_candidates | length) == 1 {
+          let release_candidate = $release_candidates.id | first
+          log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset)"
+          $metadata | upsert book.musicbrainz_release_id $release_candidate
+        } else {
+          log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
+          let $release_candidates = $release_candidates | get id | each {|candidate|
+            let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [label-rels recordings url-rels]
+            if ($received_metadata | is-empty) {
+              log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
+              null
             } else {
-              log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
-              let $release_candidates = $release_candidates | get id | each {|candidate|
-                let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [label-rels recordings url-rels]
-                if ($received_metadata | is-empty) {
-                  log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
-                  null
-                } else {
-                  $received_metadata
-                }
-              }
-              if ($release_candidates | any {|r| $r == null}) {
-                return null
-              }
-              let release_candidates = $release_candidates | filter_musicbrainz_releases $metadata $max_track_duration_difference
-              if ($release_candidates | is-empty) {
-                log error $"Unable to find any matching MusicBrainz releases after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-                $metadata
-              } else if ($release_candidates | length) == 1 {
-                let release_candidate = $release_candidates | first
-                log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset) after filtering"
-                $metadata | upsert book.musicbrainz_release_id $release_candidate
-              } else {
-                # todo Interactively allow selecting an available release
-                log error $"Multiple matching MusicBrainz releases remaining after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-                $metadata
-              }
+              $received_metadata
             }
           }
-        } else {
-          $metadata
+          if ($release_candidates | any {|r| $r == null}) {
+            return null
+          }
+          let release_candidates = $release_candidates | filter_musicbrainz_releases $metadata $max_track_duration_difference
+          if ($release_candidates | is-empty) {
+            log error $"Unable to find any matching MusicBrainz releases after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+            $metadata
+          } else if ($release_candidates | length) == 1 {
+            let release_candidate = $release_candidates | first
+            log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset) after filtering"
+            $metadata | upsert book.musicbrainz_release_id $release_candidate
+          } else {
+            # todo Interactively allow selecting an available release
+            log error $"Multiple matching MusicBrainz releases remaining after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+            $metadata
+          }
         }
-      )
+      }
+    } else {
       $metadata
     }
   )
 
   # We need to keep metadata that isn't available from MusicBrainz like AcoustID fingerprint and AcoustID track ID.
   # Passing on the duration is also good.
+
   # todo Validate MBIDs when parsing them.
 
   if ($metadata | is-empty) or "book" not-in $metadata or "musicbrainz_release_id" not-in $metadata.book or ($metadata.book.musicbrainz_release_id | is-empty) {
@@ -5276,28 +5302,43 @@ export def tag_audiobook [
   if ($acoustid_user_key | is-not-empty) {
     # Calculate the AcoustID fingerprint if necessary
     let tracks = (
-      if (
-        $metadata.tracks
-        | all {|track|
-          "acoustid_fingerprint" in $track
+      $metadata.tracks | each {|track|
+        if ($track | get --ignore-errors "acoustid_fingerprint" | is-empty) {
+          $track | get_acoustid_fingerprint_track $ignore_embedded_acoustid_fingerprints
+        } else {
+          $track
         }
-      ) {
-        $metadata.tracks
-      } else {
-        $metadata.tracks | get_acoustid_fingerprint_tracks $ignore_embedded_acoustid_fingerprints
       }
     )
+    # Filter out tracks where the MusicBrainz Recording IDs were successfully retrieved by using their AcoustID fingerprints.
+    # That means that the AcoustID fingerprints already exist on the server and don't need to be submitted.
     let tracks = (
       if $submit_all_acoustid_fingerprints {
         $tracks
       } else {
-        # Ignore tracks which already had the embedded AcoustID fingerprint and corresponding MusicBrainz Recording ID.
-        if (
-          ($original_metadata.tracks | get --ignore-errors acoustid_fingerprint | is-empty)
-          or ($original_metadata.tracks | get --ignore-errors musicbrainz_recording_id | is-empty)
-        ) {
+        if ($acoustid_metadata | is-empty) {
           $tracks
         } else {
+          # Don't filter out tracks where the retrieved MusicBrainz Recording ID differs from the one the track ended up with at the end
+          (
+            $tracks
+            | join ($acoustid_metadata.tracks | rename --column {musicbrainz_recording_id: "retrieved_musicbrainz_recording_id"}) file
+            | filter {|track|
+              $track.musicbrainz_recording_id != $track.retrieved_musicbrainz_recording_id
+            }
+          )
+        }
+      }
+    )
+    # Filter out tracks which already had the embedded AcoustID fingerprint and corresponding MusicBrainz Recording ID.
+    let tracks = (
+      if $submit_all_acoustid_fingerprints {
+        $tracks
+      } else {
+        if (
+          "acoustid_fingerprint" in ($original_metadata.tracks | columns)
+          and "musicbrainz_recording_id" in ($original_metadata.tracks | columns)
+        ) {
           # We have both acoustid_fingerprint and musicbrainz_recording_id columns, but one or the other could be missing for individual tracks
           (
             $original_metadata.tracks
@@ -5319,12 +5360,14 @@ export def tag_audiobook [
               }
             }
           )
+        } else {
+          $tracks
         }
       }
     )
     # log info $"tracks: ($tracks)"
     if ($tracks | is-empty) {
-      log info "No AcoustID fingerprints will be submitted since tracks already had corresponding AcoustID fingerprints and MusicBrainz Recording IDs embedded in their metadata."
+      log info "No AcoustID fingerprints will be submitted since tracks already had corresponding AcoustID fingerprints and MusicBrainz Recording IDs on the AcoustID server or embedded in their metadata."
     } else {
       # log info $"$tracks: ($tracks | reject embedded_pictures)"
       let acoustid_submissions = (
