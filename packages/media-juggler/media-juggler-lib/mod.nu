@@ -3947,7 +3947,16 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<file: 
   if ($tracks | is-empty) {
     return null
   }
-  let all_possible_release_ids = $tracks | get matches | flatten | get recordings | flatten | get releases | flatten | get id | uniq
+  let all_possible_release_ids = (
+    $tracks | get matches | flatten | get recordings | flatten
+  )
+  let all_possible_release_ids = (
+    if "releases" in ($all_possible_release_ids | columns) {
+      $all_possible_release_ids | get releases | flatten | get id | uniq
+    } else {
+      return null
+    }
+  )
   $all_possible_release_ids | filter {|release_id|
     $tracks | all {|track|
       $release_id in ($track | get matches | get recordings | flatten | get releases | flatten | get id)
