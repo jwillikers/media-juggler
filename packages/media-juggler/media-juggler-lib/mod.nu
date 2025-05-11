@@ -4984,7 +4984,7 @@ export def get_musicbrainz_ids_by_acoustid [
     log error "Failed to link each AcoustID track to exactly one recording for the release"
     return null
   }
-  let track_recording_ids_for_release = each {|track|
+  let track_recording_ids_for_release = $track_recording_ids_for_release | each {|track|
     (
       $track
       | insert musicbrainz_recording_id ($track.musicbrainz_recording_ids | first)
@@ -5285,6 +5285,7 @@ export def tag_audiobook [
         }
       }
     } else {
+      log info $"Successfully determined the MusicBrainz Recording and Release IDs using AcoustID fingerprints"
       $metadata
     }
   )
