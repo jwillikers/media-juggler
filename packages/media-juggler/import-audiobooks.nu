@@ -39,7 +39,7 @@ def main [
   --lossy-to-lossy # Allow transcoding lossy formats to other lossy formats. This is irreversible and has the potential to introduce artifacts and degrade quality. It's recommended to keep the original lossy files for archival purposes when doing this.
   --musicbrainz-release-id: string
   --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
-  --delete # Delete the original file
+  --keep # Keep the original file
   --delay-between-imports: duration = 1min # When importing multiple books, pause for this amount between imports. This reduces load on various endpoints by spreading out workload over time. For metadata refreshes, this should probably be increased to as large a delay as you can tolerate.
   --destination: directory = "meerkat:/var/media/audiobooks" # The directory under which to copy files.
   --merge # Combine multiple audio files for a book into a single file
@@ -189,7 +189,7 @@ def main [
           $file | scp ([$temporary_directory "downloads" ($file | path basename)] | path join)
         }
       }
-    } else {
+    } else if $keep {
       # Copy to temp directory to avoid modifying the original file
       $audiobook.files | each {|file|
         if ($file | path parse | get extension) == "zip" {
@@ -438,47 +438,6 @@ def main [
     return {audiobook: $audiobook.directory error: $"Number of tracks doesn't match the number of files for (ansi yellow)($audiobook.directory)(ansi clear)"}
   }
 
-  # Rename M4B file using the title of the audiobook
-  let audiobook = (
-    # For a single file, just name the file exactly as the track
-    # if ($metadata.tracks | length) == 1 {
-    #   $audiobook | update files (
-    #     # This is okay for single file outputs only.
-    #     let new_file = (
-    #       $metadata.tracks.file
-    #       | first
-    #       | path parse
-    #       | update stem ()
-    #       | update parent $temporary_directory
-    #       | path join
-    #     );
-    #     mkdir ($new_file | path dirname);
-    #     cp --force ($metadata.tracks.file | first) $new_file;
-    #     [$new_file]
-    #   )
-    # } else {
-      # For multiple files, prefix the name with the index
-      # First, determine how many leading zeros are required for the track number.
-      let number_of_digits = (($metadata.tracks | length) - 1) | into string | str length;
-      $audiobook | update files (
-        $metadata.tracks
-        | each {|track|
-          let stem = (
-            if ($metadata.tracks | length) == 1 {
-              $track.title | sanitize_file_name
-            } else {
-              ($track.index | fill --alignment r --character '0' --width $number_of_digits) + " " + $track.title
-            }
-          )
-          let new_file = $track.file | path parse | update stem $stem | update parent $temporary_directory | path join
-          mkdir ($new_file | path dirname)
-          cp --force $track.file $new_file
-          $new_file
-        }
-      )
-    # }
-  )
-
   let primary_authors = $metadata.book.contributors | where role == "primary author"
   if ($primary_authors | is-empty) {
     return {audiobook: $audiobook.directory error: $"Failed to find primary authors for the audiobook (ansi yellow)($audiobook.directory)(ansi clear). Contributors are ($metadata.book.contributors)"}
@@ -501,12 +460,23 @@ def main [
 
   let target_destination_directory = [$destination $relative_destination_directory] | path join
 
+  # Determine how many leading zeros are required for the track number.
+  let number_of_digits = (($metadata.tracks | length) - 1) | into string | str length;
   let audiobook = $audiobook | update files (
-    $audiobook.files
-    | each {|file|
+    $metadata.tracks
+    | each {|track|
+      # For multiple files, prefix the name with the index
+      let stem = (
+        if ($metadata.tracks | length) == 1 {
+          $track.title | sanitize_file_name
+        } else {
+          ($track.index | fill --alignment r --character '0' --width $number_of_digits) + " " + $track.title
+        }
+      )
+      let destination = $track.file | path parse | update stem $stem | update parent $target_destination_directory | path join
       {
-        file: $file
-        destination: ([$target_destination_directory ($file | path basename)] | path join)
+        file: $track.file
+        destination: $destination
       }
     }
   )
@@ -527,7 +497,7 @@ def main [
     }
   }
 
-  if $delete {
+  if not $keep {
     log debug "Deleting the original files"
     (
       $audiobook.original_files
