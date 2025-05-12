@@ -3663,84 +3663,84 @@ def test_fetch_and_parse_musicbrainz_series [] {
 }
 
 def test_build_series_tree_up_three_levels [] {
-let monogatari_series_cache = {|series_id, update|
-  log info $"$series_id: ($series_id)"
-  if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
-    {
-      id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
-      name: "Monogatari"
-      parent_series: []
-      subseries: [
-        [id name];
-        ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
-        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
-        ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
-      ]
-      genres: [
-        [name, count];
-        [fiction, 1],
-        ["light novel", 1],
-        [mystery, 1],
-        [paranormal, 1],
-        [psychological, 1],
-        [romance, 1],
-        ["school life", 1],
-        [supernatural, 1],
-        [vampire, 1]
-      ]
-      tags: []
-    }
-  } else if $series_id == "6660f123-24a0-46c7-99bf-7ff5dc11ceef" {
-    {
-      id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
-      name: "Monogatari Series: First Season"
-      parent_series: [
-        [id name];
-        ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
-      ]
-      subseries: [
-        [id name];
-        ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
-      ]
-      genres: [
-        [name, count];
-        [fiction, 1],
-        ["light novel", 1],
-        [mystery, 1],
-        [paranormal, 1],
-        [psychological, 1],
-        [romance, 1],
-        ["school life", 1],
-        [supernatural, 1],
-        [vampire, 1]
-      ]
-      tags: []
-    }
-  } else if $series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" {
-    {
-      id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
-      name: "Bakemonogatari"
-      parent_series: [
-        [id name];
-        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
-      ]
-      subseries: []
-      genres: [
-        [name, count];
-        [fiction, 1],
-        ["light novel", 1],
-        [mystery, 1],
-        [paranormal, 1],
-        [psychological, 1],
-        [romance, 1],
-        ["school life", 1],
-        ["speculative fiction", 1],
-        [vampire, 1]
-      ]
-      tags: []
+  let monogatari_series_cache = {|series_id, update|
+    log info $"$series_id: ($series_id)"
+    if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
+      {
+        id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+        name: "Monogatari"
+        parent_series: []
+        subseries: [
+          [id name];
+          ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+          ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+        ]
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    } else if $series_id == "6660f123-24a0-46c7-99bf-7ff5dc11ceef" {
+      {
+        id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+        name: "Monogatari Series: First Season"
+        parent_series: [
+          [id name];
+          ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+        ]
+        subseries: [
+          [id name];
+          ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+        ]
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    } else if $series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" {
+      {
+        id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+        name: "Bakemonogatari"
+        parent_series: [
+          [id name];
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ]
+        subseries: []
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          ["speculative fiction", 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
     }
   }
-}
   let expected = {
     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
     name: "Bakemonogatari"
@@ -3835,178 +3835,178 @@ let monogatari_series_cache = {|series_id, update|
   assert equal ($input | build_series_tree_up 5 $monogatari_series_cache) $expected
 }
 
-# def test_build_series_tree_up_three_levels_2 [] {
-# let monogatari_series_cache = {|series_id, update|
-#   log info $"$series_id: ($series_id)"
-#   if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
-#     {
-#       id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
-#       name: "Monogatari"
-#       parent_series: []
-#       subseries: [
-#         [id name];
-#         ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
-#         ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
-#         ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
-#       ]
-#       genres: [
-#         [name, count];
-#         [fiction, 1],
-#         ["light novel", 1],
-#         [mystery, 1],
-#         [paranormal, 1],
-#         [psychological, 1],
-#         [romance, 1],
-#         ["school life", 1],
-#         [supernatural, 1],
-#         [vampire, 1]
-#       ]
-#       tags: []
-#     }
-#   } else if $series_id == "6660f123-24a0-46c7-99bf-7ff5dc11ceef" {
-#     {
-#       id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
-#       name: "Monogatari Series: First Season"
-#       parent_series: [
-#         [id name];
-#         ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
-#       ]
-#       subseries: [
-#         [id name];
-#         ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
-#       ]
-#       genres: [
-#         [name, count];
-#         [fiction, 1],
-#         ["light novel", 1],
-#         [mystery, 1],
-#         [paranormal, 1],
-#         [psychological, 1],
-#         [romance, 1],
-#         ["school life", 1],
-#         [supernatural, 1],
-#         [vampire, 1]
-#       ]
-#       tags: []
-#     }
-#   } else if $series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" {
-#     {
-#       id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
-#       name: "Bakemonogatari"
-#       parent_series: [
-#         [id name];
-#         ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
-#       ]
-#       subseries: []
-#       genres: [
-#         [name, count];
-#         [fiction, 1],
-#         ["light novel", 1],
-#         [mystery, 1],
-#         [paranormal, 1],
-#         [psychological, 1],
-#         [romance, 1],
-#         ["school life", 1],
-#         ["speculative fiction", 1],
-#         [vampire, 1]
-#       ]
-#       tags: []
-#     }
-#   }
-# }
-#   let expected = {
-#     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
-#     name: "Bakemonogatari"
-#     parent_series: [
-#       [id name parent_series subseries genres tags];
-#       [
-#         "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
-#         "Monogatari Series: First Season"
-#         [
-#           [id name parent_series subseries genres tags];
-#           [
-#             "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
-#             "Monogatari"
-#             []
-#             [
-#               [id name];
-#               ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
-#               ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
-#               ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
-#             ]
-#             [
-#               [name, count];
-#               [fiction, 1],
-#               ["light novel", 1],
-#               [mystery, 1],
-#               [paranormal, 1],
-#               [psychological, 1],
-#               [romance, 1],
-#               ["school life", 1],
-#               [supernatural, 1],
-#               [vampire, 1]
-#             ]
-#             []
-#           ]
-#         ]
-#         [
-#           [id name];
-#           ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
-#         ]
-#         [
-#           [name, count];
-#           [fiction, 1],
-#           ["light novel", 1],
-#           [mystery, 1],
-#           [paranormal, 1],
-#           [psychological, 1],
-#           [romance, 1],
-#           ["school life", 1],
-#           [supernatural, 1],
-#           [vampire, 1]
-#         ]
-#         []
-#       ]
-#     ]
-#     subseries: []
-#     genres: [
-#       [name, count];
-#       [fiction, 1],
-#       ["light novel", 1],
-#       [mystery, 1],
-#       [paranormal, 1],
-#       [psychological, 1],
-#       [romance, 1],
-#       ["school life", 1],
-#       ["speculative fiction", 1],
-#       [vampire, 1]
-#     ]
-#     tags: []
-#   }
-#   let input = {
-#     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
-#     name: "Bakemonogatari"
-#     parent_series: [
-#       [id name];
-#       ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
-#     ]
-#     subseries: []
-#     genres: [
-#       [name, count];
-#       [fiction, 1],
-#       ["light novel", 1],
-#       [mystery, 1],
-#       [paranormal, 1],
-#       [psychological, 1],
-#       [romance, 1],
-#       ["school life", 1],
-#       ["speculative fiction", 1],
-#       [vampire, 1]
-#     ]
-#     tags: []
-#   }
-#   assert equal ($input | build_series_tree_up 5 $monogatari_series_cache) $expected
-# }
+def test_build_series_tree_up_three_levels_2 [] {
+  let monogatari_series_cache = {|series_id, update|
+    log info $"$series_id: ($series_id)"
+    if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
+      {
+        id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+        name: "Monogatari"
+        parent_series: []
+        subseries: [
+          [id name];
+          ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+          ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+        ]
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    } else if $series_id == "6660f123-24a0-46c7-99bf-7ff5dc11ceef" {
+      {
+        id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+        name: "Monogatari Series: First Season"
+        parent_series: [
+          [id name];
+          ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+        ]
+        subseries: [
+          [id name];
+          ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+        ]
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    } else if $series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" {
+      {
+        id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+        name: "Bakemonogatari"
+        parent_series: [
+          [id name];
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ]
+        subseries: []
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          ["speculative fiction", 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    }
+  }
+  let expected = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name parent_series subseries genres tags];
+      [
+        "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+        "Monogatari Series: First Season"
+        [
+          [id name parent_series subseries genres tags];
+          [
+            "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+            "Monogatari"
+            []
+            [
+              [id name];
+              ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+              ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+              ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+            ]
+            [
+              [name, count];
+              [fiction, 1],
+              ["light novel", 1],
+              [mystery, 1],
+              [paranormal, 1],
+              [psychological, 1],
+              [romance, 1],
+              ["school life", 1],
+              [supernatural, 1],
+              [vampire, 1]
+            ]
+            []
+          ]
+        ]
+        [
+          [id name];
+          ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+        ]
+        [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        []
+      ]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  let input = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name];
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | build_series_tree_up 5 $monogatari_series_cache) $expected
+}
 
 # def test_build_series_tree_up_max_depth [] {
 #   let expected = {
@@ -4107,7 +4107,7 @@ let monogatari_series_cache = {|series_id, update|
 
 def test_build_series_tree_up [] {
   test_build_series_tree_up_three_levels
-  # test_build_series_tree_up_three_levels_2
+  test_build_series_tree_up_three_levels_2
   # test_build_series_tree_up_max_depth
 }
 
