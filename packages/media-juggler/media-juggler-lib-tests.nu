@@ -709,7 +709,7 @@ def test_convert_series_for_group_tag_two_with_index [] {
 
 def test_convert_series_for_group_tag_one_without_index_one_with_index [] {
   let expected = "Series One;Mistborn #3"
-  assert equal ([[name index]; ["Series One" null] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
+  assert equal ([[name index]; ["Series One" ""] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
 }
 
 def test_convert_series_for_group_tag [] {
@@ -2084,13 +2084,13 @@ def test_equivalent_track_durations [] {
   test_equivalent_track_durations_duplicate_indices_left
 }
 
-def test_has_distributor_in_common_both_empty []: {
+def test_has_distributor_in_common_both_empty [] {
   let left = []
   let right = []
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_right_empty []: {
+def test_has_distributor_in_common_right_empty [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2101,7 +2101,7 @@ def test_has_distributor_in_common_right_empty []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_left_empty []: {
+def test_has_distributor_in_common_left_empty [] {
   let left = []
   let right = [
     [id name entity role];
@@ -2112,7 +2112,7 @@ def test_has_distributor_in_common_left_empty []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_none []: {
+def test_has_distributor_in_common_none [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2128,7 +2128,7 @@ def test_has_distributor_in_common_none []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_same_name_different_id []: {
+def test_has_distributor_in_common_same_name_different_id [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2144,7 +2144,7 @@ def test_has_distributor_in_common_same_name_different_id []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_same_id_different_entity []: {
+def test_has_distributor_in_common_same_id_different_entity [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2160,7 +2160,7 @@ def test_has_distributor_in_common_same_id_different_entity []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_one []: {
+def test_has_distributor_in_common_one [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2176,12 +2176,12 @@ def test_has_distributor_in_common_one []: {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_name_only_left []: {
+def test_has_distributor_in_common_name_only_left [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
     ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
-    [null "Libro.fm" label distributor]
+    ["" "Libro.fm" label distributor]
   ]
   let right = [
     [id name entity role];
@@ -2192,7 +2192,7 @@ def test_has_distributor_in_common_name_only_left []: {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_name_only_right []: {
+def test_has_distributor_in_common_name_only_right [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2208,7 +2208,7 @@ def test_has_distributor_in_common_name_only_right []: {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common []: {
+def test_has_distributor_in_common [] {
   test_has_distributor_in_common_left_empty
   test_has_distributor_in_common_right_empty
   test_has_distributor_in_common_both_empty
@@ -2220,7 +2220,7 @@ def test_has_distributor_in_common []: {
   test_has_distributor_in_common_name_only_right
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags [] {
   let input = [
     [id tags];
     ["x" []]
@@ -2230,7 +2230,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag [] {
   let input = [
     [id tags];
     ["x" [[name count]; [chapter 1]]]
@@ -2241,7 +2241,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_one []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_one [] {
   let input = [
     [id tags];
     ["x" [[name count]; [chapters 1]]]
@@ -2250,7 +2250,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_one []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest [] {
   let input = [
     [id tags];
     ["x" [[name count]; [chapters 1] [unabridged 1]]]
@@ -2261,7 +2261,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest [] {
   let input = [
     [id tags];
     ["u" [[name count]; [chapters 1]]]
@@ -2273,7 +2273,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag [] {
   test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags
   test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag
   test_audiobooks_with_the_highest_voted_chapters_tag_one
@@ -2281,7 +2281,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag []: {
   test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest
 }
 
-def test_filter_musicbrainz_chapters_releases_bad_length []: {
+def test_filter_musicbrainz_chapters_releases_bad_length [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2363,7 +2363,7 @@ def test_filter_musicbrainz_chapters_releases_bad_length []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) null
 }
 
-def test_filter_musicbrainz_chapters_releases_one_match []: {
+def test_filter_musicbrainz_chapters_releases_one_match [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2446,7 +2446,7 @@ def test_filter_musicbrainz_chapters_releases_one_match []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_one_track []: {
+def test_filter_musicbrainz_chapters_releases_one_track [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2511,7 +2511,7 @@ def test_filter_musicbrainz_chapters_releases_one_track []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_audible_asin []: {
+def test_filter_musicbrainz_chapters_releases_audible_asin [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2607,7 +2607,7 @@ def test_filter_musicbrainz_chapters_releases_audible_asin []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_chapter_tags []: {
+def test_filter_musicbrainz_chapters_releases_chapter_tags [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2711,7 +2711,7 @@ def test_filter_musicbrainz_chapters_releases_chapter_tags []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_distributor []: {
+def test_filter_musicbrainz_chapters_releases_distributor [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2807,7 +2807,7 @@ def test_filter_musicbrainz_chapters_releases_distributor []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_duration []: {
+def test_filter_musicbrainz_chapters_releases_duration [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2903,7 +2903,7 @@ def test_filter_musicbrainz_chapters_releases_duration []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_two_match []: {
+def test_filter_musicbrainz_chapters_releases_two_match [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -3000,7 +3000,7 @@ def test_filter_musicbrainz_chapters_releases_two_match []: {
 }
 
 
-def test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks []: {
+def test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -3110,7 +3110,7 @@ def test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases []: {
+def test_filter_musicbrainz_chapters_releases [] {
   test_filter_musicbrainz_chapters_releases_bad_length
   test_filter_musicbrainz_chapters_releases_one_match
   test_filter_musicbrainz_chapters_releases_one_track
@@ -3121,7 +3121,7 @@ def test_filter_musicbrainz_chapters_releases []: {
   test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks
 }
 
-def test_filter_musicbrainz_releases_audible_asin []: {
+def test_filter_musicbrainz_releases_audible_asin [] {
   let candidates = [
     [book, tracks];
     [
@@ -3193,7 +3193,7 @@ def test_filter_musicbrainz_releases_audible_asin []: {
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases_distributor []: {
+def test_filter_musicbrainz_releases_distributor [] {
   let candidates = [
     [book, tracks];
     [
@@ -3275,7 +3275,7 @@ def test_filter_musicbrainz_releases_distributor []: {
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases_track_duration []: {
+def test_filter_musicbrainz_releases_track_duration [] {
   let candidates = [
     [book, tracks];
     [
@@ -3344,7 +3344,7 @@ def test_filter_musicbrainz_releases_track_duration []: {
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations []: {
+def test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations [] {
   let candidates = [
     [book, tracks];
     [
@@ -3427,14 +3427,14 @@ def test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_duratio
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases []: {
+def test_filter_musicbrainz_releases [] {
   test_filter_musicbrainz_releases_distributor
   test_filter_musicbrainz_releases_audible_asin
   test_filter_musicbrainz_releases_track_duration
   test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations
 }
 
-def test_parse_container_and_audio_codec_from_ffprobe_output_aax []: {
+def test_parse_container_and_audio_codec_from_ffprobe_output_aax [] {
   let input = open ([$test_data_dir "ffprobe_output_aax.json"] | path join)
   let expected = {
     audio_codec: "aac"
@@ -3444,7 +3444,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_aax []: {
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
 
-def test_parse_container_and_audio_codec_from_ffprobe_output_flac []: {
+def test_parse_container_and_audio_codec_from_ffprobe_output_flac [] {
   let input = open ([$test_data_dir "ffprobe_output_flac.json"] | path join)
   let expected = {
     audio_codec: "flac"
@@ -3454,7 +3454,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_flac []: {
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
 
-def test_parse_container_and_audio_codec_from_ffprobe_output_m4b_aac []: {
+def test_parse_container_and_audio_codec_from_ffprobe_output_m4b_aac [] {
   let input = open ([$test_data_dir "ffprobe_output_m4b_aac.json"] | path join)
   let expected = {
     audio_codec: "aac"
@@ -3464,7 +3464,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_m4b_aac []: {
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
 
-def test_parse_container_and_audio_codec_from_ffprobe_output_mp3 []: {
+def test_parse_container_and_audio_codec_from_ffprobe_output_mp3 [] {
   let input = open ([$test_data_dir "ffprobe_output_mp3.json"] | path join)
   let expected = {
     audio_codec: "mp3"
@@ -3474,7 +3474,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_mp3 []: {
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
 
-def test_parse_container_and_audio_codec_from_ffprobe_output_oga_flac []: {
+def test_parse_container_and_audio_codec_from_ffprobe_output_oga_flac [] {
   let input = open ([$test_data_dir "ffprobe_output_oga_flac.json"] | path join)
   let expected = {
     audio_codec: "flac"
@@ -3484,7 +3484,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_oga_flac []: {
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
 
-def test_parse_container_and_audio_codec_from_ffprobe_output_opus []: {
+def test_parse_container_and_audio_codec_from_ffprobe_output_opus [] {
   let input = open ([$test_data_dir "ffprobe_output_opus.json"] | path join)
   let expected = {
     audio_codec: "opus"
@@ -3494,7 +3494,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_opus []: {
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
 
-def test_parse_container_and_audio_codec_from_ffprobe_output_wav []: {
+def test_parse_container_and_audio_codec_from_ffprobe_output_wav [] {
   let input = open ([$test_data_dir "ffprobe_output_wav.json"] | path join)
   let expected = {
     audio_codec: "pcm_s16le"
@@ -3504,7 +3504,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output_wav []: {
   assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
 }
 
-def test_parse_container_and_audio_codec_from_ffprobe_output []: {
+def test_parse_container_and_audio_codec_from_ffprobe_output [] {
   test_parse_container_and_audio_codec_from_ffprobe_output_aax
   test_parse_container_and_audio_codec_from_ffprobe_output_flac
   test_parse_container_and_audio_codec_from_ffprobe_output_m4b_aac
@@ -3514,7 +3514,7 @@ def test_parse_container_and_audio_codec_from_ffprobe_output []: {
   test_parse_container_and_audio_codec_from_ffprobe_output_wav
 }
 
-def test_parse_musicbrainz_series_monogatari_work []: {
+def test_parse_musicbrainz_series_monogatari_work [] {
   let input = open ([$test_data_dir "monogatari_work_series.json"] | path join)
   let expected = {
     id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
@@ -3543,7 +3543,7 @@ def test_parse_musicbrainz_series_monogatari_work []: {
   assert equal ($input | parse_musicbrainz_series) $expected
 }
 
-def test_parse_musicbrainz_series_monogatari_first_season_work []: {
+def test_parse_musicbrainz_series_monogatari_first_season_work [] {
   let input = open ([$test_data_dir "monogatari_first_season_work_series.json"] | path join)
   let expected = {
     id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
@@ -3573,7 +3573,7 @@ def test_parse_musicbrainz_series_monogatari_first_season_work []: {
   assert equal ($input | parse_musicbrainz_series) $expected
 }
 
-def test_parse_musicbrainz_series_bakemonogatari_work []: {
+def test_parse_musicbrainz_series_bakemonogatari_work [] {
   let input = open ([$test_data_dir "bakemonogatari_work_series.json"] | path join)
   let expected = {
     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
@@ -3600,13 +3600,518 @@ def test_parse_musicbrainz_series_bakemonogatari_work []: {
   assert equal ($input | parse_musicbrainz_series) $expected
 }
 
-def test_parse_musicbrainz_series []: {
+def test_parse_musicbrainz_series [] {
   test_parse_musicbrainz_series_monogatari_work
   test_parse_musicbrainz_series_monogatari_first_season_work
   test_parse_musicbrainz_series_bakemonogatari_work
 }
 
-def test_organize_subseries_two_subseries []: {
+def test_fetch_and_parse_musicbrainz_series_cached [] {
+  let cache = {|series_id, update|
+    if ($series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322") {
+      {
+        id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+        name: "Bakemonogatari"
+        parent_series: [
+          [id name];
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ]
+        subseries: []
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          ["speculative fiction", 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    }
+  }
+  let expected = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name];
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  assert equal ("0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" | fetch_and_parse_musicbrainz_series $cache) $expected
+}
+
+def test_fetch_and_parse_musicbrainz_series [] {
+  test_fetch_and_parse_musicbrainz_series_cached
+}
+
+def test_build_series_tree_up_three_levels [] {
+let monogatari_series_cache = {|series_id, update|
+  log info $"$series_id: ($series_id)"
+  if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
+    {
+      id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+      name: "Monogatari"
+      parent_series: []
+      subseries: [
+        [id name];
+        ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+      ]
+      genres: [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      tags: []
+    }
+  } else if $series_id == "6660f123-24a0-46c7-99bf-7ff5dc11ceef" {
+    {
+      id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+      name: "Monogatari Series: First Season"
+      parent_series: [
+        [id name];
+        ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+      ]
+      subseries: [
+        [id name];
+        ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+      ]
+      genres: [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      tags: []
+    }
+  } else if $series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" {
+    {
+      id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+      name: "Bakemonogatari"
+      parent_series: [
+        [id name];
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+      ]
+      subseries: []
+      genres: [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        ["speculative fiction", 1],
+        [vampire, 1]
+      ]
+      tags: []
+    }
+  }
+}
+  let expected = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name parent_series subseries genres tags];
+      [
+        "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+        "Monogatari Series: First Season"
+        [
+          [id name parent_series subseries genres tags];
+          [
+            "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+            "Monogatari"
+            []
+            [
+              [id name];
+              ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+              ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+              ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+            ]
+            [
+              [name, count];
+              [fiction, 1],
+              ["light novel", 1],
+              [mystery, 1],
+              [paranormal, 1],
+              [psychological, 1],
+              [romance, 1],
+              ["school life", 1],
+              [supernatural, 1],
+              [vampire, 1]
+            ]
+            []
+          ]
+        ]
+        [
+          [id name];
+          ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+        ]
+        [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        []
+      ]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  let input = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name];
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | build_series_tree_up 5 $monogatari_series_cache) $expected
+}
+
+# def test_build_series_tree_up_three_levels_2 [] {
+# let monogatari_series_cache = {|series_id, update|
+#   log info $"$series_id: ($series_id)"
+#   if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
+#     {
+#       id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+#       name: "Monogatari"
+#       parent_series: []
+#       subseries: [
+#         [id name];
+#         ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+#         ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+#         ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+#       ]
+#       genres: [
+#         [name, count];
+#         [fiction, 1],
+#         ["light novel", 1],
+#         [mystery, 1],
+#         [paranormal, 1],
+#         [psychological, 1],
+#         [romance, 1],
+#         ["school life", 1],
+#         [supernatural, 1],
+#         [vampire, 1]
+#       ]
+#       tags: []
+#     }
+#   } else if $series_id == "6660f123-24a0-46c7-99bf-7ff5dc11ceef" {
+#     {
+#       id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+#       name: "Monogatari Series: First Season"
+#       parent_series: [
+#         [id name];
+#         ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+#       ]
+#       subseries: [
+#         [id name];
+#         ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+#       ]
+#       genres: [
+#         [name, count];
+#         [fiction, 1],
+#         ["light novel", 1],
+#         [mystery, 1],
+#         [paranormal, 1],
+#         [psychological, 1],
+#         [romance, 1],
+#         ["school life", 1],
+#         [supernatural, 1],
+#         [vampire, 1]
+#       ]
+#       tags: []
+#     }
+#   } else if $series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" {
+#     {
+#       id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+#       name: "Bakemonogatari"
+#       parent_series: [
+#         [id name];
+#         ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+#       ]
+#       subseries: []
+#       genres: [
+#         [name, count];
+#         [fiction, 1],
+#         ["light novel", 1],
+#         [mystery, 1],
+#         [paranormal, 1],
+#         [psychological, 1],
+#         [romance, 1],
+#         ["school life", 1],
+#         ["speculative fiction", 1],
+#         [vampire, 1]
+#       ]
+#       tags: []
+#     }
+#   }
+# }
+#   let expected = {
+#     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+#     name: "Bakemonogatari"
+#     parent_series: [
+#       [id name parent_series subseries genres tags];
+#       [
+#         "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+#         "Monogatari Series: First Season"
+#         [
+#           [id name parent_series subseries genres tags];
+#           [
+#             "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+#             "Monogatari"
+#             []
+#             [
+#               [id name];
+#               ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+#               ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+#               ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+#             ]
+#             [
+#               [name, count];
+#               [fiction, 1],
+#               ["light novel", 1],
+#               [mystery, 1],
+#               [paranormal, 1],
+#               [psychological, 1],
+#               [romance, 1],
+#               ["school life", 1],
+#               [supernatural, 1],
+#               [vampire, 1]
+#             ]
+#             []
+#           ]
+#         ]
+#         [
+#           [id name];
+#           ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+#         ]
+#         [
+#           [name, count];
+#           [fiction, 1],
+#           ["light novel", 1],
+#           [mystery, 1],
+#           [paranormal, 1],
+#           [psychological, 1],
+#           [romance, 1],
+#           ["school life", 1],
+#           [supernatural, 1],
+#           [vampire, 1]
+#         ]
+#         []
+#       ]
+#     ]
+#     subseries: []
+#     genres: [
+#       [name, count];
+#       [fiction, 1],
+#       ["light novel", 1],
+#       [mystery, 1],
+#       [paranormal, 1],
+#       [psychological, 1],
+#       [romance, 1],
+#       ["school life", 1],
+#       ["speculative fiction", 1],
+#       [vampire, 1]
+#     ]
+#     tags: []
+#   }
+#   let input = {
+#     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+#     name: "Bakemonogatari"
+#     parent_series: [
+#       [id name];
+#       ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+#     ]
+#     subseries: []
+#     genres: [
+#       [name, count];
+#       [fiction, 1],
+#       ["light novel", 1],
+#       [mystery, 1],
+#       [paranormal, 1],
+#       [psychological, 1],
+#       [romance, 1],
+#       ["school life", 1],
+#       ["speculative fiction", 1],
+#       [vampire, 1]
+#     ]
+#     tags: []
+#   }
+#   assert equal ($input | build_series_tree_up 5 $monogatari_series_cache) $expected
+# }
+
+# def test_build_series_tree_up_max_depth [] {
+#   let expected = {
+#     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+#     name: "Bakemonogatari"
+#     parent_series: [
+#       [id name parent_series subseries genres tags];
+#       [
+#         "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+#         "Monogatari Series: First Season"
+#         [
+#           # [id name];
+#           # ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+#           [id name parent_series subseries genres tags];
+#           [
+#             "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+#             "Monogatari"
+#             []
+#             [
+#               [id name];
+#               ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+#               ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+#               ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+#             ]
+#             [
+#               [name, count];
+#               [fiction, 1],
+#               ["light novel", 1],
+#               [mystery, 1],
+#               [paranormal, 1],
+#               [psychological, 1],
+#               [romance, 1],
+#               ["school life", 1],
+#               [supernatural, 1],
+#               [vampire, 1]
+#             ]
+#             []
+#           ]
+#         ]
+#         [
+#           [id name];
+#           ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+#         ]
+#         [
+#           [name, count];
+#           [fiction, 1],
+#           ["light novel", 1],
+#           [mystery, 1],
+#           [paranormal, 1],
+#           [psychological, 1],
+#           [romance, 1],
+#           ["school life", 1],
+#           [supernatural, 1],
+#           [vampire, 1]
+#         ]
+#         []
+#       ]
+#     ]
+#     subseries: []
+#     genres: [
+#       [name, count];
+#       [fiction, 1],
+#       ["light novel", 1],
+#       [mystery, 1],
+#       [paranormal, 1],
+#       [psychological, 1],
+#       [romance, 1],
+#       ["school life", 1],
+#       ["speculative fiction", 1],
+#       [vampire, 1]
+#     ]
+#     tags: []
+#   }
+#   let input = {
+#     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+#     name: "Bakemonogatari"
+#     parent_series: [
+#       [id name];
+#       ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+#     ]
+#     subseries: []
+#     genres: [
+#       [name, count];
+#       [fiction, 1],
+#       ["light novel", 1],
+#       [mystery, 1],
+#       [paranormal, 1],
+#       [psychological, 1],
+#       [romance, 1],
+#       ["school life", 1],
+#       ["speculative fiction", 1],
+#       [vampire, 1]
+#     ]
+#     tags: []
+#   }
+#   assert equal ($input | build_series_tree_up 4 $monogatari_series_cache) $expected
+# }
+
+def test_build_series_tree_up [] {
+  test_build_series_tree_up_three_levels
+  # test_build_series_tree_up_three_levels_2
+  # test_build_series_tree_up_max_depth
+}
+
+def test_organize_subseries_two_subseries [] {
   let input = [
     [id name parent_series subseries genres tags];
     [
@@ -3758,13 +4263,13 @@ def test_organize_subseries_two_subseries []: {
   assert equal ($input | organize_subseries) $expected
 }
 
-def test_organize_subseries []: {
+def test_organize_subseries [] {
   # test_organize_subseries_one_series
   # test_organize_subseries_one_subseries
   test_organize_subseries_two_subseries
 }
 
-def main []: {
+def main [] {
   test_upsert_if_present
   test_upsert_if_value
   test_round_to_second_using_cumulative_offset
@@ -3801,6 +4306,8 @@ def main []: {
   # todo test_split_ssh_path
   test_parse_container_and_audio_codec_from_ffprobe_output
   test_parse_musicbrainz_series
-  test_organize_subseries
+  test_fetch_and_parse_musicbrainz_series
+  test_build_series_tree_up
+  # test_organize_subseries
   echo "All tests passed!"
 }

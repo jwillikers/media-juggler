@@ -2672,7 +2672,7 @@ export def merge_or_input [
 # Parse multi-value tags
 export def parse_multi_value_tag [
   separator: string = ";"
-] string -> list {
+]: any -> list {
   let input = $in
   if ($input | is-empty) {
     return null
@@ -3123,6 +3123,14 @@ export def convert_series_for_group_tag []: table<name: string, index: string> -
   } | str join ";"
 }
 
+export def join_multi_value []: any -> string {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+  $input | str join ";"
+}
+
 # Convert the internal audiobook metadata representation of a track into the format required for tone
 #
 # The input metadata should be for an individual track, with a book and track record at the top level.
@@ -3157,11 +3165,11 @@ export def into_tone_format []: record -> record {
     # book metadata
     | upsert_if_value tags (
       if "tags" in $metadata.book and ($metadata.book.tags | is-not-empty) and "name" in ($metadata.book.tags | columns) {
-        $metadata.book.tags.name | uniq | str join ";"
+        $metadata.book.tags.name | uniq | join_multi_value
       }
     )
-    | upsert_if_value "MusicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | str join ";")
-    | upsert_if_value "MusicBrainz Album Artist Id" ($primary_authors | get --ignore-errors id | str join ";")
+    | upsert_if_value "MusicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | join_multi_value)
+    | upsert_if_value "MusicBrainz Album Artist Id" ($primary_authors | get --ignore-errors id | join_multi_value)
     | upsert_if_present "MusicBrainz Release Group Id" $metadata.book musicbrainz_release_group_id
     | upsert_if_present "MusicBrainz Album Id" $metadata.book musicbrainz_release_id
     | upsert_if_present "MusicBrainz Album Release Country" $metadata.book musicbrainz_release_country
@@ -3169,7 +3177,7 @@ export def into_tone_format []: record -> record {
     | upsert_if_present script $metadata.book
     # For audiobookshelf to be happy, publisher has to go in additionalFields for some reason.
     # todo I'm not sure audiobookshelf supports multiple values for the publisher
-    | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
+    | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | join_multi_value)
     | upsert_if_present ISBN $metadata.book isbn
     | upsert_if_present barcode $metadata.book isbn
     | upsert_if_present asin $metadata.book amazon_asin
@@ -3184,12 +3192,12 @@ export def into_tone_format []: record -> record {
     | upsert_if_present "MusicBrainz Release Track Id" $metadata.track musicbrainz_track_id
     | upsert_if_value "MusicBrainz Artist Id" (
       if "contributors" in $metadata.track and ($metadata.track.contributors | is-not-empty) {
-        $metadata.track.contributors | where role == "writer" | get --ignore-errors id | str join ";"
+        $metadata.track.contributors | where role == "writer" | get --ignore-errors id | join_multi_value
       }
     )
-    | upsert_if_value "MusicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors id | str join ";")
-    | upsert_if_value "MusicBrainz Label Id" ($metadata.track | get --ignore-errors publishers | get --ignore-errors id | str join ";")
-    | upsert_if_value "work" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors name | str join ";")
+    | upsert_if_value "MusicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors id | join_multi_value)
+    | upsert_if_value "MusicBrainz Label Id" ($metadata.track | get --ignore-errors publishers | get --ignore-errors id | join_multi_value)
+    | upsert_if_value "work" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors name | join_multi_value)
     | (
       let input = $in;
       if "contributors" in $metadata.track and ($metadata.track.contributors | is-not-empty) {
@@ -3199,7 +3207,7 @@ export def into_tone_format []: record -> record {
             | where role == $role
             | get name
             | uniq
-            | str join ";"
+            | join_multi_value
           )
           if ($contributors_for_role | is-not-empty) {
             {$role: $contributors_for_role}
@@ -3224,14 +3232,14 @@ export def into_tone_format []: record -> record {
       #
       | upsert_if_present album $metadata.book title
       | upsert_if_present subtitle $metadata.book
-      | upsert_if_value albumArtist ($primary_authors | get --ignore-errors name | str join ";")
+      | upsert_if_value albumArtist ($primary_authors | get --ignore-errors name | join_multi_value)
       | upsert_if_present description $metadata.book
       | upsert_if_present longDescription $metadata.book long_description
       | upsert_if_present comment $metadata.book
       | upsert_if_value group $group
       | upsert_if_value genre (
         if "genres" in $metadata.book and ($metadata.book.genres | is-not-empty) and "name" in ($metadata.book.genres | columns) {
-          $metadata.book.genres.name | uniq | str join ";"
+          $metadata.book.genres.name | uniq | join_multi_value
         }
       )
       | upsert_if_value publishingDate $publication_date
@@ -3239,8 +3247,8 @@ export def into_tone_format []: record -> record {
       | upsert_if_value recordingDate $publication_date
       # language has no effect here I guess?
       # | upsert_if_present language $metadata.book
-      | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
-      | upsert_if_value label ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
+      | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | join_multi_value)
+      | upsert_if_value label ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | join_multi_value)
       | upsert_if_present totalDiscs $metadata.book total_discs
       | upsert_if_present totalTracks $metadata.book total_tracks
       #
@@ -3267,7 +3275,7 @@ export def into_tone_format []: record -> record {
               )
               | get name
               | uniq
-              | str join ";"
+              | join_multi_value
             )
             if ($contributors_for_role | is-not-empty) {
               {$role: $contributors_for_role}
@@ -3608,32 +3616,40 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
   $series | upsert parent_series $parent_series | upsert subseries $subseries
 }
 
-# Fetch and parse a MusicBrainz Series by ID
+# Fetch and parse a MusicBrainz Series by ID.
 export def fetch_and_parse_musicbrainz_series [
-  cache: directory # Cache directory where parsed series are stored in files named according to mbid, i.e. mbid.json.
+  # cache: directory # Cache directory where parsed series are stored in files named according to mbid, i.e. mbid.json.
+  cache: closure # Closure that returns parsed series information given a series id
   --retries: int = 3
   --retry-delay: duration = 3sec
 ]: string -> record {
   let musicbrainz_series_id = $in
-  let cached_series_file = {parent: $cache, stem: $musicbrainz_series_id, extension: "json"} | path join
-  if ($cached_series_file | path exists) {
-    open $cached_series_file
-  } else {
-    let series = $musicbrainz_series_id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay | parse_musicbrainz_series
-    $series | save $cached_series_file
-    $series
+  # let cached_series_file = {parent: $cache, stem: $musicbrainz_series_id, extension: "json"} | path join
+  let update_cache = {|series_id|
+    $musicbrainz_series_id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay | parse_musicbrainz_series
+    # $series | save $cached_series_file
+    # $series
   }
+  do $cache $musicbrainz_series_id $update_cache
+  # if ($cached | is-empty) {
+  #   # open $cached_series_file
+  # } else {
+  # }
 }
 
 # Build a tree of subseries going up through the parent series
 export def build_series_tree_up [
   depth: int
-  cache: directory # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
+  # cache: directory # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
+  cache: closure # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
   --required-series: list<string>
   --retries: int = 3
   --retry-delay: duration = 3sec
 ]: record -> record {
   let series = $in
+
+  log info $"Series: ($series)"
+  log info $"Depth: ($depth)"
 
   # Base case: No parent series
   if ($series | get --ignore-errors parent_series | is-empty) {
@@ -3653,8 +3669,15 @@ export def build_series_tree_up [
   }
 
   $series | upsert parent_series (
+    log info $"$series.parent_series: ($series.parent_series | to nuon)";
     $series.parent_series | each {|parent_series|
+      log info $"$parent_series: ($parent_series | to nuon)";
+      log info $"$parent_series.id: ($parent_series.id)";
+    };
+    $series.parent_series | each {|parent_series|
+      log info $"parent_series: ($parent_series)"
       if $required_series == null {
+        log info $"parent_series.id: ($parent_series.id)"
         $parent_series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree_up ($depth - 1) $cache
       } else {
         $parent_series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree_up ($depth - 1) $cache --required-series ($required_series | filter {|id| $id != $series.id})
@@ -3666,7 +3689,8 @@ export def build_series_tree_up [
 # Build a tree of subseries under a series
 export def build_series_tree [
   depth: int
-  cache: directory # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
+  # cache: directory # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
+  cache: closure
   --required-series: list<string>
   --retries: int = 3
   --retry-delay: duration = 3sec
@@ -3746,7 +3770,8 @@ export def series_is_in_series [
 # Subseries are nested under their parent series.
 # Series are sorted by name when multiple are at the same tier.
 export def create_series_tree [
-  cache: directory # todo Use a cache closure to allow unit testing
+  # cache: directory # todo Use a cache closure to allow unit testing
+  cache: closure
   max_depth: int = 10
   --retries: int = 3
   --retry-delay: duration = 3sec
@@ -3818,7 +3843,7 @@ export def retry [
   should_retry: closure # A closure which determines whether to retry or not based on the result of the request closure. True means retry, false means stop.
   retries: int # The number of retries to perform
   delay: duration # The amount of time to wait between successive executions of the request closure
-] nothing -> any {
+]: nothing -> any {
   for attempt in 1..($retries - 1) {
     let response = do $request
     if not (do $should_retry $response) {
@@ -3835,7 +3860,7 @@ export def retry_http [
   retries: int # The number of retries to perform
   delay: duration # The amount of time to wait between successive executions of the request closure
   http_status_codes_to_retry: list<int> = [408 429 500 502 503 504] # HTTP status codes where the request will be retries
-] nothing -> any {
+]: nothing -> any {
   let should_retry = {|result|
     $result.status in $http_status_codes_to_retry
   }
@@ -4128,7 +4153,7 @@ export def parse_contributors []: table -> table<id: string, name: string, entit
 # The goal of this is to order parent series before subseries.
 # This is due to the limited series information available when querying a release from MusicBrainz.
 # Actually subseries information must be obtained through separate API calls to MusicBrainz.
-export def parse_series_from_musicbrainz_relations [] table -> table<id: string, name: string, index: string> {
+export def parse_series_from_musicbrainz_relations []: table -> table<id: string, name: string, index: string> {
   let relations = $in
   if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
     return null
@@ -5078,7 +5103,7 @@ export def has_distributor_in_common [
 export def filter_musicbrainz_releases [
   metadata: record<book: record, tracks: table> # Audiobook metadata
   duration_threshold: duration = 3sec # The allowed drift between the duration of tracks
-] table<book: record, tracks: table> -> list<string> {
+]: table<book: record, tracks: table> -> list<string> {
   let candidates = $in
   # log info $"candidates: ($candidates | to nuon)"
   # log info $"metadata: ($metadata | reject tracks.embedded_pictures | to nuon)"
@@ -5402,7 +5427,7 @@ export def tag_audiobook [
 # The format is similar to tone's format.
 # Unlike the format tone uses, the start and length fields are durations.
 # For output via tone, these need to be converted back to milliseconds as integers.
-export def parse_chapters_from_tone []: table<index: int, start: int, length: int, title: string> -> table<index: int, start: duration, length: duration, title: string> {
+export def parse_chapters_from_tone []: table<start: int, length: int, title: string> -> table<index: int, start: duration, length: duration, title: string> {
   $in | enumerate | each {|chapter|
     {
       index: $chapter.index
@@ -5504,7 +5529,7 @@ export def audiobooks_with_the_highest_voted_chapters_tag []: table<id: string, 
 export def filter_musicbrainz_chapters_releases [
   release: record<book: record, tracks: table>
   duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
-] table<book: record, tracks: table> -> table<book: record, tracks: table> {
+]: table<book: record, tracks: table> -> table<book: record, tracks: table> {
   let candidates = $in
   # log info $"candidates: ($candidates | to nuon)"
   # log info $"release: ($release | reject tracks.embedded_pictures | to nuon)"
@@ -5559,7 +5584,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
-] table -> table<index: int, start: duration, length: duration, title: string> {
+]: table -> table<index: int, start: duration, length: duration, title: string> {
   let release = $in
   if "musicbrainz_release_group_id" not-in $release.book or ($release.book.musicbrainz_release_group_id | is-empty) {
     return null
@@ -5646,118 +5671,118 @@ export def look_up_chapters_from_similar_musicbrainz_release [
 # In addition to the musicbrainz_recording_id key, the acoustid_fingerprint, audio_duration, and acoustid_track_id tags can also be included.
 # The acoustid_fingerprint and acoustid_track_id will be embedded in the files with the other metadata.
 # The audio_duration value is used to avoid recalculating the duration of the audio.
-export def tag_audiobook_files_by_musicbrainz_release_id [
-  release_id: string
-  working_directory: directory
-  duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
-  chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
-  --retries: int = 3
-  --retry-delay: duration = 5sec
-]: table -> list<path> {
-  let audiobook_files = $in
-  # let current_metadata = (
-  #   $audiobook_files | parse_audiobook_metadata_from_files
-  # )
-  let metadata = (
-    $release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
-  )
-  if ($metadata | is-empty) {
-    log error $"Failed to fetch MusicBrainz Release (ansi yellow)($release_id)(ansi reset)"
-    return null
-  }
-  # log info $"audiobook_files: ($audiobook_files)"
-  # log info $"audiobook_files.metadata.track: ($audiobook_files.metadata.track)"
-  let tracks = (
-    if (
-      "musicbrainz_recording_id" in ($audiobook_files | columns)
-      and ($audiobook_files.musicbrainz_recording_id | is-not-empty)
-    ) {
-      $metadata.tracks | join $audiobook_files musicbrainz_recording_id
-    } else {
-      let enumerated_audiobook_files = (
-        $audiobook_files | enumerate | each {|f|
-          {
-            index: ($f.index + 1)
-            file: $f.item.file
-          }
-        }
-      )
-      $metadata.tracks | join $enumerated_audiobook_files index
-    }
-  )
-  # log info $"tracks: ($tracks)"
-  for track in $tracks {
-    let duration = (
-      if "audio_duration" in $track and ($track.audio_duration | is-not-empty) {
-        $track.audio_duration
-      } else {
-        $track.file | tone_dump | get audio.duration | into int | into duration --unit ms
-      }
-    )
-    if ($track.duration - $duration | math abs) > $duration_threshold {
-      log error $"The (ansi green)($track)(ansi reset) is ($duration) long, but the MusicBrainz track is ($track.duration) long, which is outside the acceptable duration threshold of ($duration_threshold)"
-      return null
-    }
-  }
+# export def tag_audiobook_files_by_musicbrainz_release_id [
+#   release_id: string
+#   working_directory: directory
+#   duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
+#   chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
+#   --retries: int = 3
+#   --retry-delay: duration = 5sec
+# ]: table -> list<path> {
+#   let audiobook_files = $in
+#   # let current_metadata = (
+#   #   $audiobook_files | parse_audiobook_metadata_from_files
+#   # )
+#   let metadata = (
+#     $release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
+#   )
+#   if ($metadata | is-empty) {
+#     log error $"Failed to fetch MusicBrainz Release (ansi yellow)($release_id)(ansi reset)"
+#     return null
+#   }
+#   # log info $"audiobook_files: ($audiobook_files)"
+#   # log info $"audiobook_files.metadata.track: ($audiobook_files.metadata.track)"
+#   let tracks = (
+#     if (
+#       "musicbrainz_recording_id" in ($audiobook_files | columns)
+#       and ($audiobook_files.musicbrainz_recording_id | is-not-empty)
+#     ) {
+#       $metadata.tracks | join $audiobook_files musicbrainz_recording_id
+#     } else {
+#       let enumerated_audiobook_files = (
+#         $audiobook_files | enumerate | each {|f|
+#           {
+#             index: ($f.index + 1)
+#             file: $f.item.file
+#           }
+#         }
+#       )
+#       $metadata.tracks | join $enumerated_audiobook_files index
+#     }
+#   )
+#   # log info $"tracks: ($tracks)"
+#   for track in $tracks {
+#     let duration = (
+#       if "audio_duration" in $track and ($track.audio_duration | is-not-empty) {
+#         $track.audio_duration
+#       } else {
+#         $track.file | tone_dump | get audio.duration | into int | into duration --unit ms
+#       }
+#     )
+#     if ($track.duration - $duration | math abs) > $duration_threshold {
+#       log error $"The (ansi green)($track)(ansi reset) is ($duration) long, but the MusicBrainz track is ($track.duration) long, which is outside the acceptable duration threshold of ($duration_threshold)"
+#       return null
+#     }
+#   }
 
-  let chapters = (
-    if ($metadata | get --ignore-errors chapters | is-empty) {
-      $metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
-    } else {
-      $metadata.chapters
-    }
-  )
-  # log info $"Chapters: ($chapters)"
+#   let chapters = (
+#     if ($metadata | get --ignore-errors chapters | is-empty) {
+#       $metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
+#     } else {
+#       $metadata.chapters
+#     }
+#   )
+#   # log info $"Chapters: ($chapters)"
 
-  let front_cover = (
-    if "front_cover_available" in $metadata.book and $metadata.book.front_cover_available {
-      $metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
-    }
-  )
+#   let front_cover = (
+#     if "front_cover_available" in $metadata.book and $metadata.book.front_cover_available {
+#       $metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
+#     }
+#   )
 
-  # let chapters_file = mktemp --suffix ".txt" --tmpdir
-  # if ($chapters | is-not-empty) {
-  #   $chapters | chapters_into_chapters_txt_format | save --force $chapters_file
-  # }
+#   # let chapters_file = mktemp --suffix ".txt" --tmpdir
+#   # if ($chapters | is-not-empty) {
+#   #   $chapters | chapters_into_chapters_txt_format | save --force $chapters_file
+#   # }
 
-  let files = (
-    $metadata
-    | update tracks $tracks
-    | reject --ignore-errors book.embedded_pictures
-    | (
-      let input = $in;
-      if ($chapters | is-not-empty) {
-        $input | upsert book.chapters $chapters
-      } else {
-        $input
-      }
-    )
-    | (
-      tone_tag_tracks $working_directory
-      "--taggers" 'remove,*'
-      # Remove all sort fields
-      "--meta-remove-property" "sortalbum"
-      "--meta-remove-property" "sorttitle"
-      "--meta-remove-property" "sortalbumartist"
-      "--meta-remove-property" "sortartist"
-      "--meta-remove-property" "sortcomposer"
-      "--meta-remove-property" "EmbeddedPictures"
-      "--meta-remove-property" "comment"
-      "--meta-cover-file" $front_cover
-      # "--meta-chapters-file" $chapters_file
-    )
-  )
+#   let files = (
+#     $metadata
+#     | update tracks $tracks
+#     | reject --ignore-errors book.embedded_pictures
+#     | (
+#       let input = $in;
+#       if ($chapters | is-not-empty) {
+#         $input | upsert book.chapters $chapters
+#       } else {
+#         $input
+#       }
+#     )
+#     | (
+#       tone_tag_tracks $working_directory
+#       "--taggers" 'remove,*'
+#       # Remove all sort fields
+#       "--meta-remove-property" "sortalbum"
+#       "--meta-remove-property" "sorttitle"
+#       "--meta-remove-property" "sortalbumartist"
+#       "--meta-remove-property" "sortartist"
+#       "--meta-remove-property" "sortcomposer"
+#       "--meta-remove-property" "EmbeddedPictures"
+#       "--meta-remove-property" "comment"
+#       "--meta-cover-file" $front_cover
+#       # "--meta-chapters-file" $chapters_file
+#     )
+#   )
 
-  # Clean up
-  if ($front_cover | is-not-empty) {
-    rm $front_cover
-  }
-  # if ($chapters_file | is-not-empty) {
-  #   rm $chapters_file
-  # }
+#   # Clean up
+#   if ($front_cover | is-not-empty) {
+#     rm $front_cover
+#   }
+#   # if ($chapters_file | is-not-empty) {
+#   #   rm $chapters_file
+#   # }
 
-  $files
-}
+#   $files
+# }
 
 
 # Tag the given audiobook tracks using the MusicBrainz Release ID and certain other metadata
@@ -5964,7 +5989,7 @@ export def append_to_musicbrainz_query [
 }
 
 # Escape special Lucene characters in a string with a backslash
-export def escape_special_lucene_characters [] string -> string {
+export def escape_special_lucene_characters []: string -> string {
   let input = $in
   if ($input | describe) != "string" {
     return $input
