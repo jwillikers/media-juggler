@@ -25,7 +25,7 @@ export const image_extensions = [
   webp
 ]
 
-export const musicbrainz_non_genre_tags = ["abridged", "chapters", "explicit", "unabridged"]
+export const musicbrainz_non_genre_tags = ["abridged", "audiobook", "chapters", "explicit", "unabridged"]
 
 # Surround special characters in a string with square brackets
 #
