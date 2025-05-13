@@ -1,0 +1,94 @@
+{
+  "id": "c7a83643-33a3-48ab-b54e-f56554359802",
+  "attributes": [],
+  "type-id": "78a8e727-edc2-35b9-8829-a46111ef6df9",
+  "disambiguation": "light novel, English",
+  "type": "Prose",
+  "relations": [
+    {
+      "type": "part of",
+      "series": {
+        "name": "Full Metal Panic!",
+        "type": "Work series",
+        "id": "9e870727-57a7-43db-bebb-d6e9580829c5",
+        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+        "disambiguation": "light novel, English, all"
+      },
+      "type-id": "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0",
+      "ended": false,
+      "ordering-key": 1,
+      "attributes": [
+        "number"
+      ],
+      "end": null,
+      "direction": "backward",
+      "target-credit": "",
+      "target-type": "series",
+      "source-credit": "",
+      "attribute-ids": {
+        "number": "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"
+      },
+      "begin": null,
+      "attribute-values": {
+        "number": "1"
+      }
+    },
+    {
+      "begin": null,
+      "attribute-ids": {
+        "number": "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"
+      },
+      "attribute-values": {
+        "number": "1"
+      },
+      "target-type": "series",
+      "source-credit": "",
+      "target-credit": "",
+      "direction": "backward",
+      "end": null,
+      "attributes": [
+        "number"
+      ],
+      "ordering-key": 1,
+      "series": {
+        "name": "Full Metal Panic!",
+        "id": "e51f4f5c-7526-4a8c-a36d-5e52886783d0",
+        "disambiguation": "light novel, English, core",
+        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+        "type": "Work series"
+      },
+      "type": "part of",
+      "ended": false,
+      "type-id": "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0"
+    }
+  ],
+  "language": "eng",
+  "tags": [
+    {
+      "count": 1,
+      "name": "action"
+    },
+    {
+      "name": "fiction",
+      "count": 1
+    },
+    {
+      "count": 1,
+      "name": "light novel"
+    },
+    {
+      "count": 1,
+      "name": "mecha"
+    },
+    {
+      "name": "military",
+      "count": 1
+    }
+  ],
+  "genres": [],
+  "iswcs": [],
+  "languages": [
+    "eng"
+  ],
+  "title": "Full Metal Panic! Volume 1: Fighting Boy Meets Girl"
+}

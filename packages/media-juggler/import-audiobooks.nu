@@ -55,11 +55,35 @@ def main [
     exit 1
   }
 
+  let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-audiobooks"] | path join
+  let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-audiobooks-config.json"] | path join
+  let config: record = (
+    try {
+      open $config_file
+    } catch {
+      {}
+    }
+  )
+
+  let cache_function = {|type, id, update_function|
+    let cached_file = [$cache_directory $type $"($id).json"] | path join
+    try {
+      open $cached_file
+    } catch {
+      let result = do $update_function $type $id
+      mkdir ($cached_file | path dirname)
+      $result | save --force $cached_file
+      $result
+    }
+  }
+
   let audible_activation_bytes = (
     if $audible_activation_bytes != null {
       $audible_activation_bytes
     } else if "AUDIBLE_ACTIVATION_BYTES" in $env {
       $env.AUDIBLE_ACTIVATION_BYTES
+    } else if ($config | get --ignore-errors audible_activation_bytes | is-not-empty) {
+      $config.audible_activation_bytes
     } else {
       null
     }
@@ -70,6 +94,8 @@ def main [
       $acoustid_client_key
     } else if "MEDIA_JUGGLER_ACOUSTID_CLIENT_KEY" in $env {
       $env.MEDIA_JUGGLER_ACOUSTID_CLIENT_KEY
+    } else if ($config | get --ignore-errors acoustid_client_key | is-not-empty) {
+      $config.acoustid_client_key
     } else {
       null
     }
@@ -80,10 +106,46 @@ def main [
       $acoustid_user_key
     } else if "MEDIA_JUGGLER_ACOUSTID_USER_KEY" in $env {
       $env.MEDIA_JUGGLER_ACOUSTID_USER_KEY
+    } else if ($config | get --ignore-errors acoustid_user_key | is-not-empty) {
+      $config.acoustid_user_key
     } else {
       null
     }
   )
+
+  let keep = (
+    if $keep != null {
+      $keep
+    } else if ($config | get --ignore-errors keep | is-not-empty) {
+      $config.keep
+    }
+  )
+  let merge = (
+    if $merge != null {
+      $merge
+    } else if ($config | get --ignore-errors merge | is-not-empty) {
+      $config.merge
+    }
+  )
+  let use_rsync = (
+    if $use_rsync != null {
+      $use_rsync
+    } else if ($config | get --ignore-errors use_rsync | is-not-empty) {
+      $config.use_rsync
+    }
+  )
+
+  let destination = (
+    if ($destination | is-not-empty) {
+      $destination
+    } else if ($config | get --ignore-errors destination | is-not-empty) {
+      $config.destination
+    }
+  )
+  if ($destination | is-empty) {
+    log error "Missing destination!"
+    exit 1
+  }
 
   let destination = (
     if ($destination | is_ssh_path) {
@@ -180,18 +242,16 @@ def main [
 
   # First, copy files via SSH if necessary
   let audiobook = $audiobook | update files (
-    if ($audiobook.files | first | is_ssh_path) {
-      $audiobook.files | each {|file|
+    $audiobook.files | each {|file|
+      if ($file | is_ssh_path) {
         mkdir ([$temporary_directory "downloads"] | path join)
         if $use_rsync {
           $file | rsync ([$temporary_directory "downloads" ($file | path basename)] | path join) "--mkpath"
         } else {
           $file | scp ([$temporary_directory "downloads" ($file | path basename)] | path join)
         }
-      }
-    } else if $keep {
-      # Copy to temp directory to avoid modifying the original file
-      $audiobook.files | each {|file|
+      } else if $keep {
+        # Copy to temp directory to avoid modifying the original file
         if ($file | path parse | get extension) == "zip" {
           $file
         } else {
@@ -200,6 +260,8 @@ def main [
           cp $file $new_file
           $new_file
         }
+      } else {
+        $file
       }
     }
   )
@@ -420,7 +482,9 @@ def main [
   let metadata = (
     $audiobook.files
     | (
-      tag_audiobook $temporary_directory
+      tag_audiobook
+      $temporary_directory
+      $cache_function
       $submit_all_acoustid_fingerprints
       --acoustid-client-key $acoustid_client_key
       --acoustid-user-key $acoustid_user_key
