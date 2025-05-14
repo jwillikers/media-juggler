@@ -32,14 +32,12 @@ export const musicbrainz_non_genre_tags = ["abridged", "audiobook", "chapters", 
 # Use this on strings before adding glob characters.
 # Not that I can't actually escape backslashes, so those will cause the glob expression to fail outright.
 # Maybe this will be fixed in Nushell at some point?
-#
-# todo test
 export def escape_special_glob_characters []: string -> string {
   let input = $in
   if ($input | describe) not-in ["glob" "string"] {
     return $input
   }
-  const special_glob_characters = ['[' ']' '(' ')' '{' '}' '*' '?' ':' "$" ","]
+  const special_glob_characters = ['[' ']' '(' ')' '{' '}' '*' '?' ':' '$' ',']
   $special_glob_characters | reduce --fold $input {|character, acc|
     if $character in ["[" "]"] {
       $acc | str replace --all $character ('\' + $character)

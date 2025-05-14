@@ -4416,6 +4416,50 @@ def test_split_ssh_path [] {
   test_split_ssh_path_absolute_path_starts_with_colon
 }
 
+def test_escape_special_glob_characters_empty_input [] {
+  let input = ""
+  let expected = ""
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters_escape_square_brackets [] {
+  let input = '/var/[Special Directory]'
+  let expected = '/var/\[Special Directory\]'
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters_escape_parentheses [] {
+  let input = '/var/something (Special Directory)'
+  let expected = '/var/something [(]Special Directory[)]'
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters_escape_curly_braces [] {
+  let input = '/var/something {Special Directory}/test'
+  let expected = '/var/something [{]Special Directory[}]/test'
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters_escape_nothing [] {
+  let input = '/var/nothing special here!/...'
+  assert equal ($input | escape_special_glob_characters) $input
+}
+
+def test_escape_special_glob_characters_escape_all_special_characters [] {
+  let input = '/var/][nothing }{special here!/...($money: 20.*,)'
+  let expected = '/var/\]\[nothing [}][{]special here!/...[(][$]money[:] 20.[*][,][)]'
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters [] {
+  test_escape_special_glob_characters_empty_input
+  test_escape_special_glob_characters_escape_square_brackets
+  test_escape_special_glob_characters_escape_parentheses
+  test_escape_special_glob_characters_escape_curly_braces
+  test_escape_special_glob_characters_escape_nothing
+  test_escape_special_glob_characters_escape_all_special_characters
+}
+
 def main [] {
   test_upsert_if_present
   test_upsert_if_value
@@ -4453,9 +4497,10 @@ def main [] {
   test_fetch_and_parse_musicbrainz_series
   test_build_series_tree_up
   # test_organize_subseries
-  # todo test_escape_special_lucene_characters
-  # todo test_append_to_musicbrainz_query
   test_is_ssh_path
   test_split_ssh_path
+  test_escape_special_glob_characters
+  # todo test_escape_special_lucene_characters
+  # todo test_append_to_musicbrainz_query
   echo "All tests passed!"
 }
