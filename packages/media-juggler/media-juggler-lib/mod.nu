@@ -245,12 +245,14 @@ export def is_ssh_path []: path -> bool {
   if ($input | is-empty) {
     return false
   }
-  $input | path split | first | str trim --left --char ":" | str contains ":"
-  # if ($split | length) == 1 {
-  #   $split | first | str trim ":" | str contains ":"
-  # } else {
-  #   $split | first | str trim ":" | str contains ":"
-  # }
+  let components = $input | path split
+  let first_component = (
+    $components | first | str trim --left --char ":"
+  )
+  (
+    ($first_component | str contains ":")
+    and ($components | split row ":" | filter {|component| $component | is-not-empty} | append ($components | skip 1) | length) > 1
+  )
 }
 
 # Split an SSH path into the server and path elements
@@ -258,6 +260,12 @@ export def split_ssh_path []: path -> record<server: string, path: path> {
   let input = $in
   if ($input | is-empty) {
     return null
+  }
+  if not ($input | is_ssh_path) {
+    return {
+      server: null
+      path: $input
+    }
   }
   let split = $input | path split
   let server = (

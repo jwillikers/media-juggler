@@ -4247,8 +4247,173 @@ def test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802 [] {
 }
 
 def test_parse_musicbrainz_work [] {
-
   test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802
+}
+
+def test_is_ssh_path_simple_ssh_path [] {
+  let input = "meerkat:/var/home/media"
+  assert ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_simple_local_path [] {
+  let input = "/var/home/media"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_server_no_path [] {
+  let input = "meerkat:"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_server_root_path_depth_one [] {
+  let input = "meerkat:/var"
+  assert ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_server_relative_path_depth_one [] {
+  let input = "meerkat:dir"
+  assert ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_server_relative_path_depth_two [] {
+  let input = "meerkat:one/two"
+  assert ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_local_absolute_path_with_colon [] {
+  let input = "/var/o:ne/two"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_local_relative_path_with_colon [] {
+  let input = "one/t:wo"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_relative_path_starts_with_colon [] {
+  let input = ":one/two"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_absolute_path_starts_with_colon [] {
+  let input = ":/one/two"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path [] {
+  test_is_ssh_path_simple_ssh_path
+  test_is_ssh_path_simple_local_path
+  test_is_ssh_path_server_no_path
+  test_is_ssh_path_server_root_path_depth_one
+  test_is_ssh_path_server_relative_path_depth_one
+  test_is_ssh_path_server_relative_path_depth_two
+  test_is_ssh_path_local_absolute_path_with_colon
+  test_is_ssh_path_local_relative_path_with_colon
+  test_is_ssh_path_relative_path_starts_with_colon
+  test_is_ssh_path_absolute_path_starts_with_colon
+}
+
+def test_split_ssh_path_simple_ssh_path [] {
+  let input = "meerkat:/var/home/media"
+  let expected = {
+    server: "meerkat"
+    path: "/var/home/media"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_simple_local_path [] {
+  let input = "/var/home/media"
+  let expected = {
+    server: null
+    path: "/var/home/media"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_server_no_path [] {
+  let input = "meerkat:"
+  let expected = {
+    server: null
+    path: "meerkat:"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_server_root_path_depth_one [] {
+  let input = "meerkat:/var"
+  let expected = {
+    server: "meerkat"
+    path: "/var"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_server_relative_path_depth_one [] {
+  let input = "meerkat:dir"
+  let expected = {
+    server: "meerkat"
+    path: "dir"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_server_relative_path_depth_two [] {
+  let input = "meerkat:one/two"
+  let expected = {
+    server: "meerkat"
+    path: "one/two"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_local_absolute_path_with_colon [] {
+  let input = "/var/o:ne/two"
+  let expected = {
+    server: null
+    path: "/var/o:ne/two"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_local_relative_path_with_colon [] {
+  let input = "one/t:wo"
+  let expected = {
+    server: null
+    path: "one/t:wo"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_relative_path_starts_with_colon [] {
+  let input = ":one/two"
+  let expected = {
+    server: null
+    path: ":one/two"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_absolute_path_starts_with_colon [] {
+  let input = ":/one/two"
+  let expected = {
+    server: null
+    path: ":/one/two"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path [] {
+  test_split_ssh_path_simple_ssh_path
+  test_split_ssh_path_simple_local_path
+  test_split_ssh_path_server_no_path
+  test_split_ssh_path_server_root_path_depth_one
+  test_split_ssh_path_server_relative_path_depth_one
+  test_split_ssh_path_server_relative_path_depth_two
+  test_split_ssh_path_local_absolute_path_with_colon
+  test_split_ssh_path_local_relative_path_with_colon
+  test_split_ssh_path_relative_path_starts_with_colon
+  test_split_ssh_path_absolute_path_starts_with_colon
 }
 
 def main [] {
@@ -4280,17 +4445,17 @@ def main [] {
   test_equivalent_track_durations
   test_has_distributor_in_common
   test_audiobooks_with_the_highest_voted_chapters_tag
-  # todo test_escape_special_lucene_characters
-  # todo test_append_to_musicbrainz_query
   test_filter_musicbrainz_chapters_releases
   test_filter_musicbrainz_releases
-  # todo test_is_ssh_path
-  # todo test_split_ssh_path
   test_parse_container_and_audio_codec_from_ffprobe_output
   test_parse_musicbrainz_work
   test_parse_musicbrainz_series
   test_fetch_and_parse_musicbrainz_series
   test_build_series_tree_up
   # test_organize_subseries
+  # todo test_escape_special_lucene_characters
+  # todo test_append_to_musicbrainz_query
+  test_is_ssh_path
+  test_split_ssh_path
   echo "All tests passed!"
 }
