@@ -6209,6 +6209,9 @@ export def append_to_musicbrainz_query [
   --transform: closure
 ]: string -> string {
   let query = $in
+  if ($metadata | is-empty) {
+    return $query
+  }
   let prefix = (
     if ($query | is-empty) {
       ""

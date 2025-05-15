@@ -4484,6 +4484,50 @@ def test_escape_special_lucene_characters [] {
   test_escape_special_lucene_characters_escape_all_special_characters
 }
 
+def test_append_to_musicbrainz_query_empty_input [] {
+  let input = ""
+  let metadata = {
+    musicbrainz_release_country: "WX"
+  }
+  let expected = 'country:"WX"'
+  assert equal ($input | append_to_musicbrainz_query $metadata musicbrainz_release_country country) $expected
+}
+
+def test_append_to_musicbrainz_query_empty_metadata [] {
+  let input = ""
+  let metadata = {}
+  let expected = ""
+  assert equal ($input | append_to_musicbrainz_query $metadata musicbrainz_release_country country) $expected
+}
+
+def test_append_to_musicbrainz_query_existing_input [] {
+  let input = 'country:"WX"'
+  let metadata = {
+    musicbrainz_release_country: "WX"
+    language: "eng"
+  }
+  let expected = 'country:"WX" AND lang:"eng"'
+  assert equal ($input | append_to_musicbrainz_query $metadata language lang) $expected
+}
+
+def test_append_to_musicbrainz_query_existing_input_with_transform [] {
+  let input = 'country:"WX"'
+  let metadata = {
+    musicbrainz_release_country: "WX"
+    language: "english"
+  }
+  let expected = 'country:"WX" AND lang:"eng"'
+  let transform = {|language| if $language == "english" {"eng"} else {$language}}
+  assert equal ($input | append_to_musicbrainz_query $metadata language lang --transform $transform) $expected
+}
+
+def test_append_to_musicbrainz_query [] {
+  test_append_to_musicbrainz_query_empty_input
+  test_append_to_musicbrainz_query_empty_metadata
+  test_append_to_musicbrainz_query_existing_input
+  test_append_to_musicbrainz_query_existing_input_with_transform
+}
+
 def main [] {
   test_upsert_if_present
   test_upsert_if_value
@@ -4525,6 +4569,6 @@ def main [] {
   test_split_ssh_path
   test_escape_special_glob_characters
   test_escape_special_lucene_characters
-  # todo test_append_to_musicbrainz_query
+  test_append_to_musicbrainz_query
   echo "All tests passed!"
 }
