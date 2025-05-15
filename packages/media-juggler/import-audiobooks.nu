@@ -513,9 +513,45 @@ def main [
     ]
     | prepend (
       if ($metadata.book | get --ignore-errors series | is-not-empty) {
-        # First series is the primary series
-        # todo Nest subseries under the primary series
-        $metadata.book.series.name | first | sanitize_file_name
+        # First series will eventually be the primary series.
+        # todo Nest under subseries of the primary series.
+        let primary_series = (
+          if "scope" in ($metadata.book.series | columns) {
+            let release_group_series = $metadata.book.series | where scope == "release group"
+            if ($release_group_series | is-empty) {
+              # Fall back to the work series if there is no release group series
+              let work_series = $metadata.book.series | where scope == "work"
+              if ($work_series | is-empty) {
+                # Use whatever series exist are at this point
+                if ($metadata.book.series | length) > 1 {
+                  log warning "More than one non release group / non work series exists when no release group series exist. Not yet able to determine series and subseries ordering. Ignoring series altogether and placing book directory directly under the authors' subdirectory."
+                } else if ($metadata.book.series | length) == 1 {
+                  log warning "Falling back to non release group / non work series because no release group or work series exist"
+                  $metadata.book.series | first
+                }
+              } else if ($work_series | length) == 1 {
+                log warning "Falling back to work series because no release group series exists"
+                $work_series | first
+              } else {
+                log warning "More than one work series exists when no release group series exist. Not yet able to determine series and subseries ordering. Ignoring series altogether and placing book directory directly under the authors' subdirectory."
+              }
+            } else if ($release_group_series | length) == 1 {
+              $release_group_series | first
+            } else {
+              log warning $"More than one release group series exists. Not yet able to determine series and subseries ordering. Ignoring series altogether and placing book directory directly under the authors' subdirectory."
+            }
+          } else {
+            if ($metadata.book.series | length) == 1 {
+              $metadata.book.series | first
+            } else {
+              log info "Multiple series with no scope exist. Ignoring series altogether and placing book directory directly under the authors' subdirectory."
+            }
+          }
+        )
+        if ($primary_series | is-not-empty) {
+          log info $"Primary series is ($primary_series)"
+          $primary_series.name | sanitize_file_name
+        }
       }
     )
     | prepend ($primary_authors.name | str join ", " | sanitize_file_name)

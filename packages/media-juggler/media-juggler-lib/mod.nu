@@ -3151,9 +3151,26 @@ export def join_multi_value []: any -> string {
 # Technically, I think ID3v2.4 is supposed to use a null byte, but tone doesn't seem to support that.
 export def into_tone_format []: record -> record {
   let metadata = $in
+  # Prefer release group series
   let group = (
     if "series" in $metadata.book and $metadata.book.series != null {
-      $metadata.book.series | convert_series_for_group_tag
+      if "scope" in ($metadata.book.series | columns) {
+        let release_group_series = $metadata.book.series | where scope == "release group"
+        if ($release_group_series | is-empty) {
+          # Fallback to the work series if there is no release group series
+          let work_series = $metadata.book.series | where scope == "work"
+          if ($work_series | is-empty) {
+            # Use whatever series there are at this point
+            $metadata.book.series
+          } else {
+            $work_series | convert_series_for_group_tag
+          }
+        } else {
+          $release_group_series | convert_series_for_group_tag
+        }
+      } else {
+        $metadata.book.series | convert_series_for_group_tag
+      }
     }
   )
   let publication_date = (
@@ -5829,6 +5846,34 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   # log info $"tracks: ($tracks)"
   let musicbrainz_metadata = $musicbrainz_metadata | upsert tracks $tracks
 
+  # This should only be necessary to check at the point where renaming occurs
+  # Verify that there is only one release-group, work, or other kind of series for a book.
+  # if "series" in $metadata.book and $metadata.book.series != null {
+  #   if "scope" in ($metadata.book.series | columns) {
+  #     let release_group_series = $metadata.book.series | where scope == "release group"
+  #     if ($release_group_series | is-empty) {
+  #       # Fall back to the work series if there is no release group series
+  #       let work_series = $metadata.book.series | where scope == "work"
+  #       if ($work_series | is-empty) {
+  #         # Use whatever series exist are at this point
+  #         if ($metadata.book.series | length) > 1 {
+  #           log warning "More than one non release group / non work series exists when no release group series exist. Not yet able to determine series and subseries ordering."
+  #         } else if ($metadata.book.series | length) == 1 {
+  #           log warning "Will fall back to non release group / non work series because no release group or work series exist"
+  #         }
+  #       } else if ($work_series | length) != 1 {
+  #         log warning "More than one work series exists when no release group series exist. Not yet able to determine series and subseries ordering."
+  #       } else {
+  #         log warning "Will fall back to work series because no release group series exists"
+  #       }
+  #     } else if ($release_group_series | length) != 1 {
+  #       log warning $"More than one release group series exists. Not yet able to determine series and subseries ordering."
+  #     }
+  #   } else {
+  #     log warning $"No scope available for series: ($metadata.book.series)"
+  #   }
+  # }
+
   # Fetch additional MusicBrainz Series info, such as genres, tags, and series relationships
   # todo Attach series to tracks?
   # todo Determine series order based on parent and subseries relationships
@@ -5919,7 +5964,6 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
       }
     )
   )
-
 
   let chapters = (
     if "chapters" not-in $musicbrainz_metadata.book or ($musicbrainz_metadata.book.chapters | is-empty) {
