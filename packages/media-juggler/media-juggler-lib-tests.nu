@@ -4460,6 +4460,30 @@ def test_escape_special_glob_characters [] {
   test_escape_special_glob_characters_escape_all_special_characters
 }
 
+def test_escape_special_lucene_characters_empty_input [] {
+  let input = ""
+  let expected = ""
+  assert equal ($input | escape_special_lucene_characters) $expected
+}
+
+def test_escape_special_lucene_characters_escape_backslash [] {
+  let input = 'The \Backslash'
+  let expected = 'The \\Backslash'
+  assert equal ($input | escape_special_lucene_characters) $expected
+}
+
+def test_escape_special_lucene_characters_escape_all_special_characters [] {
+  let input = 'Whoa, there is/are a lot of special-characters to escape like ^, ~, ", *, +, \, am I right!? {[(&&Yikes:||)]}'
+  let expected = 'Whoa, there is\/are a lot of special\-characters to escape like \^, \~, \", \*, \+, \\, am I right\!\? \{\[\(\&&Yikes\:\||\)\]\}'
+  assert equal ($input | escape_special_lucene_characters) $expected
+}
+
+def test_escape_special_lucene_characters [] {
+  test_escape_special_lucene_characters_empty_input
+  test_escape_special_lucene_characters_escape_backslash
+  test_escape_special_lucene_characters_escape_all_special_characters
+}
+
 def main [] {
   test_upsert_if_present
   test_upsert_if_value
@@ -4500,7 +4524,7 @@ def main [] {
   test_is_ssh_path
   test_split_ssh_path
   test_escape_special_glob_characters
-  # todo test_escape_special_lucene_characters
+  test_escape_special_lucene_characters
   # todo test_append_to_musicbrainz_query
   echo "All tests passed!"
 }
