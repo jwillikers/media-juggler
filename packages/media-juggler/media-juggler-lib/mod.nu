@@ -3558,80 +3558,13 @@ export def parse_musicbrainz_work []: record -> record<id: string, title: string
   if ($input | is-empty) {
     return null
   }
-  let genres = (
-    let genres = $input | get --ignore-errors genres;
-    let tags = $input | get --ignore-errors tags;
-    if ($genres | is-empty) {
-      if ($tags | is-empty) {
-        $genres
-      } else {
-        $tags
-        | select name count
-        | uniq
-        | filter {|tag|
-          $tag.name not-in $musicbrainz_non_genre_tags
-        }
-        # sort by the count, highest to lowest, and then name alphabetically
-        | sort-by --custom {|a, b|
-          if $a.count == $b.count {
-            $a.name < $b.name
-          } else {
-            $a.count > $b.count
-          }
-        }
-      }
-    } else {
-      $genres
-      | select name count
-      | uniq
-      | filter {|tag|
-        $tag.name not-in $musicbrainz_non_genre_tags
-      }
-      # sort by the count, highest to lowest, and then name alphabetically
-      | sort-by --custom {|a, b|
-        if $a.count == $b.count {
-          $a.name < $b.name
-        } else {
-          $a.count > $b.count
-        }
-      }
-    }
-  )
-  let tags = (
-    let tags = $input | get --ignore-errors tags;
-    if ($tags | is-empty) {
-      $tags
-    } else {
-      $tags
-      | select name count
-      | uniq
-      # sort by the count, highest to lowest, and then name alphabetically
-      | sort-by --custom {|a, b|
-        if $a.count == $b.count {
-          $a.name < $b.name
-        } else {
-          $a.count > $b.count
-        }
-      }
-      # Filter out genres from the tags
-      | (
-        let tags_in = $in;
-        if ($genres | is-not-empty) {
-          $tags_in | filter {|tag|
-            $tag.name not-in $genres.name
-          }
-        } else {
-          $tags_in
-        }
-      )
-    }
-  )
+  let genres_and_tags = $input | select --ignore-errors genres tags | parse_genres_and_tags
   {
     id: $input.id
     title: $input.title
     language: $input.language
-    genres: $genres
-    tags: $tags
+    genres: $genres_and_tags.genres
+    tags: $genres_and_tags.tags
   }
 }
 
@@ -4439,95 +4372,45 @@ export def parse_series_from_musicbrainz_release [
 # The genres should also be parsed from associated series and works, but these require separate API calls.
 #
 # MusicBrainz doesn't really provide genres for audiobooks yet, so most genres are directly imported from tags.
-export def parse_genres_from_musicbrainz_release [
-  --musicbrainz-genres-only # Parse only official MusicBrainz genres instead of using tags
-]: record -> table {
+#
+# todo Test
+export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> {
   let metadata = $in
   if ($metadata | is-empty) {
     return null
   }
-  if $musicbrainz_genres_only {
-    let genres = (
-      []
-      | append (
-        $metadata
-        | get --ignore-errors genres
-      )
-      | append (
-        $metadata
-        | get --ignore-errors release-group
-        | get --ignore-errors genres
-      )
-      # recordings
-      | append (
-        $metadata
-        | get --ignore-errors media
-        | get --ignore-errors tracks
-        | flatten
-        | get --ignore-errors recording
-        | get --ignore-errors genres
-        | flatten
-      )
+  let tags = (
+    []
+    # Release
+    | append (
+      $metadata
+      | get --ignore-errors tags
     )
-    if ($genres | is-empty) or "name" not-in ($genres | columns) or "count" not-in ($genres | columns) {
-      return null
-    }
-    (
-      $genres
-      | select name count
-      | uniq
-      # sort by the count, highest to lowest, and then name alphabetically
-      | sort-by --custom {|a, b|
-        if $a.count == $b.count {
-          $a.name < $b.name
-        } else {
-          $a.count > $b.count
-        }
-      }
+    # Release Group
+    | append (
+      $metadata
+      | get --ignore-errors release-group
+      | get --ignore-errors tags
     )
-  } else {
-    let genres = (
-      []
-      | append (
-        $metadata
-        | get --ignore-errors tags
-      )
-      | append (
-        $metadata
-        | get --ignore-errors release-group
-        | get --ignore-errors tags
-      )
-      # recordings
-      | append (
-        $metadata
-        | get --ignore-errors media
-        | get --ignore-errors tracks
-        | flatten
-        | get --ignore-errors recording
-        | get --ignore-errors tags
-        | flatten
-      )
+    # Recordings
+    | append (
+      $metadata
+      | get --ignore-errors media
+      | get --ignore-errors tracks
+      | flatten
+      | get --ignore-errors recording
+      | get --ignore-errors tags
+      | flatten
     )
-    if ($genres | is-empty) or "name" not-in ($genres | columns) or "count" not-in ($genres | columns) {
-      return null
-    }
-    (
-      $genres
-      | select name count
-      | uniq
-      | filter {|tag|
-        $tag.name not-in $musicbrainz_non_genre_tags
-      }
-      # sort by the count, highest to lowest, and then name alphabetically
-      | sort-by --custom {|a, b|
-        if $a.count == $b.count {
-          $a.name < $b.name
-        } else {
-          $a.count > $b.count
-        }
-      }
-    )
+  )
+  if ($tags | is-empty) or "name" not-in ($tags | columns) or "count" not-in ($tags | columns) {
+    return null
   }
+
+  {
+    genres: []
+    tags: $tags
+  } | parse_genres_and_tags
 }
 
 # Parse tags from a MusicBrainz release, release group, and recordings
@@ -4738,52 +4621,23 @@ export def parse_musicbrainz_release []: record -> record {
             )
           }
         )
-        let genres = (
+        let genres_and_tags = (
           if "recording" in $track and "tags" in $track.recording and ($track.recording.tags | is-not-empty) {
-            $track
-            | get --ignore-errors recording
-            | get --ignore-errors tags
-            | select name count
-            | uniq
-            | filter {|tag|
-              $tag.name not-in $musicbrainz_non_genre_tags
-            }
-            # sort by the count, highest to lowest, and then name alphabetically
-            | sort-by --custom {|a, b|
-              if $a.count == $b.count {
-                $a.name < $b.name
-              } else {
-                $a.count > $b.count
-              }
-            }
-          }
-        )
-        let tags = (
-          if "recording" in $track and "tags" in $track.recording and ($track.recording.tags | is-not-empty) {
-            $track
-            | get --ignore-errors recording
-            | get --ignore-errors tags
-            | select name count
-            | uniq
-            # sort by the count, highest to lowest, and then name alphabetically
-            | sort-by --custom {|a, b|
-              if $a.count == $b.count {
-                $a.name < $b.name
-              } else {
-                $a.count > $b.count
-              }
-            }
-            # Filter out genres from the tags
-            | (
-              let input = $in;
-              if ($genres | is-not-empty) {
-                $input | filter {|tag|
-                  $tag.name not-in $genres.name
-                }
-              } else {
-                $input
-              }
+            let tags = (
+              $track
+              | get --ignore-errors recording
+              | get --ignore-errors tags
+              | select name count
             )
+            {
+              genres: []
+              tags: $tags
+            } | parse_genres_and_tags
+          } else {
+            {
+              genres: []
+              tags: []
+            }
           }
         )
         let title = (
@@ -4809,8 +4663,8 @@ export def parse_musicbrainz_release []: record -> record {
           | upsert_if_present musicbrainz_track_id $track id
           | upsert_if_present title $track
           | upsert_if_present musicbrainz_recording_id $track.recording id
-          | upsert_if_value genres $genres
-          | upsert_if_value tags $tags
+          | upsert_if_value genres $genres_and_tags.genres
+          | upsert_if_value tags $genres_and_tags.tags
           | upsert_if_value musicbrainz_works $musicbrainz_works
           | upsert_if_value contributors $track_contributors
           | upsert_if_value duration $length
@@ -4901,64 +4755,14 @@ export def parse_musicbrainz_release []: record -> record {
       $audible_asins | first
     }
   )
-  let genres = $metadata | parse_genres_from_musicbrainz_release
-  let tags = (
-    $metadata
-    | parse_tags_from_musicbrainz_release
-    # Filter out genres from the tags
-    | (
-      let input = $in;
-      if ($genres | is-not-empty) {
-        $input | filter {|tag|
-          $tag.name not-in $genres.name
-        }
-      } else {
-        $input
-      }
-    )
-    # sort by the count, highest to lowest, and then name alphabetically
-    | (
-        let input = $in;
-        if ($input | is-not-empty) {
-          $input | sort-by --custom {|a, b|
-            if $a.count == $b.count {
-              $a.name < $b.name
-            } else {
-              $a.count > $b.count
-            }
-          }
-        } else {
-          $input
-        }
-    )
-  )
+  let genres_and_tags = $metadata | parse_genres_and_tags_from_musicbrainz_release
   let release_tags = (
     let tags = $metadata | get --ignore-errors tags;
     if ($tags | is-not-empty) and "name" in ($tags | columns) and "count" in ($tags | columns) {
-      (
-        $tags
-        | select name count
-        | uniq
-        # Filter out genres from the tags
-        | (
-          let input = $in;
-          if ($genres | is-not-empty) {
-            $input | filter {|tag|
-              $tag.name not-in $genres.name
-            }
-          } else {
-            $input
-          }
-        )
-        # sort by the count, highest to lowest, and then name alphabetically
-        | sort-by --custom {|a, b|
-          if $a.count == $b.count {
-            $a.name < $b.name
-          } else {
-            $a.count > $b.count
-          }
-        }
-      )
+      {
+        genres: []
+        tags: $tags
+      } | parse_genres_and_tags | get tags
     }
   )
 
@@ -5021,8 +4825,8 @@ export def parse_musicbrainz_release []: record -> record {
     | upsert_if_value musicbrainz_release_status $musicbrainz_release_status
     | upsert_if_present amazon_asin $metadata asin
     | upsert_if_value audible_asin $audible_asin
-    | upsert_if_value genres $genres
-    | upsert_if_value tags $tags
+    | upsert_if_value genres $genres_and_tags.genres
+    | upsert_if_value tags $genres_and_tags.tags
     | upsert_if_value release_tags $release_tags
     | upsert_if_value publication_date $publication_date
     | upsert_if_value series $series
@@ -6196,6 +6000,60 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   }
 
   $musicbrainz_metadata
+}
+
+# Parse genres and tags from MusicBrainz metadata
+#
+# Since MusicBrainz doesn't yet support genres / themes for books, genres are generally determined from the tags.
+# Tags become the genres, with a few special tags filtered out, which remain in the tags table.
+# Genres and tags are then sorted by count from highest to lowest and then by name
+#
+# Any genres in the input table will be in the output genres table.
+export def parse_genres_and_tags []: record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> -> record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+
+  # sort by the count, highest to lowest, and then name alphabetically
+  let sort = {|a, b|
+    if $a.count == $b.count {
+      $a.name < $b.name
+    } else {
+      $a.count > $b.count
+    }
+  }
+
+  if ($input.tags | is-empty) {
+    return {
+      genres: ($input.genres | sort-by --custom $sort | uniq-by name)
+      tags: $input.tags
+    }
+  }
+
+  let genres = $input.genres | append (
+    $input.tags
+    # | select name count
+    | filter {|tag|
+      $tag.name not-in $musicbrainz_non_genre_tags
+    }
+  ) | sort-by --custom $sort | uniq-by name
+
+  let tags = (
+    $input.tags
+    # | select name count
+    | filter {|tag|
+      $tag.name not-in ($genres | get --ignore-errors name)
+    }
+    # sort by the count, highest to lowest, and then name alphabetically
+    | sort-by --custom $sort
+    | uniq-by name
+  )
+
+  {
+    genres: $genres
+    tags: $tags
+  }
 }
 
 # Append the the value for the given key in the given metadata to a MusicBrainz search query for the given search term

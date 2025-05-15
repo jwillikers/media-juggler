@@ -4528,6 +4528,113 @@ def test_append_to_musicbrainz_query [] {
   test_append_to_musicbrainz_query_existing_input_with_transform
 }
 
+def test_parse_genres_and_tags_empty_input [] {
+  let input = {}
+  let expected = null
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+def test_parse_genres_and_tags_empty_genres_empty_tags [] {
+  let input = {
+    genres: []
+    tags: []
+  }
+  let expected = $input
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+def test_parse_genres_and_tags_genres_empty_tags [] {
+  let input = {
+    genres: [
+      [name count];
+      ["dark fantasy" 1]
+      ["fiction" 2]
+      ["fantasy" 2]
+    ]
+    tags: []
+  }
+  let expected = {
+    genres: [
+      [name count];
+      ["fantasy" 2]
+      ["fiction" 2]
+      ["dark fantasy" 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+def test_parse_genres_and_tags_empty_genres_tags [] {
+  let input = {
+    genres: []
+    tags: [
+      [name count];
+      ["dark fantasy" 1]
+      ["fiction" 2]
+      ["fantasy" 2]
+      ["unabridged" 1]
+    ]
+  }
+  let expected = {
+    genres: [
+      [name count];
+      ["fantasy" 2]
+      ["fiction" 2]
+      ["dark fantasy" 1]
+    ]
+    tags: [
+      [name count];
+      ["unabridged" 1]
+    ]
+  }
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+
+def test_parse_genres_and_tags_genres_tags [] {
+  let input = {
+    genres: [
+      [name count];
+      ["special" 1]
+      ["fiction" 3]
+    ]
+    tags: [
+      [name count];
+      ["dark fantasy" 1]
+      ["fiction" 2]
+      ["fantasy" 2]
+      ["unabridged" 1]
+      ["explicit" 2]
+      ["abridged" 2]
+    ]
+  }
+  let expected = {
+    genres: [
+      [name count];
+      ["fiction" 3]
+      ["fantasy" 2]
+      ["dark fantasy" 1]
+      ["special" 1]
+    ]
+    tags: [
+      [name count];
+      ["abridged" 2]
+      ["explicit" 2]
+      ["unabridged" 1]
+    ]
+  }
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+def test_parse_genres_and_tags [] {
+  test_parse_genres_and_tags_empty_input
+  test_parse_genres_and_tags_empty_genres_empty_tags
+  test_parse_genres_and_tags_genres_empty_tags
+  test_parse_genres_and_tags_empty_genres_tags
+  test_parse_genres_and_tags_genres_tags
+}
+
 def main [] {
   test_upsert_if_present
   test_upsert_if_value
@@ -4570,5 +4677,6 @@ def main [] {
   test_escape_special_glob_characters
   test_escape_special_lucene_characters
   test_append_to_musicbrainz_query
+  test_parse_genres_and_tags
   echo "All tests passed!"
 }
