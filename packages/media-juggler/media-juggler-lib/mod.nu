@@ -25,6 +25,12 @@ export const image_extensions = [
   webp
 ]
 
+export const supplementary_audiobook_file_extensions = [
+  cbz
+  epub
+  pdf
+]
+
 export const musicbrainz_non_genre_tags = ["abridged", "audiobook", "chapters", "explicit", "novel", "unabridged"]
 
 # Surround special characters in a string with square brackets

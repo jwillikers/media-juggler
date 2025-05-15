@@ -279,6 +279,17 @@ def main [
     | flatten
   )
 
+
+  # Locate any supplementary documents, i.e. accompanying PDFs
+  let audiobook = (
+    let supplementary_documents = (glob $"($audiobook.directory | escape_special_glob_characters)/*.{($supplementary_audiobook_file_extensions | str join ',')}");
+    if ($supplementary_documents | is-not-empty) {
+      $audiobook | insert supplementary_documents $supplementary_documents
+    } else {
+      $audiobook | insert supplementary_documents []
+    }
+  )
+
   # Next, decrypt any Audible AAX files
   let audiobook = (
     if ($audiobook.files | first | path parse | get extension) == "aax" {
@@ -581,8 +592,35 @@ def main [
     }
   )
 
+  # todo Get supplementary document metadata from BookBrainz
+  let audiobook = $audiobook | update supplementary_documents (
+    $audiobook.supplementary_documents
+    | each {|document|
+      let stem = (
+        # For a single file, rename the file to match the book.
+        if ($audiobook.supplementary_documents | length) == 1 {
+          $metadata.book.title | sanitize_file_name
+        # For multiple files, leave the names as is.
+        } else {
+          $document | path parse | get stem
+        }
+      )
+      let destination = $document | path parse | update stem $stem | update parent $target_destination_directory | path join
+      {
+        file: $document
+        destination: $destination
+      }
+    }
+  )
+
+  # todo
+  # If the audiobook files are already present under the correct author / series subdirectory, but reside under extra directories, go ahead and leave that directory structure intact.
+  # This is to accommodate external subseries management since this script doesn't yet support nesting series / subseries directories.
+  # Note that if anything is renamed in the path hierarchy, such subdirectories will be dropped.
+  # if top_part matches top_part, and audiobook_directory matches bottom_part, use existing path.
+
   if ($target_destination_directory | is_ssh_path) {
-    $audiobook.files | each {|file|
+    $audiobook.files | append $audiobook.supplementary_documents | each {|file|
       log info $"Uploading (ansi yellow)($file.file)(ansi reset) to (ansi yellow)($file.destination)(ansi reset)"
       if $use_rsync {
         $file.file | rsync $file.destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
@@ -592,7 +630,7 @@ def main [
     }
   } else {
     mkdir $target_destination_directory
-    $audiobook.files | each {|file|
+    $audiobook.files | append $audiobook.supplementary_documents | each {|file|
       mv $file.file $file.destination
     }
   }
@@ -603,6 +641,19 @@ def main [
       $audiobook.original_files
       | filter {|file|
         $file not-in ($audiobook.files | get destination)
+      }
+      | each {|file|
+        if ($file | is_ssh_path) {
+          $file | ssh rm
+        } else {
+          rm $file
+        }
+      }
+    )
+    (
+      $audiobook.supplementary_documents
+      | filter {|file|
+        $file.file != $file.destination
       }
       | each {|file|
         if ($file | is_ssh_path) {
