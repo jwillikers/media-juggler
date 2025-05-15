@@ -1423,14 +1423,14 @@ def test_parse_series_from_musicbrainz_relations [] {
 def test_parse_series_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = [
-    [name id index];
-    ["Monogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein" "2c867f6d-09db-477e-99f1-aa7725239720" "3"]
-    ["Bakemonogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein" "94b16acb-7f06-42e1-96ac-7ff970972238" "1"]
-    ["Bakemonogatari" "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "1"]
-    ["Monogatari" "05ef20c8-9286-4b53-950f-eac8cbb32dc3" "1"]
-    ["Monogatari Series: First Season" "6660f123-24a0-46c7-99bf-7ff5dc11ceef" "1"]
+    [name id index scope];
+    ["Monogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein" "2c867f6d-09db-477e-99f1-aa7725239720" "3" "release group"]
+    ["Bakemonogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein" "94b16acb-7f06-42e1-96ac-7ff970972238" "1" "release group"]
+    ["Bakemonogatari" "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "1" "work"]
+    ["Monogatari" "05ef20c8-9286-4b53-950f-eac8cbb32dc3" "1" "work"]
+    ["Monogatari Series: First Season" "6660f123-24a0-46c7-99bf-7ff5dc11ceef" "1" "work"]
   ]
-  let actual = $input | parse_series_from_musicbrainz_release ["release", "release-group", "works"]
+  let actual = $input | parse_series_from_musicbrainz_release
   assert equal ($actual | take 2) ($expected | take 2)
   assert equal ($actual | skip 2 | sort-by name) ($expected | skip 2)
 }
@@ -4635,6 +4635,21 @@ def test_parse_genres_and_tags [] {
   test_parse_genres_and_tags_genres_tags
 }
 
+def test_has_bad_video_stream_bad [] {
+  let input = open ([$test_data_dir "ffprobe_bad_video_stream.json"] | path join)
+  assert ($input | has_bad_video_stream)
+}
+
+def test_has_bad_video_stream_good [] {
+  let input = open ([$test_data_dir "ffprobe_output_m4b_aac.json"] | path join)
+  assert not ($input | has_bad_video_stream)
+}
+
+def test_has_bad_video_stream [] {
+  test_has_bad_video_stream_bad
+  test_has_bad_video_stream_good
+}
+
 def main [] {
   test_upsert_if_present
   test_upsert_if_value
@@ -4678,5 +4693,6 @@ def main [] {
   test_escape_special_lucene_characters
   test_append_to_musicbrainz_query
   test_parse_genres_and_tags
+  test_has_bad_video_stream
   echo "All tests passed!"
 }
