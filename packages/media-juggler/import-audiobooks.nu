@@ -282,11 +282,11 @@ def main [
 
   # Locate any supplementary documents, i.e. accompanying PDFs
   let audiobook = (
-    let supplementary_documents = (glob $"($audiobook.directory | escape_special_glob_characters)/*.{($supplementary_audiobook_file_extensions | str join ',')}");
-    if ($supplementary_documents | is-not-empty) {
-      $audiobook | insert supplementary_documents $supplementary_documents
+    let companion_documents = (glob $"($audiobook.directory | escape_special_glob_characters)/*.{($audiobook_companion_document_file_extensions | str join ',')}");
+    if ($companion_documents | is-not-empty) {
+      $audiobook | insert companion_documents $companion_documents
     } else {
-      $audiobook | insert supplementary_documents []
+      $audiobook | insert companion_documents []
     }
   )
 
@@ -593,12 +593,12 @@ def main [
   )
 
   # todo Get supplementary document metadata from BookBrainz
-  let audiobook = $audiobook | update supplementary_documents (
-    $audiobook.supplementary_documents
+  let audiobook = $audiobook | update companion_documents (
+    $audiobook.companion_documents
     | each {|document|
       let stem = (
         # For a single file, rename the file to match the book.
-        if ($audiobook.supplementary_documents | length) == 1 {
+        if ($audiobook.companion_documents | length) == 1 {
           $metadata.book.title | sanitize_file_name
         # For multiple files, leave the names as is.
         } else {
@@ -620,7 +620,7 @@ def main [
   # if top_part matches top_part, and audiobook_directory matches bottom_part, use existing path.
 
   if ($target_destination_directory | is_ssh_path) {
-    $audiobook.files | append $audiobook.supplementary_documents | each {|file|
+    $audiobook.files | append $audiobook.companion_documents | each {|file|
       log info $"Uploading (ansi yellow)($file.file)(ansi reset) to (ansi yellow)($file.destination)(ansi reset)"
       if $use_rsync {
         $file.file | rsync $file.destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
@@ -630,7 +630,7 @@ def main [
     }
   } else {
     mkdir $target_destination_directory
-    $audiobook.files | append $audiobook.supplementary_documents | each {|file|
+    $audiobook.files | append $audiobook.companion_documents | each {|file|
       mv $file.file $file.destination
     }
   }
@@ -651,7 +651,7 @@ def main [
       }
     )
     (
-      $audiobook.supplementary_documents
+      $audiobook.companion_documents
       | filter {|file|
         $file.file != $file.destination
       }

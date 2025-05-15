@@ -25,7 +25,7 @@ export const image_extensions = [
   webp
 ]
 
-export const supplementary_audiobook_file_extensions = [
+export const audiobook_companion_document_file_extensions = [
   cbz
   epub
   pdf
