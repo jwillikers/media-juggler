@@ -2708,7 +2708,20 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       }
     );
     # The first series should be considered the primary series
-    [] | append $series | append $group_series | uniq
+    let series = [] | append $series | append $group_series;
+    if ($series | is-not-empty) {
+      let duplicate_series = (
+        $series | group-by --to-table name | each {|group|
+          if ($group.items | length) > 1 {
+            $group.items
+          }
+        } | flatten | filter {|item| $item != null}
+      )
+      if ($duplicate_series | is-not-empty) {
+        log error $"Multiple series with the same name present: ($duplicate_series). Only the first series will be used and duplicate series will be ignored."
+      }
+      $series | uniq-by name
+    }
   )
   let genres = (
     if "genre" in $metadata {
@@ -3153,24 +3166,39 @@ export def into_tone_format []: record -> record {
   let metadata = $in
   # Prefer release group series
   let group = (
-    if "series" in $metadata.book and $metadata.book.series != null {
-      if "scope" in ($metadata.book.series | columns) {
-        let release_group_series = $metadata.book.series | where scope == "release group"
-        if ($release_group_series | is-empty) {
-          # Fallback to the work series if there is no release group series
-          let work_series = $metadata.book.series | where scope == "work"
-          if ($work_series | is-empty) {
-            # Use whatever series there are at this point
-            $metadata.book.series
+    let series = (
+      if "series" in $metadata.book and $metadata.book.series != null {
+        if "scope" in ($metadata.book.series | columns) {
+          let release_group_series = $metadata.book.series | where scope == "release group"
+          if ($release_group_series | is-empty) {
+            # Fallback to the work series if there is no release group series
+            let work_series = $metadata.book.series | where scope == "work"
+            if ($work_series | is-empty) {
+              # Use whatever series there are at this point
+              $metadata.book.series
+            } else {
+              $work_series
+            }
           } else {
-            $work_series | convert_series_for_group_tag
+            $release_group_series
           }
         } else {
-          $release_group_series | convert_series_for_group_tag
+          $metadata.book.series
         }
-      } else {
-        $metadata.book.series | convert_series_for_group_tag
       }
+    );
+    if ($series | is-not-empty) {
+      let duplicate_series = (
+        $series | group-by --to-table name | each {|group|
+          if ($group.items | length) > 1 {
+            $group.items
+          }
+        } | flatten | filter {|item| $item != null}
+      )
+      if ($duplicate_series | is-not-empty) {
+        log error $"Multiple series with the same name present: ($duplicate_series). Only the first series will be used and duplicate series will be ignored."
+      }
+      $series | uniq-by name | convert_series_for_group_tag
     }
   )
   let publication_date = (
