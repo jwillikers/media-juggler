@@ -5931,23 +5931,37 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     } else {
       (
         $musicbrainz_metadata
-        | update book.genres (
+        | upsert book.genres (
           $musicbrainz_metadata.book.series | each {|series|
             if ($series | get --ignore-errors genres | is-empty) {
               $series.genres
             } else {
               $series.genres | default ($series.scope + " series") scope
             }
-          } | get genres | uniq-by name scope | append $musicbrainz_metadata.book.genres
+          } | (
+            let input = $in;
+            if ($input | is-not-empty) and "genres" in ($input | columns) {
+              $input.genres | uniq-by name scope | append $musicbrainz_metadata.book.genres
+            } else {
+              $input
+            }
+          )
         )
-        | update book.tags (
+        | upsert book.tags (
           $musicbrainz_metadata.book.series | each {|series|
             if ($series | get --ignore-errors tags | is-empty) {
               $series.tags
             } else {
               $series.tags | default ($series.scope + " series") scope
             }
-          } | get tags | uniq-by name scope | append $musicbrainz_metadata.book.tags
+          } | (
+            let input = $in;
+            if ($input | is-not-empty) and "tags" in ($input | columns) {
+              $input.tags | uniq-by name scope | append $musicbrainz_metadata.book.tags
+            } else {
+              $input
+            }
+          )
         )
       )
     }
@@ -5964,8 +5978,8 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
           let musicbrainz_works = $track.musicbrainz_works | each {|musicbrainz_work|
             $musicbrainz_work | merge ($musicbrainz_work.id | fetch_and_parse_musicbrainz_work $cache --retries $retries --retry-delay $retry_delay)
           }
-          let genres = $musicbrainz_works.genres | flatten | uniq-by name scope
-          let tags = $musicbrainz_works.tags | flatten | uniq-by name scope
+          let genres = $musicbrainz_works.genres | flatten | uniq-by name | default work scope
+          let tags = $musicbrainz_works.tags | flatten | uniq-by name | default work scope
           (
             $track
             | update musicbrainz_works $musicbrainz_works
@@ -6083,6 +6097,16 @@ export def parse_genres_and_tags []: record<genres: table<name: string, count: i
 
   # sort by the count, highest to lowest, and then name alphabetically
   let sort = {|a, b|
+    if (
+      ($a | is-empty)
+      or ($b | is-empty)
+      or "name" not-in ($a | columns)
+      or "name" not-in ($b | columns)
+      or "count" not-in ($a | columns)
+      or "count" not-in ($b | columns)
+    ) {
+      return true
+    }
     if $a.count == $b.count {
       $a.name < $b.name
     } else {
@@ -6090,14 +6114,14 @@ export def parse_genres_and_tags []: record<genres: table<name: string, count: i
     }
   }
 
-  if ($input.tags | is-empty) {
+  if ($input | get --ignore-errors tags | is-empty) or "tags" not-in ($input | columns) {
     return {
-      genres: ($input.genres | sort-by --custom $sort | uniq-by name)
-      tags: $input.tags
+      genres: ($input | get --ignore-errors genres | sort-by --custom $sort | uniq-by name)
+      tags: []
     }
   }
 
-  let genres = $input.genres | append (
+  let genres = $input | get --ignore-errors genres | append (
     $input.tags
     # | select name count
     | filter {|tag|
