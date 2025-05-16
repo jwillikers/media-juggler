@@ -2997,6 +2997,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
   let book = (
     {}
     | upsert_if_present title $metadata album
+    | upsert_if_present title_sort $metadata albumSort
     | upsert_if_present subtitle $metadata
     | upsert_if_value contributors $book_contributors
     | upsert_if_present comment $metadata
@@ -3339,6 +3340,7 @@ export def into_tone_format []: record -> record {
       # book metadata
       #
       | upsert_if_present album $metadata.book title
+      | upsert_if_present albumSort $metadata.book title_sort
       | upsert_if_present subtitle $metadata.book
       | upsert_if_value albumArtist ($primary_authors | get --ignore-errors name | join_multi_value)
       | upsert_if_present description $metadata.book
@@ -3548,6 +3550,7 @@ export def fetch_musicbrainz_release_group [
 # Get a Release with all of the gory details
 export def fetch_musicbrainz_release [
   includes: list<string> = [
+    aliases
     artist-credits
     labels
     recordings
@@ -4817,6 +4820,23 @@ export def parse_musicbrainz_release []: record -> record {
     }
   )
 
+  # The sort name can only be found in aliases.
+  let title_sort = (
+    if "aliases" in $metadata and ($metadata.aliases | is-not-empty) {
+      let matching_aliases = (
+        $metadata.aliases
+        | where name == $metadata.title
+        | filter {|alias| $alias.name != $alias.sort-name}
+      )
+      if ($matching_aliases | is-not-empty) {
+        if ($matching_aliases | length) > 1 {
+          log warning $"Multiple aliases match the title exactly: ($matching_aliases). Using the first one. Please correct this issue on MusicBrainz."
+        }
+        $matching_aliases | first
+      }
+    }
+  )
+
   # Book metadata
   let book = (
     {}
@@ -4828,6 +4848,7 @@ export def parse_musicbrainz_release []: record -> record {
     )
     | upsert_if_value musicbrainz_release_types $musicbrainz_release_types
     | upsert_if_present title $metadata
+    | upsert_if_value title_sort $metadata
     | upsert_if_value contributors $contributors
     | upsert_if_present isbn $metadata barcode
     | upsert_if_value musicbrainz_release_country $musicbrainz_release_country
@@ -4865,6 +4886,7 @@ export def parse_musicbrainz_release []: record -> record {
 # Fetch the given release id from MusicBrainz and parse it into a normalized data structure
 export def fetch_and_parse_musicbrainz_release [
   includes: list<string> = [
+    aliases
     artist-credits
     labels
     recordings
