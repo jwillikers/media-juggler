@@ -503,19 +503,19 @@ def main [
     )
   )
   if ($metadata | is-empty) {
-    return {audiobook: $audiobook.directory error: $"Failed to retrieve metadata for the audiobook (ansi yellow)($audiobook.directory)(ansi clear)"}
+    return {audiobook: $audiobook.directory error: $"Failed to retrieve metadata for the audiobook (ansi yellow)($audiobook.directory)(ansi reset)"}
   }
   if ($metadata.book | get --ignore-errors contributors | is-empty) {
-    return {audiobook: $audiobook.directory error: $"Missing contributors for the audiobook (ansi yellow)($audiobook.directory)(ansi clear)"}
+    return {audiobook: $audiobook.directory error: $"Missing contributors for the audiobook (ansi yellow)($audiobook.directory)(ansi reset)"}
   }
   # This issue should be caught before here, but check just to be safe.
   if ($metadata.tracks | length) != ($audiobook.files | length) {
-    return {audiobook: $audiobook.directory error: $"Number of tracks doesn't match the number of files for (ansi yellow)($audiobook.directory)(ansi clear)"}
+    return {audiobook: $audiobook.directory error: $"Number of tracks doesn't match the number of files for (ansi yellow)($audiobook.directory)(ansi reset)"}
   }
 
   let primary_authors = $metadata.book.contributors | where role == "primary author"
   if ($primary_authors | is-empty) {
-    return {audiobook: $audiobook.directory error: $"Failed to find primary authors for the audiobook (ansi yellow)($audiobook.directory)(ansi clear). Contributors are ($metadata.book.contributors)"}
+    return {audiobook: $audiobook.directory error: $"Failed to find primary authors for the audiobook (ansi yellow)($audiobook.directory)(ansi reset). Contributors are ($metadata.book.contributors)"}
   }
 
   let relative_destination_directory = (

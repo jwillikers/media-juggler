@@ -31,7 +31,15 @@ export const audiobook_companion_document_file_extensions = [
   pdf
 ]
 
-export const musicbrainz_non_genre_tags = ["abridged", "audiobook", "chapters", "explicit", "novel", "unabridged"]
+export const musicbrainz_non_genre_tags = [
+  "abridged"
+  "accompanying document"
+  "audiobook"
+  "chapters"
+  "explicit"
+  "novel"
+  "unabridged"
+]
 
 # Surround special characters in a string with square brackets
 #
