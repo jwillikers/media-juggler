@@ -2997,7 +2997,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
   let book = (
     {}
     | upsert_if_present title $metadata album
-    | upsert_if_present title_sort $metadata albumSort
+    | upsert_if_present title_sort $metadata sortAlbum
     | upsert_if_present subtitle $metadata
     | upsert_if_value contributors $book_contributors
     | upsert_if_present comment $metadata
@@ -3047,6 +3047,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       duration: $duration
     }
     | upsert_if_present title $metadata
+    | upsert_if_present title_sort $metadata sortTitle
     | upsert_if_present index $metadata trackNumber
     | upsert_if_present embedded_pictures $metadata embeddedPictures
     | upsert_if_value musicbrainz_works $musicbrainz_works
@@ -3340,7 +3341,7 @@ export def into_tone_format []: record -> record {
       # book metadata
       #
       | upsert_if_present album $metadata.book title
-      | upsert_if_present albumSort $metadata.book title_sort
+      | upsert_if_present sortAlbum $metadata.book title_sort
       | upsert_if_present subtitle $metadata.book
       | upsert_if_value albumArtist ($primary_authors | get --ignore-errors name | join_multi_value)
       | upsert_if_present description $metadata.book
@@ -3361,6 +3362,7 @@ export def into_tone_format []: record -> record {
       # track metadata
       #
       | upsert_if_present title $metadata.track
+      | upsert_if_present sortTitle $metadata.track title_sort
       | upsert_if_present trackNumber $metadata.track index
       | (
         let input = $in;
@@ -3520,7 +3522,11 @@ export def fetch_release_front_cover [
   let url = "https://coverartarchive.org/release"
   let request = {http get --full --headers [User-Agent $user_agent] $"($url)/($release_id)"}
   let response = retry_http $request $retries $retry_delay
-  let cover = $response | get body | get images | where front == true | select id image thumbnails | first
+  let front_covers = $response | get body | get images | where front == true | select id image thumbnails
+  if ($front_covers | is-empty) {
+    return null
+  }
+  let cover = $front_covers | first
 
   # thumbnail sizes are 1200, 500, and 250
   let download_url = (
@@ -4668,6 +4674,22 @@ export def parse_musicbrainz_release []: record -> record {
             $metadata.title
           }
         )
+        # The sort name can only be found in aliases.
+        let title_sort = (
+          if "recording" in $track and ($track.recording | is-not-empty) and "aliases" in $track.recording and ($track.recording | is-not-empty) {
+            let matching_aliases = (
+              $track.recording.aliases
+              | where name == $title
+              | filter {|alias| $alias.name != $alias.sort-name}
+            )
+            if ($matching_aliases | is-not-empty) {
+              if ($matching_aliases | length) > 1 {
+                log warning $"Multiple aliases match the title exactly for the recording: ($matching_aliases). Using the first one. Please correct this issue on MusicBrainz."
+              }
+              $matching_aliases.sort-name | first
+            }
+          }
+        )
         let musicbrainz_artist_ids = $track | get --ignore-errors artist-credit.artist.id | uniq
         let disc_subtitle = (
           if "title" in $media and ($media.title | is-not-empty) {
@@ -4683,6 +4705,7 @@ export def parse_musicbrainz_release []: record -> record {
           | upsert_if_present media $media format
           | upsert_if_present musicbrainz_track_id $track id
           | upsert_if_present title $track
+          | upsert_if_value title_sort $title_sort
           | upsert_if_present musicbrainz_recording_id $track.recording id
           | upsert_if_value genres $genres_and_tags.genres
           | upsert_if_value tags $genres_and_tags.tags
@@ -4832,7 +4855,7 @@ export def parse_musicbrainz_release []: record -> record {
         if ($matching_aliases | length) > 1 {
           log warning $"Multiple aliases match the title exactly: ($matching_aliases). Using the first one. Please correct this issue on MusicBrainz."
         }
-        $matching_aliases | first
+        $matching_aliases.sort-name | first
       }
     }
   )
@@ -4848,7 +4871,7 @@ export def parse_musicbrainz_release []: record -> record {
     )
     | upsert_if_value musicbrainz_release_types $musicbrainz_release_types
     | upsert_if_present title $metadata
-    | upsert_if_value title_sort $metadata
+    | upsert_if_value title_sort $title_sort
     | upsert_if_value contributors $contributors
     | upsert_if_present isbn $metadata barcode
     | upsert_if_value musicbrainz_release_country $musicbrainz_release_country
