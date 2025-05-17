@@ -76,7 +76,7 @@ export def has_bad_video_stream []: record<streams: table, format: record> -> bo
     return false
   }
   # The problematic video streams have default disposition set to 1 instead of attached_pic
-  $video_streams | where disposition.default.attached_pic == 0 | is-not-empty
+  $video_streams | where disposition.attached_pic == 0 | is-not-empty
 }
 
 export def remove_video_stream [
@@ -3677,7 +3677,7 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
   if ($input | is-empty) {
     return null
   }
-  let genres_and_tags = $input | select --ignore-errors genres tags
+  let genres_and_tags = $input | select --ignore-errors genres tags | parse_genres_and_tags
   let series = {
     id: $input.id
     name: $input.name
@@ -3716,7 +3716,7 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
 # Fetch and parse a MusicBrainz Series by ID.
 export def fetch_and_parse_musicbrainz_series [
   # cache: directory # Cache directory where parsed series are stored in files named according to mbid, i.e. mbid.json.
-  cache: closure # Closure that returns parsed series information given a series id
+  cache: closure # Closure that returns parsed series information given a type and a series id
   --retries: int = 3
   --retry-delay: duration = 3sec
 ]: string -> record {
@@ -3745,8 +3745,8 @@ export def build_series_tree_up [
 ]: record -> record {
   let series = $in
 
-  log info $"Series: ($series)"
-  log info $"Depth: ($depth)"
+  # log info $"Series: ($series)"
+  # log info $"Depth: ($depth)"
 
   # Base case: No parent series
   if ($series | get --ignore-errors parent_series | is-empty) {
@@ -3766,15 +3766,15 @@ export def build_series_tree_up [
   }
 
   $series | upsert parent_series (
-    log info $"$series.parent_series: ($series.parent_series | to nuon)";
+    # log info $"$series.parent_series: ($series.parent_series | to nuon)";
+    # $series.parent_series | each {|parent_series|
+      # log info $"$parent_series: ($parent_series | to nuon)";
+      # log info $"$parent_series.id: ($parent_series.id)";
+    # };
     $series.parent_series | each {|parent_series|
-      log info $"$parent_series: ($parent_series | to nuon)";
-      log info $"$parent_series.id: ($parent_series.id)";
-    };
-    $series.parent_series | each {|parent_series|
-      log info $"parent_series: ($parent_series)"
+      # log info $"parent_series: ($parent_series)"
       if $required_series == null {
-        log info $"parent_series.id: ($parent_series.id)"
+        # log info $"parent_series.id: ($parent_series.id)"
         $parent_series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree_up ($depth - 1) $cache
       } else {
         $parent_series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree_up ($depth - 1) $cache --required-series ($required_series | filter {|id| $id != $series.id})
@@ -4364,8 +4364,6 @@ export def parse_series_from_musicbrainz_release []: record -> table<name: strin
 # The genres should also be parsed from associated series and works, but these require separate API calls.
 #
 # MusicBrainz doesn't really provide genres for audiobooks yet, so most genres are directly imported from tags.
-#
-# todo test
 export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<genres: table<name: string, count: int, scope: string>, tags: table<name: string, count: int, scope: string>> {
   let metadata = $in
   if ($metadata | is-empty) {
@@ -4374,6 +4372,7 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
   let release = (
     $metadata
     | get --ignore-errors tags
+    | wrap tags
     | parse_genres_and_tags
     | default "release" scope
   )
@@ -4381,6 +4380,7 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
     $metadata
     | get --ignore-errors release-group
     | get --ignore-errors tags
+    | wrap tags
     | parse_genres_and_tags
     | default "release group" scope
   )
@@ -4392,6 +4392,7 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
     | get --ignore-errors recording
     | get --ignore-errors tags
     | flatten
+    | wrap tags
     | parse_genres_and_tags
     | default "recording" scope
   )
@@ -4410,6 +4411,7 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
       | default "recording" scope
     )
     | filter {|row| ($row | is-not-empty) and "name" in $row and "count" in $row}
+    | select --ignore-errors name count scope
   )
   let tags = (
     $release
@@ -4426,6 +4428,7 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
       | default "recording" scope
     )
     | filter {|row| ($row | is-not-empty) and "name" in $row and "count" in $row}
+    | select --ignore-errors name count scope
   )
   {
     genres: $genres
