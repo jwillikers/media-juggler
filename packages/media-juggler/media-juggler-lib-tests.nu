@@ -61,6 +61,88 @@ def test_round_to_second_using_cumulative_offset [] {
   assert equal ($durations | round_to_second_using_cumulative_offset) $expected
 }
 
+def test_combine_chapter_parts_none [] {
+  let input = [
+    [index title duration];
+    [1 "Chapter 1" 30069ms]
+    [2 "Chapter 2" 7191ms]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "Chapter 5" 340334ms]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Chapter 1" 30069ms]
+    [2 "Chapter 2" 7191ms]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "Chapter 5" 340334ms]
+  ]
+  assert equal ($input | combine_chapter_parts) $expected
+}
+
+def test_combine_chapter_parts_combine_one_chapter [] {
+  let input = [
+    [index title duration];
+    [1 "Chapter 1" 30069ms]
+    [2 "Chapter 2, Part 1" 7191ms]
+    [3 "Chapter 2, Part 2" 1144834ms]
+    [4 "Chapter 3" 1148453ms]
+    [5 "Chapter 4" 340334ms]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Chapter 1" 30069ms]
+    [2 "Chapter 2" 1152025ms]
+    [3 "Chapter 3" 1148453ms]
+    [4 "Chapter 4" 340334ms]
+  ]
+  assert equal ($input | combine_chapter_parts) $expected
+}
+
+def test_combine_chapter_parts_combine_two_chapters [] {
+  let input = [
+    [index title duration];
+    [1 "Chapter 1" 30069ms]
+    [2 "Chapter 2, Part 1" 7191ms]
+    [3 "Chapter 2, Part 2" 1144834ms]
+    [4 "Chapter 3, Part 1" 1148453ms]
+    [5 "Chapter 3, Part 2" 340334ms]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Chapter 1" 30069ms]
+    [2 "Chapter 2" 1152025ms]
+    [3 "Chapter 3" 1488787ms]
+  ]
+  assert equal ($input | combine_chapter_parts) $expected
+}
+
+def test_combine_chapter_parts_combine_one_chapter_three_parts [] {
+  let input = [
+    [index title duration];
+    [1 "Part 1, Part 1" 30069ms]
+    [2 "Part 1, Part 2" 7191ms]
+    [3 "Part 1, Part 3" 1144834ms]
+    [4 "Part 2" 1148453ms]
+    [5 "Part 3" 340334ms]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Part 1" 1182094ms]
+    [2 "Part 2" 1148453ms]
+    [3 "Part 3" 340334ms]
+  ]
+  assert equal ($input | combine_chapter_parts) $expected
+}
+
+def test_combine_chapter_parts [] {
+  test_combine_chapter_parts_none
+  test_combine_chapter_parts_combine_one_chapter
+  test_combine_chapter_parts_combine_two_chapters
+  test_combine_chapter_parts_combine_one_chapter_three_parts
+}
+
 def test_parse_series_from_group_one_without_index [] {
   let expected = [[name index]; ["The Stormlight Archive" null]]
   assert equal ("The Stormlight Archive" | parse_series_from_group) $expected
@@ -709,7 +791,7 @@ def test_convert_series_for_group_tag_two_with_index [] {
 
 def test_convert_series_for_group_tag_one_without_index_one_with_index [] {
   let expected = "Series One;Mistborn #3"
-  assert equal ([[name index]; ["Series One" null] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
+  assert equal ([[name index]; ["Series One" ""] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
 }
 
 def test_convert_series_for_group_tag [] {
@@ -1423,16 +1505,17 @@ def test_parse_series_from_musicbrainz_relations [] {
 def test_parse_series_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = [
-    [name id index];
-    ["Monogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein" "2c867f6d-09db-477e-99f1-aa7725239720" "3"]
-    ["Bakemonogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein" "94b16acb-7f06-42e1-96ac-7ff970972238" "1"]
-    ["Bakemonogatari" "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "1"]
-    ["Monogatari" "05ef20c8-9286-4b53-950f-eac8cbb32dc3" "1"]
-    ["Monogatari Series: First Season" "6660f123-24a0-46c7-99bf-7ff5dc11ceef" "1"]
+    [name id index scope];
+    ["Monogatari Series: First Season" "fb6c2a8a-9820-4e09-a0ea-9e12b8bc5e2b" "2" "release group"]
+    ["Monogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein" "2c867f6d-09db-477e-99f1-aa7725239720" "2" "release group"]
+    ["Bakemonogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein" "94b16acb-7f06-42e1-96ac-7ff970972238" "1" "release group"]
+    ["Monogatari" "05ef20c8-9286-4b53-950f-eac8cbb32dc3" "1" "work"]
+    ["Bakemonogatari" "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "1" "work"]
+    ["Monogatari Series: First Season" "6660f123-24a0-46c7-99bf-7ff5dc11ceef" "1" "work"]
   ]
-  let actual = $input | parse_series_from_musicbrainz_release ["release", "release-group", "works"]
+  let actual = $input | parse_series_from_musicbrainz_release
   assert equal ($actual | take 2) ($expected | take 2)
-  assert equal ($actual | skip 2 | sort-by name) ($expected | skip 2)
+  assert equal ($actual | skip 2) ($expected | skip 2)
 }
 
 def test_parse_series_from_musicbrainz_release [] {
@@ -1483,16 +1566,8 @@ def test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let expected = [
     [name count];
     ["chapters" 1]
-    ["fiction" 1]
     ["light novel" 1]
-    ["mystery" 1]
-    ["paranormal" 1]
-    ["psychological" 1]
-    ["romance" 1]
-    ["school life" 1]
-    ["supernatural" 1]
     ["unabridged" 1]
-    ["vampire" 1]
   ]
   assert equal ($input | parse_tags_from_musicbrainz_release) $expected
 }
@@ -1501,16 +1576,8 @@ def test_parse_tags_from_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = [
     [name count];
-    ["adventure" 1]
-    ["fantasy" 1]
-    ["fiction" 1]
-    ["historical fantasy" 1]
     ["light novel" 1]
-    ["mystery" 1]
-    ["paranormal" 1]
-    ["supernatural" 1]
     ["unabridged" 1]
-    ["urban fantasy" 1]
   ]
   assert equal ($input | parse_tags_from_musicbrainz_release) $expected
 }
@@ -1641,6 +1708,43 @@ def test_chapters_into_tone_format [] {
   test_chapters_into_tone_format_baccano_vol_1
 }
 
+def test_parse_genres_and_tags_from_musicbrainz_release_baccano_vol_1 [] {
+  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
+  let expected = {
+    genres: [
+      [name count scope];
+      ["light novel" 1 "release group"]
+    ]
+    tags: [
+      [name count scope];
+      [unabridged 1 "release group"]
+      [unabridged 1 "recording"]
+    ]
+  }
+  assert equal ($input | parse_genres_and_tags_from_musicbrainz_release) $expected
+}
+
+def test_parse_genres_and_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
+  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
+  let expected = {
+    genres: [
+      [name count scope];
+      ["light novel" 1 "release group"]
+    ]
+    tags: [
+      [name count scope];
+      [chapters 1 "release"]
+      [unabridged 1 "release group"]
+    ]
+  }
+  assert equal ($input | parse_genres_and_tags_from_musicbrainz_release) $expected
+}
+
+def test_parse_genres_and_tags_from_musicbrainz_release [] {
+  test_parse_genres_and_tags_from_musicbrainz_release_baccano_vol_1
+  test_parse_genres_and_tags_from_musicbrainz_release_bakemonogatari_part_01
+}
+
 def test_parse_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = {
@@ -1662,34 +1766,30 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
       musicbrainz_release_status: "official"
       amazon_asin: "B0CRSJ8RQV"
       audible_asin: "B0CRSPBW6X"
-      genres: [
-        [name count];
-        [adventure 1]
-        [fantasy 1]
-        [fiction 1]
-        ["historical fantasy" 1]
-        ["light novel" 1]
-        [mystery 1]
-        [paranormal 1]
-        [supernatural 1]
-        ["urban fantasy" 1]
-      ],
-      tags: [
-        [name count];
-        [unabridged 1]
-      ],
-      release_tags: [
-        [name count];
-        [unabridged 1]
-      ],
       publication_date: ("2024-05-14T00:00:00-05:00" | into datetime)
       series: [
-        [name id index];
+        [name id index scope];
         [
           "Baccano! read by Michael Butler Murray"
           "762cd100-5319-4f9e-8a97-c7f71ae66ad7"
           "1"
+          "release group"
         ]
+        [
+          "Baccano!"
+          "c7b56e90-fdc0-4324-a399-7a4c7b534c24"
+          "1"
+          "work"
+        ]
+      ]
+      genres: [
+        [name count scope];
+        ["light novel" 1 "release group"]
+      ]
+      tags: [
+        [name count scope];
+        [unabridged 1 "release group"]
+        [unabridged 1 recording]
       ]
       front_cover_available: true
       publishers: [
@@ -1710,7 +1810,6 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
         musicbrainz_track_id
         title
         musicbrainz_recording_id
-        genres
         tags
         musicbrainz_works
         contributors
@@ -1724,22 +1823,10 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
         "Baccano! Vol. 1: The Rolling Bootlegs"
         "7c7064d1-fd42-414c-a8d3-52cce1e58ad1"
         [
-          [name count];
-          [adventure 1]
-          [fantasy 1]
-          [fiction 1]
-          ["historical fantasy" 1]
-          ["light novel" 1]
-          [mystery 1]
-          [paranormal 1]
-          [supernatural 1]
-          ["urban fantasy" 1]
+          [name count scope];
+          [unabridged 1 recording]
         ]
-        [
-          [name count];
-          [unabridged 1]
-        ]
-        [[id title]; ["4b5f1fcc-1765-43c3-89f9-a20998cfb5a4" "Baccano!, Vol. 1: The Rolling Bootlegs"]]
+        [[id title bookbrainz_work_id]; ["4b5f1fcc-1765-43c3-89f9-a20998cfb5a4" "Baccano!, Vol. 1: The Rolling Bootlegs" "9edfaf35-77dc-4ad5-aa15-d048f8609b17"]]
         [
           [id, name, entity, role];
           ["efc0e95e-2d3e-4219-8ebb-28ed3751e6ab", "Ryohgo Narita", artist, writer]
@@ -1752,10 +1839,9 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
   }
   let actual = ($input | parse_musicbrainz_release)
   # assert equal ($actual | get book | columns) ($expected | get book | columns)
-  # assert equal ($actual | get book | get genres) ($expected | get book | get genres)
-  # assert equal ($actual | get book | get tags) ($expected | get book | get tags)
-  # assert equal ($actual | get book | get release_tags) ($expected | get book | get release_tags)
   # assert equal ($actual | get book | get series) ($expected | get book | get series)
+  # assert equal ($actual | get book | get tags) ($expected | get book | get tags)
+  # assert equal ($actual | get book | get genres) ($expected | get book | get genres)
   # assert equal ($actual | get book | get contributors) ($expected | get book | get contributors)
   # assert equal ($actual | get book) ($expected | get book)
   # assert equal ($actual | get tracks | first | columns) ($expected | get tracks | first | columns)
@@ -1778,7 +1864,6 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
         audiobook
       ]
       title: "Bakemonogatari: Monster Tale, Part 01"
-
       contributors: [
         [id name entity role];
         ["2c7b9427-6776-4969-8028-5de988724659" NISIOISIN artist "primary author"]
@@ -1794,38 +1879,52 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
       musicbrainz_release_country: "XW"
       musicbrainz_release_status: "official"
       genres: [
-        [name count];
-        [fiction 1]
-        ["light novel" 1]
-        [mystery 1]
-        [paranormal 1]
-        [psychological 1]
-        [romance 1]
-        ["school life" 1]
-        [supernatural 1]
-        [vampire 1]
+        [name count scope];
+        ["light novel" 1 "release group"]
       ]
       tags: [
-        [name count];
-        [chapters 1]
-        [unabridged 1]
-      ]
-      release_tags: [
-        [name count];
-        [chapters 1]
-        [unabridged 1]
+        [name count scope];
+        [chapters 1 release]
+        [unabridged 1 "release group"]
       ]
       publication_date: ("2020-03-24T00:00:00-05:00" | into datetime)
       series: [
-        [name id index];
+        [name id index scope];
+        [
+          "Monogatari Series: First Season"
+          "fb6c2a8a-9820-4e09-a0ea-9e12b8bc5e2b"
+          "2"
+          "release group"
+        ]
         [
           "Monogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein"
           "2c867f6d-09db-477e-99f1-aa7725239720"
-          "3"
-        ] [
+          "2"
+          "release group"
+        ]
+        [
           "Bakemonogatari, read by Erik Kimerer, Cristina Vee, Erica Mendez & Keith Silverstein"
           "94b16acb-7f06-42e1-96ac-7ff970972238"
           "1"
+          "release group"
+        ]
+        [
+          Monogatari
+          "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+          "1"
+          work
+        ]
+        [
+          Bakemonogatari
+          "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+          "1"
+          work
+        ]
+        [
+          "Monogatari Series: First Season"
+          "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+          "1"
+          work
         ]
       ]
       chapters: [[index, start, length, title]; [0, 0ns, 15000000000ns, "Opening Credits"], [1, 15000000000ns, 55000000000ns, Copyright], [2, 70000000000ns, 370000000000ns, "Chapter One: Hitagi Crab, Chapter 001"], [3, 440000000000ns, 904000000000ns, "Chapter One: Hitagi Crab, Chapter 002"], [4, 1344000000000ns, 1437000000000ns, "Chapter One: Hitagi Crab, Chapter 003"], [5, 2781000000000ns, 1581000000000ns, "Chapter One: Hitagi Crab, Chapter 004"], [6, 4362000000000ns, 2430000000000ns, "Chapter One: Hitagi Crab, Chapter 005"], [7, 6792000000000ns, 1958000000000ns, "Chapter One: Hitagi Crab, Chapter 006"], [8, 8750000000000ns, 692000000000ns, "Chapter One: Hitagi Crab, Chapter 007"], [9, 9442000000000ns, 68000000000ns, "Chapter One: Hitagi Crab, Chapter 008"], [10, 9510000000000ns, 439000000000ns, "Chapter Two: Mayoi Snail, Chapter 001"], [11, 9949000000000ns, 2782000000000ns, "Chapter Two: Mayoi Snail, Chapter 002"], [12, 12731000000000ns, 1420000000000ns, "Chapter Two: Mayoi Snail, Chapter 003"], [13, 14151000000000ns, 1678000000000ns, "Chapter Two: Mayoi Snail, Chapter 004"], [14, 15829000000000ns, 1863000000000ns, "Chapter Two: Mayoi Snail, Chapter 005"], [15, 17692000000000ns, 3922000000000ns, "Chapter Two: Mayoi Snail, Chapter 006"], [16, 21614000000000ns, 1354000000000ns, "Chapter Two: Mayoi Snail, Chapter 007"], [17, 22968000000000ns, 1319000000000ns, "Chapter Two: Mayoi Snail, Chapter 008"], [18, 24287000000000ns, 154000000000ns, "Chapter Two: Mayoi Snail, Chapter 009"], [19, 24441000000000ns, 230000000000ns, Afterword], [20, 24671000000000ns, 30000000000ns, "End Credits"]]
@@ -1841,54 +1940,12 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
       language: "eng"
     }
     tracks: [
-      [index, disc_number, media, musicbrainz_track_id, title, musicbrainz_recording_id, musicbrainz_works, contributors, duration];
-      [
-        1,
-        1,
-        "Digital Media",
-        "1af64466-4b91-4d49-8c48-743c8bbdc542",
-        "Opening Credits",
-        "ddf19afa-8d0a-4d7d-95f5-c6f0ad6daaf5",
-        [
-          [id, title];
-          ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]
-        ]
-        [
-          [id, name, entity, role];
-          ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer],
-          ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator],
-          ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer],
-          ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator],
-          ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]
-        ]
-        15000000000ns
-      ]
-      [
-        2
-        1
-        "Digital Media"
-        "7a41a13e-18f2-48a2-943e-ab65e646800b"
-        Copyright
-        "19af78c6-fa48-4b1d-b211-c916dbdb29cc"
-        [
-          [id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]
-        ]
-        [
-          [id, name, entity, role];
-          ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer],
-          ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator],
-          ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer],
-          ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator],
-          ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]],
-          55000000000ns
-        ]
-        [3, 1, "Digital Media", "ee624e13-4ba9-4ebb-ae65-f3bb4da8f09c", "Chapter One: Hitagi Crab, Chapter 001", "6a9b6fcf-bcdf-4077-9f92-21153773ae7c", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 370000000000ns], [4, 1, "Digital Media", "e54e6d65-a8ef-481a-b5cc-e1df1b34fd34", "Chapter One: Hitagi Crab, Chapter 002", "eff08c59-06fe-4b4c-8f12-923d8228fa45", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 904000000000ns], [5, 1, "Digital Media", "1fe66e7b-defe-4f6a-89ba-a63e46bd57d2", "Chapter One: Hitagi Crab, Chapter 003", "17cc0da0-ee32-4686-81b7-85202cc29775", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1437000000000ns], [6, 1, "Digital Media", "5790db34-a353-4648-9c90-b067f4c97b18", "Chapter One: Hitagi Crab, Chapter 004", "359596d6-213a-49e2-a0b4-1c01968ca660", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1581000000000ns], [7, 1, "Digital Media", "4a96c1b7-20a9-4e39-becf-56dfe96423a0", "Chapter One: Hitagi Crab, Chapter 005", "83fb8681-62eb-4b31-9269-bf2e2d3703d0", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 2430000000000ns], [8, 1, "Digital Media", "f68880dd-fd54-459e-a3f6-32a0c405cc93", "Chapter One: Hitagi Crab, Chapter 006", "99a7fc25-4765-4df7-951e-7f6e870cab85", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1958000000000ns], [9, 1, "Digital Media", "46f366db-03b8-47e3-822b-e5088bdb6194", "Chapter One: Hitagi Crab, Chapter 007", "85176035-3856-443f-bb17-d602d0b6a4c0", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 692000000000ns], [10, 1, "Digital Media", "c2ee3a84-58c2-4152-a420-7d55d58bd05e", "Chapter One: Hitagi Crab, Chapter 008", "a201d5c4-a6f7-4609-abc2-dcb54052c7ea", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 68000000000ns], [11, 1, "Digital Media", "88981d2d-9af9-4bf9-a96a-e040b9afe48b", "Chapter Two: Mayoi Snail, Chapter 001", "59f48ed4-bfbf-4b4c-8df5-d5133366da4d", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 439000000000ns], [12, 1, "Digital Media", "c11d5faa-4893-4825-98b3-c1b200957800", "Chapter Two: Mayoi Snail, Chapter 002", "bda5b5e5-9ed2-4ce2-9221-c8797e1247d8", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 2782000000000ns], [13, 1, "Digital Media", "ce379ad4-e31c-4ae8-83ea-c5ebe4ed57ec", "Chapter Two: Mayoi Snail, Chapter 003", "6dee17b8-2198-44df-8841-a0f311771623", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1420000000000ns], [14, 1, "Digital Media", "a6a8838d-4b2f-4e4c-8c3b-58b6aa2df200", "Chapter Two: Mayoi Snail, Chapter 004", "01aadb9b-055c-4839-b8da-b7f146493b23", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1678000000000ns], [15, 1, "Digital Media", "c688dcc3-5200-4fd7-8566-15fc29b75c09", "Chapter Two: Mayoi Snail, Chapter 005", "7feca352-c937-4220-8dee-28ebfaa3bc6d", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1863000000000ns], [16, 1, "Digital Media", "9822b36c-d3dc-4f4a-b200-5519c09fae62", "Chapter Two: Mayoi Snail, Chapter 006", "5798acc6-7724-4af8-9078-89c475a12ed2", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 3922000000000ns], [17, 1, "Digital Media", "9e2f4206-f380-4a50-8d3f-43faf675e429", "Chapter Two: Mayoi Snail, Chapter 007", "d3396b1a-5896-4c39-b5d9-37d478a7f4f9", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1354000000000ns], [18, 1, "Digital Media", "85e22b41-9038-4fe0-acaa-adfd8d5d60c5", "Chapter Two: Mayoi Snail, Chapter 008", "60ee765c-41d4-477a-b6b4-85d280c953d5", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1319000000000ns], [19, 1, "Digital Media", "1948d583-f1c3-4997-9234-fe96479dd0a5", "Chapter Two: Mayoi Snail, Chapter 009", "88df0c01-8617-4796-a41b-ad4463fd0cc7", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 154000000000ns], [20, 1, "Digital Media", "0146128e-31d1-4e37-be88-cebc09f178dd", Afterword, "5b57067e-a537-4075-bb59-2240af0fcc97", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 230000000000ns], [21, 1, "Digital Media", "ab132164-d144-4c71-97f1-b35966da72a5", "End Credits", "3b927907-6b99-4437-920c-70f387a0437e", [[id, title]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 30000000000ns]]
+      [index, disc_number, media, musicbrainz_track_id, title, musicbrainz_recording_id, musicbrainz_works, contributors, duration]; [1, 1, "Digital Media", "1af64466-4b91-4d49-8c48-743c8bbdc542", "Opening Credits", "ddf19afa-8d0a-4d7d-95f5-c6f0ad6daaf5", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 15000000000ns], [2, 1, "Digital Media", "7a41a13e-18f2-48a2-943e-ab65e646800b", Copyright, "19af78c6-fa48-4b1d-b211-c916dbdb29cc", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 55000000000ns], [3, 1, "Digital Media", "ee624e13-4ba9-4ebb-ae65-f3bb4da8f09c", "Chapter One: Hitagi Crab, Chapter 001", "6a9b6fcf-bcdf-4077-9f92-21153773ae7c", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 370000000000ns], [4, 1, "Digital Media", "e54e6d65-a8ef-481a-b5cc-e1df1b34fd34", "Chapter One: Hitagi Crab, Chapter 002", "eff08c59-06fe-4b4c-8f12-923d8228fa45", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 904000000000ns], [5, 1, "Digital Media", "1fe66e7b-defe-4f6a-89ba-a63e46bd57d2", "Chapter One: Hitagi Crab, Chapter 003", "17cc0da0-ee32-4686-81b7-85202cc29775", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1437000000000ns], [6, 1, "Digital Media", "5790db34-a353-4648-9c90-b067f4c97b18", "Chapter One: Hitagi Crab, Chapter 004", "359596d6-213a-49e2-a0b4-1c01968ca660", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1581000000000ns], [7, 1, "Digital Media", "4a96c1b7-20a9-4e39-becf-56dfe96423a0", "Chapter One: Hitagi Crab, Chapter 005", "83fb8681-62eb-4b31-9269-bf2e2d3703d0", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 2430000000000ns], [8, 1, "Digital Media", "f68880dd-fd54-459e-a3f6-32a0c405cc93", "Chapter One: Hitagi Crab, Chapter 006", "99a7fc25-4765-4df7-951e-7f6e870cab85", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1958000000000ns], [9, 1, "Digital Media", "46f366db-03b8-47e3-822b-e5088bdb6194", "Chapter One: Hitagi Crab, Chapter 007", "85176035-3856-443f-bb17-d602d0b6a4c0", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 692000000000ns], [10, 1, "Digital Media", "c2ee3a84-58c2-4152-a420-7d55d58bd05e", "Chapter One: Hitagi Crab, Chapter 008", "a201d5c4-a6f7-4609-abc2-dcb54052c7ea", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 68000000000ns], [11, 1, "Digital Media", "88981d2d-9af9-4bf9-a96a-e040b9afe48b", "Chapter Two: Mayoi Snail, Chapter 001", "59f48ed4-bfbf-4b4c-8df5-d5133366da4d", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 439000000000ns], [12, 1, "Digital Media", "c11d5faa-4893-4825-98b3-c1b200957800", "Chapter Two: Mayoi Snail, Chapter 002", "bda5b5e5-9ed2-4ce2-9221-c8797e1247d8", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 2782000000000ns], [13, 1, "Digital Media", "ce379ad4-e31c-4ae8-83ea-c5ebe4ed57ec", "Chapter Two: Mayoi Snail, Chapter 003", "6dee17b8-2198-44df-8841-a0f311771623", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1420000000000ns], [14, 1, "Digital Media", "a6a8838d-4b2f-4e4c-8c3b-58b6aa2df200", "Chapter Two: Mayoi Snail, Chapter 004", "01aadb9b-055c-4839-b8da-b7f146493b23", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1678000000000ns], [15, 1, "Digital Media", "c688dcc3-5200-4fd7-8566-15fc29b75c09", "Chapter Two: Mayoi Snail, Chapter 005", "7feca352-c937-4220-8dee-28ebfaa3bc6d", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1863000000000ns], [16, 1, "Digital Media", "9822b36c-d3dc-4f4a-b200-5519c09fae62", "Chapter Two: Mayoi Snail, Chapter 006", "5798acc6-7724-4af8-9078-89c475a12ed2", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 3922000000000ns], [17, 1, "Digital Media", "9e2f4206-f380-4a50-8d3f-43faf675e429", "Chapter Two: Mayoi Snail, Chapter 007", "d3396b1a-5896-4c39-b5d9-37d478a7f4f9", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1354000000000ns], [18, 1, "Digital Media", "85e22b41-9038-4fe0-acaa-adfd8d5d60c5", "Chapter Two: Mayoi Snail, Chapter 008", "60ee765c-41d4-477a-b6b4-85d280c953d5", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 1319000000000ns], [19, 1, "Digital Media", "1948d583-f1c3-4997-9234-fe96479dd0a5", "Chapter Two: Mayoi Snail, Chapter 009", "88df0c01-8617-4796-a41b-ad4463fd0cc7", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["9fac1f69-0044-4b51-ad1c-6bee4c749b91", "Cristina Vee", artist, narrator], ["91225f09-2f8e-4aee-8718-9329cac8ef03", "Erica Mendez", artist, narrator], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 154000000000ns], [20, 1, "Digital Media", "0146128e-31d1-4e37-be88-cebc09f178dd", Afterword, "5b57067e-a537-4075-bb59-2240af0fcc97", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["ac830008-5b9c-4f98-ae2b-cac499c40ad8", "Erik Kimerer", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 230000000000ns], [21, 1, "Digital Media", "ab132164-d144-4c71-97f1-b35966da72a5", "End Credits", "3b927907-6b99-4437-920c-70f387a0437e", [[id, title, bookbrainz_work_id]; ["1f1a315c-49fe-4d4c-9c07-1903a113f984", "Bakemonogatari: Monster Tale, Part 01", "817e90a9-f58e-48ce-8ea8-e3aed01ed308"]], [[id, name, entity, role]; ["2c7b9427-6776-4969-8028-5de988724659", NISIOISIN, artist, writer], ["9c1e9bd5-4ded-4944-8190-1fec6e530e64", "Keith Silverstein", artist, narrator], ["b4641041-b9f9-4baa-a463-d2c5c7ec9dfe", "Brandon Schuster", artist, engineer], ["3192a6d6-bf15-434e-bfea-827865a3cc0a", "Ko Ransom", artist, translator], ["86fd3cfe-7eb8-47f8-a87c-1c668cff97a5", "Steve Staley", artist, director]], 30000000000ns]]
   }
   let actual = ($input | parse_musicbrainz_release)
   # assert equal ($actual | get book | columns) ($expected | get book | columns)
   # assert equal ($actual | get book | get genres) ($expected | get book | get genres)
   # assert equal ($actual | get book | get tags) ($expected | get book | get tags)
-  # assert equal ($actual | get book | get release_tags) ($expected | get book | get release_tags)
   # assert equal ($actual | get book | get chapters) ($expected | get book | get chapters)
   # assert equal ($actual | get book | get series) ($expected | get book | get series)
   # assert equal ($actual | get book | get contributors) ($expected | get book | get contributors)
@@ -2084,13 +2141,13 @@ def test_equivalent_track_durations [] {
   test_equivalent_track_durations_duplicate_indices_left
 }
 
-def test_has_distributor_in_common_both_empty []: {
+def test_has_distributor_in_common_both_empty [] {
   let left = []
   let right = []
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_right_empty []: {
+def test_has_distributor_in_common_right_empty [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2101,7 +2158,7 @@ def test_has_distributor_in_common_right_empty []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_left_empty []: {
+def test_has_distributor_in_common_left_empty [] {
   let left = []
   let right = [
     [id name entity role];
@@ -2112,7 +2169,7 @@ def test_has_distributor_in_common_left_empty []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_none []: {
+def test_has_distributor_in_common_none [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2128,7 +2185,7 @@ def test_has_distributor_in_common_none []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_same_name_different_id []: {
+def test_has_distributor_in_common_same_name_different_id [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2144,7 +2201,7 @@ def test_has_distributor_in_common_same_name_different_id []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_same_id_different_entity []: {
+def test_has_distributor_in_common_same_id_different_entity [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2160,7 +2217,7 @@ def test_has_distributor_in_common_same_id_different_entity []: {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_one []: {
+def test_has_distributor_in_common_one [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2176,12 +2233,12 @@ def test_has_distributor_in_common_one []: {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_name_only_left []: {
+def test_has_distributor_in_common_name_only_left [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
     ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
-    [null "Libro.fm" label distributor]
+    ["" "Libro.fm" label distributor]
   ]
   let right = [
     [id name entity role];
@@ -2192,7 +2249,7 @@ def test_has_distributor_in_common_name_only_left []: {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_name_only_right []: {
+def test_has_distributor_in_common_name_only_right [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -2208,7 +2265,7 @@ def test_has_distributor_in_common_name_only_right []: {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common []: {
+def test_has_distributor_in_common [] {
   test_has_distributor_in_common_left_empty
   test_has_distributor_in_common_right_empty
   test_has_distributor_in_common_both_empty
@@ -2220,7 +2277,7 @@ def test_has_distributor_in_common []: {
   test_has_distributor_in_common_name_only_right
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags [] {
   let input = [
     [id tags];
     ["x" []]
@@ -2230,7 +2287,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag [] {
   let input = [
     [id tags];
     ["x" [[name count]; [chapter 1]]]
@@ -2241,7 +2298,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_one []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_one [] {
   let input = [
     [id tags];
     ["x" [[name count]; [chapters 1]]]
@@ -2250,7 +2307,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_one []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest [] {
   let input = [
     [id tags];
     ["x" [[name count]; [chapters 1] [unabridged 1]]]
@@ -2261,7 +2318,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest [] {
   let input = [
     [id tags];
     ["u" [[name count]; [chapters 1]]]
@@ -2273,7 +2330,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest []: {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag []: {
+def test_audiobooks_with_the_highest_voted_chapters_tag [] {
   test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags
   test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag
   test_audiobooks_with_the_highest_voted_chapters_tag_one
@@ -2281,7 +2338,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag []: {
   test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest
 }
 
-def test_filter_musicbrainz_chapters_releases_bad_length []: {
+def test_filter_musicbrainz_chapters_releases_bad_length [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2363,7 +2420,7 @@ def test_filter_musicbrainz_chapters_releases_bad_length []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) null
 }
 
-def test_filter_musicbrainz_chapters_releases_one_match []: {
+def test_filter_musicbrainz_chapters_releases_one_match [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2446,7 +2503,7 @@ def test_filter_musicbrainz_chapters_releases_one_match []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_one_track []: {
+def test_filter_musicbrainz_chapters_releases_one_track [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2511,7 +2568,7 @@ def test_filter_musicbrainz_chapters_releases_one_track []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_audible_asin []: {
+def test_filter_musicbrainz_chapters_releases_audible_asin [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2607,7 +2664,7 @@ def test_filter_musicbrainz_chapters_releases_audible_asin []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_chapter_tags []: {
+def test_filter_musicbrainz_chapters_releases_chapter_tags [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2649,9 +2706,9 @@ def test_filter_musicbrainz_chapters_releases_chapter_tags []: {
           ["158b7958-b872-4944-88a5-fd9d75c5d2e8", "Libro.fm", label, distributor]
         ],
         isbn: "9781501915925",
-        release_tags: [
-          [name count];
-          [chapters 11]
+        tags: [
+          [name count scope];
+          [chapters 11 release]
         ]
         musicbrainz_release_country: XW,
         musicbrainz_release_status: official,
@@ -2682,9 +2739,9 @@ def test_filter_musicbrainz_chapters_releases_chapter_tags []: {
           ["158b7958-b872-4944-88a5-fd9d75c5d2e8", "Libro.fm", label, distributor]
         ],
         isbn: "9781501915925",
-        release_tags: [
-          [name count];
-          [chapters 10]
+        tags: [
+          [name count scope];
+          [chapters 10 release]
         ]
         musicbrainz_release_country: XW,
         musicbrainz_release_status: official,
@@ -2711,7 +2768,7 @@ def test_filter_musicbrainz_chapters_releases_chapter_tags []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_distributor []: {
+def test_filter_musicbrainz_chapters_releases_distributor [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2807,7 +2864,7 @@ def test_filter_musicbrainz_chapters_releases_distributor []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_duration []: {
+def test_filter_musicbrainz_chapters_releases_duration [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -2903,7 +2960,7 @@ def test_filter_musicbrainz_chapters_releases_duration []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_two_match []: {
+def test_filter_musicbrainz_chapters_releases_two_match [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -3000,7 +3057,7 @@ def test_filter_musicbrainz_chapters_releases_two_match []: {
 }
 
 
-def test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks []: {
+def test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -3110,7 +3167,7 @@ def test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks []: {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases []: {
+def test_filter_musicbrainz_chapters_releases [] {
   test_filter_musicbrainz_chapters_releases_bad_length
   test_filter_musicbrainz_chapters_releases_one_match
   test_filter_musicbrainz_chapters_releases_one_track
@@ -3121,7 +3178,7 @@ def test_filter_musicbrainz_chapters_releases []: {
   test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks
 }
 
-def test_filter_musicbrainz_releases_audible_asin []: {
+def test_filter_musicbrainz_releases_audible_asin [] {
   let candidates = [
     [book, tracks];
     [
@@ -3193,7 +3250,7 @@ def test_filter_musicbrainz_releases_audible_asin []: {
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases_distributor []: {
+def test_filter_musicbrainz_releases_distributor [] {
   let candidates = [
     [book, tracks];
     [
@@ -3275,7 +3332,7 @@ def test_filter_musicbrainz_releases_distributor []: {
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases_track_duration []: {
+def test_filter_musicbrainz_releases_track_duration [] {
   let candidates = [
     [book, tracks];
     [
@@ -3344,7 +3401,7 @@ def test_filter_musicbrainz_releases_track_duration []: {
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations []: {
+def test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations [] {
   let candidates = [
     [book, tracks];
     [
@@ -3427,17 +3484,1275 @@ def test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_duratio
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases []: {
+def test_filter_musicbrainz_releases [] {
   test_filter_musicbrainz_releases_distributor
   test_filter_musicbrainz_releases_audible_asin
   test_filter_musicbrainz_releases_track_duration
   test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations
 }
 
-def main []: {
+def test_parse_container_and_audio_codec_from_ffprobe_output_aax [] {
+  let input = open ([$test_data_dir "ffprobe_output_aax.json"] | path join)
+  let expected = {
+    audio_codec: "aac"
+    container: "mov,mp4,m4a,3gp,3g2,mj2"
+    audio_channel_layout: null
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_flac [] {
+  let input = open ([$test_data_dir "ffprobe_output_flac.json"] | path join)
+  let expected = {
+    audio_codec: "flac"
+    container: "flac"
+    audio_channel_layout: "stereo"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_m4b_aac [] {
+  let input = open ([$test_data_dir "ffprobe_output_m4b_aac.json"] | path join)
+  let expected = {
+    audio_codec: "aac"
+    container: "mov,mp4,m4a,3gp,3g2,mj2"
+    audio_channel_layout: "mono"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_mp3 [] {
+  let input = open ([$test_data_dir "ffprobe_output_mp3.json"] | path join)
+  let expected = {
+    audio_codec: "mp3"
+    container: "mp3"
+    audio_channel_layout: "mono"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_oga_flac [] {
+  let input = open ([$test_data_dir "ffprobe_output_oga_flac.json"] | path join)
+  let expected = {
+    audio_codec: "flac"
+    container: "ogg"
+    audio_channel_layout: "stereo"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_opus [] {
+  let input = open ([$test_data_dir "ffprobe_output_opus.json"] | path join)
+  let expected = {
+    audio_codec: "opus"
+    container: "ogg"
+    audio_channel_layout: "stereo"
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output_wav [] {
+  let input = open ([$test_data_dir "ffprobe_output_wav.json"] | path join)
+  let expected = {
+    audio_codec: "pcm_s16le"
+    container: "wav"
+    audio_channel_layout: null
+  }
+  assert equal ($input | parse_container_and_audio_codec_from_ffprobe_output) $expected
+}
+
+def test_parse_container_and_audio_codec_from_ffprobe_output [] {
+  test_parse_container_and_audio_codec_from_ffprobe_output_aax
+  test_parse_container_and_audio_codec_from_ffprobe_output_flac
+  test_parse_container_and_audio_codec_from_ffprobe_output_m4b_aac
+  test_parse_container_and_audio_codec_from_ffprobe_output_mp3
+  test_parse_container_and_audio_codec_from_ffprobe_output_oga_flac
+  test_parse_container_and_audio_codec_from_ffprobe_output_opus
+  test_parse_container_and_audio_codec_from_ffprobe_output_wav
+}
+
+def test_parse_musicbrainz_series_monogatari_work [] {
+  let input = open ([$test_data_dir "monogatari_work_series.json"] | path join)
+  let expected = {
+    id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+    name: "Monogatari"
+    parent_series: []
+    subseries: [
+      [id name];
+      ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+      ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+    ]
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      [supernatural, 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | parse_musicbrainz_series) $expected
+}
+
+def test_parse_musicbrainz_series_monogatari_first_season_work [] {
+  let input = open ([$test_data_dir "monogatari_first_season_work_series.json"] | path join)
+  let expected = {
+    id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+    name: "Monogatari Series: First Season"
+    parent_series: [
+      [id name];
+      ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+    ]
+    subseries: [
+      [id name];
+      ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+    ]
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      [supernatural, 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | parse_musicbrainz_series) $expected
+}
+
+def test_parse_musicbrainz_series_bakemonogatari_work [] {
+  let input = open ([$test_data_dir "bakemonogatari_work_series.json"] | path join)
+  let expected = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name];
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | parse_musicbrainz_series) $expected
+}
+
+def test_parse_musicbrainz_series [] {
+  test_parse_musicbrainz_series_monogatari_work
+  test_parse_musicbrainz_series_monogatari_first_season_work
+  test_parse_musicbrainz_series_bakemonogatari_work
+}
+
+def test_fetch_and_parse_musicbrainz_series_cached [] {
+  let cache = {|type, series_id, update|
+    if ($series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322") {
+      {
+        id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+        name: "Bakemonogatari"
+        parent_series: [
+          [id name];
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ]
+        subseries: []
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          ["speculative fiction", 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    }
+  }
+  let expected = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name];
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  assert equal ("0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" | fetch_and_parse_musicbrainz_series $cache) $expected
+}
+
+def test_fetch_and_parse_musicbrainz_series [] {
+  test_fetch_and_parse_musicbrainz_series_cached
+}
+
+def test_build_series_tree_up_three_levels [] {
+  let monogatari_series_cache = {|type series_id, update|
+    if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
+      {
+        id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+        name: "Monogatari"
+        parent_series: []
+        subseries: [
+          [id name];
+          ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+          ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+        ]
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    } else if $series_id == "6660f123-24a0-46c7-99bf-7ff5dc11ceef" {
+      {
+        id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+        name: "Monogatari Series: First Season"
+        parent_series: [
+          [id name];
+          ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+        ]
+        subseries: [
+          [id name];
+          ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+        ]
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    } else if $series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" {
+      {
+        id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+        name: "Bakemonogatari"
+        parent_series: [
+          [id name];
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ]
+        subseries: []
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          ["speculative fiction", 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    }
+  }
+  let expected = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name parent_series subseries genres tags];
+      [
+        "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+        "Monogatari Series: First Season"
+        [
+          [id name parent_series subseries genres tags];
+          [
+            "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+            "Monogatari"
+            []
+            [
+              [id name];
+              ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+              ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+              ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+            ]
+            [
+              [name, count];
+              [fiction, 1],
+              ["light novel", 1],
+              [mystery, 1],
+              [paranormal, 1],
+              [psychological, 1],
+              [romance, 1],
+              ["school life", 1],
+              [supernatural, 1],
+              [vampire, 1]
+            ]
+            []
+          ]
+        ]
+        [
+          [id name];
+          ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+        ]
+        [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        []
+      ]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  let input = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name];
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | build_series_tree_up 5 $monogatari_series_cache) $expected
+}
+
+def test_build_series_tree_up_three_levels_2 [] {
+  let monogatari_series_cache = {|type series_id, update|
+    log info $"$series_id: ($series_id)"
+    if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
+      {
+        id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+        name: "Monogatari"
+        parent_series: []
+        subseries: [
+          [id name];
+          ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+          ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+        ]
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    } else if $series_id == "6660f123-24a0-46c7-99bf-7ff5dc11ceef" {
+      {
+        id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+        name: "Monogatari Series: First Season"
+        parent_series: [
+          [id name];
+          ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+        ]
+        subseries: [
+          [id name];
+          ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+        ]
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    } else if $series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" {
+      {
+        id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+        name: "Bakemonogatari"
+        parent_series: [
+          [id name];
+          ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ]
+        subseries: []
+        genres: [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          ["speculative fiction", 1],
+          [vampire, 1]
+        ]
+        tags: []
+      }
+    }
+  }
+  let expected = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name parent_series subseries genres tags];
+      [
+        "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+        "Monogatari Series: First Season"
+        [
+          [id name parent_series subseries genres tags];
+          [
+            "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+            "Monogatari"
+            []
+            [
+              [id name];
+              ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+              ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+              ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+            ]
+            [
+              [name, count];
+              [fiction, 1],
+              ["light novel", 1],
+              [mystery, 1],
+              [paranormal, 1],
+              [psychological, 1],
+              [romance, 1],
+              ["school life", 1],
+              [supernatural, 1],
+              [vampire, 1]
+            ]
+            []
+          ]
+        ]
+        [
+          [id name];
+          ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+        ]
+        [
+          [name, count];
+          [fiction, 1],
+          ["light novel", 1],
+          [mystery, 1],
+          [paranormal, 1],
+          [psychological, 1],
+          [romance, 1],
+          ["school life", 1],
+          [supernatural, 1],
+          [vampire, 1]
+        ]
+        []
+      ]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  let input = {
+    id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+    name: "Bakemonogatari"
+    parent_series: [
+      [id name];
+      ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+    ]
+    subseries: []
+    genres: [
+      [name, count];
+      [fiction, 1],
+      ["light novel", 1],
+      [mystery, 1],
+      [paranormal, 1],
+      [psychological, 1],
+      [romance, 1],
+      ["school life", 1],
+      ["speculative fiction", 1],
+      [vampire, 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | build_series_tree_up 5 $monogatari_series_cache) $expected
+}
+
+# def test_build_series_tree_up_max_depth [] {
+#   let expected = {
+#     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+#     name: "Bakemonogatari"
+#     parent_series: [
+#       [id name parent_series subseries genres tags];
+#       [
+#         "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+#         "Monogatari Series: First Season"
+#         [
+#           # [id name];
+#           # ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+#           [id name parent_series subseries genres tags];
+#           [
+#             "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+#             "Monogatari"
+#             []
+#             [
+#               [id name];
+#               ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+#               ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+#               ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+#             ]
+#             [
+#               [name, count];
+#               [fiction, 1],
+#               ["light novel", 1],
+#               [mystery, 1],
+#               [paranormal, 1],
+#               [psychological, 1],
+#               [romance, 1],
+#               ["school life", 1],
+#               [supernatural, 1],
+#               [vampire, 1]
+#             ]
+#             []
+#           ]
+#         ]
+#         [
+#           [id name];
+#           ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+#         ]
+#         [
+#           [name, count];
+#           [fiction, 1],
+#           ["light novel", 1],
+#           [mystery, 1],
+#           [paranormal, 1],
+#           [psychological, 1],
+#           [romance, 1],
+#           ["school life", 1],
+#           [supernatural, 1],
+#           [vampire, 1]
+#         ]
+#         []
+#       ]
+#     ]
+#     subseries: []
+#     genres: [
+#       [name, count];
+#       [fiction, 1],
+#       ["light novel", 1],
+#       [mystery, 1],
+#       [paranormal, 1],
+#       [psychological, 1],
+#       [romance, 1],
+#       ["school life", 1],
+#       ["speculative fiction", 1],
+#       [vampire, 1]
+#     ]
+#     tags: []
+#   }
+#   let input = {
+#     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+#     name: "Bakemonogatari"
+#     parent_series: [
+#       [id name];
+#       ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+#     ]
+#     subseries: []
+#     genres: [
+#       [name, count];
+#       [fiction, 1],
+#       ["light novel", 1],
+#       [mystery, 1],
+#       [paranormal, 1],
+#       [psychological, 1],
+#       [romance, 1],
+#       ["school life", 1],
+#       ["speculative fiction", 1],
+#       [vampire, 1]
+#     ]
+#     tags: []
+#   }
+#   assert equal ($input | build_series_tree_up 4 $monogatari_series_cache) $expected
+# }
+
+def test_build_series_tree_up [] {
+  test_build_series_tree_up_three_levels
+  # test_build_series_tree_up_three_levels_2
+  # test_build_series_tree_up_max_depth
+}
+
+def test_organize_subseries_two_subseries [] {
+  let input = [
+    [id name parent_series subseries genres tags];
+    [
+      "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+      "Monogatari"
+      []
+      [
+        [id name];
+        ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+      ]
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+    [
+      "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+      "Monogatari Series: First Season"
+      [
+        [id name];
+        ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+      ]
+      [
+        [id name];
+        ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+      ]
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+    [
+      "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+      "Bakemonogatari"
+      [
+        [id name];
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+      ]
+      []
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        ["speculative fiction", 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+  ]
+  let expected = [
+    [id name parent_series subseries genres tags];
+    [
+      "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
+      "Monogatari"
+      []
+      [
+        [id name];
+        ["4c7a3056-279a-451d-a7ee-3f6f6536f1f0" "Nekomonogatari"]
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+        ["b3e14bc3-014f-438b-b5c6-6b38081334ad" "Monogatari Series: Second Season"]
+      ]
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+    [
+      "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
+      "Monogatari Series: First Season"
+      [
+        [id name];
+        ["05ef20c8-9286-4b53-950f-eac8cbb32dc3" "Monogatari"]
+      ]
+      [
+        [id name];
+        ["0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" "Bakemonogatari"]
+      ]
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        [supernatural, 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+    [
+      "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
+      "Bakemonogatari"
+      [
+        [id name];
+        ["6660f123-24a0-46c7-99bf-7ff5dc11ceef" "Monogatari Series: First Season"]
+      ]
+      []
+      [
+        [name, count];
+        [fiction, 1],
+        ["light novel", 1],
+        [mystery, 1],
+        [paranormal, 1],
+        [psychological, 1],
+        [romance, 1],
+        ["school life", 1],
+        ["speculative fiction", 1],
+        [vampire, 1]
+      ]
+      []
+    ]
+  ]
+  assert equal ($input | organize_subseries) $expected
+}
+
+def test_organize_subseries [] {
+  # test_organize_subseries_one_series
+  # test_organize_subseries_one_subseries
+  test_organize_subseries_two_subseries
+}
+
+def test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802 [] {
+  let input = open ([$test_data_dir "work_c7a83643-33a3-48ab-b54e-f56554359802.json"] | path join)
+  let expected = {
+    id: "c7a83643-33a3-48ab-b54e-f56554359802"
+    title: "Full Metal Panic! Volume 1: Fighting Boy Meets Girl"
+    language: "eng"
+    genres: [
+      [name, count];
+      [action, 1],
+      [fiction, 1],
+      ["light novel", 1],
+      [mecha, 1],
+      [military, 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | parse_musicbrainz_work) $expected
+}
+
+def test_parse_musicbrainz_work [] {
+  test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802
+}
+
+def test_is_ssh_path_simple_ssh_path [] {
+  let input = "meerkat:/var/home/media"
+  assert ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_simple_local_path [] {
+  let input = "/var/home/media"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_server_no_path [] {
+  let input = "meerkat:"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_server_root_path_depth_one [] {
+  let input = "meerkat:/var"
+  assert ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_server_relative_path_depth_one [] {
+  let input = "meerkat:dir"
+  assert ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_server_relative_path_depth_two [] {
+  let input = "meerkat:one/two"
+  assert ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_local_absolute_path_with_colon [] {
+  let input = "/var/o:ne/two"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_local_relative_path_with_colon [] {
+  let input = "one/t:wo"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_relative_path_starts_with_colon [] {
+  let input = ":one/two"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path_absolute_path_starts_with_colon [] {
+  let input = ":/one/two"
+  assert not ($input | is_ssh_path)
+}
+
+def test_is_ssh_path [] {
+  test_is_ssh_path_simple_ssh_path
+  test_is_ssh_path_simple_local_path
+  test_is_ssh_path_server_no_path
+  test_is_ssh_path_server_root_path_depth_one
+  test_is_ssh_path_server_relative_path_depth_one
+  test_is_ssh_path_server_relative_path_depth_two
+  test_is_ssh_path_local_absolute_path_with_colon
+  test_is_ssh_path_local_relative_path_with_colon
+  test_is_ssh_path_relative_path_starts_with_colon
+  test_is_ssh_path_absolute_path_starts_with_colon
+}
+
+def test_split_ssh_path_simple_ssh_path [] {
+  let input = "meerkat:/var/home/media"
+  let expected = {
+    server: "meerkat"
+    path: "/var/home/media"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_simple_local_path [] {
+  let input = "/var/home/media"
+  let expected = {
+    server: null
+    path: "/var/home/media"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_server_no_path [] {
+  let input = "meerkat:"
+  let expected = {
+    server: null
+    path: "meerkat:"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_server_root_path_depth_one [] {
+  let input = "meerkat:/var"
+  let expected = {
+    server: "meerkat"
+    path: "/var"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_server_relative_path_depth_one [] {
+  let input = "meerkat:dir"
+  let expected = {
+    server: "meerkat"
+    path: "dir"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_server_relative_path_depth_two [] {
+  let input = "meerkat:one/two"
+  let expected = {
+    server: "meerkat"
+    path: "one/two"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_local_absolute_path_with_colon [] {
+  let input = "/var/o:ne/two"
+  let expected = {
+    server: null
+    path: "/var/o:ne/two"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_local_relative_path_with_colon [] {
+  let input = "one/t:wo"
+  let expected = {
+    server: null
+    path: "one/t:wo"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_relative_path_starts_with_colon [] {
+  let input = ":one/two"
+  let expected = {
+    server: null
+    path: ":one/two"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path_absolute_path_starts_with_colon [] {
+  let input = ":/one/two"
+  let expected = {
+    server: null
+    path: ":/one/two"
+  }
+  assert equal ($input | split_ssh_path) $expected
+}
+
+def test_split_ssh_path [] {
+  test_split_ssh_path_simple_ssh_path
+  test_split_ssh_path_simple_local_path
+  test_split_ssh_path_server_no_path
+  test_split_ssh_path_server_root_path_depth_one
+  test_split_ssh_path_server_relative_path_depth_one
+  test_split_ssh_path_server_relative_path_depth_two
+  test_split_ssh_path_local_absolute_path_with_colon
+  test_split_ssh_path_local_relative_path_with_colon
+  test_split_ssh_path_relative_path_starts_with_colon
+  test_split_ssh_path_absolute_path_starts_with_colon
+}
+
+def test_escape_special_glob_characters_empty_input [] {
+  let input = ""
+  let expected = ""
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters_escape_square_brackets [] {
+  let input = '/var/[Special Directory]'
+  let expected = '/var/\[Special Directory\]'
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters_escape_parentheses [] {
+  let input = '/var/something (Special Directory)'
+  let expected = '/var/something [(]Special Directory[)]'
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters_escape_curly_braces [] {
+  let input = '/var/something {Special Directory}/test'
+  let expected = '/var/something [{]Special Directory[}]/test'
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters_escape_nothing [] {
+  let input = '/var/nothing special here!/...'
+  assert equal ($input | escape_special_glob_characters) $input
+}
+
+def test_escape_special_glob_characters_escape_all_special_characters [] {
+  let input = '/var/][nothing }{special here!/...($money: 20.*,)'
+  let expected = '/var/\]\[nothing [}][{]special here!/...[(][$]money[:] 20.[*][,][)]'
+  assert equal ($input | escape_special_glob_characters) $expected
+}
+
+def test_escape_special_glob_characters [] {
+  test_escape_special_glob_characters_empty_input
+  test_escape_special_glob_characters_escape_square_brackets
+  test_escape_special_glob_characters_escape_parentheses
+  test_escape_special_glob_characters_escape_curly_braces
+  test_escape_special_glob_characters_escape_nothing
+  test_escape_special_glob_characters_escape_all_special_characters
+}
+
+def test_escape_special_lucene_characters_empty_input [] {
+  let input = ""
+  let expected = ""
+  assert equal ($input | escape_special_lucene_characters) $expected
+}
+
+def test_escape_special_lucene_characters_escape_backslash [] {
+  let input = 'The \Backslash'
+  let expected = 'The \\Backslash'
+  assert equal ($input | escape_special_lucene_characters) $expected
+}
+
+def test_escape_special_lucene_characters_escape_all_special_characters [] {
+  let input = 'Whoa, there is/are a lot of special-characters to escape like ^, ~, ", *, +, \, am I right!? {[(&&Yikes:||)]}'
+  let expected = 'Whoa, there is\/are a lot of special\-characters to escape like \^, \~, \", \*, \+, \\, am I right\!\? \{\[\(\&&Yikes\:\||\)\]\}'
+  assert equal ($input | escape_special_lucene_characters) $expected
+}
+
+def test_escape_special_lucene_characters [] {
+  test_escape_special_lucene_characters_empty_input
+  test_escape_special_lucene_characters_escape_backslash
+  test_escape_special_lucene_characters_escape_all_special_characters
+}
+
+def test_append_to_musicbrainz_query_empty_input [] {
+  let input = ""
+  let metadata = {
+    musicbrainz_release_country: "WX"
+  }
+  let expected = 'country:"WX"'
+  assert equal ($input | append_to_musicbrainz_query $metadata musicbrainz_release_country country) $expected
+}
+
+def test_append_to_musicbrainz_query_empty_metadata [] {
+  let input = ""
+  let metadata = {}
+  let expected = ""
+  assert equal ($input | append_to_musicbrainz_query $metadata musicbrainz_release_country country) $expected
+}
+
+def test_append_to_musicbrainz_query_existing_input [] {
+  let input = 'country:"WX"'
+  let metadata = {
+    musicbrainz_release_country: "WX"
+    language: "eng"
+  }
+  let expected = 'country:"WX" AND lang:"eng"'
+  assert equal ($input | append_to_musicbrainz_query $metadata language lang) $expected
+}
+
+def test_append_to_musicbrainz_query_existing_input_with_transform [] {
+  let input = 'country:"WX"'
+  let metadata = {
+    musicbrainz_release_country: "WX"
+    language: "english"
+  }
+  let expected = 'country:"WX" AND lang:"eng"'
+  let transform = {|language| if $language == "english" {"eng"} else {$language}}
+  assert equal ($input | append_to_musicbrainz_query $metadata language lang --transform $transform) $expected
+}
+
+def test_append_to_musicbrainz_query [] {
+  test_append_to_musicbrainz_query_empty_input
+  test_append_to_musicbrainz_query_empty_metadata
+  test_append_to_musicbrainz_query_existing_input
+  test_append_to_musicbrainz_query_existing_input_with_transform
+}
+
+def test_parse_genres_and_tags_empty_input [] {
+  let input = {}
+  let expected = null
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+def test_parse_genres_and_tags_empty_genres_empty_tags [] {
+  let input = {
+    genres: []
+    tags: []
+  }
+  let expected = $input
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+def test_parse_genres_and_tags_genres_empty_tags [] {
+  let input = {
+    genres: [
+      [name count];
+      ["dark fantasy" 1]
+      ["fiction" 2]
+      ["fantasy" 2]
+    ]
+    tags: []
+  }
+  let expected = {
+    genres: [
+      [name count];
+      ["fantasy" 2]
+      ["fiction" 2]
+      ["dark fantasy" 1]
+    ]
+    tags: []
+  }
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+def test_parse_genres_and_tags_empty_genres_tags [] {
+  let input = {
+    genres: []
+    tags: [
+      [name count];
+      ["dark fantasy" 1]
+      ["fiction" 2]
+      ["fantasy" 2]
+      ["unabridged" 1]
+    ]
+  }
+  let expected = {
+    genres: [
+      [name count];
+      ["fantasy" 2]
+      ["fiction" 2]
+      ["dark fantasy" 1]
+    ]
+    tags: [
+      [name count];
+      ["unabridged" 1]
+    ]
+  }
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+
+def test_parse_genres_and_tags_genres_tags [] {
+  let input = {
+    genres: [
+      [name count];
+      ["special" 1]
+      ["fiction" 3]
+    ]
+    tags: [
+      [name count];
+      ["dark fantasy" 1]
+      ["fiction" 2]
+      ["fantasy" 2]
+      ["unabridged" 1]
+      ["explicit" 2]
+      ["abridged" 2]
+    ]
+  }
+  let expected = {
+    genres: [
+      [name count];
+      ["fiction" 3]
+      ["fantasy" 2]
+      ["dark fantasy" 1]
+      ["special" 1]
+    ]
+    tags: [
+      [name count];
+      ["abridged" 2]
+      ["explicit" 2]
+      ["unabridged" 1]
+    ]
+  }
+  assert equal ($input | parse_genres_and_tags) $expected
+}
+
+def test_parse_genres_and_tags [] {
+  test_parse_genres_and_tags_empty_input
+  test_parse_genres_and_tags_empty_genres_empty_tags
+  test_parse_genres_and_tags_genres_empty_tags
+  test_parse_genres_and_tags_empty_genres_tags
+  test_parse_genres_and_tags_genres_tags
+}
+
+def test_has_bad_video_stream_bad [] {
+  let input = open ([$test_data_dir "ffprobe_bad_video_stream.json"] | path join)
+  assert ($input | has_bad_video_stream)
+}
+
+def test_has_bad_video_stream_good [] {
+  let input = open ([$test_data_dir "ffprobe_output_m4b_aac.json"] | path join)
+  assert not ($input | has_bad_video_stream)
+}
+
+def test_has_bad_video_stream [] {
+  test_has_bad_video_stream_bad
+  test_has_bad_video_stream_good
+}
+
+def main [] {
   test_upsert_if_present
   test_upsert_if_value
   test_round_to_second_using_cumulative_offset
+  test_combine_chapter_parts
   test_parse_series_from_group
   test_parse_series_from_series_tags
   test_parse_audiobook_metadata_from_tone
@@ -3458,14 +4773,26 @@ def main []: {
   test_parse_chapters_from_tone
   test_chapters_into_tone_format
   test_parse_chapters_from_musicbrainz_release
+  test_parse_genres_and_tags
+  test_parse_genres_and_tags_from_musicbrainz_release
   # todo Add tests for Baccano! Vol. 1 for parsing things.
   test_parse_musicbrainz_release
   test_equivalent_track_durations
   test_has_distributor_in_common
   test_audiobooks_with_the_highest_voted_chapters_tag
-  # todo test_escape_special_lucene_characters
-  # todo test_append_to_musicbrainz_query
   test_filter_musicbrainz_chapters_releases
   test_filter_musicbrainz_releases
+  test_parse_container_and_audio_codec_from_ffprobe_output
+  test_parse_musicbrainz_work
+  test_parse_musicbrainz_series
+  test_fetch_and_parse_musicbrainz_series
+  test_build_series_tree_up
+  # test_organize_subseries
+  test_is_ssh_path
+  test_split_ssh_path
+  test_escape_special_glob_characters
+  test_escape_special_lucene_characters
+  test_append_to_musicbrainz_query
+  test_has_bad_video_stream
   echo "All tests passed!"
 }

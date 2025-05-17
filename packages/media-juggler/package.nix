@@ -8,7 +8,7 @@
   image_optim,
   keyfinder-cli,
   lib,
-  # m4b-tool,
+  m4b-tool,
   minio-client,
   makeWrapper,
   mupdf-headless,
@@ -45,7 +45,7 @@ else
       # kcc
       image_optim
       keyfinder-cli
-      # m4b-tool
+      m4b-tool
       minio-client
       nushell
       picard
@@ -84,9 +84,9 @@ else
             chromaprint
             ffmpeg
             image_optim
-            # m4b-tool
-            minio-client
+            m4b-tool
             tone
+            zip
           ]
         }
       wrapProgram $out/bin/import-comics.nu \

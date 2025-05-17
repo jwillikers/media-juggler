@@ -6,837 +6,675 @@
 use std log
 use media-juggler-lib *
 
-# Unzip a directory
-export def unzip [
-    working_directory: directory
-]: path -> path {
-    let archive = $in
-    let target_directory = [$working_directory ($archive | path parse | get stem)] | path join
-    ^unzip -q $archive -d $target_directory
-    $target_directory
-}
-
-# Convert a directory of MP3 files to an M4B file
-export def mp3_directory_to_m4b [
-    working_directory: directory
-]: path -> path {
-    let directory = $in
-    let m4b = { parent: $working_directory, stem: ($directory | path basename), extension: "m4b" } | path join
-    ^m4b-tool merge --jobs ((^nproc | into int) / 2) --output-file $m4b $directory
-    $m4b
-}
-
-# Can search based on details or use the id directly
-# http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/release/?query=('secondarytype:audiobook AND packaging:"None" AND artistname:\"Brandon Sanderson\" AND release:\"The Way of Kings\"' | url encode)" | get releases | sort-by --reverse score | first
-
-# Lookup a MusicBrainz release given metadata for the tracks
-#
-#
-export def find_musicbrainz_release []: [list<record> -> table] {
-  let metadata = $in
-  let url = "https://musicbrainz.org/ws/2/release/"
-
-  # First, check if there is already a release MBID in the metadata.
-
-  # The release must be an Audiobook or Audio drama
-  let query = "primary-type:Other AND (secondarytype:Audiobook OR secondarytype:\"Audio drama\""
-
-  let query = (
-    if "albumArtist" in $metadata {
-      $query += $" AND artist:\"($metadata.albumArtist)\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    let artists = (
-        ["artist" "composer" "narrator"] | each {|type|
-            if $type in $metadata {
-                $metadata | get $type | split row "," | str trim
-            }
-        }
-    );
-    if ($artists | is-not-empty) {
-      $query += $artists | reduce {|it, acc|
-        $acc + $" AND artistname:\"($it)\""
-      }
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "recordingDate" in $metadata {
-      $query += $" AND date:($metadata.data | into datetime | format date '%Y-%m-%d')"
-    } else if "originalyear" in $metadata.additionalFields {
-      $query += $" AND date:($metadata.additionalFields.originalyear)"
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "musicBrainz Album Release Country" in $metadata.additionalFields {
-      $query += $" AND country:($metadata.'musicBrainz Album Release Country')"
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "barcode" in $metadata.additionalFields {
-      $query += $" AND barcode:($metadata.additionalFields.barcode)"
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "packaging" in $metadata {
-      $query += $" AND packaging:\"($metadata.packaging)\""
-    } else {
-      $query
-    }
-  )
-  let query = (
-    if "album" in $metadata {
-      $query += $" AND release:\"($metadata.album)\""
-    } else {
-      $query
-    }
-  )
-
-  # Must search for recording using acoustid
-#   let query = (
-#     if "acoustid Fingerprint" in $metadata {
-#       $query += $" AND :\"($metadata.title)\""
-#     } else {
-#       $query
-#     }
-#   )
-
-  # todo Distributor = Libro.fm if in comment
-  # todo Number of tracks
-  # todo Track length
-  # todo Acoustid
-  # todo recordingDate == release Date
-
-  let query = $query | url encode
-
-  http get --headers [Accept "application/json"] $"($url)?query=($query)" | get releases | sort-by --reverse score
-
-    # filter based on distributor where $comment contains "Libro.fm"
-}
-
-# todo Add function to get series using the Work series from the work associated with a recording
-
-# todo Get artist en alias?  http get --headers [Accept "application/json"]  $"https://musicbrainz.org/ws/2/artist/616f49c8-b33a-4de9-80c6-d99a4a74184e/?inc=aliases"
-
-# Get the metadata for an Audiobook using MusicBrainz
-#
-# Takes a list of records where each record is the metadata of a track
-export def get_audiobook_metadata_from_musicbrainz []: list<record> -> record {
-  let audiobook_metadata = $in
-  let releases = $audiobook_metadata | find_musicbrainz_release | where score >= 90
-  if ($releases | is-empty) {
-    log debug "No matches with at least a 90% score from MusicBrainz"
-    return null
-  }
-  if ($releases | length) > 1 {
-    log warning "Multiple matches with a score of at least 90% from MusicBrainz"
-  }
-  let release = $releases | first
-
-  let release_groups = $release.id | fetch_musicbrainz_release_group_for_release
-  if ($release_groups | is-empty) {
-    log debug $"No release groups for release ($release.id)"
-  } else if ($release_groups | length) > 1 {
-    log warning $"Multiple release groups found for the release ($release.id). Using the first one."
-  }
-  let release_group = $release_groups | first | get id | fetch_musicbrainz_release_group
-
-  # todo Add work-series as well.
-  let series = $release_group | parse_series_from_release_group
-
-  let chapters = $release | get media | chapters_from_musicbrainz_release_media
-
-  # todo
-  # let authors = authors_from release
-  # let narrators = narrators_from_release
-
-  {
-    # https://www.audiobookshelf.org/docs#book-audio-metadata
-    # authors: $authors should be taken from associated works first, and if not that, then the from artist-credit
-    # Use name as it appears in the artist credit when present
-    chapters: $chapters
-    # cover image from release
-    date: $release.date
-    # disambiguation?
-    # Assume the first label is the publisher... if there is no label, use the publisher relationship on the release if available
-    # publisher: $label
-    # narrators: narrators from spoken-vocal relationships on all recordings or parsed from artist-credit (narrated by, read by, performed by)
-    # year: release year, just parse this from the release date
-    # labels (tags)
-    # country
-    # language?
-    # todo embed for Amazon releases the ASIN
-    musicbrainz_id: $release.id
-    series: $series # Can tone support multiple?
-    title: $release.title
-  } | (
-    let i = $in;
-    if "barcode" in $release {
-      $i | insert isbn $release.barcode
-    } else {
-      $i
-    }
-  )
-}
-
-# export def tag_audiobook [
-#     output_directory: directory
-#     --asin: string
-#     --tone-tag-args: list<string> = []
-# ]: path -> path {
-#     let m4b = $in
-
-#     let current_metadata = ^tone dump --format json $m4b | from json | get meta
-#     let asin = (
-#         if $asin == null {
-#             if "additionalFields" in $current_metadata and "asin" in $current_metadata.additionalFields {
-#                 $current_metadata.additionalFields.asin
-#             } else if "title" in $current_metadata {
-#                 # todo Use additional fields to make this query more reliable.
-#                 http get $"https://api.audible.com/1.0/catalog/products?region=us&response_groups=series&title=($current_metadata.title | url encode)"  | get products | first | get asin
-#             } else {
-#                 log error "Unable to determine the ASIN for the book!"
-#                 exit 1
-#             }
-#         } else {
-#             $asin
-#         }
-#     )
-
-#     log info $"ASIN is (ansi purple)($asin)(ansi reset)"
-#     let r = (
-#         let result = http get $"https://api.audnex.us/books/($asin)";
-#         # Fix bad data
-#         if "seriesPrimary" in $result {
-#             if ($result.seriesPrimary.name | str contains --ignore-case "Eighty-Six") {
-#                 $result
-#                 # Just to be safe
-#                 | update seriesPrimary.name "86--EIGHTY-SIX"
-#                 | update authors [[name]; ["Asato Asato"] ["Roman Lempert - translator"] ["Shirabii - illustrator"]]
-#             } else {
-#                 $result
-#             }
-#             if $result.seriesPrimary.name =~ "Rascal Does Not Dream" {
-#                 $result
-#                 # Series seems to now be Rascal Does Not Dream (light novel)
-#                 # todo Remove "(light novel)" and "Series" from the end of series names?
-#                 | update seriesPrimary.name "Rascal Does Not Dream"
-#                 | update authors [[name]; ["Hajime Kamoshida"] ["Andrew Cunningham - translator"] ["Keji Mizoguchi - illustrator"]]
-#                 | (
-#                     let input = $in;
-#                     if ($result.genres | is-empty) {
-#                         $input | update genres [[name type]; ["Science Fiction & Fantasy" genre]]
-#                     } else {
-#                         $input
-#                     }
-#                 )
-#             } else {
-#                 $result
-#             }
-#             if $result.seriesPrimary.name =~ "Spice and Wolf" {
-#                 $result
-#                 | update authors [[name]; ["Isuna Hasekura"] ["Paul Starr - translator"]]
-#             } else {
-#                 $result
-#             }
-#         } else {
-#             $result
-#         }
-#     )
-#     let r = (
-#         if $r.title == "Arcanum Unbounded: The Cosmere Collection" {
-#             $r
-#             # Tries to put this under the Mistborn series, which isn't quite right
-#             | reject seriesPrimary
-#         } else {
-#             $r
-#         }
-#     )
-
-#     # todo Check for inconsistencies between the previous data and the current metadata, such as different authors.
-
-#     let authors = (
-#         $r.authors
-#         | get name
-#         | filter {|a|
-#             (
-#             not ($a | str ends-with "- afterword")
-#             and not ($a | str ends-with "- contributor")
-#             and not ($a | str ends-with "- editor")
-#             and not ($a | str ends-with "- illustrator")
-#             and not ($a | str ends-with "- translator")
-#             )
-#         }
-#     )
-#     let contributors = (
-#         $r.authors
-#         | get name
-#         | filter {|a| $a | str ends-with "- contributor" }
-#         | str replace "- contributor" ""
-#         | str trim
-#     )
-#     let editors = (
-#         $r.authors
-#         | get name
-#         | filter {|a| $a | str ends-with "- editor" }
-#         | str replace "- editor" ""
-#         | str trim
-#     )
-#     let illustrators = (
-#         $r.authors
-#         | get name
-#         | filter {|a| $a | str ends-with "- illustrator" }
-#         | str replace "- illustrator" ""
-#         | str trim
-#     )
-#     let translators = (
-#         $r.authors
-#         | get name
-#         | filter {|a| $a | str ends-with "- translator" }
-#         | str replace "- translator" ""
-#         | str trim
-#     )
-#     # let primary_authors = (
-#     #     let authors_with_asin = (
-#     #         $r.authors
-#     #         | default null asin
-#     #         | where asin != null
-#     #         | get name
-#     #         | filter {|a| not ($a | str ends-with " - translator") }
-#     #     );
-#     #     if ($authors_with_asin | is-empty) {
-#     #         $authors
-#     #     } else {
-#     #         $authors_with_asin
-#     #     }
-#     # )
-#     let series = (
-#         if "seriesPrimary" in $r {
-#             { name: $r.seriesPrimary.name } | (
-#                 let input = $in;
-#                 if "position" in $r.seriesPrimary {
-#                     $input | insert position $r.seriesPrimary.position
-#                 } else {
-#                     $input
-#                 }
-#             )
-#         } else {
-#             null
-#         }
-#     )
-#     # Normalize the title under weird circumstances where it doesn't match the title.
-#     let title = (
-#         if $series == null {
-#             $r.title
-#         } else {
-#             if ($r.title | str contains --ignore-case ', vol. ') {
-#                 # 86 - Eighty-Six, Vol. 1 -> 86--EIGHTY-SIX, Vol. 1
-#                 [$series.name ($r.title | str substring ($r.title | str downcase | str index-of ', vol. ')..)] | str join
-#             } else {
-#                 $r.title
-#             }
-#         }
-#     )
-#     let title = (
-#         # Remove inconsistent use of " (light novel)" in titles
-#         if ($title | str contains --ignore-case " (light novel)") {
-#             $title | str replace --regex ' \([lL]ight [nN]ovel\)' ""
-#         } else {
-#             $title
-#         }
-#     )
-#     log debug $"The title is (ansi yellow)($title)(ansi reset)"
-#     # Audiobookshelf and Picard use a semicolon followed by a space to separate multiple values, I think.
-#     # Technically, I think ID3v2.4 is supposed to use a null byte, but not sure whether that's just what is shown or what is actually used.
-#     let tone_data = (
-#         {
-#             meta: {
-#                 album: $title
-#                 albumArtist: ($authors | str join ";")
-#                 artist: ($authors | str join ";")
-#                 composer: ($r.narrators | get name | str join ";")
-#                 description: $r.description
-#                 language: $r.language
-#                 narrator: ($r.narrators | get name | str join ";")
-#                 publisher: $r.publisherName
-#                 publishingDate: $r.releaseDate
-#                 title: $title
-#                 additionalFields: {
-#                     asin: $r.asin
-#                 }
-#             }
-#         }
-#         | (
-#             let input = $in;
-#             if "genres" in $r {
-#                 $input
-#                 | insert meta.genre ($r.genres | where type == "genre" | get name | str join ";")
-#                 | insert meta.additionalFields.tags ($r.genres | where type == "tag" | get name | str join ";")
-#             } else {
-#                 $input
-#             }
-#         )
-#         | (
-#             let input = $in;
-#             if "isbn" in $r {
-#                 $input | insert meta.additionalFields.isbn $r.isbn
-#             } else {
-#                 $input
-#             }
-#         )
-#         | (
-#             let input = $in;
-#             if "copyright" in $r {
-#                 $input | insert meta.copyright $r.copyright
-#             } else {
-#                 $input
-#             }
-#         )
-#         # | (
-#         #     let input = $in;
-#         #     if ($authors | is-empty) or ($authors == $primary_authors) {
-#         #         $input
-#         #     } else {
-#         #         (
-#         #             $input
-#         #             | insert meta.additionalFields.authors ($authors | str join ";")
-#         #         )
-#         #     }
-#         # )
-#         | (
-#             let input = $in;
-#             if ($contributors | is-empty) {
-#                 $input
-#             } else {
-#                 (
-#                     $input
-#                     | insert meta.additionalFields.contributors ($contributors | str join ";")
-#                 )
-#             }
-#         )
-#         | (
-#             let input = $in;
-#             if ($editors | is-empty) {
-#                 $input
-#             } else {
-#                 (
-#                     $input
-#                     | insert meta.additionalFields.editors ($editors | str join ";")
-#                 )
-#             }
-#         )
-#         | (
-#             let input = $in;
-#             if ($illustrators | is-empty) {
-#                 $input
-#             } else {
-#                 (
-#                     $input
-#                     | insert meta.additionalFields.illustrators ($illustrators | str join ";")
-#                 )
-#             }
-#         )
-#         | (
-#             let input = $in;
-#             if ($translators | is-empty) {
-#                 $input
-#             } else {
-#                 (
-#                     $input
-#                     | insert meta.additionalFields.translators ($translators | str join ";")
-#                 )
-#             }
-#         )
-#         | (
-#             let input = $in;
-#             if $series == null {
-#                 $input
-#             } else {
-#                 (
-#                     $input
-#                     | insert meta.movementName $series.name
-#                 )
-#             }
-#         )
-#     )
-#     let tone_json = $"($output_directory)/tone.json"
-#     $tone_data | save --force $tone_json
-#     let chapters = $"($output_directory)/chapters.txt"
-#     (
-#         http get $"https://api.audnex.us/books/($asin)/chapters"
-#         | get chapters
-#         | each {|chapter|
-#             let time = ($chapter.startOffsetMs | into duration --unit ms | format_chapter_duration);
-#             $"($time) ($chapter.title)"
-#         }
-#         | str join "\n"
-#         | save --force $chapters
-#     )
-#     log debug $"Chapters: ($chapters)"
-#     # let cover = $r.cover # "https://m.media-amazon.com/images/I/91rYWS09+AL.jpg"
-#     let cover = ({ parent: $output_directory, stem: "cover", extension: ($r.image | path parse | get extension )} | path join)
-#     # let ffmetadata = $"($output_directory)/ffmetadata.txt"
-#     # ^ffprobe -loglevel error -show_entries stream_tags:format_tags $m4b | save --force $ffmetadata
-#     http get --raw $r.image | save --force $cover
-#     [$cover] | optimize_images
-#     let args = (
-#         []
-#         | append (
-#             if $series != null and "position" in $series {
-#                 $"--meta-part=($series.position)"
-#             } else {
-#                 null
-#             }
-#         )
-#     )
-#     (
-#         ^tone tag
-#             # todo When tone is new enough:
-#             # --id $r.asin
-#             --meta-chapters-file $chapters
-#             --meta-cover-file $cover
-#             --meta-tone-json-file $tone_json
-#             --meta-remove-property "comment"
-#             ...$args
-#             ...$tone_tag_args
-#             $m4b
-#     )
-#     let renamed = (
-#         let components = $m4b | path parse;
-#         {
-#             parent: (
-#                 [$output_directory]
-#                 | append (
-#                     # Jellyfin can't handle having a bare audiobook file in the Audiobooks directory.
-#                     # So, place it in a directory named after the book if it won't be in a subdirectory for the author and/or series.
-#                     if ($authors | is-empty) and $series == null {
-#                         $title
-#                     } else {
-#                         $authors | str join ", "
-#                     }
-#                 )
-#                 | append (
-#                     if $series == null {
-#                         null
-#                     } else {
-#                         $series.name
-#                     }
-#                 )
-#                 | path join
-#             ),
-#             stem: $title,
-#             extension: $components.extension,
-#         }
-#         | path join
-#     )
-#     mkdir ($renamed | path dirname)
-#     mv $m4b $renamed
-#     $renamed
-# }
-
-# Import Audiobooks with Beets.
-#
-# The final file is named according to Jellyfin's recommendation, Authors/Book.
-#
-export def beet_import [
-    # beet_executable: path # Path to the Beets executable to use
-    beets_directory: directory # Directory to which the books are imported
-    config: path # Path to the Beets config to use
-    --library: path # Path to the Beets library to use
-    # --search-id
-    # --set
-    --working-directory: directory
-]: path -> record<cover: path, m4b: path> {
-    let m4b = $in
-    # (
-    #     ^beet
-    #     --config $config
-    #     --directory $beets_directory
-    #     --library $library
-    #     import
-    #     $m4b
-    # )
-    let args = (
-        []
-        | append (if $library == null { "--volume=audible-beets-library:/config/library:Z" } else { $"--volume=($library | path dirname):/config/library:Z" })
-    )
-    log debug $"Running: podman run --detach --env PUID=0 --env PGID=0 --name beets-audible --rm --volume ($m4b):/input/($m4b | path basename):Z --volume ($beets_directory):/audiobooks:z --volume ($config):/config/config.yaml:Z --volume ($config | path dirname)/scripts:/custom-cont-init.d:Z ($args | str join ' ') lscr.io/linuxserver/beets:2.0.0"
-    (
-        ^podman run
-            --detach
-            --env "PUID=0"
-            --env "PGID=0"
-            --name "beets-audible"
-            --rm
-            # --volume $"($library | path dirname):/config/library:Z"
-            --volume $"($m4b):/input/($m4b | path basename):Z"
-            --volume $"($beets_directory):/audiobooks:z"
-            --volume $"($config):/config/config.yaml:Z"
-            --volume $"($config | path dirname)/scripts:/custom-cont-init.d:Z"
-            ...$args
-            "lscr.io/linuxserver/beets:2.0.0"
-    )
-    sleep 2min
-    (
-        ^podman exec
-        --interactive
-        --tty
-        "beets-audible"
-        beet import (["/input" ($m4b | path basename)] | path join)
-    )
-    ^podman stop beets-audible
-    let author_directory = ls --full-paths $beets_directory | get name | first
-    let imported_m4b = (
-        let m4b_files = glob ([$author_directory "**" "*.m4b"] | path join);
-        if ($m4b_files | is-empty) {
-            log error $"No imported M4B file found in (ansi yellow)($author_directory)(ansi reset)!"
-            exit 1
-        } else if ($m4b_files | length) > 1 {
-            log error $"Multiple imported M4B files found: (ansi yellow)($m4b_files)(ansi reset)!"
-            exit 1
-        } else {
-            $m4b_files | first
-        }
-    )
-    log debug $"The imported M4B file is (ansi yellow)($imported_m4b)(ansi reset)"
-    let covers = (
-        glob ([($imported_m4b | path dirname) "**" "cover.*"] | path join)
-        | filter {|f|
-            let components = $f | path parse
-            $components.stem == "cover" and $components.extension in $image_extensions
-        }
-    );
-    let cover = (
-        if not ($covers | is-empty) {
-            if ($covers | length) > 1 {
-                log error $"Found multiple files looking for the cover image file:\n($covers)\n"
-                exit 1
-            } else {
-                $covers | first
-            }
-        } else {
-            null
-        }
-    )
-    if $cover != null {
-        log debug $"The cover file is (ansi yellow)($cover)(ansi reset)"
-    } else {
-        log warning $"No cover found!"
-    }
-    {
-        cover: $cover,
-        m4b: $imported_m4b,
-    }
-}
-
-# Decrypt and convert an AAX file from Audible to an M4B file.
-export def decrypt_audible [
-    activation_bytes: string # Audible activation bytes
-    --working-directory: directory
-]: path -> path {
-    let aax = $in
-    let stem = $aax | path parse | get stem
-    let m4b = ({ parent: $working_directory, stem: $stem, extension: "m4b" } | path join)
-    ^ffmpeg -activation_bytes $activation_bytes -i $aax -c copy $m4b
-    $m4b
-}
-
-# Embed the cover art to an M4B file
-export def embed_cover []: record<cover: path, m4b: path> -> path {
-    let audiobook = $in
-    if $audiobook.cover == null {
-        ^tone tag --auto-import=covers $audiobook.m4b
-    } else {
-        ^tone tag --meta-cover-file $audiobook.cover $audiobook.m4b
-    }
-    $audiobook
-}
+export const supported_file_extensions = ["aax" "flac" "m4a" "m4b" "mp3" "mp4" "oga" "ogg" "opus" "wav" "zip"]
 
 # Import an audiobook to my collection.
 #
-# Audiobooks can be provided in the AAX and M4B formats.
+# Audiobooks must be organized with the all of the book's audio files in a single directory.
+# It will be assumed that all files in the directory belong to the same audiobook.
 #
 # This script performs several steps to process the audiobook file.
 #
 # 1. Decrypt the audiobook if it is from Audible.
 # 2. Tag the audiobook.
-# 3. Upload the audiobook
+# 3. Upload the audiobook to a server over SSH
 #
-# The final file is named according to Jellyfin's recommendation, but includes a directory for the series if applicable.
-# The path for a book in a series will look like "<authors>/<series>/<series-position> - <title>.m4b".
-# The path for a standalone book will look like "<authors>/<title>.m4b".
+# The path for a book in a series will look like "<primary authors>/<series>/<title>/<title>.m4b".
+# The path for a book in a subseries will look like "<primary authors>/<series>/<subseries>/<title>/<title>.m4b".
+# The path for a standalone book will look like "<primary authors>/<title>/<title>.m4b".
 #
-# todo use JSON over ssh to run commands as necessary and retrieve output, i.e. ssh meerkat nu -c "\'ls | to json\'"
+# This script will attempt to merge multiple files of an audiobook into a single file.
+# Additionally, it will try to use a container with proper chapters support if possible.
+# Lossless FLACs will be merged into one FLAC-encoded OGG file using the ".oga" file extension.
+# The OGG container has support for multiple chapters.
+# Lossy AAC or MP3 files will be transcoded to OPUS and stored in an OGG container using the ".opus" file extension.
+# I still need to implement all of this.
 def main [
-    ...files: string # The paths to audio files or a directory containing audio files belonging to a single book to tag and upload. Prefix paths with "ssh:" to download them from the server via SSH
-    # --asin: string
-    # --isbn: string
-    --musicbrainz-release-id: string
-    --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
-    --delete # Delete the original file
-    --server: string = "meerkat" # The server to which to copy files via SSH
-    --server-path: string = "/var/media/audiobooks" # The base directory to which to copy files.
-    --output-directory: directory # Directory to place files when not being uploaded
-    --skip-upload # Don't upload files to the server
-    --tone-tag-args: list<string> = [] # Additional arguments to pass to the tone tag command
+  ...items: string # The paths to the audio files in a book or a directory containing the audio files belonging to a single book to tag and upload. Prefix paths with "ssh:" to download them from the server via SSH.
+  # --asin: string
+  # --isbn: string
+  # --ignore-embedded-acoustid-fingerprints
+  --acoustid-client-key: string # The application API key for the AcoustID server
+  --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
+  --combine-chapter-parts # Combine chapters split into multiple parts into individual chapters
+  --lossy-to-lossy # Allow transcoding lossy formats to other lossy formats. This is irreversible and has the potential to introduce artifacts and degrade quality. It's recommended to keep the original lossy files for archival purposes when doing this.
+  --musicbrainz-release-id: string
+  --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
+  --keep # Keep the original file
+  --delay-between-imports: duration = 1min # When importing multiple books, pause for this amount between imports. This reduces load on various endpoints by spreading out workload over time. For metadata refreshes, this should probably be increased to as large a delay as you can tolerate.
+  --destination: directory = "meerkat:/var/media/audiobooks" # The directory under which to copy files.
+  --merge # Combine multiple audio files for a book into a single file
+  --submit-all-acoustid-fingerprints # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
+  --preferred-mp3-container: string = "m4b" # The preferred container for mp3 files. Can be either mp3 or m4b.
+  --preferred-container: string = "ogg" # The preferred container for the output audio. Use either m4b or ogg.
+  --tone-tag-args: list<string> = [] # Additional arguments to pass to the tone tag command
+  --transcode-bitrate: string = "" # The bitrate to use when transcoding audio. For opus, it defaults to 24k for mono and 32k for stereo recordings. For further details, see here: https://wiki.xiph.org/Opus_Recommended_Settings
+  --use-rsync # Use rsync instead of scp to transfer files
 ] {
-    if ($files | is-empty) {
-        log error "No files provided"
-        exit 1
+  if ($items | is-empty) {
+    log error "No files provided"
+    exit 1
+  }
+
+  let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-audiobooks"] | path join
+  let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-audiobooks-config.json"] | path join
+  let config: record = (
+    try {
+      open $config_file
+    } catch {
+      {}
     }
+  )
 
-    if $musicbrainz_release_id != null and ($files | length) > 1 {
-        log error "Setting the MusicBrainz ID for multiple books is not allowed as it can result in overwriting the final file"
-        exit 1
+  let cache_function = {|type, id, update_function|
+    let cached_file = [$cache_directory $type $"($id).json"] | path join
+    try {
+      open $cached_file
+    } catch {
+      let result = do $update_function $type $id
+      mkdir ($cached_file | path dirname)
+      $result | save --force $cached_file
+      $result
     }
+  }
 
-    let output_directory = (
-        if $output_directory == null {
-            "." | path expand
-        } else {
-            $output_directory
-        }
-    )
-    mkdir $output_directory
-
-    for original_file in $files {
-
-    log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
-
-    let working_directory = (mktemp --directory "import-audiobooks.XXXXXXXXXX")
-    log info $"Using the temporary directory (ansi yellow)($working_directory)(ansi reset)"
-
-    let audible_activation_bytes = (
-        if $audible_activation_bytes != null {
-            $audible_activation_bytes
-        } else if "AUDIBLE_ACTIVATION_BYTES" in $env {
-            $env.AUDIBLE_ACTIVATION_BYTES
-        } else {
-            null
-        }
-    )
-
-    # try {
-
-    let file = (
-        if ($original_file | str starts-with "ssh:") {
-            let file = ($original_file | str replace "ssh:" "")
-            ^scp $"($server):$file" $"($working_directory)/($file | path basename)"
-            [$working_directory ($file | path basename)] | path join
-        } else {
-            cp $original_file $working_directory
-            [$working_directory ($original_file | path basename)] | path join
-        }
-    )
-
-    let input_format = (
-        if ($file | path type) == "dir" {
-            "dir"
-        } else {
-            let ext = $file | path parse | get extension;
-            if $ext == null {
-                log error $"Unable to determine input file type of (ansi yellow)($file)(ansi reset). It is not a directory and has no file extension."
-                exit 1
-            } else {
-                $ext
-            }
-        }
-    )
-
-    let audiobook = (
-        # Assume an AAX file is from Audible and require decryption.
-        if $input_format == "aax" {
-            if $audible_activation_bytes == null {
-                log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
-                exit 1
-            }
-            $file | decrypt_audible $audible_activation_bytes --working-directory $working_directory
-        } else if $input_format in ["m4a", "m4b"] {
-            $file
-        #
-        } else if $input_format == "dir" {
-            $file | mp3_directory_to_m4b $working_directory
-        } else if $input_format == "zip" {
-            $file
-            | unzip $working_directory
-            | mp3_directory_to_m4b $working_directory
-        } else {
-            log error $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
-            exit 1
-        }
-        | (
-            if $asin == null {
-                tag_audiobook --tone-tag-args $tone_tag_args $working_directory
-            } else {
-                tag_audiobook --asin $asin --tone-tag-args $tone_tag_args $working_directory
-            }
-        )
-    )
-
-    # log debug $"Fetching and writing metadata to '($formats.cbz)' with ComicTagger"
-    # log debug $"The ComicTagger result is:\n(ansi green)($tag_result.result)(ansi reset)\n"
-    # log debug "Renaming the CBZ according to the updated metadata"
-
-    # let formats = $formats | (
-    #     let format = $in;
-    #     $format | update cbz ($format.cbz | comictagger_rename_cbz --comictagger $comictagger)
-    # )
-
-    # let comic_metadata = ($tag_result.result | get md)
-
-    # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
-    # let authors = ($comic_metadata | get credits | where role == "Writer" | get person)
-    # log debug $"Authors determined to be (ansi purple)'($authors)'(ansi reset)"
-
-    # let current_metadata = ^tone dump --format json $audiobook | from json | get meta
-
-    let authors_subdirectory = (
-        $audiobook | path dirname | path relative-to $working_directory
-    )
-    let minio_target_directory =  [$minio_alias $minio_path $authors_subdirectory] | path join | sanitize_minio_filename
-    let minio_target_destination = (
-        let components = ($audiobook | path parse);
-        { parent: $minio_target_directory, stem: $components.stem, extension: $components.extension } | path join | sanitize_minio_filename
-    )
-    if $skip_upload {
-        mv $audiobook $output_directory
+  let audible_activation_bytes = (
+    if $audible_activation_bytes != null {
+      $audible_activation_bytes
+    } else if "AUDIBLE_ACTIVATION_BYTES" in $env {
+      $env.AUDIBLE_ACTIVATION_BYTES
+    } else if ($config | get --ignore-errors audible_activation_bytes | is-not-empty) {
+      $config.audible_activation_bytes
     } else {
-        log info $"Uploading (ansi yellow)($audiobook)(ansi reset) to (ansi yellow)($minio_target_destination)(ansi reset)"
-        ^mc mv $audiobook $minio_target_destination
+      null
     }
+  )
 
-    if $delete {
-        log debug "Deleting the original file"
-        if ($original_file | str starts-with "minio:") {
-            let actual_path = ($original_file | str replace "minio:" "")
-            if ($actual_path | sanitize_minio_filename) == $minio_target_destination {
-                log info $"Not deleting the original file (ansi yellow)($original_file)(ansi reset) since it was overwritten by the updated file"
-            } else {
-                log info $"Deleting the original file on MinIO (ansi yellow)($actual_path)(ansi reset)"
-                ^mc rm $actual_path
-            }
+  let acoustid_client_key = (
+    if $acoustid_client_key != null {
+      $acoustid_client_key
+    } else if "MEDIA_JUGGLER_ACOUSTID_CLIENT_KEY" in $env {
+      $env.MEDIA_JUGGLER_ACOUSTID_CLIENT_KEY
+    } else if ($config | get --ignore-errors acoustid_client_key | is-not-empty) {
+      $config.acoustid_client_key
+    } else {
+      null
+    }
+  )
+
+  let acoustid_user_key = (
+    if $acoustid_user_key != null {
+      $acoustid_user_key
+    } else if "MEDIA_JUGGLER_ACOUSTID_USER_KEY" in $env {
+      $env.MEDIA_JUGGLER_ACOUSTID_USER_KEY
+    } else if ($config | get --ignore-errors acoustid_user_key | is-not-empty) {
+      $config.acoustid_user_key
+    } else {
+      null
+    }
+  )
+
+  let keep = (
+    if $keep != null {
+      $keep
+    } else if ($config | get --ignore-errors keep | is-not-empty) {
+      $config.keep
+    }
+  )
+  let merge = (
+    if $merge != null {
+      $merge
+    } else if ($config | get --ignore-errors merge | is-not-empty) {
+      $config.merge
+    }
+  )
+  let use_rsync = (
+    if $use_rsync != null {
+      $use_rsync
+    } else if ($config | get --ignore-errors use_rsync | is-not-empty) {
+      $config.use_rsync
+    }
+  )
+
+  let destination = (
+    if ($destination | is-not-empty) {
+      $destination
+    } else if ($config | get --ignore-errors destination | is-not-empty) {
+      $config.destination
+    }
+  )
+  if ($destination | is-empty) {
+    log error "Missing destination!"
+    exit 1
+  }
+
+  let destination = (
+    if ($destination | is_ssh_path) {
+      $destination # todo expand path?
+    } else {
+      if ($destination | is-empty) {
+        "." | path expand
+      } else {
+        $destination
+      }
+    }
+  )
+  if not ($destination | is_ssh_path) {
+    mkdir $destination
+  }
+
+  # Group files together into individual audiobooks based on directory
+  let audiobooks = (
+    $items
+    | par-each {|item|
+      let item_type = (
+        if ($item | is_ssh_path) {
+          $item | ssh_path_type
         } else {
-            log info $"Deleting the original file (ansi yellow)($original_file)(ansi reset)"
-            rm $original_file
+          $item | path type
         }
+      )
+      let files = (
+        if ($item | is_ssh_path) {
+          let server = $item | split_ssh_path | get server
+          if $item_type == "dir" {
+            $"($item | escape_special_glob_characters)/**/*" | ssh glob "--no-dir" "--no-symlink" | each {|file| $"($server):($file)"}
+          } else {
+            $item | ssh ls --expand-path | get name | each {|file| $"($server):($file)"}
+          }
+        } else {
+          if $item_type == "dir" {
+            glob --no-dir --no-symlink (($item | path expand | escape_special_glob_characters) + "/**/*")
+          } else {
+            [($item | path expand)]
+          }
+        }
+      )
+      if ($files | is-empty) {
+        log error $"Missing audio files for (ansi yellow)($item)(ansi reset)"
+        exit 1
+      }
+      $files
     }
-    log debug $"Removing the working directory (ansi yellow)($working_directory)(ansi reset)"
-    rm --force --recursive $working_directory
-
-    # } catch {
-    #     log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
-    #     continue
-    # }
-
+    | flatten
+    | uniq
+    | path parse
+    # Group files together by directory
+    | group-by --to-table parent
+    | rename directory files
+    | par-each {|audiobook|
+      $audiobook | update files ($audiobook.files | path join)
     }
+  )
+
+  # Verify that audiobooks contain files with supported file extensions
+  let audiobooks = $audiobooks | par-each {|audiobook|
+    let audio_files = $audiobook.files | path parse | where extension in $supported_file_extensions
+    if ($audiobook.files | is-empty) {
+      log error $"No supported audio files in ($audiobook.directory). Skipping."
+      null
+    } else {
+      $audiobook
+    }
+  }
+  if ($audiobooks | is-empty) {
+    log error "No audiobooks to import!"
+    exit 1
+  }
+
+  if $musicbrainz_release_id != null and ($audiobooks | length) > 1 {
+    log error "Setting the MusicBrainz ID for multiple books is not allowed to prevent mistakes"
+    exit 1
+  }
+
+  # Copy files column to original_files
+  let audiobooks = $audiobooks | rename directory original_files | insert files {|audiobook| $audiobook.original_files}
+
+  for audiobook in ($audiobooks | enumerate) {
+    let index = $audiobook.index
+    let audiobook = $audiobook.item
+
+  log info $"Importing audiobook files in directory (ansi purple)($audiobook.directory)(ansi reset)"
+
+  let temporary_directory = (mktemp --directory $"import-audiobooks.($audiobook.directory | path basename).XXXXXXXXXX")
+  log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
+
+  # try {
+
+  # First, copy files via SSH if necessary
+  let audiobook = $audiobook | update files (
+    $audiobook.files | each {|file|
+      if ($file | is_ssh_path) {
+        mkdir ([$temporary_directory "downloads"] | path join)
+        if $use_rsync {
+          $file | rsync ([$temporary_directory "downloads" ($file | path basename)] | path join) "--mkpath"
+        } else {
+          $file | scp ([$temporary_directory "downloads" ($file | path basename)] | path join)
+        }
+      } else if $keep {
+        # Copy to temp directory to avoid modifying the original file
+        if ($file | path parse | get extension) == "zip" {
+          $file
+        } else {
+          let new_file = [$temporary_directory "downloads" ($file | path basename)] | path join
+          mkdir ($new_file | path dirname)
+          cp $file $new_file
+          $new_file
+        }
+      } else {
+        $file
+      }
+    }
+  )
+
+  # Next, unzip any zip archives
+  let audiobook = $audiobook | update files (
+    $audiobook.files
+    | each {|file|
+      if ($file | path parse | get extension) == "zip" {
+        $file | unzip ([$temporary_directory "extracted"] | path join)
+      } else {
+        [$file]
+      }
+    }
+    | flatten
+  )
+
+
+  # Locate any supplementary documents, i.e. accompanying PDFs
+  let audiobook = (
+    let companion_documents = (glob $"($audiobook.directory | escape_special_glob_characters)/*.{($audiobook_companion_document_file_extensions | str join ',')}");
+    if ($companion_documents | is-not-empty) {
+      $audiobook | insert companion_documents $companion_documents
+    } else {
+      $audiobook | insert companion_documents []
+    }
+  )
+
+  # Next, decrypt any Audible AAX files
+  let audiobook = (
+    if ($audiobook.files | first | path parse | get extension) == "aax" {
+      if $audible_activation_bytes == null {
+        log error "Audible activation bytes must be provided to decrypt Audible audiobooks"
+        exit 1
+      }
+      let files = $audiobook.files | each {|file|
+        log debug $"Decrypting Audible AAX file (ansi yellow)($file)(ansi reset) with ffmpeg"
+        $file | decrypt_audible_aax $audible_activation_bytes --working-directory $temporary_directory
+      }
+      $audiobook | update files $files
+    } else {
+      if ($audiobook.files | first | path parse | get extension) == "m4b" {
+        # Check for weird embedded video stream that needs removed
+        let files = $audiobook.files | each {|file|
+          if ($file | ffprobe | has_bad_video_stream) {
+            $file | remove_video_stream
+          } else {
+            $file
+          }
+        }
+        $audiobook | update files $files
+      } else {
+        $audiobook
+      }
+    }
+  )
+
+  # Check that the audio codecs and containers are consistent among all audiobook files
+  let audiobook = (
+    let audio_files = $audiobook.files | path parse | where extension in $supported_file_extensions | path join;
+    let audio_codec_and_container = $audio_files | first | ffprobe | parse_container_and_audio_codec_from_ffprobe_output;
+    if (
+      $audio_files
+      | skip 1
+      | all {|file|
+        ($file | ffprobe | parse_container_and_audio_codec_from_ffprobe_output) == $audio_codec_and_container
+      }
+    ) {
+      (
+        $audiobook
+        | insert audio_codec $audio_codec_and_container.audio_codec
+        | insert container $audio_codec_and_container.container
+        | insert audio_channel_layout $audio_codec_and_container.audio_channel_layout
+      )
+    } else {
+      return {audiobook: $audiobook.directory, error: $"Not all audio files for the audiobook are of the same container and audio codec: ($audio_files). Skipping."}
+    }
+  )
+
+  # Set target output type
+  let audiobook = (
+    let target = (
+      # Lossless
+      if $audiobook.audio_codec in ["flac"] or ($audiobook.audio_codec | str starts-with "pcm") {
+        if $preferred_container == "ogg" {
+          {audio_codec: "flac", container: "ogg", file_extension: "oga"}
+        } else {
+          {audio_codec: "flac", container: "mov,mp4,m4a,3gp,3g2,mj2", file_extension: "m4b"}
+        }
+      # Lossy
+      } else {
+        # Use opus
+        if $lossy_to_lossy or $audiobook.audio_codec == "opus" {
+          if $preferred_container == "ogg" {
+            {audio_codec: "opus", container: "ogg", file_extension: "opus"}
+          } else {
+            {audio_codec: "opus", container: "mov,mp4,m4a,3gp,3g2,mj2", file_extension: "m4b"}
+          }
+        # Keep the original audio codec
+        } else {
+          if $audiobook.audio_codec == "mp3" and $preferred_mp3_container == "mp3" {
+            {audio_codec: $audiobook.audio_codec, container: "mp3", file_extension: "mp3"}
+          } else {
+            {audio_codec: $audiobook.audio_codec, container: "mov,mp4,m4a,3gp,3g2,mj2", file_extension: "m4b"}
+          }
+        }
+      }
+    );
+    $audiobook | insert target $target
+  )
+  log debug $"Target: ($audiobook.target)"
+
+  # Convert and merge audio files
+  let audiobook = (
+    if ($audiobook.files | length) == 1 {
+      if (
+        $audiobook.container == $audiobook.target.container
+        and $audiobook.audio_codec == $audiobook.target.audio_codec
+      ) {
+        # No conversion necessary
+        $audiobook
+      } else {
+        let audiobook_file = $audiobook.files | first
+        log debug $"Converting ($audiobook_file) file to a ($audiobook.target.audio_codec) encoded ($audiobook.target.container) container"
+        let output_file = $audiobook_file | path parse | update parent $temporary_directory | update extension $audiobook.target.file_extension | path join
+        let ffmpeg_audio_encoder = (
+          if $audiobook.target.audio_codec == "opus" {
+            "libopus"
+          } else if $audiobook.target.audio_codec == "aac" {
+            "libfdk_aac"
+          } else if $audiobook.target.audio_codec == "mp3" {
+            "libmp3lame"
+          } else if $audiobook.target.audio_codec == "wav" {
+            "wavpack"
+          } else {
+            $audiobook.target.audio_codec
+          }
+        )
+        let ffmpeg_args = (
+          []
+          | append (
+            if $audiobook.audio_codec == $audiobook.target.audio_codec {
+              ["-c" "copy"]
+            } else {
+              ["-c:a" $ffmpeg_audio_encoder]
+            }
+          )
+          | append (
+            if $audiobook.target.audio_codec == "opus" and $audiobook.audio_codec != $audiobook.target.audio_codec {
+              if ($transcode_bitrate | is-empty) {
+                if $audiobook.audio_channel_layout == "mono" {
+                  ["-b:a" "24k"]
+                } else if $audiobook.audio_channel_layout == "stereo" {
+                  ["-b:a" "32k"]
+                } else {
+                  # Not sure, so just use variable, which is the default
+                }
+              } else {
+                if $transcode_bitrate != "variable" {
+                  ["-b:a" $transcode_bitrate]
+                }
+              }
+            }
+          )
+        )
+        ^ffmpeg -i $audiobook_file ...$ffmpeg_args $output_file
+        $audiobook | update files [$output_file]
+      }
+    } else if $merge {
+      log debug $"Merging ($audiobook.container) files into a single ($audiobook.target.file_extension) file with m4b-tool"
+      let m4b_tool_audio_format = (
+        if $audiobook.target.container == "mov,mp4,m4a,3gp,3g2,mj2" {
+          "m4b"
+        } else {
+          $audiobook.target.container
+        }
+      )
+      let ffmpeg_audio_encoder = (
+        if $audiobook.audio_codec == $audiobook.target.audio_codec {
+          "copy"
+        } else if $audiobook.target.audio_codec == "opus" {
+          "libopus"
+        } else if $audiobook.target.audio_codec == "aac" {
+          "libfdk_aac"
+        } else if $audiobook.target.audio_codec == "mp3" {
+          "libmp3lame"
+        } else if $audiobook.target.audio_codec == "wav" {
+          "wavpack"
+        } else {
+          $audiobook.target.audio_codec
+        }
+      )
+      let m4b_tool_args = (
+        [
+          "--audio-codec" $ffmpeg_audio_encoder
+        ]
+        | append (
+          if $audiobook.target.audio_codec == "opus" and $audiobook.audio_codec != $audiobook.target.audio_codec {
+            if ($transcode_bitrate | is-empty) {
+              if $audiobook.audio_channel_layout == "mono" {
+                ["--audio-bitrate" "24k"]
+              } else if $audiobook.audio_channel_layout == "stereo" {
+                ["--audio-bitrate" "32k"]
+              } else {
+                # Not sure, so just use variable, which is the default
+              }
+            } else {
+              if $transcode_bitrate != "variable" {
+                ["--audio-bitrate" $transcode_bitrate]
+              }
+            }
+          }
+        )
+      )
+      $audiobook | update files (
+        $audiobook.files | (
+          merge_into_m4b $temporary_directory
+          --audio-format $m4b_tool_audio_format
+          --audio-extension $audiobook.target.file_extension
+          ...$m4b_tool_args
+        )
+      )
+    } else {
+      # If --no-merge is passed, don't worry about conversion either
+      $audiobook
+    }
+  )
+
+  let metadata = (
+    $audiobook.files
+    | (
+      tag_audiobook
+      $temporary_directory
+      $cache_function
+      $submit_all_acoustid_fingerprints
+      $combine_chapter_parts
+      --acoustid-client-key $acoustid_client_key
+      --acoustid-user-key $acoustid_user_key
+      --musicbrainz-release-id $musicbrainz_release_id
+    )
+  )
+  if ($metadata | is-empty) {
+    return {audiobook: $audiobook.directory error: $"Failed to retrieve metadata for the audiobook (ansi yellow)($audiobook.directory)(ansi reset)"}
+  }
+  if ($metadata.book | get --ignore-errors contributors | is-empty) {
+    return {audiobook: $audiobook.directory error: $"Missing contributors for the audiobook (ansi yellow)($audiobook.directory)(ansi reset)"}
+  }
+  # This issue should be caught before here, but check just to be safe.
+  if ($metadata.tracks | length) != ($audiobook.files | length) {
+    return {audiobook: $audiobook.directory error: $"Number of tracks doesn't match the number of files for (ansi yellow)($audiobook.directory)(ansi reset)"}
+  }
+
+  let primary_authors = $metadata.book.contributors | where role == "primary author"
+  if ($primary_authors | is-empty) {
+    return {audiobook: $audiobook.directory error: $"Failed to find primary authors for the audiobook (ansi yellow)($audiobook.directory)(ansi reset). Contributors are ($metadata.book.contributors)"}
+  }
+
+  let relative_destination_directory = (
+    [
+      ($metadata.book.title | sanitize_file_name)
+    ]
+    | prepend (
+      if ($metadata.book | get --ignore-errors series | is-not-empty) {
+        # First series will eventually be the primary series.
+        # todo Nest under subseries of the primary series.
+        let primary_series = (
+          if "scope" in ($metadata.book.series | columns) {
+            let release_group_series = $metadata.book.series | where scope == "release group"
+            if ($release_group_series | is-empty) {
+              # Fall back to the work series if there is no release group series
+              let work_series = $metadata.book.series | where scope == "work"
+              if ($work_series | is-empty) {
+                # Use whatever series exist are at this point
+                if ($metadata.book.series | length) > 1 {
+                  log warning "More than one non release group / non work series exists when no release group series exist. Not yet able to determine series and subseries ordering. Ignoring series altogether and placing book directory directly under the authors' subdirectory."
+                } else if ($metadata.book.series | length) == 1 {
+                  log warning "Falling back to non release group / non work series because no release group or work series exist"
+                  $metadata.book.series | first
+                }
+              } else if ($work_series | length) == 1 {
+                log warning "Falling back to work series because no release group series exists"
+                $work_series | first
+              } else {
+                log warning "More than one work series exists when no release group series exist. Not yet able to determine series and subseries ordering. Ignoring series altogether and placing book directory directly under the authors' subdirectory."
+              }
+            } else if ($release_group_series | length) == 1 {
+              $release_group_series | first
+            } else {
+              log warning $"More than one release group series exists. Not yet able to determine series and subseries ordering. Ignoring series altogether and placing book directory directly under the authors' subdirectory."
+            }
+          } else {
+            if ($metadata.book.series | length) == 1 {
+              $metadata.book.series | first
+            } else {
+              log info "Multiple series with no scope exist. Ignoring series altogether and placing book directory directly under the authors' subdirectory."
+            }
+          }
+        )
+        if ($primary_series | is-not-empty) {
+          log info $"Primary series is ($primary_series)"
+          $primary_series.name | sanitize_file_name
+        }
+      }
+    )
+    | prepend ($primary_authors.name | str join ", " | sanitize_file_name)
+    | path join
+  )
+
+  let target_destination_directory = [$destination $relative_destination_directory] | path join
+
+  # Determine how many leading zeros are required for the track number.
+  let number_of_digits = (($metadata.tracks | length) - 1) | into string | str length;
+  let audiobook = $audiobook | update files (
+    $metadata.tracks
+    | each {|track|
+      # For multiple files, prefix the name with the index
+      let stem = (
+        if ($metadata.tracks | length) == 1 {
+          $track.title | sanitize_file_name
+        } else {
+          ($track.index | fill --alignment r --character '0' --width $number_of_digits) + " " + $track.title
+        }
+      )
+      let destination = $track.file | path parse | update stem $stem | update parent $target_destination_directory | path join
+      {
+        file: $track.file
+        destination: $destination
+      }
+    }
+  )
+
+  # todo Get supplementary document metadata from BookBrainz
+  let audiobook = $audiobook | update companion_documents (
+    $audiobook.companion_documents
+    | each {|document|
+      let stem = (
+        # For a single file, rename the file to match the book.
+        if ($audiobook.companion_documents | length) == 1 {
+          $metadata.book.title | sanitize_file_name
+        # For multiple files, leave the names as is.
+        } else {
+          $document | path parse | get stem
+        }
+      )
+      let destination = $document | path parse | update stem $stem | update parent $target_destination_directory | path join
+      {
+        file: $document
+        destination: $destination
+      }
+    }
+  )
+
+  # todo
+  # If the audiobook files are already present under the correct author / series subdirectory, but reside under extra directories, go ahead and leave that directory structure intact.
+  # This is to accommodate external subseries management since this script doesn't yet support nesting series / subseries directories.
+  # Note that if anything is renamed in the path hierarchy, such subdirectories will be dropped.
+  # if top_part matches top_part, and audiobook_directory matches bottom_part, use existing path.
+
+  if ($target_destination_directory | is_ssh_path) {
+    $audiobook.files | append $audiobook.companion_documents | each {|file|
+      log info $"Uploading (ansi yellow)($file.file)(ansi reset) to (ansi yellow)($file.destination)(ansi reset)"
+      if $use_rsync {
+        $file.file | rsync $file.destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
+      } else {
+        $file.file | scp --mkdir $file.destination
+      }
+    }
+  } else {
+    mkdir $target_destination_directory
+    $audiobook.files | append $audiobook.companion_documents | each {|file|
+      mv $file.file $file.destination
+    }
+  }
+
+  if not $keep {
+    log debug "Deleting the original files"
+    (
+      $audiobook.original_files
+      | filter {|file|
+        $file not-in ($audiobook.files | get destination)
+      }
+      | each {|file|
+        if ($file | is_ssh_path) {
+          $file | ssh rm
+        } else {
+          rm $file
+        }
+      }
+    )
+    (
+      $audiobook.companion_documents
+      | filter {|file|
+        $file.file != $file.destination
+      }
+      | each {|file|
+        if ($file | is_ssh_path) {
+          $file | ssh rm
+        } else {
+          rm $file
+        }
+      }
+    )
+  }
+  log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
+  rm --force --recursive $temporary_directory
+
+  # } catch {
+  #     log error $"Import of (ansi red)($original_file)(ansi reset) failed!"
+  #     continue
+  # }
+    if $index < ($audiobooks | length) - 1 {
+      sleep $delay_between_imports
+    }
+  }
 }

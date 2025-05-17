@@ -25,6 +25,377 @@ export const image_extensions = [
   webp
 ]
 
+export const audiobook_companion_document_file_extensions = [
+  cbz
+  epub
+  pdf
+]
+
+export const musicbrainz_non_genre_tags = [
+  "abridged"
+  "accompanying document"
+  "audiobook"
+  "chapters"
+  "explicit"
+  "novel"
+  "unabridged"
+]
+
+# Surround special characters in a string with square brackets
+#
+# Use this on strings before adding glob characters.
+# Not that I can't actually escape backslashes, so those will cause the glob expression to fail outright.
+# Maybe this will be fixed in Nushell at some point?
+export def escape_special_glob_characters []: string -> string {
+  let input = $in
+  if ($input | describe) not-in ["glob" "string"] {
+    return $input
+  }
+  const special_glob_characters = ['[' ']' '(' ')' '{' '}' '*' '?' ':' '$' ',']
+  $special_glob_characters | reduce --fold $input {|character, acc|
+    if $character in ["[" "]"] {
+      $acc | str replace --all $character ('\' + $character)
+    } else {
+      $acc | str replace --all $character ('[' + $character + ']')
+    }
+  }
+}
+
+# Determine of the embedded cover in a video stream is set incorrectly
+export def has_bad_video_stream []: record<streams: table, format: record> -> bool {
+  let ffprobe_output = $in
+  if ($ffprobe_output | is-empty) {
+    return false
+  }
+  let streams = $ffprobe_output | get --ignore-errors streams
+  if ($streams | is-empty) {
+    return false
+  }
+  let video_streams = $streams | where codec_type == "video"
+  if ($video_streams | is-empty) {
+    return false
+  }
+  # The problematic video streams have default disposition set to 1 instead of attached_pic
+  $video_streams | where disposition.attached_pic == 0 | is-not-empty
+}
+
+export def remove_video_stream [
+  output_file: path = ""
+]: path -> path {
+  let input_file = $in
+  let the_output_file = (
+    if ($output_file | is-empty) {
+      mktemp --suffix ("." + ($input_file | path parse | get extension)) --tmpdir
+    } else {
+      $output_file
+    }
+  )
+  # log info $"the_output_file: ($the_output_file)"
+  ^ffmpeg -y -i $input_file -codec:a copy -vn $the_output_file
+  if ($output_file | is-empty) {
+    mv $the_output_file $input_file
+    $input_file
+  } else {
+    $the_output_file
+  }
+}
+
+# Parse the container and audio codec from ffprobe's output
+export def parse_container_and_audio_codec_from_ffprobe_output []: record<streams: table, format: record> -> record<audio_codec: string, container: string, audio_channel_layout: string> {
+  let ffprobe_output = $in
+  if ($ffprobe_output | is-empty) {
+    log error "No ffprobe output"
+    return null
+  }
+  let streams = $ffprobe_output | get --ignore-errors streams
+  if ($streams | is-empty) {
+    log error "Missing streams in ffprobe output"
+    return null
+  }
+  let audio_streams = $streams | where codec_type == "audio"
+  if ($audio_streams | is-empty) {
+    log error "No audio stream in ffprobe output"
+    return null
+  }
+  if ($audio_streams | length) > 1 {
+    log error $"The ffprobe output contains ($audio_streams | length) audio streams. Unsure what to do when there is more than one audio stream."
+    return null
+  }
+  let audio_stream = $audio_streams | first
+  if "codec_name" not-in $audio_stream {
+    log error "The ffprobe audio stream is missing the codec_name"
+    return null
+  }
+  let format = $ffprobe_output | get --ignore-errors format;
+  if ($format | is-empty) {
+    log error "The ffprobe output is missing the format field"
+    return null
+  }
+  {
+    container: $format.format_name
+    audio_codec: $audio_stream.codec_name
+    audio_channel_layout: ($audio_stream | get --ignore-errors channel_layout)
+  }
+}
+
+# Parse the output from the ffprobe command
+export def parse_ffprobe_output []: record<streams: table, format: record> -> record<audio_streams: table, video_streams: table, format: record<format_name: string, format_long_name: string>> {
+  let ffprobe_output = $in
+  let streams = $ffprobe_output | get --ignore-errors streams
+  if ($streams | is-empty) {
+    log error "Missing streams in ffprobe output"
+    return null
+  }
+  let audio_streams = (
+    let audio_streams = $streams | where codec_type == "audio";
+    if ($audio_streams | is-empty) {
+      []
+    } else {
+      $audio_streams
+      | select codec_name codec_long_name profile codec_tag_string sample_fmt sample_rate channels channel_layout time_base duration bit_rate nb_frames
+      | update duration {|audio_stream| $audio_stream.duration | into duration --unit sec}
+    }
+  )
+  let video_streams = (
+    let video_streams = $streams | where codec_type == "video";
+    if ($video_streams | is-empty) {
+      []
+    } else {
+      $video_streams
+      | select codec_name codec_long_name codec_type codec_tag_string width height coded_width coded_height pix_fmt color_range color_space
+    }
+  )
+  let format = (
+    let format = $ffprobe_output | get --ignore-errors format;
+    if ($format | is-empty) {
+      {}
+    } else {
+      $format | select format_name format_long_name
+    }
+  )
+  {
+    audio_streams: $audio_streams
+    video_streams: $video_streams
+    format: $format
+  }
+}
+
+# Get the audio data for a file using the ffprobe command
+export def ffprobe [
+  ...args: string # Arguments to pass to the ffprobe command
+]: path -> record {
+  ^ffprobe ...$args -v quiet -print_format json -show_format -show_streams $in | from json
+}
+
+# todo
+export def convert_to_opus [
+  extension: string # file extension of the output container, i.e. ogg, m4b
+  ...args: string # ffmpeg args
+]: path -> path {
+  let input = $in
+  let output = $input | path parse | update extension $extension
+  ^ffmpeg -i $input -c:a libopus ...$args $output
+  # todo Use opusenc to keep embedded cover art
+  # ^opusenc
+  #  -b:a 128k
+  #  -map_metadata 0
+}
+
+# Replace forward slashes and reserved file names with Unicode characters for use as file names
+#
+# Thank you Unicode.
+export def sanitize_file_name []: path -> path {
+  let name = $in
+  if $name == "." {
+    '․'
+  } else if $name == ".." {
+    "‥"
+  } else {
+    $name | str replace --all '/' '⁄'
+  }
+}
+
+# Get the type of a path via SSH
+export def "ssh_path_type" []: path -> string {
+  let input = $in
+  let ssh_path = $in | split_ssh_path
+  ^ssh $ssh_path.server nu --commands $"\'\"($ssh_path.path)\" | path type | to json\'" | from json
+}
+
+# Delete a file over SSH
+export def "ssh rm" []: path -> nothing {
+  let target = $in | split_ssh_path
+  ^ssh $target.server nu --commands $"\'rm ($target)\'"
+  # Prune empty directories
+  let parent_directory = $target.path | path dirname
+  ^ssh $target.server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($parent_directory)\'"
+}
+
+# Move a file over SSH
+export def "ssh mv" [
+  server: string
+  destination: path
+]: path -> nothing {
+  let source = $in
+  let target_directory = ($destination | path dirname)
+  if ($target_directory | is-not-empty) {
+    ^ssh $server nu --commands $"\'mkdir ($target_directory)\'"
+  }
+  ^ssh $server nu --commands $"\'mv ($source) ($destination)\'"
+  # Prune empty directories
+  if ($source | ssh path type $server) == "dir" {
+    ^ssh $server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($source)\'"
+  } else {
+    let parent_directory = $source | path dirname
+    ^ssh $server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($parent_directory)\'"
+  }
+}
+
+# Determine if a path is meant for SSH, i.e. it starts with "server:"
+export def is_ssh_path []: path -> bool {
+  let input = $in
+  if ($input | is-empty) {
+    return false
+  }
+  let components = $input | path split
+  let first_component = (
+    $components | first | str trim --left --char ":"
+  )
+  (
+    ($first_component | str contains ":")
+    and ($components | split row ":" | filter {|component| $component | is-not-empty} | append ($components | skip 1) | length) > 1
+  )
+}
+
+# Split an SSH path into the server and path elements
+export def split_ssh_path []: path -> record<server: string, path: path> {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+  if not ($input | is_ssh_path) {
+    return {
+      server: null
+      path: $input
+    }
+  }
+  let split = $input | path split
+  let server = (
+    $split | first | split row ':' | first
+  )
+  if ($server | is-empty) {
+    return null
+  }
+  let path = $input | str replace ($server + ":") ""
+  if ($path | is-empty) {
+    return null
+  }
+  {
+    server: $server
+    path: $path
+  }
+}
+
+# Copy files over SSH using the scp program
+export def "scp" [
+  destination: path # The destination on the server to which to copy the file
+  ...args: string # Arguments to pass to the scp program
+  --mkdir # Create the destination directory and any parent directories on the server
+  # --mkdir-permissions # Set the permissions
+  # --mkdir-group
+  # --file-group
+  # --file-permissions
+]: path -> path {
+  let source = $in
+  let source_path_type = (
+    if ($source | is_ssh_path) {
+      $source | ssh_path_type
+    } else {
+      $source | path type
+    }
+  )
+  if $mkdir {
+    let ssh_path = $destination | path dirname | split_ssh_path
+    ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
+  }
+  if $source_path_type == "dir" {
+    ^scp --recursive ...$args $source $destination
+  } else {
+    ^scp ...$args $source $destination
+  }
+  [$destination ($source | path basename)] | path join
+}
+
+# Copy files via rsync
+#
+# The server must have rsync installed for this to work.
+export def "rsync" [
+  destination: path
+  ...args: string
+]: path -> path {
+  let source = $in
+  let source_path_type = (
+    if ($source | is_ssh_path) {
+      $source | ssh_path_type
+    } else {
+      $source | path type
+    }
+  )
+  # let ssh_path = $destination | path dirname | split_ssh_path
+  # ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
+  # ^ssh $ssh_path.server nu --commands $"\'chmod 2770 \"($ssh_path.path)\"\'"
+  if $source_path_type == "dir" {
+    ^rsync --recursive ...$args $source $destination
+  } else {
+    ^rsync ...$args $source $destination
+  }
+  [$destination ($source | path basename)] | path join
+}
+
+# Glob files over SSH
+export def "ssh glob" [
+  ...glob_args: string
+]: path -> table {
+  let input = $in
+  let ssh_path = $input | split_ssh_path
+  ^ssh $ssh_path.server nu --commands $"\'glob (...$glob_args) ($ssh_path.path) | to json\'" | from json
+}
+
+# List files over SSH
+export def "ssh ls" [
+  ...args: string
+  --expand-path
+]: path -> table {
+  let input = $in
+  let ssh_path = $input | split_ssh_path
+  let path = $ssh_path.path
+  if $expand_path {
+    ^ssh $ssh_path.server nu --commands $"\'ls (...$args) ($path | path expand) | to json\'" | from json
+  } else {
+    ^ssh $ssh_path.server nu --commands $"\'ls (...$args) ($path) | to json\'" | from json
+  }
+}
+
+# List files over SSH
+# export def "ssh_list_files_in_archive_with_extensions" [
+#   ...args: string
+# ]: path -> nothing {
+#   let input = $in
+#   let ssh_path = $input | split_ssh_path
+#   (
+#     ^unzip -l $archive
+#     | lines
+#     | drop nth 0 1
+#     | drop 2
+#     | str trim
+#     | parse "{length}  {date} {time}   {name}"
+#     | get name
+#     | uniq
+#     | sort
+#   )
+#   ^ssh $ssh_path.server nu --commands $"\'ls (...$args) ($ssh_path.path) | to json\'" | from json
+# }
+
 # Get the number of pages in a PDF
 export def pdf_page_count []: path -> int {
   let pdf = $in
@@ -923,14 +1294,73 @@ export def title_from_metadata []: record -> string {
   }
 }
 
+# Extract files from a zip archive
+export def unzip [
+  destination: directory
+]: path -> path {
+  let archive = $in
+  let files = $archive | list_files_in_archive
+  ^unzip -q $archive -d $destination
+  $files | par-each {|file|
+    [($destination | path expand) $file] | path join
+  }
+}
+
 # Extract a file from a zip archive
 export def extract_file_from_archive [
-    file: path
-    working_directory: directory # The scratch-space directory to use
+  file: path
+  working_directory: directory # The scratch-space directory to use
 ]: path -> path {
-    let archive = $in
-    ^unzip $archive $file -d $working_directory
-    [$working_directory $file] | path join
+  let archive = $in
+  ^unzip $archive $file -d $working_directory
+  [$working_directory $file] | path join
+}
+
+# Combine a list of audio files into a single M4B file with m4b-tool
+export def merge_into_m4b [
+  output_directory: directory
+  ...args: string
+  --audio-format: string = "m4b" # Use "opus" for opus-encoded audio and "oga" for lossless encoded audio, i.e. wav / flac.
+  --audio-extension: string = "m4b"
+  # --audio-bitrate: string = "128k" # Use "opus" for opus-encoded audio and "oga" for lossless encoded audio, i.e. wav / flac.
+  # --audio-codec: string = "opus" # Use "opus" for opus-encoded audio and "flac" for lossless encoded audio
+]: list<path> -> path {
+  let files = $in
+  let output_file = (
+    {
+      parent: $output_directory
+      stem: ($output_directory | path basename)
+      extension: $audio_extension
+    }
+    | path join
+  )
+  # todo do complete and error checking
+  (
+    ^m4b-tool merge
+    --audio-format $audio_format
+    --audio-extension $audio_extension
+    --jobs ((^nproc | into int) / 2)
+    --no-interaction
+    --output-file $output_file
+    ...$args
+    "--"
+    ...$files
+  )
+  $output_file
+}
+
+# Decrypt and convert an AAX file from Audible to an M4B file.
+export def decrypt_audible_aax [
+  activation_bytes: string # Audible activation bytes
+  --working-directory: directory
+]: path -> path {
+  let aax = $in
+  let stem = $aax | path parse | get stem
+  let m4b = ({ parent: $working_directory, stem: $stem, extension: "m4b" } | path join)
+  # todo do complete and error checking
+  # ^ffmpeg -activation_bytes $activation_bytes -i $aax -c copy $m4b
+  ^ffmpeg -activation_bytes $activation_bytes -i $aax -c:a copy -vn $m4b
+  $m4b
 }
 
 # Extract the ComicInfo.xml file from an archive
@@ -1369,37 +1799,70 @@ export def comic_file_name_from_metadata [
     }
 }
 
+# Convert a FLAC to an OGA
+#
+# ffmpeg drops embedded cover art.
+export def flac_to_oga [
+  output_directory: directory
+  ...args: string # Arguments to pass to opusenc
+]: path -> path {
+  let flac = $in
+  let output_file = $flac | path parse | update parent $output_directory | update extension "oga" | path join
+  # ^opusenc $flac $output_file
+  ^ffmpeg -i $flac -c:a copy ...$args $output_file
+  $output_file
+}
+
+# Transcode a lossy audio format to OPUS
+#
+# Converting between lossy formats further degrades quality and can introduce artifacts.
+# ffmpeg drops embedded cover art.
+# For lossless formats, prefer using opusenc instead of ffmpeg.
+export def ffmpeg_transcode_to_opus [
+  output_directory: directory
+  # bitrate: string = "128k" # Audio bitrate with which to encode
+  ...args: string # Arguments to pass to opusenc
+]: path -> path {
+  let file = $in
+  let output_file = $file | path parse | update parent $output_directory | update extension "opus" | path join
+  # -b:a $bitrate
+  ^ffmpeg -i $file -vn -c:a libopus ...$args $output_file
+  $output_file
+}
+
 # List the files in a zip archive
 export def list_files_in_archive []: path -> list<path> {
-    let archive = $in
-    (
-      ^unzip -l $archive
-      | lines
-      | drop nth 0 1
-      | drop 2
-      | str trim
-      | parse "{length}  {date} {time}   {name}"
-      | get name
-      | uniq
-      | sort
-    )
+  let archive = $in
+  (
+    ^unzip -l $archive
+    | lines
+    | drop nth 0 1
+    | drop 2
+    | str trim
+    | parse "{length}  {date} {time}   {name}"
+    | get name
+    | uniq
+    | sort
+  )
 }
 
 # List the image files in a zip archive
-export def list_image_files_in_archive []: path -> list<path> {
-    let archive = $in
-    (
-      $archive
-        | list_files_in_archive
-        | path parse
-        | where extension in $image_extensions
-        | path join
-    )
+export def list_files_in_archive_with_extensions [
+  extensions: list<string>
+]: path -> list<path> {
+  let archive = $in
+  (
+    $archive
+    | list_files_in_archive
+    | path parse
+    | where extension in $extensions
+    | path join
+  )
 }
 
 # Get the image extension used in a comic book archive
 export def get_image_extension []: path -> string {
-    let cbz = $in
+  let cbz = $in
     let file_extensions = (
         $cbz
         | list_image_files_in_archive
@@ -2229,7 +2692,7 @@ export def merge_or_input [
 # Parse multi-value tags
 export def parse_multi_value_tag [
   separator: string = ";"
-] string -> list {
+]: any -> list {
   let input = $in
   if ($input | is-empty) {
     return null
@@ -2259,7 +2722,20 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       }
     );
     # The first series should be considered the primary series
-    [] | append $series | append $group_series | uniq
+    let series = [] | append $series | append $group_series;
+    if ($series | is-not-empty) {
+      let duplicate_series = (
+        $series | group-by --to-table name | each {|group|
+          if ($group.items | length) > 1 {
+            $group.items
+          }
+        } | flatten | filter {|item| $item != null}
+      )
+      if ($duplicate_series | is-not-empty) {
+        log error $"Multiple series with the same name present: ($duplicate_series). Only the first series will be used and duplicate series will be ignored."
+      }
+      $series | uniq-by name
+    }
   )
   let genres = (
     if "genre" in $metadata {
@@ -2398,12 +2874,17 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
           $metadata.additionalFields."musicBrainz Work Id" | parse_multi_value_tag | wrap id
         }
       )
+      let bookbrainz_work_id = (
+        if "bookBrainz Work Id" in $metadata.additionalFields {
+          $metadata.additionalFields."bookBrainz Work Id" | parse_multi_value_tag | wrap bookbrainz_work_id
+        }
+      )
       let names = (
         if "work" in $metadata.additionalFields {
           $metadata.additionalFields.work | parse_multi_value_tag | wrap name
         }
       )
-      $ids | merge_or_input $names
+      $ids | merge_or_input $names | merge_or_input $bookbrainz_work_id
     }
   )
 
@@ -2516,6 +2997,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
   let book = (
     {}
     | upsert_if_present title $metadata album
+    | upsert_if_present title_sort $metadata sortAlbum
     | upsert_if_present subtitle $metadata
     | upsert_if_value contributors $book_contributors
     | upsert_if_present comment $metadata
@@ -2565,6 +3047,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       duration: $duration
     }
     | upsert_if_present title $metadata
+    | upsert_if_present title_sort $metadata sortTitle
     | upsert_if_present index $metadata trackNumber
     | upsert_if_present embedded_pictures $metadata embeddedPictures
     | upsert_if_value musicbrainz_works $musicbrainz_works
@@ -2680,6 +3163,14 @@ export def convert_series_for_group_tag []: table<name: string, index: string> -
   } | str join ";"
 }
 
+export def join_multi_value []: any -> string {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+  $input | str join ";"
+}
+
 # Convert the internal audiobook metadata representation of a track into the format required for tone
 #
 # The input metadata should be for an individual track, with a book and track record at the top level.
@@ -2689,9 +3180,41 @@ export def convert_series_for_group_tag []: table<name: string, index: string> -
 # Technically, I think ID3v2.4 is supposed to use a null byte, but tone doesn't seem to support that.
 export def into_tone_format []: record -> record {
   let metadata = $in
+  # Prefer release group series
   let group = (
-    if "series" in $metadata.book and $metadata.book.series != null {
-      $metadata.book.series | convert_series_for_group_tag
+    let series = (
+      if "series" in $metadata.book and $metadata.book.series != null {
+        if "scope" in ($metadata.book.series | columns) {
+          let release_group_series = $metadata.book.series | where scope == "release group"
+          if ($release_group_series | is-empty) {
+            # Fallback to the work series if there is no release group series
+            let work_series = $metadata.book.series | where scope == "work"
+            if ($work_series | is-empty) {
+              # Use whatever series there are at this point
+              $metadata.book.series
+            } else {
+              $work_series
+            }
+          } else {
+            $release_group_series
+          }
+        } else {
+          $metadata.book.series
+        }
+      }
+    );
+    if ($series | is-not-empty) {
+      let duplicate_series = (
+        $series | group-by --to-table name | each {|group|
+          if ($group.items | length) > 1 {
+            $group.items
+          }
+        } | flatten | filter {|item| $item != null}
+      )
+      if ($duplicate_series | is-not-empty) {
+        log error $"Multiple series with the same name present: ($duplicate_series). Only the first series will be used and duplicate series will be ignored."
+      }
+      $series | uniq-by name | convert_series_for_group_tag
     }
   )
   let publication_date = (
@@ -2709,16 +3232,52 @@ export def into_tone_format []: record -> record {
       $metadata.book.contributors | where entity == "artist" | where role == "primary author"
     }
   )
+
+  # todo Should genres and tags only be kept at the track level?
+  # Combine track and book genres
+  let genres = (
+    let track_genres = (
+      if "genres" in $metadata.track and ($metadata.track.genres | is-not-empty) and "name" in ($metadata.track.genres | columns) {
+        $metadata.track.genres.name
+      } else {
+        []
+      }
+    );
+    let book_genres = (
+      if "genres" in $metadata.book and ($metadata.book.genres | is-not-empty) and "name" in ($metadata.book.genres | columns) {
+        $metadata.book.genres.name
+      } else {
+        []
+      }
+    );
+    $track_genres | append $book_genres | uniq | join_multi_value
+  )
+
+  # Combine track and book tags
+  let tags = (
+    let track_tags = (
+      if "tags" in $metadata.track and ($metadata.track.tags | is-not-empty) and "name" in ($metadata.track.tags | columns) {
+        $metadata.track.tags.name
+      } else {
+        []
+      }
+    );
+    let book_tags = (
+      if "tags" in $metadata.book and ($metadata.book.tags | is-not-empty) and "name" in ($metadata.book.tags | columns) {
+        $metadata.book.tags.name
+      } else {
+        []
+      }
+    );
+    $track_tags | append $book_tags | uniq | filter {|tag| $tag not-in ["chapters"]} | join_multi_value
+  )
+
   let additionalFields = (
     {}
     # book metadata
-    | upsert_if_value tags (
-      if "tags" in $metadata.book and ($metadata.book.tags | is-not-empty) and "name" in ($metadata.book.tags | columns) {
-        $metadata.book.tags.name | uniq | str join ";"
-      }
-    )
-    | upsert_if_value "MusicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | str join ";")
-    | upsert_if_value "MusicBrainz Album Artist Id" ($primary_authors | get --ignore-errors id | str join ";")
+    | upsert_if_value tags $tags
+    | upsert_if_value "MusicBrainz Album Type" ($metadata.book | get --ignore-errors musicbrainz_release_types | join_multi_value)
+    | upsert_if_value "MusicBrainz Album Artist Id" ($primary_authors | get --ignore-errors id | join_multi_value)
     | upsert_if_present "MusicBrainz Release Group Id" $metadata.book musicbrainz_release_group_id
     | upsert_if_present "MusicBrainz Album Id" $metadata.book musicbrainz_release_id
     | upsert_if_present "MusicBrainz Album Release Country" $metadata.book musicbrainz_release_country
@@ -2726,7 +3285,7 @@ export def into_tone_format []: record -> record {
     | upsert_if_present script $metadata.book
     # For audiobookshelf to be happy, publisher has to go in additionalFields for some reason.
     # todo I'm not sure audiobookshelf supports multiple values for the publisher
-    | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
+    | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | join_multi_value)
     | upsert_if_present ISBN $metadata.book isbn
     | upsert_if_present barcode $metadata.book isbn
     | upsert_if_present asin $metadata.book amazon_asin
@@ -2741,12 +3300,13 @@ export def into_tone_format []: record -> record {
     | upsert_if_present "MusicBrainz Release Track Id" $metadata.track musicbrainz_track_id
     | upsert_if_value "MusicBrainz Artist Id" (
       if "contributors" in $metadata.track and ($metadata.track.contributors | is-not-empty) {
-        $metadata.track.contributors | where role == "writer" | get --ignore-errors id | str join ";"
+        $metadata.track.contributors | where role == "writer" | get --ignore-errors id | join_multi_value
       }
     )
-    | upsert_if_value "MusicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors id | str join ";")
-    | upsert_if_value "MusicBrainz Label Id" ($metadata.track | get --ignore-errors publishers | get --ignore-errors id | str join ";")
-    | upsert_if_value "work" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors name | str join ";")
+    | upsert_if_value "MusicBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors id | join_multi_value)
+    | upsert_if_value "BookBrainz Work Id" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors bookbrainz_work_id | join_multi_value)
+    | upsert_if_value "MusicBrainz Label Id" ($metadata.track | get --ignore-errors publishers | get --ignore-errors id | join_multi_value)
+    | upsert_if_value "work" ($metadata.track | get --ignore-errors musicbrainz_works | get --ignore-errors name | join_multi_value)
     | (
       let input = $in;
       if "contributors" in $metadata.track and ($metadata.track.contributors | is-not-empty) {
@@ -2756,7 +3316,7 @@ export def into_tone_format []: record -> record {
             | where role == $role
             | get name
             | uniq
-            | str join ";"
+            | join_multi_value
           )
           if ($contributors_for_role | is-not-empty) {
             {$role: $contributors_for_role}
@@ -2770,6 +3330,7 @@ export def into_tone_format []: record -> record {
       }
     )
   )
+
   let m = {
     # audio: {
     #   language:
@@ -2780,30 +3341,28 @@ export def into_tone_format []: record -> record {
       # book metadata
       #
       | upsert_if_present album $metadata.book title
+      | upsert_if_present sortAlbum $metadata.book title_sort
       | upsert_if_present subtitle $metadata.book
-      | upsert_if_value albumArtist ($primary_authors | get --ignore-errors name | str join ";")
+      | upsert_if_value albumArtist ($primary_authors | get --ignore-errors name | join_multi_value)
       | upsert_if_present description $metadata.book
       | upsert_if_present longDescription $metadata.book long_description
       | upsert_if_present comment $metadata.book
       | upsert_if_value group $group
-      | upsert_if_value genre (
-        if "genres" in $metadata.book and ($metadata.book.genres | is-not-empty) and "name" in ($metadata.book.genres | columns) {
-          $metadata.book.genres.name | uniq | str join ";"
-        }
-      )
+      | upsert_if_value genre $genres
       | upsert_if_value publishingDate $publication_date
       # audiobookshelf uses recordingDate and not publishingDate for some reason
       | upsert_if_value recordingDate $publication_date
       # language has no effect here I guess?
       # | upsert_if_present language $metadata.book
-      | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
-      | upsert_if_value label ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | str join ";")
+      | upsert_if_value publisher ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | join_multi_value)
+      | upsert_if_value label ($metadata.book | get --ignore-errors publishers | get --ignore-errors name | join_multi_value)
       | upsert_if_present totalDiscs $metadata.book total_discs
       | upsert_if_present totalTracks $metadata.book total_tracks
       #
       # track metadata
       #
       | upsert_if_present title $metadata.track
+      | upsert_if_present sortTitle $metadata.track title_sort
       | upsert_if_present trackNumber $metadata.track index
       | (
         let input = $in;
@@ -2824,7 +3383,7 @@ export def into_tone_format []: record -> record {
               )
               | get name
               | uniq
-              | str join ";"
+              | join_multi_value
             )
             if ($contributors_for_role | is-not-empty) {
               {$role: $contributors_for_role}
@@ -2963,7 +3522,11 @@ export def fetch_release_front_cover [
   let url = "https://coverartarchive.org/release"
   let request = {http get --full --headers [User-Agent $user_agent] $"($url)/($release_id)"}
   let response = retry_http $request $retries $retry_delay
-  let cover = $response | get body | get images | where front == true | select id image thumbnails | first
+  let front_covers = $response | get body | get images | where front == true | select id image thumbnails
+  if ($front_covers | is-empty) {
+    return null
+  }
+  let cover = $front_covers | first
 
   # thumbnail sizes are 1200, 500, and 250
   let download_url = (
@@ -2993,6 +3556,7 @@ export def fetch_musicbrainz_release_group [
 # Get a Release with all of the gory details
 export def fetch_musicbrainz_release [
   includes: list<string> = [
+    aliases
     artist-credits
     labels
     recordings
@@ -3032,6 +3596,334 @@ export def fetch_musicbrainz_release [
   $response.body
 }
 
+# Get a MusicBrainz Work by id
+export def fetch_musicbrainz_work [
+  includes: list<string> = [series-rels genres tags]
+  --retries: int = 3
+  --retry-delay: duration = 5sec
+]: string -> record {
+  let work_id = $in
+  let url = "https://musicbrainz.org/ws/2/work"
+  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($work_id)/?inc=($includes | str join '+')"}
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error fetching MusicBrainz Work: ($url): ($error.debug)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP status code (ansi red)($response.status)(ansi reset) when fetching MusicBrainz Work: ($url)"
+    return null
+  }
+  $response.body
+}
+
+# Parse a MusicBrainz Work
+export def parse_musicbrainz_work []: record -> record<id: string, title: string, language: string, genres: table<name: string, count: int>, tags: table<name: string, count: int>> {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+  let genres_and_tags = $input | select --ignore-errors genres tags | parse_genres_and_tags
+  {
+    id: $input.id
+    title: $input.title
+    language: $input.language
+    genres: $genres_and_tags.genres
+    tags: $genres_and_tags.tags
+  }
+}
+
+# Fetch and parse a MusicBrainz Work by ID
+export def fetch_and_parse_musicbrainz_work [
+  cache: closure
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: string -> record {
+  let musicbrainz_work_id = $in
+  let update_function = {|type id| $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay | parse_musicbrainz_work}
+  do $cache "work" $musicbrainz_work_id $update_function
+}
+
+# Get a Series
+export def fetch_musicbrainz_series [
+  includes: list<string> = [series-rels genres tags]
+  --retries: int = 3
+  --retry-delay: duration = 5sec
+]: string -> record {
+  let series_id = $in
+  let url = "https://musicbrainz.org/ws/2/series"
+  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($series_id)/?inc=($includes | str join '+')"}
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error fetching MusicBrainz Series: ($url): ($error.debug)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP status code (ansi red)($response.status)(ansi reset) when fetching MusicBrainz Series: ($url)"
+    return null
+  }
+  $response.body
+}
+
+# Parse a MusicBrainz series
+export def parse_musicbrainz_series []: record -> record<id: string, name: string, subseries: table<id: string, name: string>, parent_series: table<id: string, name: string>, genres: table<name: string, count: int>, tags: table<name: string, count: int>> {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+  let genres_and_tags = $input | select --ignore-errors genres tags | parse_genres_and_tags
+  let series = {
+    id: $input.id
+    name: $input.name
+    parent_series: []
+    subseries: []
+    genres: $genres_and_tags.genres
+    tags: $genres_and_tags.tags
+  }
+  let relations = $input | get --ignore-errors relations
+  if ($relations | is-empty) {
+    return $series
+  }
+  let series_relations = $relations | where target-type == "series"
+  if ($series_relations | is-empty) {
+    return $series
+  }
+  let parent_series_relations = $series_relations | where direction == "backward"
+  let parent_series = (
+    if ($parent_series_relations | is-empty) {
+      []
+    } else {
+      $parent_series_relations.series | select id name
+    }
+  )
+  let subseries_relations = $series_relations | where direction == "forward"
+  let subseries = (
+    if ($subseries_relations | is-empty) {
+      []
+    } else {
+      $subseries_relations.series | select id name
+    }
+  )
+  $series | upsert parent_series $parent_series | upsert subseries $subseries
+}
+
+# Fetch and parse a MusicBrainz Series by ID.
+export def fetch_and_parse_musicbrainz_series [
+  # cache: directory # Cache directory where parsed series are stored in files named according to mbid, i.e. mbid.json.
+  cache: closure # Closure that returns parsed series information given a type and a series id
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: string -> record {
+  let musicbrainz_series_id = $in
+  # let cached_series_file = {parent: $cache, stem: $musicbrainz_series_id, extension: "json"} | path join
+  let update_cache = {|type id|
+    $id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay | parse_musicbrainz_series
+    # $series | save $cached_series_file
+    # $series
+  }
+  do $cache "series" $musicbrainz_series_id $update_cache
+  # if ($cached | is-empty) {
+  #   # open $cached_series_file
+  # } else {
+  # }
+}
+
+# Build a tree of subseries going up through the parent series
+export def build_series_tree_up [
+  depth: int
+  # cache: directory # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
+  cache: closure # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
+  --required-series: list<string>
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: record -> record {
+  let series = $in
+
+  # log info $"Series: ($series)"
+  # log info $"Depth: ($depth)"
+
+  # Base case: No parent series
+  if ($series | get --ignore-errors parent_series | is-empty) {
+    return $series
+  }
+
+  # Alternate base case, this is the last required series.
+  if ($required_series != null and ($required_series | length) == 1) and ($required_series | first) == $series.id {
+    return $series
+  }
+
+  # Hit max depth
+  if ($depth <= 0) {
+    log error $"Reached max depth at series: ($series). Unwinding!"
+    # I could return null here to signal the error.
+    return $series
+  }
+
+  $series | upsert parent_series (
+    # log info $"$series.parent_series: ($series.parent_series | to nuon)";
+    # $series.parent_series | each {|parent_series|
+      # log info $"$parent_series: ($parent_series | to nuon)";
+      # log info $"$parent_series.id: ($parent_series.id)";
+    # };
+    $series.parent_series | each {|parent_series|
+      # log info $"parent_series: ($parent_series)"
+      if $required_series == null {
+        # log info $"parent_series.id: ($parent_series.id)"
+        $parent_series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree_up ($depth - 1) $cache
+      } else {
+        $parent_series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree_up ($depth - 1) $cache --required-series ($required_series | filter {|id| $id != $series.id})
+      }
+    }
+  )
+}
+
+# Build a tree of subseries under a series
+export def build_series_tree [
+  depth: int
+  # cache: directory # Cache directory where HTTP responses are stored in files named according to mbid, i.e. mbid.json.
+  cache: closure
+  --required-series: list<string>
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: record -> record {
+  let series = $in
+
+  # Base case: No subseries (leaf node)
+  if ($series | get --ignore-errors subseries | is-empty) {
+    return $series
+  }
+
+  # Alternate base case, this is the last required series.
+  if ($required_series != null and ($required_series | length) == 1) and ($required_series | first) == $series.id {
+    return $series
+  }
+
+  # Hit max depth
+  if ($depth <= 0) {
+    log error $"Reached max depth at series: ($series). Unwinding!"
+    # I could return null here to signal the error.
+    return $series
+  }
+
+  $series | upsert subseries (
+    $series.subseries | each {|subseries|
+      if $required_series == null {
+        $subseries.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree ($depth - 1) $cache
+      } else {
+        $subseries.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | build_series_tree ($depth - 1) $cache --required-series ($required_series | filter {|id| $id != $series.id})
+      }
+    }
+  )
+}
+
+# # Nest one subseries in another
+# export def nest_subseries [
+#   series_to_nest: table
+# ]: record -> record {
+#   let series = $in
+#   # Base case: No subseries (leaf node)
+#   # if ($series | all {|s| $s | get --ignore-errors subseries | is-empty}) {
+#   if ($series | get --ignore-errors subseries | is-empty) {
+#     let s = $series_to_nest | where id == $series.id
+#     if ($s | is-empty) {
+#       return {}
+#       # return $series
+#     }
+#     return ($s | first)
+#   }
+
+#   $series | upsert nested_subseries (
+#     $series.subseries | each {|s|
+#       $s | nest_subseries $series_to_nest
+#     }
+#   )
+# }
+
+export def series_is_in_series [
+  id: string
+]: record -> bool {
+  let series = $in
+  # Base case: No subseries (leaf node)
+  # if ($series | all {|s| $s | get --ignore-errors subseries | is-empty}) {
+  if ($series | get --ignore-errors nested_subseries | is-empty) {
+    return ($series.id == $id)
+  }
+
+  $series.nested_subseries | any {|s|
+    $s | series_is_in_series $id
+  }
+}
+
+
+# Organize series into a hierarchy based on subseries relationships
+#
+# Parent series are at the top of the hierarchy.
+# Subseries are nested under their parent series.
+# Series are sorted by name when multiple are at the same tier.
+export def create_series_tree [
+  # cache: directory # todo Use a cache closure to allow unit testing
+  cache: closure
+  max_depth: int = 10
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: table -> table {
+  let all_series = $in
+
+  # let all_series_and_subseries = $all_series | append (
+  #   # Recursively traverse the series relationships, calling fetch_musicbrainz_series as necessary to fill in missing series
+  #   # Need to call out to MusicBrainz for all series data
+  # ) | uniq-by id
+
+  # let all_series = $all_series_and_subseries | each {|s|
+  #   $s | nest_subseries $all_series_and_subseries
+  # }
+  # let top_level_series = $all_series | filter {|s|
+  #   not ($s | series_is_in_series $s.id)
+  # }
+
+  # $top_level_series
+
+  let ancestors_and_series = $all_series | each {|series|
+    {
+      ancestors: (
+        $series
+        | build_series_tree_up $max_depth $cache --required-series ($all_series | get id) --retries $retries --retry-delay $retry_delay
+        | get_top_parents
+        | sort-by name
+      )
+      series: $series
+    }
+  # Group by shared ancestor(s)
+  } | group-by ancestors --to-table | each {|ancestors_and_series_group|
+    {
+      # Could try merging here maybe...
+      ancestors: ($ancestors_and_series_group.items | first | get ancestors)
+      series: ($ancestors_and_series_group.items | get series)
+    }
+  } | each {|ancestors_and_series|
+    let full_series_tree = $ancestors_and_series.ancestors | build_series_tree $max_depth $cache --required-series ($ancestors_and_series.series | get id) --retries $retries --retry-delay $retry_delay
+    # Finally, calculate the degrees of separation between the common ancestor
+    let series = $ancestors_and_series.series | each {|s|
+      let depth = $ancestors_and_series.ancestors | distance_to_top $s
+      $s | upsert depth $depth
+    }
+    {
+      ancestor: $full_series_tree
+      series: ($series | sort-by depth)
+    }
+  } | sort-by --custom {|pair|
+    # When there are multiple top-level series, the primary series is assumed to be the one with the shortest depth between it and it's common ancestor.
+    # Each group will be sorted by the min depth of its series, followed by series without any depth, and any ties will be sorted based on the name of the ancestral series
+  }
+  # todo Take into account series which have an index vs. those that don't.
+}
+
 # Parse the ASIN out of an Audible URL
 export def parse_audible_asin_from_url []: string -> string {
   let url = $in
@@ -3048,7 +3940,7 @@ export def retry [
   should_retry: closure # A closure which determines whether to retry or not based on the result of the request closure. True means retry, false means stop.
   retries: int # The number of retries to perform
   delay: duration # The amount of time to wait between successive executions of the request closure
-] nothing -> any {
+]: nothing -> any {
   for attempt in 1..($retries - 1) {
     let response = do $request
     if not (do $should_retry $response) {
@@ -3065,7 +3957,7 @@ export def retry_http [
   retries: int # The number of retries to perform
   delay: duration # The amount of time to wait between successive executions of the request closure
   http_status_codes_to_retry: list<int> = [408 429 500 502 503 504] # HTTP status codes where the request will be retries
-] nothing -> any {
+]: nothing -> any {
   let should_retry = {|result|
     $result.status in $http_status_codes_to_retry
   }
@@ -3177,7 +4069,16 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<file: 
   if ($tracks | is-empty) {
     return null
   }
-  let all_possible_release_ids = $tracks | get matches | flatten | get recordings | flatten | get releases | flatten | get id | uniq
+  let all_possible_release_ids = (
+    $tracks | get matches | flatten | get recordings | flatten
+  )
+  let all_possible_release_ids = (
+    if "releases" in ($all_possible_release_ids | columns) {
+      $all_possible_release_ids | get releases | flatten | get id | uniq
+    } else {
+      return null
+    }
+  )
   $all_possible_release_ids | filter {|release_id|
     $tracks | all {|track|
       $release_id in ($track | get matches | get recordings | flatten | get releases | flatten | get id)
@@ -3345,10 +4246,11 @@ export def parse_contributors []: table -> table<id: string, name: string, entit
 
 # Parse series from MusicBrainz relationships
 #
-# Multiple series are sorted according to index, in descending order.
-# The goal of this is to order subseries after parent series.
-# Of course, this won't help where indices are missing or indices match.
-export def parse_series_from_musicbrainz_relations [] table -> table<id: string, name: string, index: string> {
+# Multiple series are sorted according to index, in descending order, followed by name length, and finally name.
+# The goal of this is to order parent series before subseries.
+# This is due to the limited series information available when querying a release from MusicBrainz.
+# Actually subseries information must be obtained through separate API calls to MusicBrainz.
+export def parse_series_from_musicbrainz_relations []: table -> table<id: string, name: string, index: string> {
   let relations = $in
   if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
     return null
@@ -3361,20 +4263,53 @@ export def parse_series_from_musicbrainz_relations [] table -> table<id: string,
   if ($series | is-empty) {
     return null
   }
-  $series | par-each {|s|
-    let name = (
-      if "target-credit" in $s and ($s.target-credit | is-not-empty) {
-        $s.target-credit
-      } else {
-        $s.series.name
+  (
+    $series | par-each {|s|
+      let name = (
+        if "target-credit" in $s and ($s.target-credit | is-not-empty) {
+          $s.target-credit
+        } else {
+          $s.series.name
+        }
+      )
+      {
+        name: $name
+        id: $s.series.id
+        index: ($s.attribute-values | get --ignore-errors number)
       }
-    )
-    {
-      name: $name
-      id: $s.series.id
-      index: ($s.attribute-values | get --ignore-errors number)
     }
-  } | uniq | sort-by --reverse index
+    | uniq
+    # Try to order the series with the top-level parent series followed by the subseries.
+    # Most entities that appear in both a parent series and a subseries will have indices in both.
+    # When a series has multiple subseries, the parent series will have the larger indices after the first subseries.
+    # Additionally, it can be cleverly deduced that most subseries will have names that are longer than their parent series.
+    # This owes to the pension of including the name of the parent series as part of the name of the subseries.
+    # The actual subseries relationships can and should be figured out later by making separate API calls to MusicBrainz to get the series relationships.
+    | sort-by --custom {|a, b|
+      if ($a.index == $b.index) {
+        let a_length = ($a.name | str length)
+        let b_length = ($b.name | str length)
+        if $a_length == $b_length {
+          # If they have the same name, that's really bizarre...
+          if ($a.name | str downcase) == ($b.name | str downcase) {
+            # Someone should probably fix this.
+            log warning $"Multiple series have the same name: ($a) and ($b). If this is a duplicate or erroneous, please correct it. Thanks!"
+            # Sort by ID I guess...
+            $a.id < $b.id
+          } else {
+            # Sort by the name itself.
+            ($a.name | str downcase) < ($b.name | str downcase)
+          }
+        } else {
+          # Sort by shortest to longest name.
+          $a_length < $b_length
+        }
+      } else {
+        # Sort by index in reverse.
+        $a.index >= $b.index
+      }
+    }
+  )
 }
 
 # Parse series from MusicBrainz release, release group, and works
@@ -3388,138 +4323,116 @@ export def parse_series_from_musicbrainz_relations [] table -> table<id: string,
 # The goal of this is to order subseries after parent series.
 # Of course, this won't help where indices are missing or indices match.
 # Unfortunately, separate lookups for each series are necessary to determine if a series is a subseries.
-export def parse_series_from_musicbrainz_release [
-  scopes: list<string> = ["release-group"] # Scopes to parse series from, i.e. "release", "release-group", and "works"
-]: record -> table {
+export def parse_series_from_musicbrainz_release []: record -> table<name: string, id: string, index: string, scope: string> {
   let metadata = $in
-  assert ($scopes | is-not-empty)
   if ($metadata | is-empty) {
     return null
   }
-  (
-    []
-    | append (
-      if "release" in $scopes {
-        $metadata | get --ignore-errors relations | parse_series_from_musicbrainz_relations
-      }
-    )
-    | append (
-      if "release-group" in $scopes {
-        (
-          $metadata
-          | get --ignore-errors release-group
-          | get --ignore-errors relations
-          | parse_series_from_musicbrainz_relations
-        )
-      }
-    )
-    | append (
-      if "works" in $scopes {
-        (
-          $metadata
-          | get --ignore-errors media
-          | get --ignore-errors tracks
-          | flatten
-          | get --ignore-errors recording
-          | get --ignore-errors relations
-          | flatten
-          | parse_works_from_musicbrainz_relations
-          | get --ignore-errors relations
-          | flatten
-          | parse_series_from_musicbrainz_relations
-        )
-      }
-    )
+  let release_series = (
+    $metadata
+    | get --ignore-errors relations
+    | parse_series_from_musicbrainz_relations
+    | default "release" scope
   )
+  let release_group_series = (
+    $metadata
+    | get --ignore-errors release-group
+    | get --ignore-errors relations
+    | parse_series_from_musicbrainz_relations
+    | default "release group" scope
+  )
+  # There could also be recording series, but I haven't come across that yet
+  let work_series = (
+    $metadata
+    | get --ignore-errors media
+    | get --ignore-errors tracks
+    | flatten
+    | get --ignore-errors recording
+    | get --ignore-errors relations
+    | flatten
+    | parse_works_from_musicbrainz_relations
+    | get --ignore-errors relations
+    | flatten
+    | parse_series_from_musicbrainz_relations
+    | default "work" scope
+  )
+  $release_series | append $release_group_series | append $work_series # | sort-by scope
 }
-
-export const musicbrainz_non_genre_tags = ["abridged", "chapters", "explicit", "unabridged"]
 
 # Parse genres from a MusicBrainz release, release group, and recordings
 #
 # The genres should also be parsed from associated series and works, but these require separate API calls.
 #
 # MusicBrainz doesn't really provide genres for audiobooks yet, so most genres are directly imported from tags.
-export def parse_genres_from_musicbrainz_release [
-  --musicbrainz-genres-only # Parse only official MusicBrainz genres instead of using tags
-]: record -> table {
+export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<genres: table<name: string, count: int, scope: string>, tags: table<name: string, count: int, scope: string>> {
   let metadata = $in
   if ($metadata | is-empty) {
     return null
   }
-  if $musicbrainz_genres_only {
-    let genres = (
-      []
-      | append (
-        $metadata
-        | get --ignore-errors genres
-      )
-      | append (
-        $metadata
-        | get --ignore-errors release-group
-        | get --ignore-errors genres
-      )
-      # recordings
-      | append (
-        $metadata
-        | get --ignore-errors media
-        | get --ignore-errors tracks
-        | flatten
-        | get --ignore-errors recording
-        | get --ignore-errors genres
-        | flatten
-      )
+  let release = (
+    $metadata
+    | get --ignore-errors tags
+    | wrap tags
+    | parse_genres_and_tags
+    | default "release" scope
+  )
+  let release_group = (
+    $metadata
+    | get --ignore-errors release-group
+    | get --ignore-errors tags
+    | wrap tags
+    | parse_genres_and_tags
+    | default "release group" scope
+  )
+  let recording = (
+    $metadata
+    | get --ignore-errors media
+    | get --ignore-errors tracks
+    | flatten
+    | get --ignore-errors recording
+    | get --ignore-errors tags
+    | flatten
+    | wrap tags
+    | parse_genres_and_tags
+    | default "recording" scope
+  )
+  let genres = (
+    $release
+    | get --ignore-errors genres
+    | default "release" scope
+    | append (
+      $release_group
+      | get --ignore-errors genres
+      | default "release group" scope
     )
-    if ($genres | is-empty) or "name" not-in ($genres | columns) or "count" not-in ($genres | columns) {
-      return null
-    }
-    (
-      $genres
-      | select name count
-      | uniq
-      # sort by the count, highest to lowest, and then name alphabetically
-      | sort-by --custom {|a, b|
-        $a.count >= $b.count and $a.name < $b.name
-      }
+    | append (
+      $recording
+      | get --ignore-errors genres
+      | default "recording" scope
     )
-  } else {
-    let genres = (
-      []
-      | append (
-        $metadata
-        | get --ignore-errors tags
-      )
-      | append (
-        $metadata
-        | get --ignore-errors release-group
-        | get --ignore-errors tags
-      )
-      # recordings
-      | append (
-        $metadata
-        | get --ignore-errors media
-        | get --ignore-errors tracks
-        | flatten
-        | get --ignore-errors recording
-        | get --ignore-errors tags
-        | flatten
-      )
+    | filter {|row| ($row | is-not-empty) and "name" in $row and "count" in $row}
+    | select --ignore-errors name count scope
+  )
+  let tags = (
+    $release
+    | get --ignore-errors tags
+    | default "release" scope
+    | append (
+      $release_group
+      | get --ignore-errors tags
+      | default "release group" scope
     )
-    if ($genres | is-empty) or "name" not-in ($genres | columns) or "count" not-in ($genres | columns) {
-      return null
-    }
-    (
-      $genres
-      | select name count
-      | uniq
-      | filter {|tag|
-        $tag.name not-in $musicbrainz_non_genre_tags
-      }
-      # sort by the count, highest to lowest, and then name alphabetically
-      | sort-by --custom {|a, b|
-        $a.count >= $b.count and $a.name < $b.name
-      }
+    | append (
+      $recording
+      | get --ignore-errors tags
+      | default "recording" scope
     )
+    | filter {|row| ($row | is-not-empty) and "name" in $row and "count" in $row}
+    | select --ignore-errors name count scope
+  )
+  {
+    genres: $genres
+    tags: $tags
   }
 }
 
@@ -3562,7 +4475,11 @@ export def parse_tags_from_musicbrainz_release []: record -> table {
     | uniq
     # sort by the count, highest to lowest, and then name alphabetically
     | sort-by --custom {|a, b|
-      $a.count >= $b.count and $a.name < $b.name
+      if $a.count == $b.count {
+        $a.name < $b.name
+      } else {
+        $a.count > $b.count
+      }
     }
   )
 }
@@ -3690,47 +4607,67 @@ export def parse_musicbrainz_release []: record -> record {
         ) | uniq
         let musicbrainz_works = (
           if ($works | is-not-empty) {
-            $works | select id title | uniq
-          }
-        )
-        let genres = (
-          if "recording" in $track and "tags" in $track.recording and ($track.recording.tags | is-not-empty) {
-            $track
-            | get --ignore-errors recording
-            | get --ignore-errors tags
-            | select name count
-            | uniq
-            | filter {|tag|
-              $tag.name not-in $musicbrainz_non_genre_tags
-            }
-            # sort by the count, highest to lowest, and then name alphabetically
-            | sort-by --custom {|a, b|
-              $a.count >= $b.count and $a.name < $b.name
-            }
-          }
-        )
-        let tags = (
-          if "recording" in $track and "tags" in $track.recording and ($track.recording.tags | is-not-empty) {
-            $track
-            | get --ignore-errors recording
-            | get --ignore-errors tags
-            | select name count
-            | uniq
-            # sort by the count, highest to lowest, and then name alphabetically
-            | sort-by --custom {|a, b|
-              $a.count >= $b.count and $a.name < $b.name
-            }
-            # Filter out genres from the tags
-            | (
-              let input = $in;
-              if ($genres | is-not-empty) {
-                $input | filter {|tag|
-                  $tag.name not-in $genres.name
+            (
+              $works
+              | each {|work|
+                if ($work | get --ignore-errors relations | is-empty) {
+                  $work | default [] bookbrainz_work_id
+                } else {
+                  let bookbrainz_work_id = (
+                    let url_relations = $work.relations | where target-type == "url";
+                    if ($url_relations | is-not-empty) {
+                      let bookbrainz_url_relations = $url_relations | where type == "BookBrainz"
+                      if ($bookbrainz_url_relations | is-not-empty) {
+                        let bookbrainz_urls = $bookbrainz_url_relations | get --ignore-errors url
+                        if ($bookbrainz_urls | is-not-empty) {
+                          let bookbrainz_work_urls = $bookbrainz_urls | filter {|url|
+                            (
+                              ($url.resource | str starts-with "https://bookbrainz.org/work/")
+                              or ($url.resource | str starts-with "http://bookbrainz.org/work/")
+                            )
+                          }
+                          if ($bookbrainz_work_urls | is-not-empty) {
+                            if ($bookbrainz_work_urls | length) > 1 {
+                              log warning $"Multiple BookBrainz Works are linked for the MusicBrainz Work ($work.id)"
+                            }
+                            $bookbrainz_work_urls.id | first
+                          }
+                        }
+                      }
+                    }
+                  )
+                  $work | insert bookbrainz_work_id $bookbrainz_work_id
                 }
-              } else {
-                $input
               }
+              | select id title bookbrainz_work_id
+              | uniq
             )
+          }
+        )
+        let genres_and_tags = (
+          if "recording" in $track and "tags" in $track.recording and ($track.recording.tags | is-not-empty) {
+            let tags = (
+              $track
+              | get --ignore-errors recording
+              | get --ignore-errors tags
+              | select name count
+            )
+            let genres_and_tags = (
+              {
+                genres: []
+                tags: $tags
+              }
+              | parse_genres_and_tags
+            )
+            {
+              genres: ($genres_and_tags.genres | default recording scope | filter {|row| "name" in $row and "count" in $row})
+              tags: ($genres_and_tags.tags | default recording scope | filter {|row| "name" in $row and "count" in $row})
+            }
+          } else {
+            {
+              genres: []
+              tags: []
+            }
           }
         )
         let title = (
@@ -3738,6 +4675,22 @@ export def parse_musicbrainz_release []: record -> record {
             $track.title
           } else {
             $metadata.title
+          }
+        )
+        # The sort name can only be found in aliases.
+        let title_sort = (
+          if "recording" in $track and ($track.recording | is-not-empty) and "aliases" in $track.recording and ($track.recording | is-not-empty) {
+            let matching_aliases = (
+              $track.recording.aliases
+              | where name == $title
+              | filter {|alias| $alias.name != $alias.sort-name}
+            )
+            if ($matching_aliases | is-not-empty) {
+              if ($matching_aliases | length) > 1 {
+                log warning $"Multiple aliases match the title exactly for the recording: ($matching_aliases). Using the first one. Please correct this issue on MusicBrainz."
+              }
+              $matching_aliases.sort-name | first
+            }
           }
         )
         let musicbrainz_artist_ids = $track | get --ignore-errors artist-credit.artist.id | uniq
@@ -3755,9 +4708,10 @@ export def parse_musicbrainz_release []: record -> record {
           | upsert_if_present media $media format
           | upsert_if_present musicbrainz_track_id $track id
           | upsert_if_present title $track
+          | upsert_if_value title_sort $title_sort
           | upsert_if_present musicbrainz_recording_id $track.recording id
-          | upsert_if_value genres $genres
-          | upsert_if_value tags $tags
+          | upsert_if_value genres $genres_and_tags.genres
+          | upsert_if_value tags $genres_and_tags.tags
           | upsert_if_value musicbrainz_works $musicbrainz_works
           | upsert_if_value contributors $track_contributors
           | upsert_if_value duration $length
@@ -3848,58 +4802,7 @@ export def parse_musicbrainz_release []: record -> record {
       $audible_asins | first
     }
   )
-  let genres = $metadata | parse_genres_from_musicbrainz_release
-  let tags = (
-    $metadata
-    | parse_tags_from_musicbrainz_release
-    # Filter out genres from the tags
-    | (
-      let input = $in;
-      if ($genres | is-not-empty) {
-        $input | filter {|tag|
-          $tag.name not-in $genres.name
-        }
-      } else {
-        $input
-      }
-    )
-    # sort by the count, highest to lowest, and then name alphabetically
-    | (
-        let input = $in;
-        if ($input | is-not-empty) {
-          $input | sort-by --custom {|a, b|
-            $a.count >= $b.count and $a.name < $b.name
-          }
-        } else {
-          $input
-        }
-    )
-  )
-  let release_tags = (
-    let tags = $metadata | get --ignore-errors tags;
-    if ($tags | is-not-empty) and "name" in ($tags | columns) and "count" in ($tags | columns) {
-      (
-        $tags
-        | select name count
-        | uniq
-        # Filter out genres from the tags
-        | (
-          let input = $in;
-          if ($genres | is-not-empty) {
-            $input | filter {|tag|
-              $tag.name not-in $genres.name
-            }
-          } else {
-            $input
-          }
-        )
-        # sort by the count, highest to lowest, and then name alphabetically
-        | sort-by --custom {|a, b|
-          $a.count >= $b.count and $a.name < $b.name
-        }
-      )
-    }
-  )
+  let genres_and_tags = $metadata | parse_genres_and_tags_from_musicbrainz_release
 
   # Chapters can come from multi-track releases, otherwise, they need to found in another release
   let chapters = (
@@ -3943,6 +4846,23 @@ export def parse_musicbrainz_release []: record -> record {
     }
   )
 
+  # The sort name can only be found in aliases.
+  let title_sort = (
+    if "aliases" in $metadata and ($metadata.aliases | is-not-empty) {
+      let matching_aliases = (
+        $metadata.aliases
+        | where name == $metadata.title
+        | filter {|alias| $alias.name != $alias.sort-name}
+      )
+      if ($matching_aliases | is-not-empty) {
+        if ($matching_aliases | length) > 1 {
+          log warning $"Multiple aliases match the title exactly: ($matching_aliases). Using the first one. Please correct this issue on MusicBrainz."
+        }
+        $matching_aliases.sort-name | first
+      }
+    }
+  )
+
   # Book metadata
   let book = (
     {}
@@ -3954,15 +4874,15 @@ export def parse_musicbrainz_release []: record -> record {
     )
     | upsert_if_value musicbrainz_release_types $musicbrainz_release_types
     | upsert_if_present title $metadata
+    | upsert_if_value title_sort $title_sort
     | upsert_if_value contributors $contributors
     | upsert_if_present isbn $metadata barcode
     | upsert_if_value musicbrainz_release_country $musicbrainz_release_country
     | upsert_if_value musicbrainz_release_status $musicbrainz_release_status
     | upsert_if_present amazon_asin $metadata asin
     | upsert_if_value audible_asin $audible_asin
-    | upsert_if_value genres $genres
-    | upsert_if_value tags $tags
-    | upsert_if_value release_tags $release_tags
+    | upsert_if_value genres $genres_and_tags.genres
+    | upsert_if_value tags $genres_and_tags.tags
     | upsert_if_value publication_date $publication_date
     | upsert_if_value series $series
     | upsert_if_value chapters $chapters
@@ -3992,6 +4912,7 @@ export def parse_musicbrainz_release []: record -> record {
 # Fetch the given release id from MusicBrainz and parse it into a normalized data structure
 export def fetch_and_parse_musicbrainz_release [
   includes: list<string> = [
+    aliases
     artist-credits
     labels
     recordings
@@ -4051,28 +4972,34 @@ export def get_acoustid_fingerprint [
   }
 }
 
+# Get the embedded AcoustID fingerprint or calculate it for a track which does not have one.
+export def get_acoustid_fingerprint_track [
+  ignore_existing = false # Recalculate the AcoustID even when the tag exists
+]: record -> record {
+  let track = $in
+  if (
+    not $ignore_existing
+    and ($track | get --ignore-errors acoustid_fingerprint | is-not-empty)
+    and ($track | get --ignore-errors duration | is-not-empty)
+  ) {
+    $track
+  } else {
+    let pair = [$track.file] | fpcalc | first
+    (
+      $track
+      | upsert acoustid_fingerprint $pair.fingerprint
+      | upsert duration $pair.duration
+    )
+  }
+}
+
 # Get the embedded AcoustID fingerprint or calculate it for the tracks which do not have one.
 export def get_acoustid_fingerprint_tracks [
   ignore_existing = false # Recalculate the AcoustID even when the tag exists
 ]: table -> table {
   let tracks = $in
   $tracks | par-each {|track|
-    if (
-      not $ignore_existing
-      and "acoustid_fingerprint" in $track
-      and ($track.acoustid_fingerprint | is-not-empty)
-      and "duration" in $track
-      and ($track.duration | is-not-empty)
-    ) {
-      $track
-    } else {
-      let pair = [$track.file] | fpcalc | first
-      (
-        $track
-        | upsert acoustid_fingerprint $pair.fingerprint
-        | upsert duration $pair.duration
-      )
-    }
+    $track | get_acoustid_fingerprint_track $ignore_existing
   }
 }
 
@@ -4114,7 +5041,7 @@ export def get_musicbrainz_ids_by_acoustid [
     return null
   }
   let release_id = $release_ids | first
-  let track_recordings_for_release = (
+  let track_recording_ids_for_release = (
     $acoustid_responses | flatten | each {|track|
       let recording_ids = (
         $track
@@ -4127,34 +5054,32 @@ export def get_musicbrainz_ids_by_acoustid [
       );
       {
         file: $track.file
-        id: $track.matches.id
-        recordings: $recording_ids
+        acoustid_track_id: $track.matches.id
+        musicbrainz_recording_ids: $recording_ids
       }
     }
   )
-  let each_track_has_exactly_one_recording_for_the_release = $track_recordings_for_release | all {|track|
-    ($track.recordings | length) == 1
+  let each_track_has_exactly_one_recording_for_the_release = $track_recording_ids_for_release | all {|track|
+    ($track.musicbrainz_recording_ids | length) == 1
   }
   if (not $each_track_has_exactly_one_recording_for_the_release) {
     log error "Failed to link each AcoustID track to exactly one recording for the release"
     return null
   }
-  let file_metadata = (
-    $track_recordings_for_release
-    | flatten
-    | rename file acoustid_track_id musicbrainz_recording_id
-    | select file acoustid_track_id musicbrainz_recording_id
-    | join --right $tracks file
-    # | rename file acoustid_track_id musicbrainz_recording_id acoustid_fingerprint duration
-    # | par-each {|track|
-    #   {
-    #     file: $track.file
-    #     acoustid_track_id: $track.acoustid_track_id
-    #     acoustid_fingerprint: $track.acoustid_fingerprint
-    #     musicbrainz_recording_id: $track.musicbrainz_recording_id
-    #     audio_duration: $track.duration
-    #   }
-    # }
+  let track_recording_ids_for_release = $track_recording_ids_for_release | each {|track|
+    (
+      $track
+      | insert musicbrainz_recording_id ($track.musicbrainz_recording_ids | first)
+      | reject musicbrainz_recording_ids
+    )
+  }
+
+  # Add the AcoustID Track IDs and MusicBrainz Recording IDs for each track.
+  let tracks = (
+    $tracks
+    | reject --ignore-errors acoustid_track_id musicbrainz_recording_id
+    # | flatten
+    | join --left $track_recording_ids_for_release file
   )
 
   {
@@ -4235,7 +5160,7 @@ export def has_distributor_in_common [
 export def filter_musicbrainz_releases [
   metadata: record<book: record, tracks: table> # Audiobook metadata
   duration_threshold: duration = 3sec # The allowed drift between the duration of tracks
-] table<book: record, tracks: table> -> list<string> {
+]: table<book: record, tracks: table> -> list<string> {
   let candidates = $in
   # log info $"candidates: ($candidates | to nuon)"
   # log info $"metadata: ($metadata | reject tracks.embedded_pictures | to nuon)"
@@ -4303,32 +5228,40 @@ export def filter_musicbrainz_releases [
 # 4. Via MusicBrainz search using the existing metadata
 #
 # If results for none of these methods is conclusive, it's recommended to provide the MusicBrainz Release ID.
-# AcoustID fingerprints will be submitted automatically.
+# AcoustID fingerprints will be submitted automatically when they are not already embedded in the file along with the corresponding MusicBrainz Recording IDs.
+# AcoustID fingerprints are also not submitted when they are successfully retrieved from the server.
 #
 # When an audiobook consists of multiple files, the caller must order the files correctly when the track number tag is missing and MusicBrainz Recording IDs can't be determined via AcoustID or embedded tags.
 # I might add logic here in the future to allow ordering recordings based on the natural order of the titles, but track number is usually embedded.
 export def tag_audiobook [
-  audiobook_files: list<path>
-  client_key: string # The application API key for the AcoustID server
   working_directory: directory
+  cache: closure # Function to call to check for or update cached values. Looks like {|type, id, update_function| ...}
+  submit_all_acoustid_fingerprints = false # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
+  combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
   ignore_embedded_acoustid_fingerprints = false # Recalculate AcoustID fingerprints for all files
   ignore_embedded_musicbrainz_ids = false # Ignore existing MusicBrainz IDs embedded in the files
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
   --search-score-threshold: int = 100 # An int value between zero and one hundred, the minimum score required to be considered a match when searching MusicBrainz
   --max-track-duration-difference: duration = 3sec # The maximum allowable difference between track durations
   --acoustid-score-threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match when searching AcoustID fingerprints
+  --acoustid-client-key: string # The application API key for the AcoustID server
   --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
   --musicbrainz-release-id: string = "" # The MusicBrainz Release ID associated with the release
   --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
-]: nothing -> record<book: record, tracks: table> {
+]: list<path> -> record<book: record, tracks: table> {
+  let audiobook_files = $in
   if ($audiobook_files | is-empty) {
     log error "No audiobook files provided!"
     return null
   }
 
   let metadata = $audiobook_files | parse_audiobook_metadata_from_files
+
+  # Create a copy of the original embedded metadata to see if AcoustID Fingerprints should be submitted at then end
+  let original_metadata = $metadata
+
   # log info $"$metadata: ($metadata)"
 
   if "tracks" not-in $metadata or ($metadata.tracks | is-empty) {
@@ -4343,89 +5276,104 @@ export def tag_audiobook [
       # Or otherwise ensure they won't be an issue when tagging
       $metadata | upsert book.musicbrainz_release_id $musicbrainz_release_id
     } else {
-      # If missing Release and/or Recording IDs, try using AcoustID
-      let metadata = (
-        if (
-          "musicbrainz_release_id" not-in $metadata.book
-          or ($metadata.book.musicbrainz_release_id | is-empty)
-          or (
-            $metadata.tracks
-            | any {|track|
-              "musicbrainz_recording_id" not-in $track or ($track.musicbrainz_recording_id | is-empty)
-            }
-          )
-        ) {
-          let retrieved = $metadata | get_musicbrainz_ids_by_acoustid $client_key $ignore_embedded_acoustid_fingerprints $fail_fast --threshold $acoustid_score_threshold --api-requests-per-second $api_requests_per_second --retries $retries --retry-delay $retry_delay
-          if ($retrieved | is-empty) {
-            $metadata
-          } else {
-            $retrieved
-          }
-        } else {
-          $metadata
-        }
-      )
-      let metadata = (
-        if (
-          "musicbrainz_release_id" not-in $metadata.book
-          or ($metadata.book.musicbrainz_release_id | is-empty)
-        ) {
-          log info $"Unable to determine MusicBrainz Recording and Release IDs using AcoustID fingerprints"
-          let release_candidates = $metadata | search_for_musicbrainz_release --retries $retries --retry-delay $retry_delay
-          if ($release_candidates | is-empty) {
-            log error $"Unable to find any matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-            $metadata
-          } else {
-            let release_candidates = $release_candidates | where score >= $search_score_threshold
-            if ($release_candidates | is-empty) {
-              log error $"Unable to find any matching MusicBrainz releases with a perfect score. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-              $metadata
-            } else if ($release_candidates | length) > 20 {
-              log error $"Found over 20 matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-              $metadata
-            } else if ($release_candidates | length) == 1 {
-              let release_candidate = $release_candidates.id | first | get id
-              log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset)"
-              $metadata | upsert book.musicbrainz_release_id $release_candidate
-            } else {
-              log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
-              let $release_candidates = $release_candidates | get id | each {|candidate|
-                let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [label-rels recordings url-rels]
-                if ($received_metadata | is-empty) {
-                  log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
-                  null
-                } else {
-                  $received_metadata
-                }
-              }
-              if ($release_candidates | any {|r| $r == null}) {
-                return null
-              }
-              let release_candidates = $release_candidates | filter_musicbrainz_releases $metadata $max_track_duration_difference
-              if ($release_candidates | is-empty) {
-                log error $"Unable to find any matching MusicBrainz releases after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-                $metadata
-              } else if ($release_candidates | length) == 1 {
-                let release_candidate = $release_candidates | first
-                log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset) after filtering"
-                $metadata | upsert book.musicbrainz_release_id $release_candidate
-              } else {
-                # todo Interactively allow selecting an available release
-                log error $"Multiple matching MusicBrainz releases remaining after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-                $metadata
-              }
-            }
-          }
-        } else {
-          $metadata
-        }
-      )
       $metadata
     }
   )
 
-  # We need to keep metadata that isn't available from MusicBrainz like AcoustID fingerprint and AcoustID track ID.
-  # Passing on the duration is also good.
+  # If missing MusicBrainz Release and/or Recording IDs, try using AcoustID
+  let acoustid_metadata = (
+    if (
+      ($musicbrainz_release_id | is-empty)
+      and (
+        ($metadata.book | get --ignore-errors musicbrainz_release_id | is-empty)
+        or (
+          $metadata.tracks
+          | any {|track|
+            "musicbrainz_recording_id" not-in $track or ($track.musicbrainz_recording_id | is-empty)
+          }
+        )
+      )
+    ) {
+      (
+        $metadata
+        | (
+          get_musicbrainz_ids_by_acoustid
+          $acoustid_client_key
+          $ignore_embedded_acoustid_fingerprints
+          $fail_fast
+          --threshold $acoustid_score_threshold
+          --api-requests-per-second $api_requests_per_second
+          --retries $retries
+          --retry-delay $retry_delay
+        )
+      )
+    }
+  )
+  let metadata = (
+    if ($acoustid_metadata | is-empty) {
+      $metadata
+    } else {
+      $acoustid_metadata
+    }
+  )
+
+  let metadata = (
+    if (
+      ($musicbrainz_release_id | is-empty)
+      and ($metadata.book | get --ignore-errors musicbrainz_release_id | is-empty)
+    ) {
+      log info $"Unable to determine MusicBrainz Recording and Release IDs using AcoustID fingerprints"
+      let release_candidates = $metadata | search_for_musicbrainz_release --retries $retries --retry-delay $retry_delay
+      if ($release_candidates | is-empty) {
+        log error $"Unable to find any matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+        $metadata
+      } else {
+        let release_candidates = $release_candidates | where score >= $search_score_threshold
+        if ($release_candidates | is-empty) {
+          log error $"Unable to find any matching MusicBrainz releases with a perfect score. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+          $metadata
+        } else if ($release_candidates | length) > 20 {
+          log error $"Found over 20 matching MusicBrainz releases. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+          $metadata
+        } else if ($release_candidates | length) == 1 {
+          let release_candidate = $release_candidates.id | first
+          log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset)"
+          $metadata | upsert book.musicbrainz_release_id $release_candidate
+        } else {
+          log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
+          let $release_candidates = $release_candidates | get id | each {|candidate|
+            let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [label-rels recordings url-rels]
+            if ($received_metadata | is-empty) {
+              log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
+              null
+            } else {
+              $received_metadata
+            }
+          }
+          if ($release_candidates | any {|r| $r == null}) {
+            return null
+          }
+          let release_candidates = $release_candidates | filter_musicbrainz_releases $metadata $max_track_duration_difference
+          if ($release_candidates | is-empty) {
+            log error $"Unable to find any matching MusicBrainz releases after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+            $metadata
+          } else if ($release_candidates | length) == 1 {
+            let release_candidate = $release_candidates | first
+            log info $"Found matching MusicBrainz Release (ansi yellow)($release_candidate)(ansi reset) after filtering"
+            $metadata | upsert book.musicbrainz_release_id $release_candidate
+          } else {
+            # todo Interactively allow selecting an available release
+            log error $"Multiple matching MusicBrainz releases remaining after filtering. Please pass the exact MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
+            $metadata
+          }
+        }
+      }
+    } else {
+      log info $"Successfully determined the MusicBrainz Recording and Release IDs using AcoustID fingerprints"
+      $metadata
+    }
+  )
+
   # todo Validate MBIDs when parsing them.
 
   if ($metadata | is-empty) or "book" not-in $metadata or "musicbrainz_release_id" not-in $metadata.book or ($metadata.book.musicbrainz_release_id | is-empty) {
@@ -4433,9 +5381,18 @@ export def tag_audiobook [
     log debug $"$metadata: ($metadata | to nuon)"
     return null
   }
-
   # Tag the files
-  let metadata = $metadata | tag_audiobook_tracks_by_musicbrainz_release_id $working_directory
+  let metadata = (
+    $metadata
+    | (
+      tag_audiobook_tracks_by_musicbrainz_release_id
+      $working_directory
+      $cache
+      $combine_chapter_parts
+      --retries $retries
+      --retry-delay $retry_delay
+    )
+  )
   if ($metadata | is-empty) {
     log error "Failed to tag audio tracks!"
     return null
@@ -4443,29 +5400,87 @@ export def tag_audiobook [
 
   # Submit AcoustID fingerprints
   if ($acoustid_user_key | is-not-empty) {
+    # Calculate the AcoustID fingerprint if necessary
     let tracks = (
-      if (
-        $metadata.tracks
-        | all {|track|
-          "acoustid_fingerprint" in $track
+      $metadata.tracks | each {|track|
+        if ($track | get --ignore-errors "acoustid_fingerprint" | is-empty) {
+          $track | get_acoustid_fingerprint_track $ignore_embedded_acoustid_fingerprints
+        } else {
+          $track
         }
-      ) {
-        $metadata.tracks
-      } else {
-        $metadata.tracks | get_acoustid_fingerprint_tracks $ignore_embedded_acoustid_fingerprints
       }
     )
-    # log info $"$tracks: ($tracks | reject embedded_pictures)"
-    let acoustid_submissions = (
-      $tracks
-      | select musicbrainz_recording_id duration acoustid_fingerprint
-      | rename musicbrainz_recording_id duration fingerprint
-      | submit_acoustid_fingerprints $client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
+    # Filter out tracks where the MusicBrainz Recording IDs were successfully retrieved by using their AcoustID fingerprints.
+    # That means that the AcoustID fingerprints already exist on the server and don't need to be submitted.
+    let tracks = (
+      if $submit_all_acoustid_fingerprints {
+        $tracks
+      } else {
+        if ($acoustid_metadata | is-empty) {
+          $tracks
+        } else {
+          # Don't filter out tracks where the retrieved MusicBrainz Recording ID differs from the one the track ended up with at the end
+          (
+            $tracks
+            | join ($acoustid_metadata.tracks | rename --column {musicbrainz_recording_id: "retrieved_musicbrainz_recording_id"}) file
+            | filter {|track|
+              $track.musicbrainz_recording_id != $track.retrieved_musicbrainz_recording_id
+            }
+          )
+        }
+      }
     )
-    if ($acoustid_submissions | is-not-empty) {
-      log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
+    # Filter out tracks which already had the embedded AcoustID fingerprint and corresponding MusicBrainz Recording ID.
+    let tracks = (
+      if $submit_all_acoustid_fingerprints {
+        $tracks
+      } else {
+        if (
+          "acoustid_fingerprint" in ($original_metadata.tracks | columns)
+          and "musicbrainz_recording_id" in ($original_metadata.tracks | columns)
+        ) {
+          # We have both acoustid_fingerprint and musicbrainz_recording_id columns, but one or the other could be missing for individual tracks
+          (
+            $original_metadata.tracks
+            | rename --column {
+              acoustid_fingerprint: "original_acoustid_fingerprint"
+              musicbrainz_recording_id: "original_musicbrainz_recording_id"
+            }
+            | join $tracks file
+            # Filter out tracks with consistent fingerprints and recording ids
+            | filter {|track|
+              # Double check if original values are missing or empty for each individual track
+              if ($track | get --ignore-errors original_acoustid_fingerprint | is-empty) or ($track | get --ignore-errors original_musicbrainz_recording_id | is-empty) {
+                true
+              } else {
+                not (
+                  $track.original_acoustid_fingerprint == $track.acoustid_fingerprint
+                  and $track.original_musicbrainz_recording_id == $track.musicbrainz_recording_id
+                )
+              }
+            }
+          )
+        } else {
+          $tracks
+        }
+      }
+    )
+    # log info $"tracks: ($tracks)"
+    if ($tracks | is-empty) {
+      log info "No AcoustID fingerprints will be submitted since tracks already had corresponding AcoustID fingerprints and MusicBrainz Recording IDs on the AcoustID server or embedded in their metadata."
     } else {
-      log error $"Failed to submit AcoustID fingerprints!"
+      # log info $"$tracks: ($tracks | reject embedded_pictures)"
+      let acoustid_submissions = (
+        $tracks
+        | select musicbrainz_recording_id duration acoustid_fingerprint
+        | rename musicbrainz_recording_id duration fingerprint
+        | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
+      )
+      if ($acoustid_submissions | is-not-empty) {
+        log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
+      } else {
+        log error $"Failed to submit AcoustID fingerprints!"
+      }
     }
   }
 
@@ -4477,7 +5492,7 @@ export def tag_audiobook [
 # The format is similar to tone's format.
 # Unlike the format tone uses, the start and length fields are durations.
 # For output via tone, these need to be converted back to milliseconds as integers.
-export def parse_chapters_from_tone []: table<index: int, start: int, length: int, title: string> -> table<index: int, start: duration, length: duration, title: string> {
+export def parse_chapters_from_tone []: table<start: int, length: int, title: string> -> table<index: int, start: duration, length: duration, title: string> {
   $in | enumerate | each {|chapter|
     {
       index: $chapter.index
@@ -4501,6 +5516,14 @@ export def chapters_into_tone_format []: table<index: int, start: duration, leng
       # To make Tone's output nicer
       | insert subtitle ""
     )
+  }
+}
+
+# Convert chapters to the chapters.txt format used by tone.
+export def chapters_into_chapters_txt_format []: table<index: int, start: duration, length: duration, title: string> -> table<string> {
+  $in | each {|chapter|
+    let offset = $chapter.start | format_chapter_duration
+    $"($offset) ($chapter.title)"
   }
 }
 
@@ -4571,7 +5594,7 @@ export def audiobooks_with_the_highest_voted_chapters_tag []: table<id: string, 
 export def filter_musicbrainz_chapters_releases [
   release: record<book: record, tracks: table>
   duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
-] table<book: record, tracks: table> -> table<book: record, tracks: table> {
+]: table<book: record, tracks: table> -> table<book: record, tracks: table> {
   let candidates = $in
   # log info $"candidates: ($candidates | to nuon)"
   # log info $"release: ($release | reject tracks.embedded_pictures | to nuon)"
@@ -4608,8 +5631,20 @@ export def filter_musicbrainz_chapters_releases [
     return $candidates
   }
   # Use the chapters tag to decide between multiple remaining candidates
-  if "release_tags" in ($candidates.book | columns) {
-    let highest_voted_chapters = $candidates.book | select musicbrainz_release_id release_tags | rename id tags | audiobooks_with_the_highest_voted_chapters_tag
+  if "tags" in ($candidates.book | columns) {
+    let highest_voted_chapters = (
+      $candidates.book | each {|book|
+        let release_tags = (
+          $book.tags
+          | where scope == "release"
+          | reject --ignore-errors scope
+        )
+        {
+          id: $book.musicbrainz_release_id
+          tags: $release_tags
+        }
+      } | audiobooks_with_the_highest_voted_chapters_tag
+    )
     $candidates | where book.musicbrainz_release_id in $highest_voted_chapters
   } else {
     return $candidates
@@ -4626,7 +5661,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
-] table -> table<index: int, start: duration, length: duration, title: string> {
+]: table -> table<index: int, start: duration, length: duration, title: string> {
   let release = $in
   if "musicbrainz_release_group_id" not-in $release.book or ($release.book.musicbrainz_release_group_id | is-empty) {
     return null
@@ -4713,94 +5748,118 @@ export def look_up_chapters_from_similar_musicbrainz_release [
 # In addition to the musicbrainz_recording_id key, the acoustid_fingerprint, audio_duration, and acoustid_track_id tags can also be included.
 # The acoustid_fingerprint and acoustid_track_id will be embedded in the files with the other metadata.
 # The audio_duration value is used to avoid recalculating the duration of the audio.
-export def tag_audiobook_files_by_musicbrainz_release_id [
-  release_id: string
-  working_directory: directory
-  duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
-  chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
-  --retries: int = 3
-  --retry-delay: duration = 5sec
-]: table -> list<path> {
-  let audiobook_files = $in
-  # let current_metadata = (
-  #   $audiobook_files | parse_audiobook_metadata_from_files
-  # )
-  let metadata = (
-    $release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
-  )
-  if ($metadata | is-empty) {
-    log error $"Failed to fetch MusicBrainz Release (ansi yellow)($release_id)(ansi reset)"
-    return null
-  }
-  # log info $"audiobook_files: ($audiobook_files)"
-  # log info $"audiobook_files.metadata.track: ($audiobook_files.metadata.track)"
-  let tracks = (
-    if (
-      "musicbrainz_recording_id" in ($audiobook_files | columns)
-      and ($audiobook_files.musicbrainz_recording_id | is-not-empty)
-    ) {
-      $metadata.tracks | join $audiobook_files musicbrainz_recording_id
-    } else {
-      let enumerated_audiobook_files = (
-        $audiobook_files | enumerate | each {|f|
-          {
-            index: ($f.index + 1)
-            file: $f.item.file
-          }
-        }
-      )
-      $metadata.tracks | join $enumerated_audiobook_files index
-    }
-  )
-  # log info $"tracks: ($tracks)"
-  for track in $tracks {
-    let duration = (
-      if "audio_duration" in $track and ($track.audio_duration | is-not-empty) {
-        $track.audio_duration
-      } else {
-        $track.file | tone_dump | get audio.duration | into int | into duration --unit ms
-      }
-    )
-    if ($track.duration - $duration | math abs) > $duration_threshold {
-      log error $"The (ansi green)($track)(ansi reset) is ($duration) long, but the MusicBrainz track is ($track.duration) long, which is outside the acceptable duration threshold of ($duration_threshold)"
-      return null
-    }
-  }
+# export def tag_audiobook_files_by_musicbrainz_release_id [
+#   release_id: string
+#   working_directory: directory
+#   duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
+#   chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
+#   --retries: int = 3
+#   --retry-delay: duration = 5sec
+# ]: table -> list<path> {
+#   let audiobook_files = $in
+#   # let current_metadata = (
+#   #   $audiobook_files | parse_audiobook_metadata_from_files
+#   # )
+#   let metadata = (
+#     $release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
+#   )
+#   if ($metadata | is-empty) {
+#     log error $"Failed to fetch MusicBrainz Release (ansi yellow)($release_id)(ansi reset)"
+#     return null
+#   }
+#   # log info $"audiobook_files: ($audiobook_files)"
+#   # log info $"audiobook_files.metadata.track: ($audiobook_files.metadata.track)"
+#   let tracks = (
+#     if (
+#       "musicbrainz_recording_id" in ($audiobook_files | columns)
+#       and ($audiobook_files.musicbrainz_recording_id | is-not-empty)
+#     ) {
+#       $metadata.tracks | join $audiobook_files musicbrainz_recording_id
+#     } else {
+#       let enumerated_audiobook_files = (
+#         $audiobook_files | enumerate | each {|f|
+#           {
+#             index: ($f.index + 1)
+#             file: $f.item.file
+#           }
+#         }
+#       )
+#       $metadata.tracks | join $enumerated_audiobook_files index
+#     }
+#   )
+#   # log info $"tracks: ($tracks)"
+#   for track in $tracks {
+#     let duration = (
+#       if "audio_duration" in $track and ($track.audio_duration | is-not-empty) {
+#         $track.audio_duration
+#       } else {
+#         $track.file | tone_dump | get audio.duration | into int | into duration --unit ms
+#       }
+#     )
+#     if ($track.duration - $duration | math abs) > $duration_threshold {
+#       log error $"The (ansi green)($track)(ansi reset) is ($duration) long, but the MusicBrainz track is ($track.duration) long, which is outside the acceptable duration threshold of ($duration_threshold)"
+#       return null
+#     }
+#   }
 
-  let chapters = (
-    if "chapters" not-in $metadata or ($metadata.chapters | is-empty) {
-      $metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
-    }
-  )
+#   let chapters = (
+#     if ($metadata | get --ignore-errors chapters | is-empty) {
+#       $metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
+#     } else {
+#       $metadata.chapters
+#     }
+#   )
+#   # log info $"Chapters: ($chapters)"
 
-  let front_cover = (
-    if "front_cover_available" in $metadata.book and $metadata.book.front_cover_available {
-      $metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
-    }
-  )
+#   let front_cover = (
+#     if "front_cover_available" in $metadata.book and $metadata.book.front_cover_available {
+#       $metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
+#     }
+#   )
 
-  let files = (
-    $metadata
-    | update tracks $tracks
-    | (
-      let input = $in;
-      if ($chapters | is-not-empty) {
-        $input | upsert book.chapters $chapters
-      } else {
-        $input
-      }
-    )
-    # Remove all sort fields
-    | tone_tag_tracks $working_directory "--taggers" 'remove,*' "--meta-remove-property" "sortalbum" "--meta-remove-property" "sorttitle" "--meta-remove-property" "sortalbumartist" "--meta-remove-property" "sortartist" "--meta-remove-property" "sortcomposer" "--meta-cover-file" $front_cover
-  )
+#   # let chapters_file = mktemp --suffix ".txt" --tmpdir
+#   # if ($chapters | is-not-empty) {
+#   #   $chapters | chapters_into_chapters_txt_format | save --force $chapters_file
+#   # }
 
-  # Clean up
-  if ($front_cover | is-not-empty) {
-    rm $front_cover
-  }
+#   let files = (
+#     $metadata
+#     | update tracks $tracks
+#     | reject --ignore-errors book.embedded_pictures
+#     | (
+#       let input = $in;
+#       if ($chapters | is-not-empty) {
+#         $input | upsert book.chapters $chapters
+#       } else {
+#         $input
+#       }
+#     )
+#     | (
+#       tone_tag_tracks $working_directory
+#       "--taggers" 'remove,*'
+#       # Remove all sort fields
+#       "--meta-remove-property" "sortalbum"
+#       "--meta-remove-property" "sorttitle"
+#       "--meta-remove-property" "sortalbumartist"
+#       "--meta-remove-property" "sortartist"
+#       "--meta-remove-property" "sortcomposer"
+#       "--meta-remove-property" "EmbeddedPictures"
+#       "--meta-remove-property" "comment"
+#       "--meta-cover-file" $front_cover
+#       # "--meta-chapters-file" $chapters_file
+#     )
+#   )
 
-  $files
-}
+#   # Clean up
+#   if ($front_cover | is-not-empty) {
+#     rm $front_cover
+#   }
+#   # if ($chapters_file | is-not-empty) {
+#   #   rm $chapters_file
+#   # }
+
+#   $files
+# }
 
 
 # Tag the given audiobook tracks using the MusicBrainz Release ID and certain other metadata
@@ -4819,6 +5878,8 @@ export def tag_audiobook_files_by_musicbrainz_release_id [
 # The audio_duration value is used to avoid recalculating the duration of the audio.
 export def tag_audiobook_tracks_by_musicbrainz_release_id [
   working_directory: directory
+  cache: closure
+  combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
   duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
   chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
   --retries: int = 3
@@ -4833,24 +5894,12 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     log error "Missing tracks to tag"
     return null
   }
-  # let existing_track_metadata_keys_to_keep = [acoustid_track_id acoustid_fingerprint file duration]
   # Keep / rename only the necessary columns
   let existing_metadata = (
     $existing_metadata | upsert tracks (
       # Rename duration column to audio_duration
       $existing_metadata.tracks | insert audio_duration {|track| $track.duration}
     )
-    # $existing_metadata.tracks | each {|track|
-    #   {
-    #     index: $track.index
-    #     acoustid_fingerprint: $track.acoustid_fingerprint
-    #     acoustid_track_id: $track.acoustid_track_id
-    #     file: $track.file
-    #     audio_duration: $track.duration
-    #     musicbrainz_recording_id: $track.musicbrainz_recording_id
-    #   }
-    # }
-    # $existing_metadata | select index acoustid_fingerprint acoustid_track_id file duration musicbrainz_recording_id
   )
   let musicbrainz_metadata = (
     $existing_metadata.book.musicbrainz_release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
@@ -4888,7 +5937,6 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
       } else {
         log error "Missing track audio duration for some reason!"
         return null
-        # $track.file | tone_dump | get audio.duration | into int | into duration --unit ms
       }
     )
     if ($track.duration - $duration | math abs) > $duration_threshold {
@@ -4900,24 +5948,157 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   # log info $"tracks: ($tracks)"
   let musicbrainz_metadata = $musicbrainz_metadata | upsert tracks $tracks
 
+  # This should only be necessary to check at the point where renaming occurs
+  # Verify that there is only one release-group, work, or other kind of series for a book.
+  # if "series" in $metadata.book and $metadata.book.series != null {
+  #   if "scope" in ($metadata.book.series | columns) {
+  #     let release_group_series = $metadata.book.series | where scope == "release group"
+  #     if ($release_group_series | is-empty) {
+  #       # Fall back to the work series if there is no release group series
+  #       let work_series = $metadata.book.series | where scope == "work"
+  #       if ($work_series | is-empty) {
+  #         # Use whatever series exist are at this point
+  #         if ($metadata.book.series | length) > 1 {
+  #           log warning "More than one non release group / non work series exists when no release group series exist. Not yet able to determine series and subseries ordering."
+  #         } else if ($metadata.book.series | length) == 1 {
+  #           log warning "Will fall back to non release group / non work series because no release group or work series exist"
+  #         }
+  #       } else if ($work_series | length) != 1 {
+  #         log warning "More than one work series exists when no release group series exist. Not yet able to determine series and subseries ordering."
+  #       } else {
+  #         log warning "Will fall back to work series because no release group series exists"
+  #       }
+  #     } else if ($release_group_series | length) != 1 {
+  #       log warning $"More than one release group series exists. Not yet able to determine series and subseries ordering."
+  #     }
+  #   } else {
+  #     log warning $"No scope available for series: ($metadata.book.series)"
+  #   }
+  # }
+
+  # Fetch additional MusicBrainz Series info, such as genres, tags, and series relationships
+  # todo Attach series to tracks?
+  # todo Determine series order based on parent and subseries relationships
   let musicbrainz_metadata = (
-    let chapters = (
-      if "chapters" not-in $musicbrainz_metadata.book or ($musicbrainz_metadata.book.chapters | is-empty) {
-        let chapters = $musicbrainz_metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
-        if ($chapters | is-not-empty) {
-          $chapters
+    if ($musicbrainz_metadata | get --ignore-errors book.series | is-empty) {
+      $musicbrainz_metadata
+    } else {
+      $musicbrainz_metadata | update book.series (
+        $musicbrainz_metadata.book.series | each {|series|
+          $series | merge ($series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay)
+        }
+      )
+    }
+  )
+
+  # Incorporate the series genres and tags into the book genres and tags.
+  # Prefer those belonging to a series.
+  let musicbrainz_metadata = (
+    if ($musicbrainz_metadata | get --ignore-errors book.series | is-empty) {
+      $musicbrainz_metadata
+    } else {
+      (
+        $musicbrainz_metadata
+        | upsert book.genres (
+          $musicbrainz_metadata.book.series | each {|series|
+            if ($series | get --ignore-errors genres | is-empty) {
+              $series.genres
+            } else {
+              $series.genres | default ($series.scope + " series") scope
+            }
+          } | (
+            let input = $in;
+            if ($input | is-not-empty) and "genres" in ($input | columns) {
+              $input.genres | uniq-by name scope | append $musicbrainz_metadata.book.genres
+            } else {
+              $input
+            }
+          )
+        )
+        | upsert book.tags (
+          $musicbrainz_metadata.book.series | each {|series|
+            if ($series | get --ignore-errors tags | is-empty) {
+              $series.tags
+            } else {
+              $series.tags | default ($series.scope + " series") scope
+            }
+          } | (
+            let input = $in;
+            if ($input | is-not-empty) and "tags" in ($input | columns) {
+              $input.tags | uniq-by name scope | append $musicbrainz_metadata.book.tags
+            } else {
+              $input
+            }
+          )
+        )
+      )
+    }
+  )
+
+  # Fetch the genres and tags from the MusicBrainz Works
+  # todo Apply series tags and genres of work series to relevant tracks?
+  let musicbrainz_metadata = (
+    $musicbrainz_metadata | update tracks (
+      $musicbrainz_metadata.tracks | each {|track|
+        if ($track | get --ignore-errors musicbrainz_works | is-empty) {
+          $track
         } else {
-          if "chapters" in $existing_metadata.book and ($existing_metadata.book.chapters | is-not-empty) {
-            # todo Should probably add flag to select whether to lookup or reuse existing chapters
-            $existing_metadata.book.chapters
+          let musicbrainz_works = $track.musicbrainz_works | each {|musicbrainz_work|
+            $musicbrainz_work | merge ($musicbrainz_work.id | fetch_and_parse_musicbrainz_work $cache --retries $retries --retry-delay $retry_delay)
           }
+          let genres = $musicbrainz_works.genres | flatten | uniq-by name | default work scope
+          let tags = $musicbrainz_works.tags | flatten | uniq-by name | default work scope
+          (
+            $track
+            | update musicbrainz_works $musicbrainz_works
+            | upsert genres (
+              if ($track | get --ignore-errors genres | is-empty) {
+                $genres
+              } else {
+                if ($genres | is-empty) {
+                  $track | get --ignore-errors genres
+                } else {
+                  # Prefer the genres from the works
+                  $genres | append $track.genres | uniq-by name scope
+                }
+              }
+            )
+            | upsert tags (
+              if ($track | get --ignore-errors tags | is-empty) {
+                $tags
+              } else {
+                if ($tags | is-empty) {
+                  $track | get --ignore-errors tags
+                } else {
+                  # Prefer the tags from the works
+                  $tags | append $track.tags | uniq-by name scope
+                }
+              }
+            )
+          )
         }
       }
-    );
-    if ($chapters | is-not-empty) {
-      $musicbrainz_metadata | upsert book.chapters $chapters
+    )
+  )
+
+  let chapters = (
+    if "chapters" not-in $musicbrainz_metadata.book or ($musicbrainz_metadata.book.chapters | is-empty) {
+      let chapters = $musicbrainz_metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
+      if ($chapters | is-not-empty) {
+        $chapters
+      } else {
+        if "chapters" in $existing_metadata.book and ($existing_metadata.book.chapters | is-not-empty) {
+          # todo Should probably add flag to select whether to lookup or reuse existing chapters
+          $existing_metadata.book.chapters
+        }
+      }
+    }
+  )
+  let chapters = (
+    if ($chapters | is-empty) or not $combine_chapter_parts {
+      $chapters
     } else {
-      $musicbrainz_metadata
+      $chapters | combine_chapter_parts
     }
   )
 
@@ -4927,10 +6108,45 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     }
   )
 
+  let tone_args = (
+    [
+      "--taggers" 'remove,*'
+      # Remove all sort fields
+      "--meta-remove-property" "sortalbum"
+      "--meta-remove-property" "sorttitle"
+      "--meta-remove-property" "sortalbumartist"
+      "--meta-remove-property" "sortartist"
+      "--meta-remove-property" "sortcomposer"
+      "--meta-remove-property" "comment"
+    ]
+    | append (
+      if ($front_cover | is-not-empty) {
+        # Drop any embedded pictures, only using the downloaded cover file
+        ["--meta-remove-property" "EmbeddedPictures" "--meta-cover-file" $front_cover]
+      }
+    )
+  )
+
   let files = (
     $musicbrainz_metadata
-    # Remove all sort fields
-    | tone_tag_tracks $working_directory "--taggers" 'remove,*' "--meta-remove-property" "sortalbum" "--meta-remove-property" "sorttitle" "--meta-remove-property" "sortalbumartist" "--meta-remove-property" "sortartist" "--meta-remove-property" "sortcomposer" "--meta-cover-file" $front_cover
+    | (
+      let input = $in;
+      if ($chapters | is-empty) {
+        $input
+      } else {
+        $input | upsert book.chapters $chapters
+      }
+    )
+    | (
+      let input = $in;
+      if ($front_cover | is-empty) {
+        $input
+      } else {
+      # Drop any embedded pictures, only using the downloaded cover file
+        $input | reject --ignore-errors book.embedded_pictures
+      }
+    )
+    | tone_tag_tracks $working_directory ...$tone_args
   )
 
   # Clean up
@@ -4939,6 +6155,76 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   }
 
   $musicbrainz_metadata
+}
+
+# Parse genres and tags from MusicBrainz metadata
+#
+# Since MusicBrainz doesn't yet support genres / themes for books, genres are generally determined from the tags.
+# Tags become the genres, with a few special tags filtered out, which remain in the tags table.
+# Genres and tags are then sorted by count from highest to lowest and then by name
+#
+# Any genres in the input table will be in the output genres table.
+export def parse_genres_and_tags []: record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> -> record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+
+  # sort by the count, highest to lowest, and then name alphabetically
+  let sort = {|a, b|
+    if (
+      ($a | is-empty)
+      or ($b | is-empty)
+      or "name" not-in ($a | columns)
+      or "name" not-in ($b | columns)
+      or "count" not-in ($a | columns)
+      or "count" not-in ($b | columns)
+    ) {
+      return true
+    }
+    if $a.count == $b.count {
+      $a.name < $b.name
+    } else {
+      $a.count > $b.count
+    }
+  }
+
+  if ($input | get --ignore-errors tags | is-empty) or "tags" not-in ($input | columns) {
+    if "genres" in ($input | columns) and ($input | get --ignore-errors genres | is-not-empty) {
+      return {
+        genres: ($input | get --ignore-errors genres | sort-by --custom $sort | uniq-by name)
+        tags: []
+      }
+    }
+    return {
+      genres: []
+      tags: []
+    }
+  }
+
+  let genres = $input | get --ignore-errors genres | append (
+    $input.tags
+    # | select name count
+    | filter {|tag|
+      $tag.name not-in $musicbrainz_non_genre_tags
+    }
+  ) | sort-by --custom $sort | uniq-by name
+
+  let tags = (
+    $input.tags
+    # | select name count
+    | filter {|tag|
+      $tag.name not-in ($genres | get --ignore-errors name)
+    }
+    # sort by the count, highest to lowest, and then name alphabetically
+    | sort-by --custom $sort
+    | uniq-by name
+  )
+
+  {
+    genres: $genres
+    tags: $tags
+  }
 }
 
 # Append the the value for the given key in the given metadata to a MusicBrainz search query for the given search term
@@ -4952,6 +6238,9 @@ export def append_to_musicbrainz_query [
   --transform: closure
 ]: string -> string {
   let query = $in
+  if ($metadata | is-empty) {
+    return $query
+  }
   let prefix = (
     if ($query | is-empty) {
       ""
@@ -4979,7 +6268,7 @@ export def append_to_musicbrainz_query [
 }
 
 # Escape special Lucene characters in a string with a backslash
-export def escape_special_lucene_characters [] string -> string {
+export def escape_special_lucene_characters []: string -> string {
   let input = $in
   if ($input | describe) != "string" {
     return $input
@@ -5027,18 +6316,22 @@ export def search_for_musicbrainz_release [
 
   let query = (
     if ($artists | is-not-empty) {
-      $query + $artists | get --ignore-errors id | reduce {|it, acc|
-        $acc + $" AND arid:\"($it | escape_special_lucene_characters)\""
-      }
+      $query + (
+        $artists | get --ignore-errors id | reduce {|it, acc|
+          $acc + $" AND arid:\"($it | escape_special_lucene_characters)\""
+        }
+      )
     } else {
       $query
     }
   )
   let query = (
     if ($artists | is-not-empty) {
-      $query + $artists | get --ignore-errors name | reduce {|it, acc|
-        $acc + $" AND artistname:\"($it | escape_special_lucene_characters)\""
-      }
+      $query + (
+        $artists | get --ignore-errors name | reduce {|it, acc|
+          $acc + $" AND artistname:\"($it | escape_special_lucene_characters)\""
+        }
+      )
     } else {
       $query
     }
@@ -5113,11 +6406,11 @@ export def search_for_musicbrainz_release [
   )
   # todo discids, discidsmedium, and tracksmedium?
 
-  log info $"query: ($query)"
+  log debug $"query: ($query)"
 
   let query = $query | url encode
 
-  log info $"request: http get --full --headers [User-Agent ($user_agent) Accept \"application/json\"] ($url)?query=($query)"
+  log debug $"request: http get --full --headers [User-Agent ($user_agent) Accept \"application/json\"] ($url)?query=($query)"
 
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)?query=($query)"}
   let response = (
@@ -5341,6 +6634,56 @@ export def parse_chapter_title []: string -> record<part: string, part_title: st
         }
         | first
     )
+}
+
+# Combine chapters split into multiple parts into complete chapters
+#
+# Only works for chapters titled according to the MusicBrainz Audiobook style guidelines.
+export def combine_chapter_parts []: table<index: int, title: string, duration: duration> -> table<index: int, title: string, duration: duration> {
+  let chapters = $in
+  let index_offset = $chapters.index | first
+  (
+    # Parse each title into the title and part portions
+    $chapters
+    | each {|chapter|
+      $chapter | update title (
+        $chapter.title
+        | parse --regex '(?P<title>.*?)(?P<part>, Part [0-9]+)?$'
+        | first
+      )
+    }
+    | reduce {|it acc|
+      if ($acc | is-empty) {
+        $acc | append $it
+      } else {
+        let last = (
+          if ($acc | describe | str starts-with record) {
+            $acc
+          } else {
+            $acc | last
+          }
+        )
+        if $last.title.title == $it.title.title {
+          let updated = $last | update duration ($last.duration + $it.duration)
+          if $acc == $last {
+            $updated
+          } else {
+            $acc | drop | append $updated
+          }
+        } else {
+          $acc | append $it
+        }
+      }
+    }
+    | enumerate
+    | each {|chapter|
+      {
+        index: ($chapter.index + $index_offset)
+        title: $chapter.item.title.title
+        duration: $chapter.item.duration
+      }
+    }
+  )
 }
 
 ##### End chapterz.nu #####

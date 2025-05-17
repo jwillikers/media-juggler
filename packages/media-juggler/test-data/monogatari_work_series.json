@@ -1,0 +1,111 @@
+{
+  "genres": [],
+  "id": "05ef20c8-9286-4b53-950f-eac8cbb32dc3",
+  "tags": [
+    {
+      "count": 1,
+      "name": "fiction"
+    },
+    {
+      "name": "light novel",
+      "count": 1
+    },
+    {
+      "name": "mystery",
+      "count": 1
+    },
+    {
+      "name": "paranormal",
+      "count": 1
+    },
+    {
+      "count": 1,
+      "name": "psychological"
+    },
+    {
+      "name": "romance",
+      "count": 1
+    },
+    {
+      "count": 1,
+      "name": "school life"
+    },
+    {
+      "name": "supernatural",
+      "count": 1
+    },
+    {
+      "name": "vampire",
+      "count": 1
+    }
+  ],
+  "relations": [
+    {
+      "series": {
+        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+        "disambiguation": "light novel, English",
+        "id": "4c7a3056-279a-451d-a7ee-3f6f6536f1f0",
+        "type": "Work series",
+        "name": "Nekomonogatari"
+      },
+      "type": "subseries",
+      "ended": false,
+      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
+      "direction": "forward",
+      "end": null,
+      "attributes": [],
+      "target-credit": "",
+      "target-type": "series",
+      "source-credit": "",
+      "begin": null,
+      "attribute-ids": {},
+      "attribute-values": {}
+    },
+    {
+      "source-credit": "",
+      "target-type": "series",
+      "attribute-values": {},
+      "begin": null,
+      "attribute-ids": {},
+      "target-credit": "",
+      "end": null,
+      "direction": "forward",
+      "attributes": [],
+      "ended": false,
+      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
+      "series": {
+        "type": "Work series",
+        "id": "6660f123-24a0-46c7-99bf-7ff5dc11ceef",
+        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+        "disambiguation": "light novel, English",
+        "name": "Monogatari Series: First Season"
+      },
+      "type": "subseries"
+    },
+    {
+      "target-credit": "",
+      "attribute-ids": {},
+      "begin": null,
+      "attribute-values": {},
+      "target-type": "series",
+      "source-credit": "",
+      "type": "subseries",
+      "series": {
+        "type": "Work series",
+        "id": "b3e14bc3-014f-438b-b5c6-6b38081334ad",
+        "disambiguation": "light novel, English",
+        "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+        "name": "Monogatari Series: Second Season"
+      },
+      "type-id": "a3af4c16-de83-4d63-b9b8-77e074c9babe",
+      "ended": false,
+      "attributes": [],
+      "direction": "forward",
+      "end": null
+    }
+  ],
+  "name": "Monogatari",
+  "disambiguation": "light novel, English",
+  "type-id": "b689f694-6305-3d78-954d-df6759a1877b",
+  "type": "Work series"
+}
