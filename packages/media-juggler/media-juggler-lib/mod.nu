@@ -4356,7 +4356,7 @@ export def parse_series_from_musicbrainz_release []: record -> table<name: strin
     | parse_series_from_musicbrainz_relations
     | default "work" scope
   )
-  $release_series | append $release_group_series | append $work_series
+  $release_series | append $release_group_series | append $work_series # | sort-by scope
 }
 
 # Parse genres from a MusicBrainz release, release group, and recordings
@@ -4409,7 +4409,7 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
       | get --ignore-errors genres
       | default "recording" scope
     )
-    | filter {|row| "name" in $row and "count" in $row}
+    | filter {|row| ($row | is-not-empty) and "name" in $row and "count" in $row}
   )
   let tags = (
     $release
@@ -4425,7 +4425,7 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
       | get --ignore-errors tags
       | default "recording" scope
     )
-    | filter {|row| "name" in $row and "count" in $row}
+    | filter {|row| ($row | is-not-empty) and "name" in $row and "count" in $row}
   )
   {
     genres: $genres
@@ -5234,6 +5234,7 @@ export def tag_audiobook [
   working_directory: directory
   cache: closure # Function to call to check for or update cached values. Looks like {|type, id, update_function| ...}
   submit_all_acoustid_fingerprints = false # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
+  combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
   ignore_embedded_acoustid_fingerprints = false # Recalculate AcoustID fingerprints for all files
   ignore_embedded_musicbrainz_ids = false # Ignore existing MusicBrainz IDs embedded in the files
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
@@ -5378,7 +5379,17 @@ export def tag_audiobook [
     return null
   }
   # Tag the files
-  let metadata = $metadata | tag_audiobook_tracks_by_musicbrainz_release_id $working_directory $cache
+  let metadata = (
+    $metadata
+    | (
+      tag_audiobook_tracks_by_musicbrainz_release_id
+      $working_directory
+      $cache
+      $combine_chapter_parts
+      --retries $retries
+      --retry-delay $retry_delay
+    )
+  )
   if ($metadata | is-empty) {
     log error "Failed to tag audio tracks!"
     return null
@@ -5865,6 +5876,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
 export def tag_audiobook_tracks_by_musicbrainz_release_id [
   working_directory: directory
   cache: closure
+  combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
   duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
   chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
   --retries: int = 3
@@ -6077,6 +6089,13 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
           $existing_metadata.book.chapters
         }
       }
+    }
+  )
+  let chapters = (
+    if ($chapters | is-empty) or not $combine_chapter_parts {
+      $chapters
+    } else {
+      $chapters | combine_chapter_parts
     }
   )
 
@@ -6606,6 +6625,56 @@ export def parse_chapter_title []: string -> record<part: string, part_title: st
         }
         | first
     )
+}
+
+# Combine chapters split into multiple parts into complete chapters
+#
+# Only works for chapters titled according to the MusicBrainz Audiobook style guidelines.
+export def combine_chapter_parts []: table<index: int, title: string, duration: duration> -> table<index: int, title: string, duration: duration> {
+  let chapters = $in
+  let index_offset = $chapters.index | first
+  (
+    # Parse each title into the title and part portions
+    $chapters
+    | each {|chapter|
+      $chapter | update title (
+        $chapter.title
+        | parse --regex '(?P<title>.*?)(?P<part>, Part [0-9]+)?$'
+        | first
+      )
+    }
+    | reduce {|it acc|
+      if ($acc | is-empty) {
+        $acc | append $it
+      } else {
+        let last = (
+          if ($acc | describe | str starts-with record) {
+            $acc
+          } else {
+            $acc | last
+          }
+        )
+        if $last.title.title == $it.title.title {
+          let updated = $last | update duration ($last.duration + $it.duration)
+          if $acc == $last {
+            $updated
+          } else {
+            $acc | drop | append $updated
+          }
+        } else {
+          $acc | append $it
+        }
+      }
+    }
+    | enumerate
+    | each {|chapter|
+      {
+        index: ($chapter.index + $index_offset)
+        title: $chapter.item.title.title
+        duration: $chapter.item.duration
+      }
+    }
+  )
 }
 
 ##### End chapterz.nu #####

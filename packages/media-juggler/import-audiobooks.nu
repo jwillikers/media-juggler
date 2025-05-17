@@ -36,6 +36,7 @@ def main [
   # --ignore-embedded-acoustid-fingerprints
   --acoustid-client-key: string # The application API key for the AcoustID server
   --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
+  --combine-chapter-parts # Combine chapters split into multiple parts into individual chapters
   --lossy-to-lossy # Allow transcoding lossy formats to other lossy formats. This is irreversible and has the potential to introduce artifacts and degrade quality. It's recommended to keep the original lossy files for archival purposes when doing this.
   --musicbrainz-release-id: string
   --audible-activation-bytes: string # The Audible activation bytes used to decrypt the AAX file
@@ -497,6 +498,7 @@ def main [
       $temporary_directory
       $cache_function
       $submit_all_acoustid_fingerprints
+      $combine_chapter_parts
       --acoustid-client-key $acoustid_client_key
       --acoustid-user-key $acoustid_user_key
       --musicbrainz-release-id $musicbrainz_release_id
