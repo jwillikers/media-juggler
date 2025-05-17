@@ -6190,8 +6190,14 @@ export def parse_genres_and_tags []: record<genres: table<name: string, count: i
   }
 
   if ($input | get --ignore-errors tags | is-empty) or "tags" not-in ($input | columns) {
+    if "genres" in ($input | columns) and ($input | get --ignore-errors genres | is-not-empty) {
+      return {
+        genres: ($input | get --ignore-errors genres | sort-by --custom $sort | uniq-by name)
+        tags: []
+      }
+    }
     return {
-      genres: ($input | get --ignore-errors genres | sort-by --custom $sort | uniq-by name)
+      genres: []
       tags: []
     }
   }
