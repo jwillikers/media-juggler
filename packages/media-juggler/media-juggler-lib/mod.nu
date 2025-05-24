@@ -376,6 +376,15 @@ export def "ssh ls" [
   }
 }
 
+# Check if a path exists over SSH
+export def "ssh_path_exists" []: path -> bool {
+  let input = $in
+  let ssh_path = $input | split_ssh_path
+  let path = $ssh_path.path
+  let exit_code = do {^ssh $ssh_path.server nu --commands $"\'stat ($path)\'"} | complete | get exit_code
+  ($exit_code == 0)
+}
+
 # List files over SSH
 # export def "ssh_list_files_in_archive_with_extensions" [
 #   ...args: string
