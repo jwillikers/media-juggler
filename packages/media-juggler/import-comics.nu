@@ -208,7 +208,7 @@ def main [
   # --issue: string # The issue number
   --issue-year: string # The publication year of the issue
   --manga: string = "YesAndRightToLeft" # Whether the file is manga "Yes", right-to-left manga "YesAndRightToLeft", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
-  --archival-path: string = "meerkat:/var/media/archive/books/" # The archival path where files will be archived. The file will be uploaded under a subdirectory named after the author.
+  --archival-path: string = "meerkat:/var/media/archive/books/" # The archival path where files will be archived. The file will be uploaded under a subdirectory named after the author and series.
   --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
   --destination: directory = "meerkat:/var/media/books" # The directory under which to copy files.
   # --series: string # The name of the series
