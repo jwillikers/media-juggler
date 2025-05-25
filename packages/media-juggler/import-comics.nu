@@ -206,7 +206,7 @@ def main [
   --keep # Don't delete the temporary directory when there's an error
   --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
   # --issue: string # The issue number
-  # --issue-year: string # The publication year of the issue
+  --issue-year: string # The publication year of the issue
   --manga: string = "YesAndRightToLeft" # Whether the file is manga "Yes", right-to-left manga "YesAndRightToLeft", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
   --archival-path: string = "meerkat:/var/media/archive/books/" # The archival path where files will be archived. The file will be uploaded under a subdirectory named after the author.
   --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
@@ -540,6 +540,7 @@ def main [
     let book_isbn_numbers = (
         let isbn_numbers = $file | isbn_from_pages $temporary_directory;
         if not $skip_ocr and ($isbn_numbers | is-empty) {
+            log debug "ISBN not detected in text. Attempting to ISBN from images using OCR."
             # Check images for the ISBN if text doesn't work out.
             if "cbz" in $formats {
                 let isbn_from_cbz = $formats.cbz | isbn_from_pages $temporary_directory
@@ -669,7 +670,7 @@ def main [
         $formats
         | update $input_format (
             if $comic_vine_issue_id == null {
-                let target = $formats | get $input_format | comic_file_name_from_metadata $temporary_directory
+                let target = $formats | get $input_format | comic_file_name_from_metadata $temporary_directory --issue-year $issue_year
                 log debug $"Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
                 mv ($formats | get $input_format) $target
                 $target

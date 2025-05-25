@@ -566,7 +566,7 @@ export def isbn_from_images_in_archive [
   working_directory: path
 ]: path -> list<string> {
   let archive = $in
-  let images = $archive | list_image_files_in_archive
+  let images = $archive | list_files_in_archive_with_extensions $image_extensions
   # We start at the back first
   let pages = (
     $images
@@ -580,7 +580,14 @@ export def isbn_from_images_in_archive [
   # }
   for page in $pages {
     let image = $archive | extract_file_from_archive $page $working_directory
-    let isbn = $image | image_to_text | lines --skip-empty | reverse | parse_isbn
+    if $image == null {
+      return []
+    }
+    let image_text = $image | image_to_text
+    if $image_text == null {
+      return []
+    }
+    let isbn = $image_text | lines --skip-empty | reverse | parse_isbn
     rm $image
     if ($isbn | is-not-empty) {
       return $isbn
@@ -592,7 +599,12 @@ export def isbn_from_images_in_archive [
 # Extract text from an image using OCR
 export def image_to_text []: path -> string {
   let image = $in
-  ^tesseract $image stdout
+  let result = do {^tesseract $image stdout} | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^tesseract \"($image)\" stdout(ansi reset)\n($result.stderr)\n"
+    return null
+  }
+  $result.stdout
 }
 
 # todo
@@ -1321,7 +1333,11 @@ export def extract_file_from_archive [
   working_directory: directory # The scratch-space directory to use
 ]: path -> path {
   let archive = $in
-  ^unzip $archive $file -d $working_directory
+  let result = do {^unzip $archive $file -d $working_directory} | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^unzip \"($archive)\" \"($file)\" -d \"($working_directory)\"(ansi reset)\n($result.stderr)\n"
+    return null
+  }
   [$working_directory $file] | path join
 }
 
@@ -1381,6 +1397,9 @@ export def extract_comic_info_xml [
       return null
     }
     let comic_info_file = $archive | extract_file_from_archive "ComicInfo.xml" $working_directory
+    if $comic_info_file == null {
+      return null
+    }
     let comic_info = $comic_info_file | open
     rm $comic_info_file
     $comic_info
@@ -1874,7 +1893,7 @@ export def get_image_extension []: path -> string {
   let cbz = $in
     let file_extensions = (
         $cbz
-        | list_image_files_in_archive
+        | list_files_in_archive_with_extensions $image_extensions
         | path parse
         | get extension
         | filter {|extension| not ($extension | is-empty) }
