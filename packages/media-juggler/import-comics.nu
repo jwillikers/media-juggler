@@ -518,6 +518,8 @@ def main [
     $formats.epub | optimize_images_in_zip | polish_epub
   }
 
+  let optimized = "epub" in $formats
+
   # Generate a CBZ from the PDF format which may be used to extract the ISBN.
   let formats = (
     if "pdf" in $formats {
@@ -667,60 +669,60 @@ def main [
 
     # Rename input file according to metadata
     let formats = (
-        $formats
-        | update $input_format (
-            if $comic_vine_issue_id == null {
-                let target = $formats | get $input_format | comic_file_name_from_metadata $temporary_directory --issue-year $issue_year
-                log debug $"Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-                mv ($formats | get $input_format) $target
-                $target
-            } else {
-                $formats | get $input_format
-            }
-        )
-        | (
-            let i = $in;
-            if $input_format == "pdf" and "cbz" in $i {
-                # Rename the CBZ according to the name of the PDF
-                let target = $i | get $input_format | path parse | update extension cbz | path join
-                mv $i.cbz $target
-                $i | update cbz $target
-            } else {
-                $i
-            }
-        )
+      $formats
+      | update $input_format (
+        if $comic_vine_issue_id == null {
+          let target = $formats | get $input_format | comic_file_name_from_metadata $temporary_directory --issue-year $issue_year
+          log debug $"Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+          mv ($formats | get $input_format) $target
+          $target
+        } else {
+          $formats | get $input_format
+        }
+      )
+      | (
+        let i = $in;
+        if $input_format == "pdf" and "cbz" in $i {
+          # Rename the CBZ according to the name of the PDF
+          let target = $i | get $input_format | path parse | update extension cbz | path join
+          mv $i.cbz $target
+          $i | update cbz $target
+        } else {
+          $i
+        }
+      )
     )
 
     # Generate a CBZ from the EPUB and PDF formats
     let formats = (
-        if "epub" in $formats {
-            log debug "Generating a CBZ from the EPUB"
-            $formats | insert cbz ($formats.epub | epub_to_cbz --working-directory $temporary_directory)
-        } else if "pdf" in $formats {
-            log debug "Updating the CBZ for the PDF"
-            let cbz = (
-                $formats.cbz
-                | (
-                let archive = $in;
-                if $comic_info != null {
-                    {
-                        archive: $archive,
-                        comic_info: (open $comic_info),
-                    }
-                    | inject_comic_info
-                } else {
-                    $archive
-                }
-                )
-            )
-            if $comic_info != null {
-                log debug $"Removing the sidecar ComicInfo file (ansi yellow)($comic_info)(ansi reset)"
-                rm $comic_info
+      if "epub" in $formats {
+        log debug "Generating a CBZ from the EPUB"
+        $formats | insert cbz ($formats.epub | epub_to_cbz --working-directory $temporary_directory)
+      } else if "pdf" in $formats {
+        log debug "Updating the CBZ for the PDF"
+        let cbz = (
+          $formats.cbz
+          | (
+          let archive = $in;
+          if $comic_info != null {
+            {
+              archive: $archive,
+              comic_info: (open $comic_info),
             }
-            $formats | update cbz $cbz
-        } else {
-            $formats
+            | inject_comic_info
+            } else {
+              $archive
+            }
+          )
+        )
+        if $comic_info != null {
+          log debug $"Removing the sidecar ComicInfo file (ansi yellow)($comic_info)(ansi reset)"
+          rm $comic_info
         }
+        $formats | update cbz $cbz
+      } else {
+        $formats
+      }
     )
 
     log debug $"Fetching and writing metadata to (ansi yellow)($formats.cbz)(ansi reset) with ComicTagger"
@@ -1002,23 +1004,23 @@ def main [
     log debug "Finished renaming files";
 
     if "cbz" in $formats {
-        let image_format = ($formats.cbz | get_image_extension)
-        if $image_format == null {
-          if not $keep {
-            rm --force --recursive $temporary_directory
-          }
-          return {
-            file: $original_file
-            error: "Failed to determine the image file format"
-          }
+      let image_format = ($formats.cbz | get_image_extension)
+      if $image_format == null {
+        if not $keep {
+          rm --force --recursive $temporary_directory
         }
+        return {
+          file: $original_file
+          error: "Failed to determine the image file format"
+        }
+      }
 
-        # todo Detect if another lossless format, i.e. webp, is being used and if so, convert those to jxl as well.
-        if $image_format in ["png"] {
-          $formats.cbz | convert_to_lossless_jxl
-        } else if $image_format != "jxl" {
-          $formats.cbz | optimize_images_in_zip
-        }
+      # todo Detect if another lossless format, i.e. webp, is being used and if so, convert those to jxl as well.
+      if $image_format in ["png"] {
+        $formats.cbz | convert_to_lossless_jxl
+      } else if $image_format != "jxl" and not $optimized {
+        $formats.cbz | optimize_images_in_zip
+      }
     }
 
     # Not sure if "webp" would really be any better than jpeg here or not...
@@ -1026,16 +1028,16 @@ def main [
     # Use PNG for lossless codecs and webp for lossy.
     # CBconvert appears to always use lossy webp encoding.
     let formats = (
-        if $ereader == null {
-            $formats
-        } else {
-            $formats
-            | insert ereader_cbz (
-                $formats
-                | get $input_format
-                | convert_for_ereader $ereader $temporary_directory
-            )
-        }
+      if $ereader == null {
+        $formats
+      } else {
+        $formats
+        | insert ereader_cbz (
+          $formats
+          | get $input_format
+          | convert_for_ereader $ereader $temporary_directory
+        )
+      }
     )
 
     # todo Functions archive_epub, upload_cbz, and perhaps copy_cbz_to_ereader
@@ -1050,25 +1052,25 @@ def main [
       }
     )
     let target_directory = (
-        [$destination $authors_subdirectory]
-        | append $series_subdirectory
-        | append (
-            if $output_format == "pdf" {
-              $formats.pdf | path parse | get stem | sanitize_file_name
-            } else {
-              null
-            }
-        )
-        | path join
+      [$destination $authors_subdirectory]
+      | append $series_subdirectory
+      | append (
+          if $output_format == "pdf" {
+            $formats.pdf | path parse | get stem | sanitize_file_name
+          } else {
+            null
+          }
+      )
+      | path join
     )
     log debug $"Target directory: ($target_directory)"
     let target_destination = (
-        let components = ($formats | get $output_format | path parse);
-        {
-          parent: $target_directory
-          stem: ($components.stem | sanitize_file_name)
-          extension: $components.extension
-        } | path join
+      let components = ($formats | get $output_format | path parse);
+      {
+        parent: $target_directory
+        stem: ($components.stem | sanitize_file_name)
+        extension: $components.extension
+      } | path join
     )
     log debug $"Target destination: ($target_destination)"
     let comic_info_target_destination = (
