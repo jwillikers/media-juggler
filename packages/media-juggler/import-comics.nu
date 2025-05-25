@@ -1004,20 +1004,20 @@ def main [
     if "cbz" in $formats {
         let image_format = ($formats.cbz | get_image_extension)
         if $image_format == null {
-            if not $keep {
-              rm --force --recursive $temporary_directory
-            }
-            return {
-                file: $original_file
-                error: "Failed to determine the image file format"
-            }
+          if not $keep {
+            rm --force --recursive $temporary_directory
+          }
+          return {
+            file: $original_file
+            error: "Failed to determine the image file format"
+          }
         }
 
         # todo Detect if another lossless format, i.e. webp, is being used and if so, convert those to jxl as well.
         if $image_format in ["png"] {
-            $formats.cbz | convert_to_lossless_jxl
+          $formats.cbz | convert_to_lossless_jxl
         } else if $image_format != "jxl" {
-            $formats.cbz | optimize_images_in_zip
+          $formats.cbz | optimize_images_in_zip
         }
     }
 
@@ -1040,14 +1040,23 @@ def main [
 
     # todo Functions archive_epub, upload_cbz, and perhaps copy_cbz_to_ereader
 
-    let authors_subdirectory = $authors | str join ", "
+    let authors_subdirectory = $authors | str join ", " | sanitize_file_name
+    # todo How to handle multiple series?
+    let series_subdirectory = (
+      # Don't use a series subdirectory if the series is only one issue long.
+      # This may change if more issues are published in the future, fyi.
+      if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+        $comic_metadata.series | sanitize_file_name
+      }
+    )
     let target_directory = (
         [$destination $authors_subdirectory]
+        | append $series_subdirectory
         | append (
             if $output_format == "pdf" {
-                $formats.pdf | path parse | get stem
+              $formats.pdf | path parse | get stem | sanitize_file_name
             } else {
-                null
+              null
             }
         )
         | path join
@@ -1057,7 +1066,7 @@ def main [
         let components = ($formats | get $output_format | path parse);
         {
           parent: $target_directory
-          stem: $components.stem
+          stem: ($components.stem | sanitize_file_name)
           extension: $components.extension
         } | path join
     )
@@ -1115,6 +1124,7 @@ def main [
     # Guess I'm willing to take that risk right now.
     let archival_target_directory = (
       [$archival_path $authors_subdirectory]
+      | append $series_subdirectory
       | append (
         if $input_format == "pdf" and $archive_pdf {
           $formats.pdf | path parse | get stem

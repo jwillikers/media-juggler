@@ -204,7 +204,7 @@ export def convert_to_opus [
 # Replace forward slashes and reserved file names with Unicode characters for use as file names
 #
 # Thank you Unicode.
-export def sanitize_file_name []: path -> path {
+export def sanitize_file_name []: string -> string {
   let name = $in
   if $name == "." {
     '․'
