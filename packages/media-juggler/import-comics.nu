@@ -117,14 +117,21 @@ export def comictagger_rename_cbz [
   --comictagger: path # ComicTagger executable
 ]: path -> path {
   let cbz = $in
+  log debug $"ComicTagger rename command: ^($comictagger) --no-cr --no-gui --rename --tags-read 'CIX' --template '{series} \({volume}\) #{issue} \({year}\)' ($cbz)";
   (
-    ^$comictagger
-    --no-cr
-    --no-gui
-    --rename
-    --tags-read "CIX"
-    --template '{series} ({volume}) #{issue} ({year})'
-    $cbz
+    do {
+      (
+        ^$comictagger
+        --no-cr
+        --no-gui
+        --rename
+        --tags-read "CIX"
+        --template '{series} ({volume}) #{issue} ({year})'
+        $cbz
+      )
+    }
+    | complete
+    | get stdout
     | lines --skip-empty
     | last
     | (
@@ -737,9 +744,10 @@ def main [
 
     log debug "Renaming the CBZ according to the updated metadata from ComicTagger"
     let formats = $formats | (
-        let format = $in;
-        $format | update cbz ($format.cbz | comictagger_rename_cbz --comictagger $comictagger)
+      let format = $in;
+      $format | update cbz ($format.cbz | comictagger_rename_cbz --comictagger $comictagger)
     )
+    log debug "Renamed the CBZ according to the updated metadata from ComicTagger"
 
     let comic_metadata = ($tag_result.result | get md)
 
@@ -946,13 +954,14 @@ def main [
             }
             let comic_info = $formats.cbz | extract_comic_info $temporary_directory;
             log debug "Extracted ComicInfo.xml";
-            let cover_url = $comic_metadata._cover_image;
+            log debug $"Cover image: ($comic_metadata._cover_image | to nuon)";
+            let cover_url = $comic_metadata._cover_image | last;
             let cover = (
-                {
-                    parent: $temporary_directory
-                    stem: "cover"
-                    extension: ($cover_url | path parse | get extension)
-                } | path join
+              {
+                parent: $temporary_directory
+                stem: "cover"
+                extension: ($cover_url | path parse | get extension)
+              } | path join
             );
             http get --raw $cover_url | save --force $cover;
             [$cover] | optimize_images;
