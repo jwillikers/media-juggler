@@ -231,26 +231,6 @@ export def "ssh rm" []: path -> nothing {
   ^ssh $target.server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($parent_directory)\'"
 }
 
-# Move a file over SSH
-export def "ssh mv" [
-  server: string
-  destination: path
-]: path -> nothing {
-  let source = $in
-  let target_directory = ($destination | path dirname)
-  if ($target_directory | is-not-empty) {
-    ^ssh $server nu --commands $"\'mkdir ($target_directory)\'"
-  }
-  ^ssh $server nu --commands $"\'mv ($source) ($destination)\'"
-  # Prune empty directories
-  if ($source | ssh path type $server) == "dir" {
-    ^ssh $server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($source)\'"
-  } else {
-    let parent_directory = $source | path dirname
-    ^ssh $server nu --commands $"\'^rmdir --ignore-fail-on-non-empty --parents ($parent_directory)\'"
-  }
-}
-
 # Determine if a path is meant for SSH, i.e. it starts with "server:"
 export def is_ssh_path []: path -> bool {
   let input = $in

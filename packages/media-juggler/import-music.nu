@@ -144,12 +144,11 @@ def main [
   --beets-config: path # The Beets config file to use
   --beets-directory: directory # The directory in which to import music with Beets. Defaults to a Music subdirectory in a temporary directory. This option can be be useful for keeping imported music between imports.
   --beets-library: path # The Beets library database file to use
-  --delete # Delete the original file
-  --ssh-server: string = "meerkat" # The address of the SSH server
-  --ssh-path: string = "/var/media/music" # The target directory on the server
-  --output-directory: directory # Directory to place files when not being uploaded
+  --destination: directory = "meerkat:/var/media/music" # The directory under which to copy files.
+  --keep # Keep the original file
   --search-id: string # An id to limit the search for metadata. One example is the MusicBrainz release id.
   --skip-upload # Don't upload files to the server
+  --use-rsync
 ] {
   if ($items | is-empty) {
     log error "No files provided"
@@ -161,14 +160,41 @@ def main [
     exit 1
   }
 
-  let output_directory = (
-    if $output_directory == null {
-      "." | path expand
-    } else {
-      $output_directory
+  let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-music-config.json"] | path join
+  let config: record = (
+    try {
+      open $config_file
+    } catch {
+      {}
     }
   )
-  mkdir $output_directory
+
+  let destination = (
+    if ($destination | is-not-empty) {
+      $destination
+    } else if ($config | get --ignore-errors destination | is-not-empty) {
+      $config.destination
+    }
+  )
+  if ($destination | is-empty) {
+    log error "Missing destination!"
+    exit 1
+  }
+
+  let destination = (
+    if ($destination | is_ssh_path) {
+      $destination # todo expand path?
+    } else {
+      if ($destination | is-empty) {
+        "." | path expand
+      } else {
+        $destination
+      }
+    }
+  )
+  if not ($destination | is_ssh_path) {
+    mkdir $destination
+  }
 
   let beets_config_data = (
     if $beets_config == null {
@@ -205,34 +231,30 @@ def main [
   # try {
 
   let item_type = (
-    if ($original_item | str starts-with "ssh:") {
-      $original_item | str replace "ssh:" "" | ssh path type $ssh_server
+    if ($original_item | is_ssh_path) {
+      $original_item | ssh_path_type
     } else {
       $original_item | path type
     }
   )
 
   let original_music_files = (
-    if ($original_item | str starts-with "ssh:") {
-      let item = $original_item | str replace "ssh:" ""
-      let item = (
-        if $item_type == "dir" {
-          $"($item)/**/*"
-        } else {
-          $item
-        }
-      )
-      $item | ssh ls $ssh_server | where type == file | get name
+    if ($original_item | is_ssh_path) {
+      let item = $original_item | split_ssh_path | get path
+      let server = $item | split_ssh_path | get server
+      if $item_type == "dir" {
+        $"($item | escape_special_glob_characters)/**/*" | ssh glob "--no-dir" "--no-symlink" | each {|file| $"($server):($file)"}
+      } else {
+        $item | ssh ls --expand-path | where type == file | get name | each {|file| $"($server):($file)"}
+      }
     } else {
       let item = (
         if $item_type == "dir" {
-          $"($original_item)/**/*"
+          glob --no-dir --no-symlink (($original_item | path expand | escape_special_glob_characters) + "/**/*")
         } else {
-          $original_item
+          [($original_item | path expand)]
         }
       )
-      ls $item | where type == file | get name
-      # glob --no-dir ([($original_item "**" "*"] | path join)
     }
   )
 
@@ -244,10 +266,15 @@ def main [
   mkdir $import_directory
 
   let item = (
-    if ($original_item | str starts-with "ssh:") {
-      let item = ($original_item | str replace "ssh:" "")
-      $item | scp $"($import_directory)/($item | path basename)"
-      [$import_directory ($item | path basename)] | path join
+    if ($original_item | is_ssh_path) {
+      let item = ($original_item | split_ssh_path | get path)
+      let target = [$import_directory ($item | path basename)] | path join
+      if $use_rsync {
+        $item | rsync $target "--mkpath"
+      } else {
+        $item | scp $target --mkdir
+      }
+      $target
     } else {
       if $item_type == "dir" {
         cp --recursive $original_item $import_directory
@@ -281,8 +308,7 @@ def main [
     $music_files
     | each {|f|
       [
-        $ssh_server
-        $ssh_path
+        $destination
         ($f | path relative-to $beets_directory)
       ] | path join
     }
@@ -291,7 +317,7 @@ def main [
     (
       $music_files
       | each {|f|
-        let target = [$output_directory ($f | path relative-to $beets_directory)] | path join
+        let target = [$destination ($f | path relative-to $beets_directory)] | path join
         mkdir ($target | path dirname)
         mv $f $target
       }
@@ -302,14 +328,18 @@ def main [
       | zip $music_file_destinations
       | each {||
         log info $"Uploading (ansi yellow)($in.0)(ansi reset) to (ansi yellow)($in.1)(ansi reset)"
-        $in.0 | ssh mv $ssh_server $in.1
+        if $use_rsync {
+          $in.0 | rsync $in.1 "--mkpath"
+        } else {
+          $in.0 | scp $in.1 --mkdir
+        }
       }
     )
   }
 
-  if $delete {
+  if not $keep {
     log debug "Deleting the original files"
-    if ($original_item | str starts-with "ssh:") {
+    if ($original_item | is_ssh_path) {
       (
         $original_music_files
         | each {|original|
@@ -340,6 +370,5 @@ def main [
   #     log error $"Import of (ansi red)($original_item)(ansi reset) failed!\n($err.msg)\n"
   #     continue
   # }
-
   }
 }
