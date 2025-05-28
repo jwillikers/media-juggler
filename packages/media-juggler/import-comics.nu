@@ -197,13 +197,13 @@ def main [
   --archive-pdf # Archive input PDF files under the --archival-path instead of uploading them to the primary bucket. This will cause a high quality CBZ file to be generated and uploaded to the primary storage server.
   --clear-comictagger-cache # Clear the ComicTagger cache to force it to pull in updated data
   --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
-  --delete # Delete the original file
   --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
   --ereader-subdirectory: string = "Books/Manga" # The subdirectory on the e-reader in-which to copy
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
   --isbn: string
   --interactive # Ask for input from the user
-  --keep # Don't delete the temporary directory when there's an error
+  --keep # Don't delete or modify the original input files
+  --keep-tmp # Don't delete the temporary directory when there's an error
   --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
   # --issue: string # The issue number
   --issue-year: string # The publication year of the issue
@@ -293,8 +293,6 @@ def main [
     rm --force --recursive ([$env.HOME ".cache" "ComicTagger"] | path join)
   }
 
-  # let results = null
-  # let original_file = $files | first
   let results = $files | each {|original_file|
 
   let original_file = (
@@ -314,21 +312,25 @@ def main [
 
   let file = (
     if ($original_file | is_ssh_path) {
-        let file = $original_file
-        let target = [$temporary_directory ($file | path basename)] | path join
-        log debug $"Downloading the file (ansi yellow)($file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-        if $use_rsync {
-          $file | rsync $target "--mkpath"
-        } else {
-          $file | scp $target --mkdir
-        }
-        $target
+      let file = $original_file
+      let target = [$temporary_directory ($file | path basename)] | path join
+      log debug $"Downloading the file (ansi yellow)($file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+      if $use_rsync {
+        $file | rsync $target "--mkpath"
       } else {
+        $file | scp $target --mkdir
+      }
+      $target
+    } else {
+      if $keep {
         let target = [$temporary_directory ($original_file | path basename)] | path join
         log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
         cp $original_file $target
         $target
+      } else {
+        $original_file
       }
+    }
   )
 
   let original_input_format = $file | path parse | get extension
@@ -426,7 +428,7 @@ def main [
       )
       if not ($covers | is-empty) {
         if ($covers | length) > 1 {
-          if not $keep {
+          if not $keep_tmp {
             rm --force --recursive $temporary_directory
           }
           return {
@@ -441,7 +443,7 @@ def main [
       let covers = (glob $"($original_file | path dirname | escape_special_glob_characters)/cover.{($image_extensions | str join ',')}")
       if not ($covers | is-empty) {
         if ($covers | length) > 1 {
-          if not $keep {
+          if not $keep_tmp {
             rm --force --recursive $temporary_directory
           }
           return {
@@ -486,8 +488,8 @@ def main [
 
   let formats = (
     if $original_input_format == "acsm" {
-      log debug "Decrypting and converting the ACSM file to an EPUB"
-      { epub: ($file | acsm_to_epub $temporary_directory) }
+      log debug "Decrypting and converting the ACSM file to the EPUB"
+      { epub: ($file | acsm_to_epub (pwd)) }
     } else if $original_input_format == "epub" {
       { epub: $file }
     } else if $original_input_format in ["cbz" "zip"] {
@@ -495,7 +497,7 @@ def main [
     } else if $original_input_format == "pdf" {
       { pdf: $file }
     } else {
-      if not $keep {
+      if not $keep_tmp {
         rm --force --recursive $temporary_directory
       }
       return {
@@ -516,6 +518,10 @@ def main [
   if "epub" in $formats {
     log debug "Optimizing the EPUB"
     $formats.epub | polish_epub | optimize_zip
+  }
+  if "pdf" in $formats {
+    log debug "Optimizing the PDF"
+    $formats.epub | optimize_pdf
   }
 
   let optimized = "epub" in $formats
@@ -573,7 +579,7 @@ def main [
                 if ($book_isbn_numbers | length) == 1 {
                     log debug "Found an exact match between the ISBN in the metadata and the ISBN in the pages of the book"
                 } else if ($book_isbn_numbers | length) > 10 {
-                    if not $keep {
+                    if not $keep_tmp {
                       rm --force --recursive $temporary_directory
                     }
                     return {
@@ -590,7 +596,7 @@ def main [
                     $book_isbn_numbers | first
                 } else {
                     if $isbn == null {
-                        if not $keep {
+                        if not $keep_tmp {
                           rm --force --recursive $temporary_directory
                         }
                         return {
@@ -735,7 +741,7 @@ def main [
         # todo Add stderr from ComicTagger here
         # todo Use make error?
         log error $"Failed to tag ($original_file)"
-        if not $keep {
+        if not $keep_tmp {
           rm --force --recursive $temporary_directory
         }
         return {
@@ -1006,7 +1012,7 @@ def main [
     if "cbz" in $formats {
       let image_format = ($formats.cbz | get_image_extension)
       if $image_format == null {
-        if not $keep {
+        if not $keep_tmp {
           rm --force --recursive $temporary_directory
         }
         return {
@@ -1019,7 +1025,7 @@ def main [
       if $image_format in ["png"] {
         $formats.cbz | convert_to_lossless_jxl | optimize_zip
       } else if $image_format != "jxl" and not $optimized {
-        $formats.cbz | optimize_images_in_zip
+        $formats.cbz | optimize_zip
       }
     }
 
@@ -1227,7 +1233,7 @@ def main [
       }
     }
 
-    if $delete {
+    if not $keep {
       log debug "Deleting the original file"
       let uploaded_paths = (
         [$target_destination]
@@ -1270,7 +1276,7 @@ def main [
       file: $original_file
     }
   } catch {|err|
-    if not $keep {
+    if not $keep_tmp {
       rm --force --recursive $temporary_directory
     }
     log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"

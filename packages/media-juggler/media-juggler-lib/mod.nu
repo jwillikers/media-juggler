@@ -1588,6 +1588,23 @@ export def optimize_zip [
   $output | advzip_recompress $optimization_level
 }
 
+# Losslessly optimize a PDF using minuimus and pdfsizeopt.
+#
+# This can take a long time, so systemd-inhibit is used to ensure the system doesn't sleep.
+# todo Use minuimus / pdfsizeopt to optimize PDFs
+export def optimize_pdf [
+  ...args: string # Arguments to pass to minuimus.pl
+]: path -> path {
+  let $pdf = $in
+  # todo Package minuimus in
+  # let result = do {^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf} | complete
+  # if $result.exit_code != 0 {
+  #   log info $"Error running '^systemd-inhibit minuimus.pl (...$args) ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+  #   return null
+  # }
+  $pdf
+}
+
 # Optimize and clean up an EPUB with Calibre
 export def polish_epub []: [path -> path] {
     let epub = $in;

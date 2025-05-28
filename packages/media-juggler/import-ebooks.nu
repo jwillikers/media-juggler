@@ -26,9 +26,9 @@ use media-juggler-lib *
 #
 def main [
     ...files: string # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. Prefix paths with "minio:" to download them from the MinIO instance
-    --delete # Delete the original file
     --isbn: string # ISBN of the book
     # --identifiers: string # asin:XXXX
+    --keep # Keep the original file
     --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
     --ereader-subdirectory: string = "Books/Books" # The subdirectory on the e-reader in-which to copy
     --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
@@ -101,10 +101,14 @@ def main [
             ^mc cp $file $target
             [$temporary_directory ($file | path basename)] | path join
         } else {
-            let target = [$temporary_directory ($original_file | path basename)] | path join
-            log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-            cp $original_file $target
-            [$temporary_directory ($original_file | path basename)] | path join
+            if $keep {
+                let target = [$temporary_directory ($original_file | path basename)] | path join
+                log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+                cp $original_file $target
+                $target
+            } else {
+                $original_file
+            }
         }
     )
 
@@ -212,12 +216,12 @@ def main [
 
     let formats = (
         if $input_format == "acsm" {
-            let epub = ($file | acsm_to_epub $temporary_directory | polish_epub | optimize_zip)
+            let epub = ($file | acsm_to_epub (pwd) | polish_epub | optimize_zip)
             { book: $epub }
         } else if $input_format == "epub" {
             { book: ($file | polish_epub | optimize_zip) }
         } else if $input_format == "pdf" {
-            { book: $file }
+            { book: ($file | optimize_pdf) }
         } else {
             rm --force --recursive $temporary_directory
             return {
@@ -227,14 +231,10 @@ def main [
         }
     )
 
-    let original_metadata = (
-        $file | get_metadata $temporary_directory
-    )
+    let original_metadata = $file | get_metadata $temporary_directory
 
     log debug "Attempting to get the ISBN from existing metadata"
-    let metadata_isbn = (
-        $original_metadata | isbn_from_metadata
-    )
+    let metadata_isbn = $original_metadata | isbn_from_metadata
     if $metadata_isbn != null {
         log debug $"Found the ISBN (ansi purple)($metadata_isbn)(ansi reset) in the book's metadata"
     }
@@ -517,7 +517,7 @@ def main [
         }
     }
 
-    if $delete {
+    if not $keep {
         let uploaded_paths = (
             [$minio_target_destination]
             | append $cover_target_destination
