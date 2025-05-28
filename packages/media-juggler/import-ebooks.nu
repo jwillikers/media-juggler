@@ -212,10 +212,10 @@ def main [
 
     let formats = (
         if $input_format == "acsm" {
-            let epub = ($file | acsm_to_epub $temporary_directory | optimize_images_in_zip | polish_epub)
+            let epub = ($file | acsm_to_epub $temporary_directory | polish_epub | optimize_zip)
             { book: $epub }
         } else if $input_format == "epub" {
-            { book: ($file | optimize_images_in_zip | polish_epub) }
+            { book: ($file | polish_epub | optimize_zip) }
         } else if $input_format == "pdf" {
             { book: $file }
         } else {

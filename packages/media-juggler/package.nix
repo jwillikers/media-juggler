@@ -1,4 +1,5 @@
 {
+  advancecomp,
   # beets,
   calibre,
   cbconvert,
@@ -37,6 +38,7 @@ else
 
     buildInputs = [
       unstable.beets
+      advancecomp
       calibre
       cbconvert
       # todo comictagger
@@ -68,6 +70,7 @@ else
       wrapProgram $out/bin/export-to-ereader.nu \
         --prefix PATH : ${
           lib.makeBinPath [
+            advancecomp
             calibre
             cbconvert
             image_optim
@@ -92,6 +95,7 @@ else
       wrapProgram $out/bin/import-comics.nu \
         --prefix PATH : ${
           lib.makeBinPath [
+            advancecomp
             calibre
             cbconvert
             # comictagger
@@ -108,6 +112,7 @@ else
       wrapProgram $out/bin/import-ebooks.nu \
         --prefix PATH : ${
           lib.makeBinPath [
+            advancecomp
             calibre
             file
             image_optim
@@ -122,6 +127,7 @@ else
       wrapProgram $out/bin/import-music.nu \
         --prefix PATH : ${
           lib.makeBinPath [
+            # todo optimize flacs like minuimus does?
             unstable.beets
             image_optim
             keyfinder-cli

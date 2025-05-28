@@ -1449,88 +1449,88 @@ export def inject_comic_info []: [
 export def acsm_to_epub [
     working_directory: directory # The scratch-space directory to use
 ]: [path -> path] {
-    let acsm_file = $in
-    log info "Closing running instance of Calibre"
-    ^calibre --shutdown-running-calibre
+  let acsm_file = $in
+  log info "Closing running instance of Calibre"
+  ^calibre --shutdown-running-calibre
 
-    log info $"Importing the ACSM file (ansi yellow)($acsm_file)(ansi reset) into Calibre. This may take a bit..."
-    let book_id = (
-        ^calibredb add --automerge overwrite -- $acsm_file
-            # todo Keep output and print in case of error?
-            # err> /dev/null
-        | lines --skip-empty
-        | last
-        | parse --regex '.* book ids: (?P<book_id>\w+)'
-        | get book_id
-        | first
-    )
-    log info $"Successfully imported into Calibre as id (ansi purple_bold)($book_id)(ansi reset)"
+  log info $"Importing the ACSM file (ansi yellow)($acsm_file)(ansi reset) into Calibre. This may take a bit..."
+  let book_id = (
+    ^calibredb add --automerge overwrite -- $acsm_file
+      # todo Keep output and print in case of error?
+      # err> /dev/null
+    | lines --skip-empty
+    | last
+    | parse --regex '.* book ids: (?P<book_id>\w+)'
+    | get book_id
+    | first
+  )
+  log info $"Successfully imported into Calibre as id (ansi purple_bold)($book_id)(ansi reset)"
 
-    log debug $"Exporting the EPUB from Calibre to (ansi yellow)($working_directory)/($book_id).epub(ansi reset)"
-    (
-        ^calibredb export
-            --dont-asciiize
-            --dont-save-cover
-            --dont-save-extra-files
-            --dont-write-opf
-            --progress
-            --template '{id}'
-            --single-dir
-            --to-dir $working_directory
-            -- $book_id
-            # err> /dev/null
-    )
+  log debug $"Exporting the EPUB from Calibre to (ansi yellow)($working_directory)/($book_id).epub(ansi reset)"
+  (
+    ^calibredb export
+      --dont-asciiize
+      --dont-save-cover
+      --dont-save-extra-files
+      --dont-write-opf
+      --progress
+      --template '{id}'
+      --single-dir
+      --to-dir $working_directory
+      -- $book_id
+      # err> /dev/null
+  )
 
-    log debug $"Removing EPUB format for book '($book_id)' in Calibre"
-    ^calibredb remove_format $book_id EPUB
-    let available_formats = (
-        ^calibredb list
-            --fields "formats"
-            --for-machine
-            --search $"id:($book_id)"
-    )
-    if ($available_formats | is-empty) {
-        log debug $"Removing book '($book_id)' in Calibre"
-        ^calibredb remove $book_id
-    }
+  log debug $"Removing EPUB format for book '($book_id)' in Calibre"
+  ^calibredb remove_format $book_id EPUB
+  let available_formats = (
+    ^calibredb list
+      --fields "formats"
+      --for-machine
+      --search $"id:($book_id)"
+  )
+  if ($available_formats | is-empty) {
+    log debug $"Removing book '($book_id)' in Calibre"
+    ^calibredb remove $book_id
+  }
 
-    ({ parent: $working_directory, stem: $book_id, extension: "epub" } | path join)
+  ({ parent: $working_directory, stem: $book_id, extension: "epub" } | path join)
 }
 
 # Losslessly optimize images
 export def optimize_images []: list<path> -> record<bytes: filesize, difference: float> {
-    let paths = $in
-    # Ignore config paths to ensure that lossy compression is not enabled.
-    log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths | str join ' ')(ansi reset)"
-    let result = ^image_optim --config-paths "" --recursive --threads ((^nproc | into int) / 2) ...$paths | complete
-    if ($result.exit_code != 0) {
-        log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths)(ansi reset)\n($result.stderr)\n"
-        return null
-    }
-    log debug $"image_optim stdout:\n($result.stdout)\n"
-    (
-        $result.stdout
-        | lines --skip-empty
-        | last
+  let paths = $in
+  # Ignore config paths to ensure that lossy compression is not enabled.
+  log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths | str join ' ')(ansi reset)"
+  let result = ^image_optim --config-paths "" --recursive --threads ((^nproc | into int) / 2) ...$paths | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths)(ansi reset)\n($result.stderr)\n"
+    return null
+  }
+  log debug $"image_optim stdout:\n($result.stdout)\n"
+  (
+    $result.stdout
+    | lines --skip-empty
+    | last
+    | (
+      let line = $in;
+      log debug $"image_optim line: ($line)";
+      if "------" in $line {
+          { difference: 0.0, bytes: (0.0 | into filesize) }
+      } else {
+        $line
+        | parse --regex 'Total:\s+(?P<difference>.+)%\s+(?P<bytes>.+)'
+        | first
         | (
-            let line = $in;
-            log debug $"image_optim line: ($line)";
-            if "------" in $line {
-                { difference: 0.0, bytes: (0.0 | into filesize) }
-            } else {
-                $line
-                | parse --regex 'Total:\s+(?P<difference>.+)%\s+(?P<bytes>.+)'
-                | first
-                | (
-                    let i = $in;
-                    {
-                        difference: ($i.difference | into float),
-                        bytes: ($i.bytes | into filesize),
-                    }
-                )
-            }
+          let i = $in;
+          {
+            difference: ($i.difference | into float),
+            bytes: ($i.bytes | into filesize),
+          }
         )
+      }
     )
+  )
 }
 
 # Losslessly optimize the images in a ZIP archive such as an EPUB or CBZ
@@ -1549,11 +1549,43 @@ export def optimize_images_in_zip []: [path -> path] {
         log info $"The archive (ansi yellow)($filename)(ansi reset) was reduced by (ansi purple_bold)($reduction.bytes)(ansi reset), a (ansi purple_bold)($reduction.difference)%(ansi reset) reduction in size"
     }
     log debug $"Compressing directory (ansi yellow)($extraction_path)(ansi reset) as (ansi yellow)($archive)(ansi reset)"
+    let temporary_archive = $archive | update parent $temporary_directory
     cd $extraction_path
-    ^zip --quiet --recurse-paths $archive .
+    ^zip --quiet --recurse-paths $temporary_archive .
     cd -
+    mv --force $temporary_archive $archive
     rm --force --recursive $temporary_directory
     $archive
+}
+
+# Optimize the compression used by a zip archive.
+#
+# Utilizes advzip from the advancecomp project.
+export def advzip_recompress [
+  optimization_level: int = 4 # The degree to which to optimize the zip archive from 0 to 4, with 4 being the best compression possible
+  ...args: string # Extra arguments to pass to advzip
+]: path -> path {
+  let archive = $in
+  let result = do {^advzip --recompress $"-($optimization_level)" ...$args $archive} | complete
+  if $result.exit_code != 0 {
+    log info $"Error running '^advzip --recompress -($optimization_level) (...$args) ($archive)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    return null
+  }
+  $archive
+}
+
+# Losslessly optimize the compression of a zip archive as well as image files in it.
+#
+# Uses image_optim to optimize image files.
+export def optimize_zip [
+  optimization_level: int = 4 # The degree to which to optimize the zip archive from 0 to 4, with 4 being the best compression possible
+]: path -> path {
+  let $archive = $in
+  let output = $archive | optimize_images_in_zip
+  if ($output | is-empty) {
+    return null
+  }
+  $output | advzip_recompress $optimization_level
 }
 
 # Optimize and clean up an EPUB with Calibre

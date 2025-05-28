@@ -515,7 +515,7 @@ def main [
 
   if "epub" in $formats {
     log debug "Optimizing the EPUB"
-    $formats.epub | optimize_images_in_zip | polish_epub
+    $formats.epub | polish_epub | optimize_zip
   }
 
   let optimized = "epub" in $formats
@@ -1017,7 +1017,7 @@ def main [
 
       # todo Detect if another lossless format, i.e. webp, is being used and if so, convert those to jxl as well.
       if $image_format in ["png"] {
-        $formats.cbz | convert_to_lossless_jxl
+        $formats.cbz | convert_to_lossless_jxl | optimize_zip
       } else if $image_format != "jxl" and not $optimized {
         $formats.cbz | optimize_images_in_zip
       }
