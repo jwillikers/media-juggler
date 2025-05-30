@@ -1427,7 +1427,7 @@ export def inject_comic_info []: [
 
 # Convert an Adobe Digital Editions ACSM file to an EPUB
 export def acsm_to_epub [
-    working_directory: directory # The scratch-space directory to use
+  working_directory: directory # The scratch-space directory to use
 ]: [path -> path] {
   let acsm_file = $in
   log info "Closing running instance of Calibre"
@@ -1481,12 +1481,12 @@ export def acsm_to_epub [
 export def optimize_images_ect []: list<path> -> record<bytes: filesize, difference: float> {
   let paths = $in
   # Ignore config paths to ensure that lossy compression is not enabled.
-  log debug $"Running command: (ansi yellow)^optimize_images_ect -9 -strip ($paths | str join ' ')(ansi reset)"
+  log debug $"Running command: (ansi yellow)^ect -9 -strip ($paths | str join ' ')(ansi reset)"
   let result = do {
-    ^optimize_images_ect -9 -strip ...$paths
+    ^ect -9 -strip ...$paths
   } | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^optimize_images_ect -9 -strip ($paths | str join ' ')(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^ect -9 -strip ($paths | str join ' ')(ansi reset)\n($result.stderr)\n"
     return null
   }
   log debug $"image_optim stdout:\n($result.stdout)\n"
