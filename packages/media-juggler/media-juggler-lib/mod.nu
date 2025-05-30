@@ -1477,18 +1477,58 @@ export def acsm_to_epub [
   ({ parent: $working_directory, stem: $book_id, extension: "epub" } | path join)
 }
 
+# Optimize images using efficient-compression-tool
+export def optimize_images_ect []: list<path> -> record<bytes: filesize, difference: float> {
+  let paths = $in
+  # Ignore config paths to ensure that lossy compression is not enabled.
+  log debug $"Running command: (ansi yellow)^optimize_images_ect -9 -strip ($paths | str join ' ')(ansi reset)"
+  let result = do {
+    ^optimize_images_ect -9 -strip ...$paths
+  } | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^optimize_images_ect -9 -strip ($paths | str join ' ')(ansi reset)\n($result.stderr)\n"
+    return null
+  }
+  log debug $"image_optim stdout:\n($result.stdout)\n"
+  (
+    $result.stdout
+    | lines --skip-empty
+    | last
+    | (
+      let line = $in;
+      log debug $"ect line: ($line)";
+      $line
+      | parse --regex 'Saved (?P<saved>.+) out of (?P<total>.+) \((?P<difference>.+)%\)'
+      | first
+      | (
+        let i = $in;
+        {
+          difference: ($i.difference | into float),
+          bytes: ($i.saved | into filesize),
+          total: ($i.total | into filesize),
+        }
+      )
+    )
+  )
+}
+
 # Losslessly optimize images
 export def optimize_images []: list<path> -> record<bytes: filesize, difference: float> {
   let paths = $in
   # Ignore config paths to ensure that lossy compression is not enabled.
   log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths | str join ' ')(ansi reset)"
-  let result = ^image_optim --config-paths "" --recursive --threads ((^nproc | into int) / 2) ...$paths | complete
+  let result = do {(
+    ^image_optim
+    --config-paths ""
+    --recursive
+    --threads ((^nproc | into int) / 2) ...$paths
+  )} | complete
   if ($result.exit_code != 0) {
     log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths)(ansi reset)\n($result.stderr)\n"
     return null
   }
   log debug $"image_optim stdout:\n($result.stdout)\n"
-  (
+  let result = (
     $result.stdout
     | lines --skip-empty
     | last
@@ -1511,6 +1551,8 @@ export def optimize_images []: list<path> -> record<bytes: filesize, difference:
       }
     )
   )
+  $paths | optimize_images_ect
+  $result
 }
 
 # Losslessly optimize the images in a ZIP archive such as an EPUB or CBZ

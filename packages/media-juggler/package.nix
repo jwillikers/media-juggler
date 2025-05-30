@@ -4,6 +4,7 @@
   calibre,
   cbconvert,
   chromaprint,
+  efficient-compression-tool,
   ffmpeg,
   file,
   image_optim,
@@ -42,6 +43,7 @@ else
       calibre
       cbconvert
       # todo comictagger
+      efficient-compression-tool
       ffmpeg
       file
       # kcc
@@ -73,6 +75,7 @@ else
             advancecomp
             calibre
             cbconvert
+            efficient-compression-tool
             image_optim
             minuimus
             # kcc
@@ -85,6 +88,7 @@ else
         --prefix PATH : ${
           lib.makeBinPath [
             chromaprint
+            efficient-compression-tool
             ffmpeg
             image_optim
             minuimus
@@ -100,6 +104,7 @@ else
             calibre
             cbconvert
             # comictagger
+            efficient-compression-tool
             image_optim
             # kcc
             minuimus
@@ -115,6 +120,7 @@ else
           lib.makeBinPath [
             advancecomp
             calibre
+            efficient-compression-tool
             file
             image_optim
             minuimus
@@ -130,6 +136,7 @@ else
           lib.makeBinPath [
             # todo optimize flacs like minuimus does?
             unstable.beets
+            efficient-compression-tool
             image_optim
             keyfinder-cli
             picard # For mbsubmit Beets plugin
