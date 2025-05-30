@@ -36,7 +36,13 @@
       package = pkgs.exiftool;
       types = [ "image" ];
     };
-    trim-trailing-whitespace.enable = true;
+    trim-trailing-whitespace = {
+      enable = true;
+      excludes = [
+        "\\.diff"
+        "\\.patch"
+      ];
+    };
     yamllint.enable = true;
   };
 }

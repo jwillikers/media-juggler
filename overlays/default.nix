@@ -3,6 +3,9 @@
   unstablePackages = final: _prev: {
     unstable = import inputs.nixpkgs-unstable { inherit (final) system; };
   };
+  image_optim = _final: prev: {
+    image_optim = prev.image_optim.override { withPngout = true; };
+  };
   m4b-tool = inputs.m4b-tool.overlay;
   calibre-acsm-plugin-libcrypto = _final: _prev: {
     # calibre = prev.calibre.overrideAttrs (prevAttrs:

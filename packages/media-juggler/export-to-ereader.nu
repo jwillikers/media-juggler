@@ -126,7 +126,7 @@ def main [
     )
 
     if $optimize_images and ($file | path parse | get extension) in ["cbz" "zip"]  {
-      $file | optimize_images_in_zip
+      $file | optimize_zip
       # todo Add support for reducing image size of epubs with ebook-polish.
     }
 

@@ -1,16 +1,18 @@
 {
+  advancecomp,
   # beets,
   calibre,
   cbconvert,
   chromaprint,
+  efficient-compression-tool,
   ffmpeg,
   file,
   image_optim,
   keyfinder-cli,
   lib,
   m4b-tool,
-  minio-client,
   makeWrapper,
+  minuimus,
   mupdf-headless,
   nushell,
   picard,
@@ -37,16 +39,18 @@ else
 
     buildInputs = [
       unstable.beets
+      advancecomp
       calibre
       cbconvert
       # todo comictagger
+      efficient-compression-tool
       ffmpeg
       file
       # kcc
       image_optim
       keyfinder-cli
       m4b-tool
-      minio-client
+      minuimus
       nushell
       picard
       tesseract
@@ -68,11 +72,13 @@ else
       wrapProgram $out/bin/export-to-ereader.nu \
         --prefix PATH : ${
           lib.makeBinPath [
+            advancecomp
             calibre
             cbconvert
+            efficient-compression-tool
             image_optim
+            minuimus
             # kcc
-            minio-client
             udisks
             util-linux
             zip
@@ -82,8 +88,10 @@ else
         --prefix PATH : ${
           lib.makeBinPath [
             chromaprint
+            efficient-compression-tool
             ffmpeg
             image_optim
+            minuimus
             m4b-tool
             tone
             zip
@@ -92,12 +100,14 @@ else
       wrapProgram $out/bin/import-comics.nu \
         --prefix PATH : ${
           lib.makeBinPath [
+            advancecomp
             calibre
             cbconvert
             # comictagger
+            efficient-compression-tool
             image_optim
             # kcc
-            minio-client
+            minuimus
             mupdf-headless
             tesseract
             udisks
@@ -108,10 +118,12 @@ else
       wrapProgram $out/bin/import-ebooks.nu \
         --prefix PATH : ${
           lib.makeBinPath [
+            advancecomp
             calibre
+            efficient-compression-tool
             file
             image_optim
-            minio-client
+            minuimus
             mupdf-headless
             tesseract
             udisks
@@ -122,10 +134,11 @@ else
       wrapProgram $out/bin/import-music.nu \
         --prefix PATH : ${
           lib.makeBinPath [
+            # todo optimize flacs like minuimus does?
             unstable.beets
+            efficient-compression-tool
             image_optim
             keyfinder-cli
-            minio-client
             picard # For mbsubmit Beets plugin
           ]
         }

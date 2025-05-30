@@ -25,216 +25,266 @@ use media-juggler-lib *
 # The path for a standalone book will look like "<authors>/<title>.epub".
 #
 def main [
-    ...files: string # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. Prefix paths with "minio:" to download them from the MinIO instance
-    --delete # Delete the original file
-    --isbn: string # ISBN of the book
-    # --identifiers: string # asin:XXXX
-    --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
-    --ereader-subdirectory: string = "Books/Books" # The subdirectory on the e-reader in-which to copy
-    --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
-    --minio-alias: string = "jwillikers" # The alias of the MinIO server used by the MinIO client application
-    --minio-path: string = "media/Books/Books" # The upload bucket and directory on the MinIO server. The file will be uploaded under a subdirectory named after the author.
-    --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
-    --output-directory: directory # Directory to place files on the local filesystem if desired
-    --skip-upload # Don't upload files to the server
-    --title: string # The title of the comic or manga issue
+  ...files: string # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. SSH style paths are supported.
+  --destination: directory = "meerkat:/var/media/books" # The directory under which to copy files.
+  --isbn: string # ISBN of the book
+  # --identifiers: string # asin:XXXX
+  --keep # Keep the original file
+  --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
+  --ereader-subdirectory: string = "Books/Books" # The subdirectory on the e-reader in-which to copy
+  --keep-tmp # Don't delete the temporary directory when there's an error
+  --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
+  --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
+  --skip-upload # Don't upload files to the server
+  --title: string # The title of the comic or manga issue
+  --use-rsync
 ] {
-    if ($files | is-empty) {
-        log error "No files provided"
-        exit 1
-    }
+  if ($files | is-empty) {
+    log error "No files provided"
+    exit 1
+  }
 
-    if $isbn != null and ($files | length) > 1 {
-        log error "Setting the ISBN for multiple files is not allowed as it can result in overwriting the final file"
-        exit 1
-    }
+  if $isbn != null and ($files | length) > 1 {
+    log error "Setting the ISBN for multiple files is not allowed as it can result in overwriting the final file"
+    exit 1
+  }
 
-    let output_directory = (
-        if $output_directory == null {
-          if $skip_upload {
-            "." | path expand
-          } else {
-            null
-          }
-        } else {
-          $output_directory | path expand
-        }
-    )
-    if $output_directory != null {
-        mkdir $output_directory
+  let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-ebooks-config.json"] | path join
+  let config: record = (
+    try {
+      open $config_file
+    } catch {
+      {}
     }
+  )
 
-    let username = (^id --name --user)
-    let ereader_disk_label = (
-      if $ereader == null {
-        null
+  let destination = (
+    if ($destination | is-not-empty) {
+      $destination
+    } else if ($config | get --ignore-errors destination | is-not-empty) {
+      $config.destination
+    }
+  )
+  if ($destination | is-empty) {
+    log error "Missing destination!"
+    exit 1
+  }
+
+  let destination = (
+    if ($destination | is_ssh_path) {
+      $destination # todo expand path?
+    } else {
+      if ($destination | is-empty) {
+        "." | path expand
       } else {
-        $ereader_profiles | where model == $ereader | first | get disk_label
+        $destination
       }
-    )
-    let ereader_mountpoint = (["/run/media" $username $ereader_disk_label] | path join)
-    let ereader_target_directory = ([$ereader_mountpoint $ereader_subdirectory] | path join)
-    if $ereader != null and not $no_copy_to_ereader {
-      if (^findmnt --target $ereader_target_directory | complete | get exit_code) != 0 {
-        ^udisksctl mount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
-        # todo Parse the mountpoint from the output of this command
-      }
-      mkdir $ereader_target_directory
     }
+  )
+  if not ($destination | is_ssh_path) {
+    mkdir $destination
+  }
 
-    # let original_file = $files | first
-    let results = $files | each {|original_file|
+  let username = (^id --name --user)
+  let ereader_disk_label = (
+    if $ereader == null {
+      null
+    } else {
+      $ereader_profiles | where model == $ereader | first | get disk_label
+    }
+  )
+  let ereader_mountpoint = (["/run/media" $username $ereader_disk_label] | path join)
+  let ereader_target_directory = ([$ereader_mountpoint $ereader_subdirectory] | path join)
+  if $ereader != null and not $no_copy_to_ereader {
+    if (^findmnt --target $ereader_target_directory | complete | get exit_code) != 0 {
+      ^udisksctl mount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
+      # todo Parse the mountpoint from the output of this command
+    }
+    mkdir $ereader_target_directory
+  }
 
-    log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
+  # let original_file = $files | first
+  let results = $files | each {|original_file|
 
-    let temporary_directory = (mktemp --directory "import-ebooks.XXXXXXXXXX")
-    log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
+  let original_file = (
+    if ($original_file | is_ssh_path) {
+      $original_file
+    } else {
+      $original_file | path expand
+    }
+  )
+
+  log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
+
+  let temporary_directory = (mktemp --directory "import-ebooks.XXXXXXXXXX")
+  log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
     # try {
 
     # todo Add support for input files from Calibre using the Calibre ID number?
-    let file = (
-        if ($original_file | str starts-with "minio:") {
-            let file = ($original_file | str replace "minio:" "")
-            let target = [$temporary_directory ($file | path basename)] | path join
-            log debug $"Downloading the file (ansi yellow)($file)(ansi reset) from MinIO to (ansi yellow)($target)(ansi reset)"
-            ^mc cp $file $target
-            [$temporary_directory ($file | path basename)] | path join
-        } else {
-            let target = [$temporary_directory ($original_file | path basename)] | path join
-            log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-            cp $original_file $target
-            [$temporary_directory ($original_file | path basename)] | path join
-        }
-    )
+  let file = (
+    if ($original_file | is_ssh_path) {
+      let file = $original_file
+      let target = [$temporary_directory ($file | path basename)] | path join
+      log debug $"Downloading the file (ansi yellow)($file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+      if $use_rsync {
+        $file | rsync $target "--mkpath"
+      } else {
+        $file | scp $target --mkdir
+      }
+      $target
+    } else {
+      if $keep {
+        let target = [$temporary_directory ($original_file | path basename)] | path join
+        log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+        cp $original_file $target
+        $target
+      } else {
+        $original_file
+      }
+    }
+  )
 
-    let original_input_format = $file | path parse | get extension
+  let original_input_format = $file | path parse | get extension
 
-    let original_opf = (
-        let opf_file = ($original_file | str replace "minio:" "" | path dirname | path join "metadata.opf");
-        if ($original_file | str starts-with "minio:") {
-            if (^mc stat $opf_file | complete).exit_code == 0 {
-                $opf_file
-            }
-        } else {
-            if ($opf_file | path exists) {
-                $opf_file
-            }
-        }
-    )
+  let original_opf = (
+    let opf_file = ($original_file | split_ssh_path | get path | path dirname | path join "metadata.opf");
+    if ($original_file | is_ssh_path) {
+      if ($opf_file | ssh_path_exists) {
+        $opf_file
+      }
+    } else {
+      if ($opf_file | path exists) {
+        $opf_file
+      }
+    }
+  )
 
+  if $original_opf != null {
+    log debug $"Found OPF metadata file (ansi yellow)($original_opf)(ansi reset)"
+  }
+
+  let opf = (
     if $original_opf != null {
-        log debug $"Found OPF metadata file (ansi yellow)($original_opf)(ansi reset)"
-    }
-
-    let opf = (
-        if $original_opf != null {
-            let target = [$temporary_directory ($original_opf | path basename)] | path join
-            if ($original_file | str starts-with "minio:") {
-                log debug $"Downloading the file (ansi yellow)($original_opf)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-                ^mc cp $original_opf $target
-            } else {
-                log debug $"Copying the file (ansi yellow)($original_opf)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-                cp $original_opf $target
-            }
-            $target
-        }
-    )
-
-    let original_cover = (
-        if ($original_file | str starts-with "minio:") {
-            let file = $original_file | str replace "minio:" ""
-            let covers = (
-                ^mc find ($file | path dirname) --name 'cover.*'
-                | lines --skip-empty
-                | filter {|f|
-                    let components = ($f | path parse);
-                    $components.stem == "cover" and $components.extension in $image_extensions
-                }
-            )
-            if not ($covers | is-empty) {
-                if ($covers | length) > 1 {
-                    rm --force --recursive $temporary_directory
-                    return {
-                        file: $original_file
-                        error: $"Found multiple files looking for the cover image file:\n($covers)\n"
-                    }
-                } else {
-                    $covers | first
-                }
-            }
+      let target = [$temporary_directory ($original_opf | path basename)] | path join
+      if ($original_opf | is_ssh_path) {
+        log debug $"Downloading the file (ansi yellow)($original_opf)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+        if $use_rsync {
+          $original_opf | rsync $target "--mkpath"
         } else {
-            let covers = (glob $"($original_file | path dirname)/cover.{($image_extensions | str join ',')}")
-            if not ($covers | is-empty) {
-                if ($covers | length) > 1 {
-                    rm --force --recursive $temporary_directory
-                    return {
-                        file: $original_file
-                        error: $"Found multiple files looking for the cover image file:\n($covers)\n"
-                    }
-                } else {
-                    $covers | first
-                }
-            }
+          $original_opf | scp $target --mkdir
         }
-    )
-
-    if $original_cover != null {
-        log debug $"Found the cover file (ansi yellow)($original_cover)(ansi reset)"
+      } else {
+        log debug $"Copying the file (ansi yellow)($original_opf)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+        cp $original_opf $target
+      }
+      $target
     }
+  )
+
+  let original_cover = (
+    if ($original_file | is_ssh_path) {
+      let file = $original_file
+      let server = $file | split_ssh_path | get server
+      let covers = (
+        $"($file | path dirname | escape_special_glob_characters)/cover.*"
+        | ssh glob "--no-dir" "--no-symlink"
+        | filter {|f|
+          let components = ($f | path parse);
+          $components.stem == "cover" and $components.extension in $image_extensions
+        }
+        | each {|file|
+          $"($server):($file)"
+        }
+      )
+      if not ($covers | is-empty) {
+        if ($covers | length) > 1 {
+          if not $keep_tmp {
+            rm --force --recursive $temporary_directory
+          }
+          return {
+            file: $original_file
+            error: $"Found multiple files looking for the cover image file:\n($covers)\n"
+          }
+        } else {
+          $covers | first
+        }
+      }
+    } else {
+      let covers = (glob $"($original_file | path dirname | escape_special_glob_characters)/cover.{($image_extensions | str join ',')}")
+      if not ($covers | is-empty) {
+        if ($covers | length) > 1 {
+          if not $keep_tmp {
+            rm --force --recursive $temporary_directory
+          }
+          return {
+            file: $original_file
+            error: $"Found multiple files looking for the cover image file:\n($covers)\n"
+          }
+        } else {
+          $covers | first
+        }
+      }
+    }
+  )
+
+  if $original_cover != null {
+    log debug $"Found the cover file (ansi yellow)($original_cover)(ansi reset)"
+  }
 
     # todo Extract the cover from metadata?
     let cover = (
-        if $original_cover != null {
-            let target = [$temporary_directory ($original_cover | path basename)] | path join
-            if ($original_file | str starts-with "minio:") {
-                log debug $"Downloading the file (ansi yellow)($original_cover)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-                ^mc cp $original_cover $target
-            } else {
-                log debug $"Copying the file (ansi yellow)($original_cover)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-                cp $original_cover $target
-            }
-            $target
+      if $original_cover != null {
+        let target = [$temporary_directory ($original_cover | path basename)] | path join
+        if ($original_cover | is_ssh_path) {
+          log debug $"Downloading the file (ansi yellow)($original_cover)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+          if $use_rsync {
+            $original_cover | rsync $target "--mkpath"
+          } else {
+            $original_cover | scp $target --mkdir
+          }
+        } else {
+          log debug $"Copying the file (ansi yellow)($original_cover)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+          cp $original_cover $target
         }
+        $target
+      }
     )
+    [$cover] | optimize_images
 
-    let original_book_files = [($original_file | str replace "minio:" "")] | append $original_cover | append $original_opf
+    let original_book_files = [($original_file | split_ssh_path | get path)] | append $original_cover | append $original_opf
     log debug $"The original files for the book are (ansi yellow)($original_book_files)(ansi reset)"
 
     let input_format = ($file | path parse | get extension)
     let output_format = (
-        if $input_format == "pdf" {
-            "pdf"
-        } else {
-            "epub"
-        }
+      if $input_format == "pdf" {
+        "pdf"
+      } else {
+        "epub"
+      }
     )
 
     let formats = (
-        if $input_format == "acsm" {
-            let epub = ($file | acsm_to_epub $temporary_directory | optimize_images_in_zip | polish_epub)
-            { book: $epub }
-        } else if $input_format == "epub" {
-            { book: ($file | optimize_images_in_zip | polish_epub) }
-        } else if $input_format == "pdf" {
-            { book: $file }
-        } else {
-            rm --force --recursive $temporary_directory
-            return {
-                file: $original_file
-                error: $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
-            }
+      if $input_format == "acsm" {
+        let epub = ($file | acsm_to_epub (pwd) | polish_epub | optimize_zip)
+        { book: $epub }
+      } else if $input_format == "epub" {
+        { book: ($file | polish_epub | optimize_zip) }
+      } else if $input_format == "pdf" {
+        { book: ($file | optimize_pdf) }
+      } else {
+        rm --force --recursive $temporary_directory
+        return {
+          file: $original_file
+          error: $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
         }
+      }
     )
 
-    let original_metadata = (
-        $file | get_metadata $temporary_directory
-    )
+    let original_metadata = $file | get_metadata $temporary_directory
 
     log debug "Attempting to get the ISBN from existing metadata"
-    let metadata_isbn = (
-        $original_metadata | isbn_from_metadata
-    )
+    let metadata_isbn = $original_metadata | isbn_from_metadata
     if $metadata_isbn != null {
         log debug $"Found the ISBN (ansi purple)($metadata_isbn)(ansi reset) in the book's metadata"
     }
@@ -438,6 +488,7 @@ def main [
         | embed_book_metadata $temporary_directory
     )
 
+    # todo Function and test case for this.
     let authors = (
       $book.opf
       | open
@@ -448,7 +499,7 @@ def main [
       | get content
       | where tag == "creator"
       | where attributes.role == "aut"
-      | par-each {|creator| $creator | get content | first | get content }
+      | par-each {|creator| $creator | get content | first | get content}
       | str trim --char ','
       | str trim
       | filter {|author| not ($author | is-empty)}
@@ -458,102 +509,112 @@ def main [
 
     let authors_subdirectory = $authors | str join ", "
     let target_subdirectory = (
-        [$authors_subdirectory]
-        | append (
-            if $output_format == "pdf" {
-                $book.book | path parse | get stem
-            } else {
-                null
-            }
-        )
-        | path join
-    )
-    let minio_target_directory = (
-        [$minio_alias $minio_path $target_subdirectory]
-        | path join
-        | sanitize_minio_filename
-    )
-    log debug $"MinIO target directory: ($minio_target_directory)"
-    let minio_target_destination = (
-        let components = $book.book | path parse;
-        {
-            parent: $minio_target_directory
-            stem: $components.stem
-            extension: $components.extension
-        } | path join | sanitize_minio_filename
-    )
-    log debug $"MinIO target destination: ($minio_target_destination)"
-    let opf_target_destination = (
+      [$authors_subdirectory]
+      # todo Add series subdirectory here
+      | append (
         if $output_format == "pdf" {
-            [
-                $minio_target_directory
-                ($book.opf | path basename)
-            ] | path join
+          $book.book | path parse | get stem | sanitize_file_name
+        } else {
+          null
         }
+      )
+      | path join
+    )
+    let target_directory = [$destination $target_subdirectory] | path join
+    log debug $"Target directory: ($target_directory)"
+    let target_destination = (
+      let components = $book.book | path parse;
+      {
+        parent: $target_directory
+        stem: ($components.stem | sanitize_file_name)
+        extension: $components.extension
+      } | path join
+    )
+    log debug $"Target destination: ($target_destination)"
+    let opf_target_destination = (
+      if $output_format == "pdf" {
+        [
+          $target_directory
+          ($book.opf | path basename)
+        ] | path join
+      }
     )
     let cover_target_destination = (
-        if $output_format == "pdf" {
-            [
-                $minio_target_directory
-                ($book.cover | path basename)
-            ] | path join
-        }
+      if $output_format == "pdf" {
+        [
+          $target_directory
+          ($book.cover | path basename)
+        ] | path join
+      }
     )
     if $skip_upload {
-        mkdir $target_subdirectory
-        if $output_format == "pdf" {
-          mv $book.book $book.cover $book.opf $target_subdirectory
-        } else {
-          mv $book.book $target_subdirectory
-        }
+      mkdir $target_subdirectory
+      if $output_format == "pdf" {
+        mv $book.book $book.cover $book.opf $target_subdirectory
+      } else {
+        mv $book.book $target_subdirectory
+      }
     } else {
-        log info $"Uploading (ansi yellow)($book.book)(ansi reset) to (ansi yellow)($minio_target_destination)(ansi reset)"
-        ^mc mv $book.book $minio_target_destination
-        if $output_format == "pdf" {
-          log info $"Uploading (ansi yellow)($book.opf)(ansi reset) to (ansi yellow)($opf_target_destination)(ansi reset)"
-          ^mc mv $book.opf $opf_target_destination
-          log info $"Uploading (ansi yellow)($book.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
-          ^mc mv $book.cover $cover_target_destination
+      log info $"Uploading (ansi yellow)($book.book)(ansi reset) to (ansi yellow)($target_destination)(ansi reset)"
+      if $use_rsync {
+        $book.book | rsync $target_destination "--mkpath"
+      } else {
+        $book.book | scp $target_destination --mkdir
+      }
+      if $output_format == "pdf" {
+        log info $"Uploading (ansi yellow)($book.opf)(ansi reset) to (ansi yellow)($opf_target_destination)(ansi reset)"
+        if $use_rsync {
+          $book.opf | rsync $target_destination "--mkpath"
+        } else {
+          $book.opf | scp $target_destination --mkdir
         }
+        log info $"Uploading (ansi yellow)($book.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
+        if $use_rsync {
+          $book.cover | rsync $target_destination "--mkpath"
+        } else {
+          $book.cover | scp $target_destination --mkdir
+        }
+      }
     }
 
-    if $delete {
-        let uploaded_paths = (
-            [$minio_target_destination]
-            | append $cover_target_destination
-            | append $opf_target_destination
-        )
-        log debug $"Uploaded paths: ($uploaded_paths)"
-        if ($original_file | str starts-with "minio:") {
-            if not $skip_upload {
-                for original in $original_book_files {
-                    if $original not-in $uploaded_paths {
-                        log info $"Deleting the file (ansi yellow)($original)(ansi reset) on MinIO"
-                        ^mc rm $original
-                    }
-                }
+    if not $keep {
+      let uploaded_paths = (
+        [$target_destination]
+        | append $cover_target_destination
+        | append $opf_target_destination
+      )
+      log debug $"Uploaded paths: ($uploaded_paths)"
+      if ($original_file | is_ssh_path) {
+        if not $skip_upload {
+          for original in $original_book_files {
+            if $original not-in $uploaded_paths {
+              log info $"Deleting the file (ansi yellow)($original)(ansi reset)"
+              $original | ssh rm
             }
-        } else {
-            if $output_directory != null {
-                for original in $original_book_files {
-                    let output = [$output_directory ($original | path basename)] | path join
-                    if $original != $output {
-                        log info $"Deleting the file (ansi yellow)($original)(ansi reset)"
-                        rm $original
-                    }
-                }
-            } else {
-                for original in $original_book_files {
-                    rm $original
-                }
-            }
+          }
         }
+      } else {
+        if $destination != null {
+          for original in $original_book_files {
+            let output = [$destination ($original | path basename)] | path join
+            if $original != $output {
+              log info $"Deleting the file (ansi yellow)($original)(ansi reset)"
+              rm $original
+            }
+          }
+        } else {
+          for original in $original_book_files {
+            rm $original
+          }
+        }
+      }
     }
     log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
     rm --force --recursive $temporary_directory
     {
-        file: $original_file
+      file: $original_file
     }
+  }
 
     # } catch {|err|
     #     rm --force --recursive $temporary_directory
@@ -563,20 +624,19 @@ def main [
     #         error: $err.msg
     #     }
     # }
-    }
 
-    if $ereader != null and not $no_copy_to_ereader {
-      if (^findmnt --target $ereader_target_directory | complete | get exit_code) == 0 {
-        ^udisksctl unmount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
-      }
+  if $ereader != null and not $no_copy_to_ereader {
+    if (^findmnt --target $ereader_target_directory | complete | get exit_code) == 0 {
+      ^udisksctl unmount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
     }
+  }
 
-    $results | to json | print
+  $results | to json | print
 
-    let errors = $results | default null error | where error != null
-    if ($errors | is-not-empty) {
-        log error $"(ansi red)Failed to import the following files due to errors!(ansi reset)"
-        $errors | get file | $"(ansi red)($in)(ansi reset)" | print --stderr
-        exit 1
-    }
+  let errors = $results | default null error | where error != null
+  if ($errors | is-not-empty) {
+    log error $"(ansi red)Failed to import the following files due to errors!(ansi reset)"
+    $errors | get file | $"(ansi red)($in)(ansi reset)" | print --stderr
+    exit 1
+  }
 }

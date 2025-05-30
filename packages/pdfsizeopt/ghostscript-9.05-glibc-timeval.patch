@@ -1,0 +1,13 @@
+diff --git a/base/gp_unix.c b/base/gp_unix.c
+index 4aa5585..c603d26 100644
+--- a/base/gp_unix.c
++++ b/base/gp_unix.c
+@@ -151,7 +151,7 @@ gp_get_realtime(long *pdt)
+     }
+ #else /* All other systems */
+     {
+-        struct timezone tzp;
++        struct timeval tzp;
+ 
+         if (gettimeofday(&tp, &tzp) == -1) {
+             lprintf("Ghostscript: gettimeofday failed!\n");

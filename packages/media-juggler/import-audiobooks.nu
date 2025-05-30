@@ -290,6 +290,17 @@ def main [
       $audiobook | insert companion_documents []
     }
   )
+  if ($audiobook.companion_documents | is-not-empty) {
+    for companion_document in $audiobook.companion_documents {
+      if ($companion_document | path parse | get extension) == "epub" {
+        $companion_document | optimize_epub | optimize_zip
+      } else if ($companion_document | path parse | get extension) == "pdf" {
+        $companion_document | optimize_pdf
+      } else if ($companion_document | path parse | get extension) == "cbz" {
+        $companion_document | optimize_zip
+      }
+    }
+  }
 
   # Next, decrypt any Audible AAX files
   let audiobook = (
