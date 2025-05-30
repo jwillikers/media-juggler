@@ -9,10 +9,14 @@ indent_style = space
 max_line_length = 120
 trim_trailing_whitespace = true
 
-[*.adoc]
+[*.{diff,patch}]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[*.{adoc,diff,patch}]
 indent_size = unset
 
-[*.{adoc,envrc,json,nix,nu,yaml,yml}]
+[*.{adoc,diff,envrc,json,nix,nu,patch,yaml,yml}]
 max_line_length = off
 
 [{justfile,.justfile,*.just}]

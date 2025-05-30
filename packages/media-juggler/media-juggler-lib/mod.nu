@@ -1576,12 +1576,20 @@ export def optimize_pdf [
   ...args: string # Arguments to pass to minuimus.pl
 ]: path -> path {
   let $pdf = $in
-  # todo Package minuimus in
-  # let result = do {^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf} | complete
-  # if $result.exit_code != 0 {
-  #   log info $"Error running '^systemd-inhibit minuimus.pl (...$args) ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
-  #   return null
-  # }
+  let original_size = ls $pdf | get size
+  let result = do {^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf} | complete
+  if $result.exit_code != 0 {
+    log info $"Error running '^systemd-inhibit minuimus.pl (...$args) ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    return null
+  }
+  let current_size = ls $pdf | get size
+  let average = (($original_size + $current_size) / 2)
+  let percent_difference = ((($original_size - $current_size) / $average) * 100)
+  if $current_size < $original_size {
+    log info $"PDF (ansi yellow)($pdf)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+  } else {
+    log debug $"No space saving achieved attempting to optimize the PDF (ansi yellow)($pdf)(ansi reset)"
+  }
   $pdf
 }
 
@@ -2503,7 +2511,7 @@ export def convert_to_lossless_jxl []: path -> path {
     let size_table = [[original current "% difference"]; [$original_size $current_size $percent_difference]]
     log info $"Converted (ansi yellow)($input_file)(ansi reset) to (ansi yellow)($file)(ansi reset) to JPEG-XL: ($size_table)"
     if $current_size > $original_size {
-        log warning "JPEG-XL comic archive increased in size compared to the original input file!"
+      log warning "JPEG-XL comic archive increased in size compared to the original input file!"
     }
     $file
 }

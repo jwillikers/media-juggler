@@ -10,8 +10,8 @@
   keyfinder-cli,
   lib,
   m4b-tool,
-  minio-client,
   makeWrapper,
+  minuimus,
   mupdf-headless,
   nushell,
   picard,
@@ -48,7 +48,7 @@ else
       image_optim
       keyfinder-cli
       m4b-tool
-      minio-client
+      minuimus
       nushell
       picard
       tesseract
@@ -74,8 +74,8 @@ else
             calibre
             cbconvert
             image_optim
+            minuimus
             # kcc
-            minio-client
             udisks
             util-linux
             zip
@@ -87,6 +87,7 @@ else
             chromaprint
             ffmpeg
             image_optim
+            minuimus
             m4b-tool
             tone
             zip
@@ -101,7 +102,7 @@ else
             # comictagger
             image_optim
             # kcc
-            minio-client
+            minuimus
             mupdf-headless
             tesseract
             udisks
@@ -116,7 +117,7 @@ else
             calibre
             file
             image_optim
-            minio-client
+            minuimus
             mupdf-headless
             tesseract
             udisks
@@ -131,7 +132,6 @@ else
             unstable.beets
             image_optim
             keyfinder-cli
-            minio-client
             picard # For mbsubmit Beets plugin
           ]
         }

@@ -72,7 +72,7 @@ def test_beet_secrets_from_env_all [] {
   ) $expected
 }
 
-def main [] [] {
+def main [] {
   test_beet_secrets_from_env_none
   test_beet_secrets_from_env_all_empty
   test_beet_secrets_from_env_one

@@ -9,3 +9,4 @@ PNGs = "PNGs"
 
 [default.extend-words]
 opf = "opf"
+ect = "ect"

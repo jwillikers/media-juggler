@@ -1,0 +1,63 @@
+diff --git a/lib/pdfsizeopt/main.py b/lib/pdfsizeopt/main.py
+index 48b2791..e996abb 100644
+--- a/lib/pdfsizeopt/main.py
++++ b/lib/pdfsizeopt/main.py
+@@ -6936,6 +6936,7 @@ class PdfData(object):
+         'targetfnq': ShellQuoteFileName(targetfn),
+         'pngout_gray_flags': '',
+         'optipng_gray_flags': '',
++        'pngcrush_gray_flags': '',
+         'sam2p_np_gray_flags': '',
+         'sam2p_pr_gray_flags': '',
+     }
+@@ -6943,6 +6944,7 @@ class PdfData(object):
+       cmd_values_dict['pngout_gray_flags'] = '-c0 '
+       # -nc: No color type reduction.
+       cmd_values_dict['optipng_gray_flags'] = '-nc -np '
++      cmd_values_dict['pngcrush_gray_flags'] = '-c0 '
+       cmd_values_dict['sam2p_np_gray_flags'] = '-s Gray1:Gray2:Gray4:Gray8:stop '
+       cmd_values_dict['sam2p_pr_gray_flags'] = '-s Gray1:Gray2:Gray4:Gray8:stop '
+     else:
+@@ -7263,8 +7265,9 @@ class PdfData(object):
+   @classmethod
+   def _IsSlowCmdName(cls, cmd_name):
+     return ('pngout' in cmd_name or 'zopflipng' in cmd_name or
+-            'optipng' in cmd_name or 'ect' in cmd_name or
+-            'advpng' in cmd_name or 'pngwolf' in cmd_name)
++            'optipng' in cmd_name or 'ect' in cmd_name or 'oxipng' in cmd_name or
++            'pngcrush' in cmd_name or 'pngquant' in cmd_name or
++            'advpng' in cmd_name or 'pngwolf' in cmd_name or 'image_optim' in cmd_name)
+ 
+   def _ConvertImageWithJbig2(self, image, cmd_name, cmd_pattern, obj_num,
+                              color_type):
+@@ -7825,6 +7828,8 @@ class PdfData(object):
+               # New pngout if: 'Unable to compress further: copying
+               # original file'
+               return_none_if_status = 0x200
++            if 'pngquant' in cmd_name:
++              return_none_if_status = 0x6200
+             image_item = self.ConvertImage(
+                 sourcefn=oi_image.file_name,
+                 is_inverted=oi_image.is_inverted,
+@@ -9431,12 +9436,18 @@ IMAGE_OPTIMIZER_CMD_MAP = {
+     # We need the -force flag specified to pngout, because on Windows
+     # pngout without the -force flag returns with a failure exit code
+     # if it can't compress the file any further.
+-    'pngout': 'pngout -force %(pngout_gray_flags)s%(sourcefnq)s %(targetfnq)s',
+-    'jbig2': 'jbig2 -p %(sourcefnq)s >%(targetfnq)s',
+-    'zopflipng': 'zopflipng -y -m --filters=p %(sourcefnq)s %(targetfnq)s',
++    'image_optim': 'image_optim %(targetfnq)s',
++    'pngcrush': 'pngcrush -blacken -q -rem alla -cc -reduce %(pngcrush_gray_flags)s%(sourcefnq)s %(targetfnq)s',
++    'oxipng': 'oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s',
++    'oxipngmax': 'oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s',
++    'oxipngmaxzopfli': 'oxipng --interlace 0 --quiet --strip all -o max --zopfli -- %(targetfnq)s',
+     'optipng':  'optipng %(sourcefnq)s -o4 -fix -force %(optipng_gray_flags)s-out %(targetfnq)s',
+     'optipng4': 'optipng %(sourcefnq)s -o4 -fix -force %(optipng_gray_flags)s-out %(targetfnq)s',
+     'optipng7': 'optipng %(sourcefnq)s -o7 -fix -force %(optipng_gray_flags)s-out %(targetfnq)s',  # Slowest.
++    'pngquant': 'pngquant --force --output=%(targetfnq)s --quality=100-100 --skip-if-larger --speed=3 256 -- %(sourcefnq)s',
++    'pngout': 'pngout -force %(pngout_gray_flags)s%(sourcefnq)s %(targetfnq)s',
++    'jbig2': 'jbig2 -p %(sourcefnq)s >%(targetfnq)s',
++    'zopflipng': 'zopflipng -y -m --filters=p %(sourcefnq)s %(targetfnq)s',
+     'ect': 'ect -9 -strip %(targetfnq)s',
+     'ECT': 'ect -9 -strip %(targetfnq)s',
+     'advpng':  'advpng -z3 -f %(targetfnq)s',

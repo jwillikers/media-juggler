@@ -17,7 +17,7 @@
         treefmt-nix.follows = "treefmt-nix";
       };
     };
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     pre-commit-hooks = {
       url = "github:cachix/pre-commit-hooks.nix";
@@ -50,6 +50,7 @@
         calibre-acsm-plugin-libcrypto
         overlays.m4b-tool
         unstablePackages
+        image_optim
       ];
     in
     flake-utils.lib.eachDefaultSystem (
@@ -59,6 +60,10 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = overlaysList;
+          config = {
+            allowUnfree = true;
+            permittedInsecurePackages = [ "python-2.7.18.8" ];
+          };
         };
         packages = import ./packages { inherit pkgs; };
         pre-commit = pre-commit-hooks.lib.${system}.run (
