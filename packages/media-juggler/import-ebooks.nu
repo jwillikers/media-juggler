@@ -88,7 +88,7 @@ def main [
   let username = (^id --name --user)
   let ereader_disk_label = (
     if $ereader == null {
-      null
+      ""
     } else {
       $ereader_profiles | where model == $ereader | first | get disk_label
     }

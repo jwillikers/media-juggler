@@ -1481,12 +1481,12 @@ export def acsm_to_epub [
 export def optimize_images_ect []: list<path> -> record<bytes: filesize, difference: float> {
   let paths = $in
   # Ignore config paths to ensure that lossy compression is not enabled.
-  log debug $"Running command: (ansi yellow)^ect -9 -strip ($paths | str join ' ')(ansi reset)"
+  log debug $"Running command: (ansi yellow)^ect -9 -recurse -strip ($paths | str join ' ')(ansi reset)"
   let result = do {
-    ^ect -9 -strip ...$paths
+    ^ect -9 -recurse -strip ...$paths
   } | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^ect -9 -strip ($paths | str join ' ')(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^ect -9 -recurse -strip ($paths | str join ' ')(ansi reset)\n($result.stderr)\n"
     return null
   }
   log debug $"image_optim stdout:\n($result.stdout)\n"
@@ -1557,27 +1557,30 @@ export def optimize_images []: list<path> -> record<bytes: filesize, difference:
 
 # Losslessly optimize the images in a ZIP archive such as an EPUB or CBZ
 export def optimize_images_in_zip []: [path -> path] {
-    let archive = ($in | path expand)
-    log debug $"Optimizing images in (ansi yellow)($archive)(ansi reset)"
-    let temporary_directory = (mktemp --directory)
-    let extraction_path = ($temporary_directory | path join "extracted")
-    log debug $"Extracting zip archive to (ansi yellow)($extraction_path)(ansi reset)"
-    ^unzip -q $archive -d $extraction_path
-    ^chmod --recursive +rw $extraction_path
-    let reduction = [$extraction_path] | optimize_images
-    log debug "Image optimization complete"
-    if $reduction.difference > 0 {
-        let filename = $archive | path basename
-        log info $"The archive (ansi yellow)($filename)(ansi reset) was reduced by (ansi purple_bold)($reduction.bytes)(ansi reset), a (ansi purple_bold)($reduction.difference)%(ansi reset) reduction in size"
-    }
-    log debug $"Compressing directory (ansi yellow)($extraction_path)(ansi reset) as (ansi yellow)($archive)(ansi reset)"
-    let temporary_archive = $archive | update parent $temporary_directory
-    cd $extraction_path
-    ^zip --quiet --recurse-paths $temporary_archive .
-    cd -
-    mv --force $temporary_archive $archive
-    rm --force --recursive $temporary_directory
-    $archive
+  let archive = ($in | path expand)
+  log debug $"Optimizing images in (ansi yellow)($archive)(ansi reset)"
+  let temporary_directory = (mktemp --directory)
+  let extraction_path = ($temporary_directory | path join "extracted")
+  log debug $"Extracting zip archive to (ansi yellow)($extraction_path)(ansi reset)"
+  ^unzip -q $archive -d $extraction_path
+  ^chmod --recursive +rw $extraction_path
+  let reduction = [$extraction_path] | optimize_images
+  log debug "Image optimization complete"
+  if $reduction.difference > 0 {
+    let filename = $archive | path basename
+    log info $"The archive (ansi yellow)($filename)(ansi reset) was reduced by (ansi purple_bold)($reduction.bytes)(ansi reset), a (ansi purple_bold)($reduction.difference)%(ansi reset) reduction in size"
+  }
+  log debug $"Compressing directory (ansi yellow)($extraction_path)(ansi reset) as (ansi yellow)($archive)(ansi reset)"
+  let temporary_archive = $archive | path parse | update parent $temporary_directory | path join
+  rm --force $temporary_archive
+  cd $extraction_path
+  log debug $"Running (ansi yellow)^zip --quiet --recurse-paths ($temporary_archive) .(ansi reset)"
+  ^zip --quiet --recurse-paths $temporary_archive .
+  cd -
+  mv --force $temporary_archive $archive
+  rm --force --recursive $temporary_directory
+  log debug $"Finished compressing (ansi yellow)($archive)(ansi reset)"
+  $archive
 }
 
 # Optimize the compression used by a zip archive.
@@ -1588,9 +1591,10 @@ export def advzip_recompress [
   ...args: string # Extra arguments to pass to advzip
 ]: path -> path {
   let archive = $in
+  log debug $"Running (ansi yellow)^advzip --recompress -($optimization_level) ($args | str join ' ') ($archive)(ansi reset)"
   let result = do {^advzip --recompress $"-($optimization_level)" ...$args $archive} | complete
   if $result.exit_code != 0 {
-    log info $"Error running '^advzip --recompress -($optimization_level) (...$args) ($archive)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    log error $"Error running (ansi yellow)^advzip --recompress -($optimization_level) ($args | str join ' ') ($archive)(ansi reset)\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
   $archive
@@ -1603,11 +1607,23 @@ export def optimize_zip [
   optimization_level: int = 4 # The degree to which to optimize the zip archive from 0 to 4, with 4 being the best compression possible
 ]: path -> path {
   let $archive = $in
+  log debug $"Optimizing ZIP archive (ansi yellow)($archive)(ansi reset)"
+  let original_size = ls $archive | get size | first
   let output = $archive | optimize_images_in_zip
   if ($output | is-empty) {
     return null
   }
-  $output | advzip_recompress $optimization_level
+  let archive = $output | advzip_recompress $optimization_level
+  let current_size = ls $archive | get size | first
+  let average = (($original_size + $current_size) / 2)
+  let percent_difference = ((($original_size - $current_size) / $average) * 100)
+  if $current_size < $original_size {
+    log info $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+  } else {
+    log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
+  }
+  log debug $"Finished Optimizing ZIP archive (ansi yellow)($archive)(ansi reset)"
+  $archive
 }
 
 # Losslessly optimize a PDF using minuimus and pdfsizeopt.
@@ -1618,13 +1634,13 @@ export def optimize_pdf [
   ...args: string # Arguments to pass to minuimus.pl
 ]: path -> path {
   let $pdf = $in
-  let original_size = ls $pdf | get size
+  let original_size = ls $pdf | get size | first
   let result = do {^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf} | complete
   if $result.exit_code != 0 {
     log info $"Error running '^systemd-inhibit minuimus.pl (...$args) ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
-  let current_size = ls $pdf | get size
+  let current_size = ls $pdf | get size | first
   let average = (($original_size + $current_size) / 2)
   let percent_difference = ((($original_size - $current_size) / $average) * 100)
   if $current_size < $original_size {

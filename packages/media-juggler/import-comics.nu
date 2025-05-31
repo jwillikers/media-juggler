@@ -273,7 +273,7 @@ def main [
   let username = (^id --name --user)
   let ereader_disk_label = (
     if $ereader == null {
-      null
+      ""
     } else {
       $ereader_profiles | where model == $ereader | first | get disk_label
     }
@@ -1260,12 +1260,12 @@ def main [
           let output = [$destination ($original | path basename)] | path join
           if $original != $output {
             log info $"Deleting the file (ansi yellow)($original)(ansi reset)"
-            rm $original
+            rm --force $original
           }
         }
       } else {
         for original in $original_comic_files {
-          rm $original
+          rm --force $original
         }
       }
     }
