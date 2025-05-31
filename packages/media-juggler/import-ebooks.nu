@@ -599,12 +599,12 @@ def main [
             let output = [$destination ($original | path basename)] | path join
             if $original != $output {
               log info $"Deleting the file (ansi yellow)($original)(ansi reset)"
-              rm $original
+              rm --force $original
             }
           }
         } else {
           for original in $original_book_files {
-            rm $original
+            rm --force $original
           }
         }
       }
