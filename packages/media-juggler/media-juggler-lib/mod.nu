@@ -1481,12 +1481,12 @@ export def acsm_to_epub [
 export def optimize_images_ect []: list<path> -> record<bytes: filesize, difference: float> {
   let paths = $in
   # Ignore config paths to ensure that lossy compression is not enabled.
-  log debug $"Running command: (ansi yellow)^ect -9 -recurse -strip ($paths | str join ' ')(ansi reset)"
+  log debug $"Running command: (ansi yellow)^ect -9 -recurse -strip --mt-deflate ($paths | str join ' ')(ansi reset)"
   let result = do {
-    ^ect -9 -recurse -strip ...$paths
+    ^ect -9 -recurse -strip --mt-deflate ...$paths
   } | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^ect -9 -recurse -strip ($paths | str join ' ')(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^ect -9 -recurse -strip --mt-deflate ($paths | str join ' ')(ansi reset)\n($result.stderr)\n"
     return null
   }
   log debug $"image_optim stdout:\n($result.stdout)\n"
@@ -1600,11 +1600,26 @@ export def advzip_recompress [
   $archive
 }
 
+# Optimize a ZIP archive using efficient-compression-tool
+export def optimize_zip_ect [
+  optimization_level: int = 9 # The degree to which to optimize the zip archive from 1 to 9, with 9 being the best compression possible
+  ...args: string # Extra arguments to pass to advzip
+]: path -> path {
+  let archive = $in
+  log debug $"Running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)"
+  let result = do {^ect $"-($optimization_level)" -strip -zip --mt-deflate ...$args $archive} | complete
+  if $result.exit_code != 0 {
+    log error $"Error running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    return null
+  }
+  $archive
+}
+
 # Losslessly optimize the compression of a zip archive as well as image files in it.
 #
 # Uses image_optim to optimize image files.
 export def optimize_zip [
-  optimization_level: int = 4 # The degree to which to optimize the zip archive from 0 to 4, with 4 being the best compression possible
+  optimization_level: int = 9 # The degree to which to optimize the zip archive from 1 to 9, with 9 being the best compression possible
 ]: path -> path {
   let $archive = $in
   log debug $"Optimizing ZIP archive (ansi yellow)($archive)(ansi reset)"
@@ -1613,7 +1628,7 @@ export def optimize_zip [
   if ($output | is-empty) {
     return null
   }
-  let archive = $output | advzip_recompress $optimization_level
+  let archive = $output | optimize_zip_ect $optimization_level
   let current_size = ls $archive | get size | first
   let average = (($original_size + $current_size) / 2)
   let percent_difference = ((($original_size - $current_size) / $average) * 100)
