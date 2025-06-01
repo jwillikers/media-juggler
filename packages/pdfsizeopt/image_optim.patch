@@ -1,5 +1,5 @@
 diff --git a/lib/pdfsizeopt/main.py b/lib/pdfsizeopt/main.py
-index 48b2791..66f7f59 100644
+index 48b2791..3bf2e3c 100644
 --- a/lib/pdfsizeopt/main.py
 +++ b/lib/pdfsizeopt/main.py
 @@ -6936,6 +6936,8 @@ class PdfData(object):
@@ -41,15 +41,16 @@ index 48b2791..66f7f59 100644
              image_item = self.ConvertImage(
                  sourcefn=oi_image.file_name,
                  is_inverted=oi_image.is_inverted,
-@@ -9431,12 +9438,22 @@ IMAGE_OPTIMIZER_CMD_MAP = {
+@@ -9431,14 +9438,25 @@ IMAGE_OPTIMIZER_CMD_MAP = {
      # We need the -force flag specified to pngout, because on Windows
      # pngout without the -force flag returns with a failure exit code
      # if it can't compress the file any further.
 -    'pngout': 'pngout -force %(pngout_gray_flags)s%(sourcefnq)s %(targetfnq)s',
 -    'jbig2': 'jbig2 -p %(sourcefnq)s >%(targetfnq)s',
 -    'zopflipng': 'zopflipng -y -m --filters=p %(sourcefnq)s %(targetfnq)s',
-+    'image_optim': 'image_optim %(targetfnq)s && ect -9 -strip %(targetfnq)s',
-+    'oxipng_ect': 'oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s && ect -9 -strip %(targetfnq)s',
++    'image_optim': 'image_optim %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
++    'oxipng_ect': 'oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
++    'oxipngmax_ect': 'oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
 +    # 'image_optim_set': 'pngcrush -blacken -ow -q -rem alla -reduce %(image_optim_set_gray_flags)s%(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s && pngquant --force --output=%(targetfnq)s --quality=100-100 --skip-if-larger --speed=3 256 -- %(targetfnq)s || true && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
 +    # 'image_optim_set_all': 'pngcrush -blacken -ow -q -rem alla -reduce %(pngcrush_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s && optipng %(targetfnq)s -clobber -o4 -fix -force %(optipng_gray_flags)s && pngquant --force --output=%(targetfnq)s --quality=100-100 --skip-if-larger --speed=3 256 -- %(targetfnq)s || true && pngout -force %(pngout_gray_flags)s%(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
 +    # 'image_optim_set_oxipng_max': 'pngcrush -ow -blacken -q -rem alla -reduce %(pngcrush_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && optipng %(sourcefnq)s -o4 -fix -force %(optipng_gray_flags)s-out %(targetfnq)s && pngquant --force --output=%(targetfnq)s --quality=100-100 --skip-if-larger --speed=3 256 -- %(sourcefnq)s || true && pngout -force %(pngout_gray_flags)s%(sourcefnq)s %(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
@@ -60,10 +61,14 @@ index 48b2791..66f7f59 100644
      'optipng':  'optipng %(sourcefnq)s -o4 -fix -force %(optipng_gray_flags)s-out %(targetfnq)s',
      'optipng4': 'optipng %(sourcefnq)s -o4 -fix -force %(optipng_gray_flags)s-out %(targetfnq)s',
      'optipng7': 'optipng %(sourcefnq)s -o7 -fix -force %(optipng_gray_flags)s-out %(targetfnq)s',  # Slowest.
+-    'ect': 'ect -9 -strip %(targetfnq)s',
+-    'ECT': 'ect -9 -strip %(targetfnq)s',
 +    'pngquant': 'pngquant --force --output=%(targetfnq)s --quality=100-100 --skip-if-larger --speed=3 256 -- %(sourcefnq)s',
 +    'pngout': 'pngout -force %(pngout_gray_flags)s%(sourcefnq)s %(targetfnq)s',
 +    'jbig2': 'jbig2 -p %(sourcefnq)s >%(targetfnq)s',
 +    'zopflipng': 'zopflipng -y -m --filters=p %(sourcefnq)s %(targetfnq)s',
-     'ect': 'ect -9 -strip %(targetfnq)s',
-     'ECT': 'ect -9 -strip %(targetfnq)s',
++    'ect': 'ect -9 -strip --mt-deflate %(targetfnq)s',
++    'ECT': 'ect -9 -strip --mt-deflate %(targetfnq)s',
      'advpng':  'advpng -z3 -f %(targetfnq)s',
+     'advpng3': 'advpng -z3 -f %(targetfnq)s',
+     'advpng4': 'advpng -z4 -f %(targetfnq)s',  # Slowest, this uses Zopfli.

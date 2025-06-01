@@ -2,6 +2,8 @@
 
 # ~/Projects/media-juggler/packages/media-juggler/import-comics.nu --output-directory ~/Downloads ~/Downloads/ComicTagger-x86_64.AppImage ...(^mc find --name '*.cbz' "jwillikers/media/Books/Books/Ryoko Kui" | lines | par-each {|l| "minio:" + $l})
 
+# todo Support / prefer CBT, especially using zstd compression?
+
 # todo Place the Calibre library and database in the temporary directory
 
 use std log
@@ -201,6 +203,7 @@ def main [
   --ereader-subdirectory: string = "Books/Manga" # The subdirectory on the e-reader in-which to copy
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
   --isbn: string
+  --jxl # Convert lossless PNG images to JXL
   --interactive # Ask for input from the user
   --keep # Don't delete or modify the original input files
   --keep-tmp # Don't delete the temporary directory when there's an error
@@ -233,6 +236,10 @@ def main [
     log error "Setting the ISBN for multiple files is not allowed as it will result in overwriting the final file"
     exit 1
   }
+
+  let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-comics"] | path join
+  let optimized_files_cache_file = [$cache_directory optimized.json] | path join
+  mkdir $cache_directory
 
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-comics-config.json"] | path join
   let config: record = (
@@ -515,17 +522,6 @@ def main [
     }
   )
 
-  if "epub" in $formats {
-    log debug "Optimizing the EPUB"
-    $formats.epub | polish_epub | optimize_zip
-  }
-  if "pdf" in $formats {
-    log debug "Optimizing the PDF"
-    $formats.epub | optimize_pdf
-  }
-
-  let optimized = "epub" in $formats
-
   # Generate a CBZ from the PDF format which may be used to extract the ISBN.
   let formats = (
     if "pdf" in $formats {
@@ -546,27 +542,27 @@ def main [
 
   log debug "Attempting to get the ISBN from the first ten and last ten pages of the book"
   let book_isbn_numbers = (
-      let isbn_numbers = $file | isbn_from_pages $temporary_directory;
-      if not $skip_ocr and ($isbn_numbers | is-empty) {
-          log debug "ISBN not detected in text. Attempting to ISBN from images using OCR."
-          # Check images for the ISBN if text doesn't work out.
-          if "cbz" in $formats {
-              let isbn_from_cbz = $formats.cbz | isbn_from_pages $temporary_directory
-              if ($isbn_from_cbz | is-not-empty) {
-                $isbn_from_cbz
-              }
-          } else if "epub" in $formats {
-              let isbn_from_epub = $formats.epub | isbn_from_pages $temporary_directory
-              if ($isbn_from_epub | is-not-empty) {
-                $isbn_from_epub
-              }
-          }
-      } else {
-          $isbn_numbers
+    let isbn_numbers = $file | isbn_from_pages $temporary_directory;
+    if not $skip_ocr and ($isbn_numbers | is-empty) {
+      log debug "ISBN not detected in text. Attempting to ISBN from images using OCR."
+      # Check images for the ISBN if text doesn't work out.
+      if "cbz" in $formats {
+        let isbn_from_cbz = $formats.cbz | isbn_from_pages $temporary_directory
+        if ($isbn_from_cbz | is-not-empty) {
+          $isbn_from_cbz
+        }
+      } else if "epub" in $formats {
+        let isbn_from_epub = $formats.epub | isbn_from_pages $temporary_directory
+        if ($isbn_from_epub | is-not-empty) {
+          $isbn_from_epub
+        }
       }
+    } else {
+      $isbn_numbers
+    }
   )
   if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
-      log debug $"Found ISBN numbers in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
+    log debug $"Found ISBN numbers in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
   }
 
   # Determine the most likely ISBN from the metadata and pages
@@ -698,6 +694,35 @@ def main [
       }
     )
   )
+
+  # If the input format is EPUB, optimize the images before generating the CBZ.
+  # This avoids optimizing the same images twice.
+  let optimized_file_hashes = (
+    try {
+      open $optimized_files_cache_file
+    } catch {
+      {sha256: []}
+    }
+  )
+  let updated_optimized_file_hashes = (
+    $optimized_file_hashes | update sha256 (
+      $optimized_file_hashes.sha256 | append (
+        if "epub" in $formats {
+          # todo I might need to fix this to work with larger files
+          let hash = $formats.epub | open --raw | hash sha256
+          if $hash not-in $optimized_file_hashes.sha256 {
+            log debug "Optimizing the EPUB"
+            $formats.epub | polish_epub | optimize_images_in_zip | open --raw | hash sha256
+          }
+        }
+      ) | uniq | sort
+    )
+  )
+  if $updated_optimized_file_hashes != $optimized_file_hashes {
+    $updated_optimized_file_hashes | save --force $optimized_files_cache_file
+  }
+  let optimized_file_hashes = $updated_optimized_file_hashes
+  let images_optimized = "epub" in $formats
 
   # Generate a CBZ from the EPUB and PDF formats
   let formats = (
@@ -999,7 +1024,7 @@ def main [
             ) | inject_comic_info
           )
         } else {
-          log debug "Dropping cbz from formats";
+          log debug "Dropping cbz from formats since the input format is a PDF";
           $input | reject cbz
         }
       )
@@ -1009,25 +1034,72 @@ def main [
   )
   log debug "Finished renaming files";
 
-  if "cbz" in $formats {
-    let image_format = ($formats.cbz | get_image_extension)
-    if $image_format == null {
-      if not $keep_tmp {
-        rm --force --recursive $temporary_directory
-      }
-      return {
-        file: $original_file
-        error: "Failed to determine the image file format"
-      }
-    }
+  let updated_optimized_file_hashes = (
+    $optimized_file_hashes | update sha256 (
+      $optimized_file_hashes.sha256 | append (
+        if "epub" in $formats {
+          # At this point, the images in the EPUB should be optimized.
+          # Just optimize the compression.
+          # Since we already cached the hash of this file, if nothing else has changed, we'll accidentally skip this part.
+          # So, ignore any existing hash for the epub and optimize it anyway.
+          # todo I could use a separate cache for that for just images optimized and use the normal cache here.
+          # todo I might need to fix this to work with larger files
+          # todo Expire the cache?
+          # let hash = $formats.epub | open --raw | hash sha256
+          # if $hash not-in $optimized_file_hashes.sha256 {
+            log debug "Optimizing the EPUB ZIP compression"
+            $formats.epub | optimize_zip_ect | open --raw | hash sha256
+          # }
+        }
+      ) | append (
+        if "pdf" in $formats {
+          let hash = $formats.pdf | open --raw | hash sha256
+          if $hash not-in $optimized_file_hashes.sha256 {
+            log debug "Optimizing the PDF"
+            $formats.pdf | optimize_pdf | open --raw | hash sha256
+          }
+        }
+      ) | append (
+        if "cbz" in $formats {
+          let image_format = ($formats.cbz | get_image_extension)
+          if $image_format == null {
+            if not $keep_tmp {
+              rm --force --recursive $temporary_directory
+            }
+            return {
+              file: $original_file
+              error: "Failed to determine the image file format"
+            }
+          }
 
-    # todo Detect if another lossless format, i.e. webp, is being used and if so, convert those to jxl as well.
-    if $image_format in ["png"] {
-      $formats.cbz | convert_to_lossless_jxl | optimize_zip
-    } else if $image_format != "jxl" and not $optimized {
-      $formats.cbz | optimize_zip
-    }
+          # todo Detect if another lossless format, i.e. webp, is being used and if so, convert those to jxl as well.
+          if $image_format in ["png"] and $jxl {
+            $formats.cbz | convert_to_lossless_jxl | optimize_zip_ect
+          # todo Someday, will it be possible to further optimize JXL?
+          } else if $image_format != "jxl" {
+            if $images_optimized {
+              # Just optimize the ZIP compression in this case
+              let hash = $formats.cbz | open --raw | hash sha256
+              if $hash not-in $optimized_file_hashes.sha256 {
+                log debug "Optimizing the CBZ archive's ZIP compression"
+                $formats.cbz | optimize_zip_ect | open --raw | hash sha256
+              }
+            } else {
+              let hash = $formats.cbz | open --raw | hash sha256
+              if $hash not-in $optimized_file_hashes.sha256 {
+                log debug "Optimizing the CBZ"
+                $formats.cbz | optimize_zip | open --raw | hash sha256
+              }
+            }
+          }
+        }
+      ) | uniq | sort
+    )
+  )
+  if $updated_optimized_file_hashes != $optimized_file_hashes {
+    $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
+  let optimized_file_hashes = $updated_optimized_file_hashes
 
   # Not sure if "webp" would really be any better than jpeg here or not...
   # I'm assuming it might at least be a little bit smaller given cbconvert doesn't appear to use mozjpeg.

@@ -49,6 +49,10 @@ def main [
     exit 1
   }
 
+  let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-ebooks"] | path join
+  let optimized_files_cache_file = [$cache_directory optimized.json] | path join
+  mkdir $cache_directory
+
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-ebooks-config.json"] | path join
   let config: record = (
     try {
@@ -266,12 +270,10 @@ def main [
 
     let formats = (
       if $input_format == "acsm" {
-        let epub = ($file | acsm_to_epub (pwd) | polish_epub | optimize_zip)
+        let epub = ($file | acsm_to_epub (pwd))
         { book: $epub }
-      } else if $input_format == "epub" {
-        { book: ($file | polish_epub | optimize_zip) }
-      } else if $input_format == "pdf" {
-        { book: ($file | optimize_pdf) }
+      } else if $input_format in ["epub" "pdf"] {
+        { book: $file }
       } else {
         rm --force --recursive $temporary_directory
         return {
@@ -312,7 +314,7 @@ def main [
         }
     )
     if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
-        log debug $"Found ISBN numbers in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
+      log debug $"Found ISBN numbers in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
     }
 
     # Determine the most likely ISBN from the metadata and pages
@@ -487,6 +489,42 @@ def main [
         | export_book_to_directory $temporary_directory
         | embed_book_metadata $temporary_directory
     )
+
+  let optimized_file_hashes = (
+    try {
+      open $optimized_files_cache_file
+    } catch {
+      {sha256: []}
+    }
+  )
+
+  let updated_optimized_file_hashes = (
+    $optimized_file_hashes | update sha256 (
+      $optimized_file_hashes.sha256 | append (
+        if $output_format == "epub" {
+          # todo I might need to fix this to work with larger files
+          let hash = $book.book | open --raw | hash sha256
+          if $hash not-in $optimized_file_hashes.sha256 {
+            log debug "Optimizing the EPUB"
+            $book.book | polish_epub | optimize_zip | open --raw | hash sha256
+          }
+        }
+      ) | append (
+        if $output_format == "pdf" {
+          let hash = $book.book | open --raw | hash sha256
+          if $hash not-in $optimized_file_hashes.sha256 {
+            log debug "Optimizing the PDF"
+            $book.book | optimize_pdf | open --raw | hash sha256
+          }
+        }
+      ) | uniq | sort
+    )
+  )
+
+  if $updated_optimized_file_hashes != $optimized_file_hashes {
+    $updated_optimized_file_hashes | save --force $optimized_files_cache_file
+  }
+  let optimized_file_hashes = $updated_optimized_file_hashes
 
     # todo Function and test case for this.
     let authors = (
