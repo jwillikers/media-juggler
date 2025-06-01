@@ -6,6 +6,7 @@
 
 # todo Place the Calibre library and database in the temporary directory
 
+use std assert
 use std log
 use media-juggler-lib *
 
@@ -297,7 +298,7 @@ def main [
 
   if $clear_comictagger_cache {
     log debug "Clearing the ComicTagger cache"
-    rm --force --recursive ([$env.HOME ".cache" "ComicTagger"] | path join)
+    rm --force --recursive ([($nu.cache-dir | path dirname) "ComicTagger"] | path join)
   }
 
   let results = $files | each {|original_file|
@@ -660,8 +661,8 @@ def main [
         $formats
         | get $input_format
         | fetch_book_metadata --isbn $isbn $temporary_directory
-        | export_book_to_directory $temporary_directory
-        | embed_book_metadata $temporary_directory
+        | export_book_to_directory ($formats | get $input_format | path dirname)
+        | embed_book_metadata
         | get book
       )
     } else {
@@ -949,8 +950,8 @@ def main [
           --title $title
           $temporary_directory
         )
-        | export_book_to_directory $temporary_directory
-        | embed_book_metadata $temporary_directory
+        | export_book_to_directory ($formats | get "epub" | path dirname)
+        | embed_book_metadata
         | (
           let input = $in;
           (

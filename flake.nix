@@ -48,6 +48,7 @@
       overlays = import ./overlays { inherit inputs; };
       overlaysList = with overlays; [
         calibre-acsm-plugin-libcrypto
+        efficient-compression-tool
         overlays.m4b-tool
         unstablePackages
         image_optim

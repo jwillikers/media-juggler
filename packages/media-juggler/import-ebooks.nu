@@ -473,21 +473,21 @@ def main [
             let input = $in;
             $input | update opf (
                 if $input.opf != null {
-                    # todo Should probably have a better way of merging metadata
-                    $original_metadata.opf | merge $input.opf
+                  # todo Should probably have a better way of merging metadata
+                  $original_metadata.opf | merge $input.opf
                 } else {
-                    $original_metadata.opf
+                  $original_metadata.opf
                 }
             ) | update cover (
                 if $cover != null {
-                    $cover
+                  $cover
                 } else {
-                    $input.cover
+                  $input.cover
                 }
             )
         )
-        | export_book_to_directory $temporary_directory
-        | embed_book_metadata $temporary_directory
+        | export_book_to_directory ($formats.book | path dirname)
+        | embed_book_metadata
     )
 
   let optimized_file_hashes = (
