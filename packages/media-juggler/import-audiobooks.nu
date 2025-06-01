@@ -57,6 +57,8 @@ def main [
   }
 
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-audiobooks"] | path join
+  let optimized_files_cache_file = [$cache_directory optimized.json] | path join
+  mkdir $cache_directory
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-audiobooks-config.json"] | path join
   let config: record = (
     try {
@@ -290,17 +292,40 @@ def main [
       $audiobook | insert companion_documents []
     }
   )
-  if ($audiobook.companion_documents | is-not-empty) {
-    for companion_document in $audiobook.companion_documents {
-      if ($companion_document | path parse | get extension) == "epub" {
-        $companion_document | optimize_epub | optimize_zip
-      } else if ($companion_document | path parse | get extension) == "pdf" {
-        $companion_document | optimize_pdf
-      } else if ($companion_document | path parse | get extension) == "cbz" {
-        $companion_document | optimize_zip
-      }
+
+  let optimized_file_hashes = (
+    try {
+      open $optimized_files_cache_file
+    } catch {
+      {sha256: []}
     }
+  )
+  let updated_optimized_file_hashes = (
+    $optimized_file_hashes | update sha256 (
+      $optimized_file_hashes.sha256 | append (
+        if ($audiobook.companion_documents | is-not-empty) {
+          $audiobook.companion_documents | each {|companion_document|
+            let hash = $companion_document | open --raw | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              log debug $"Optimizing accompanying document (ansi yellow)($companion_document)(ansi reset)"
+              if ($companion_document | path parse | get extension) == "epub" {
+                $companion_document | polish_epub | optimize_zip
+              } else if ($companion_document | path parse | get extension) == "pdf" {
+                $companion_document | optimize_pdf
+              } else if ($companion_document | path parse | get extension) == "cbz" {
+                $companion_document | optimize_zip
+              }
+              $companion_document | open --raw | hash sha256
+            }
+          }
+        }
+      ) | uniq | sort
+    )
+  )
+  if $updated_optimized_file_hashes != $optimized_file_hashes {
+    $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
+  let optimized_file_hashes = $updated_optimized_file_hashes
 
   # Next, decrypt any Audible AAX files
   let audiobook = (
