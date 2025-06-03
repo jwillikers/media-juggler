@@ -57,6 +57,8 @@ def main [
   }
 
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-audiobooks"] | path join
+  let optimized_files_cache_file = [$cache_directory optimized.json] | path join
+  mkdir $cache_directory
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-audiobooks-config.json"] | path join
   let config: record = (
     try {
@@ -283,24 +285,47 @@ def main [
 
   # Locate any supplementary documents, i.e. accompanying PDFs
   let audiobook = (
-    let companion_documents = (glob $"($audiobook.directory | escape_special_glob_characters)/*.{($audiobook_companion_document_file_extensions | str join ',')}");
-    if ($companion_documents | is-not-empty) {
-      $audiobook | insert companion_documents $companion_documents
+    let accompanying_documents = (glob $"($audiobook.directory | escape_special_glob_characters)/*.{($audiobook_accompanying_document_file_extensions | str join ',')}");
+    if ($accompanying_documents | is-not-empty) {
+      $audiobook | insert accompanying_documents $accompanying_documents
     } else {
-      $audiobook | insert companion_documents []
+      $audiobook | insert accompanying_documents []
     }
   )
-  if ($audiobook.companion_documents | is-not-empty) {
-    for companion_document in $audiobook.companion_documents {
-      if ($companion_document | path parse | get extension) == "epub" {
-        $companion_document | optimize_epub | optimize_zip
-      } else if ($companion_document | path parse | get extension) == "pdf" {
-        $companion_document | optimize_pdf
-      } else if ($companion_document | path parse | get extension) == "cbz" {
-        $companion_document | optimize_zip
-      }
+
+  let optimized_file_hashes = (
+    try {
+      open $optimized_files_cache_file
+    } catch {
+      {sha256: []}
     }
+  )
+  let updated_optimized_file_hashes = (
+    $optimized_file_hashes | update sha256 (
+      $optimized_file_hashes.sha256 | append (
+        if ($audiobook.accompanying_documents | is-not-empty) {
+          $audiobook.accompanying_documents | each {|accompanying_document|
+            let hash = $accompanying_document | open --raw | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              log debug $"Optimizing accompanying document (ansi yellow)($accompanying_document)(ansi reset)"
+              if ($accompanying_document | path parse | get extension) == "epub" {
+                $accompanying_document | polish_epub | optimize_zip
+              } else if ($accompanying_document | path parse | get extension) == "pdf" {
+                $accompanying_document | optimize_pdf
+              } else if ($accompanying_document | path parse | get extension) == "cbz" {
+                $accompanying_document | optimize_zip
+              }
+              $accompanying_document | open --raw | hash sha256
+            }
+          }
+        }
+      ) | uniq | sort
+    )
+  )
+  if $updated_optimized_file_hashes != $optimized_file_hashes {
+    $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
+  let optimized_file_hashes = $updated_optimized_file_hashes
 
   # Next, decrypt any Audible AAX files
   let audiobook = (
@@ -606,12 +631,25 @@ def main [
   )
 
   # todo Get supplementary document metadata from BookBrainz
-  let audiobook = $audiobook | update companion_documents (
-    $audiobook.companion_documents
+  if (
+      ($audiobook.accompanying_documents | length) == 1
+      and ($audiobook.accompanying_documents | first | path parse | get extension) in ["epub" "pdf"]
+    ) {
+    # todo Embed metadata in ComicInfo.xml for CBZ files.
+    (
+      ^ebook-meta
+      ($audiobook.accompanying_documents | first)
+      --title $metadata.book.title
+      --authors ($primary_authors | str join "&")
+    )
+  }
+
+  let audiobook = $audiobook | update accompanying_documents (
+    $audiobook.accompanying_documents
     | each {|document|
       let stem = (
         # For a single file, rename the file to match the book.
-        if ($audiobook.companion_documents | length) == 1 {
+        if ($audiobook.accompanying_documents | length) == 1 {
           $metadata.book.title | sanitize_file_name
         # For multiple files, leave the names as is.
         } else {
@@ -633,7 +671,7 @@ def main [
   # if top_part matches top_part, and audiobook_directory matches bottom_part, use existing path.
 
   if ($target_destination_directory | is_ssh_path) {
-    $audiobook.files | append $audiobook.companion_documents | each {|file|
+    $audiobook.files | append $audiobook.accompanying_documents | each {|file|
       log info $"Uploading (ansi yellow)($file.file)(ansi reset) to (ansi yellow)($file.destination)(ansi reset)"
       if $use_rsync {
         $file.file | rsync $file.destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
@@ -643,7 +681,7 @@ def main [
     }
   } else {
     mkdir $target_destination_directory
-    $audiobook.files | append $audiobook.companion_documents | each {|file|
+    $audiobook.files | append $audiobook.accompanying_documents | each {|file|
       mv $file.file $file.destination
     }
   }
@@ -664,7 +702,7 @@ def main [
       }
     )
     (
-      $audiobook.companion_documents
+      $audiobook.accompanying_documents
       | filter {|file|
         $file.file != $file.destination
       }

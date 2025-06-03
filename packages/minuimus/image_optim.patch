@@ -1,5 +1,5 @@
 diff --git a/minuimus.pl b/minuimus.pl
-index 37fca59..b2cbb9a 100755
+index 37fca59..5e69958 100755
 --- a/minuimus.pl
 +++ b/minuimus.pl
 @@ -223,7 +223,7 @@ sub compressfile($%) {
@@ -168,7 +168,7 @@ index 37fca59..b2cbb9a 100755
 -  `which pngout`;
 -  if(! $?) {$optimisers = $optimisers.",pngout";}
 - `which imgdataopt`;
-+  my $optimisers='--use-image-optimizer=image_optim';
++  my $optimisers='--use-image-optimizer=oxipngmax_ect';
 +  # my $optimisers='--use-image-optimizer=pngcrush,oxipng,optipng,pngquant,pngout,ect,advpng';
 +  # `which pngout`;
 +  # if(! $?) {$optimisers = $optimisers.",pngout";}

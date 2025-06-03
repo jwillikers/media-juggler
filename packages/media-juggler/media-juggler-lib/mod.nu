@@ -521,7 +521,7 @@ export def pdf_to_text []: path -> string {
 # Convert the first 10 and last 10 pages of an EPUB file to text
 export def epub_to_text []: path -> string {
   let epub = $in
-  let text_file = mktemp --suffix .txt
+  let text_file = mktemp --suffix .txt --tmpdir
   # todo Get a smaller portion of the EPUB's pages?
   ^ebook-convert $epub $text_file
   let text = open $text_file
@@ -1477,16 +1477,30 @@ export def acsm_to_epub [
   ({ parent: $working_directory, stem: $book_id, extension: "epub" } | path join)
 }
 
+# Optimize image using efficient-compression-tool
+export def optimize_image_ect []: path -> path {
+  let path = $in
+  log debug $"Running command: (ansi yellow)^ect -9 -strip --mt-deflate ($path)(ansi reset)"
+  let result = do {
+    ^ect -9 -strip --mt-deflate $path
+  } | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^ect -9 -strip --mt-deflate ($path)(ansi reset)\n($result.stderr)\n"
+    return $path
+  }
+  $path
+}
+
 # Optimize images using efficient-compression-tool
 export def optimize_images_ect []: list<path> -> record<bytes: filesize, difference: float> {
   let paths = $in
   # Ignore config paths to ensure that lossy compression is not enabled.
-  log debug $"Running command: (ansi yellow)^ect -9 -recurse -strip ($paths | str join ' ')(ansi reset)"
+  log debug $"Running command: (ansi yellow)^ect -9 -recurse -strip --mt-deflate ($paths | str join ' ')(ansi reset)"
   let result = do {
-    ^ect -9 -recurse -strip ...$paths
+    ^ect -9 -recurse -strip --mt-deflate ...$paths
   } | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^ect -9 -recurse -strip ($paths | str join ' ')(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^ect -9 -recurse -strip --mt-deflate ($paths | str join ' ')(ansi reset)\n($result.stderr)\n"
     return null
   }
   log debug $"image_optim stdout:\n($result.stdout)\n"
@@ -1512,47 +1526,98 @@ export def optimize_images_ect []: list<path> -> record<bytes: filesize, differe
   )
 }
 
-# Losslessly optimize images
-export def optimize_images []: list<path> -> record<bytes: filesize, difference: float> {
-  let paths = $in
-  # Ignore config paths to ensure that lossy compression is not enabled.
-  log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths | str join ' ')(ansi reset)"
-  let result = do {(
-    ^image_optim
-    --config-paths ""
-    --recursive
-    --threads ((^nproc | into int) / 2) ...$paths
-  )} | complete
+# Losslessly optimize jpegs with jpegli
+export def optimize_jpeg []: path -> path {
+  let jpeg = $in
+  let original_size = ls $jpeg | get size | first
+  let temporary_png = mktemp --suffix .png --tmpdir
+  let result = do {^djpegli $jpeg $temporary_png} | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths)(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^djpegli ($jpeg) ($temporary_png)(ansi reset)\n($result.stderr)\n"
+    return $jpeg
+  }
+  let temporary_jpeg = mktemp --suffix .jpeg --tmpdir
+  let result = do {^cjpegli --quality 100 $temporary_png $temporary_jpeg} | complete
+  rm --force $temporary_png
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^djpegli --quality 100 ($temporary_png) ($temporary_jpeg)(ansi reset)\n($result.stderr)\n"
+    return $jpeg
+  }
+  let current_size = ls $temporary_jpeg | get size | first
+  let average = (($original_size + $current_size) / 2)
+  let percent_difference = ((($original_size - $current_size) / $average) * 100)
+  if $current_size < $original_size {
+    log info $"JPEG (ansi yellow)($jpeg)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    mv --force $temporary_jpeg $jpeg
+  } else {
+    log debug $"No space saving achieved attempting to optimize the jpeg with jpegli (ansi yellow)($jpeg)(ansi reset)"
+    rm --force $temporary_jpeg
+  }
+  $jpeg
+}
+
+# Losslessly optimize an image with image_optim
+export def image_optim []: path -> path {
+  let path = $in
+  log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)"
+  let result = do {
+    ^image_optim --config-paths "" --threads ((^nproc | into int) / 2) $path
+  } | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)\n($result.stderr)\n"
     return null
   }
   log debug $"image_optim stdout:\n($result.stdout)\n"
-  let result = (
-    $result.stdout
-    | lines --skip-empty
-    | last
-    | (
-      let line = $in;
-      log debug $"image_optim line: ($line)";
-      if "------" in $line {
-          { difference: 0.0, bytes: (0.0 | into filesize) }
-      } else {
-        $line
-        | parse --regex 'Total:\s+(?P<difference>.+)%\s+(?P<bytes>.+)'
-        | first
-        | (
-          let i = $in;
-          {
-            difference: ($i.difference | into float),
-            bytes: ($i.bytes | into filesize),
-          }
-        )
-      }
-    )
-  )
-  $paths | optimize_images_ect
-  $result
+  $path
+}
+
+# Losslessly optimize an image
+#
+# Use jpegli for jpegs and image_optim for everything else.
+export def optimize_image []: path -> path {
+  let path = $in
+  if ($path | path parse | get extension) in ["jpg" "jpeg"] {
+    $path | optimize_jpeg
+  } else {
+    $path | image_optim | optimize_image_ect
+  }
+  $path
+}
+
+# Losslessly optimize images
+export def optimize_images []: list<path> -> record<bytes: filesize, difference: float> {
+  let paths = $in
+
+  let image_files = $paths | each {|path|
+    if ($path | path type) == "dir" {
+      glob --no-dir --no-symlink $"($path | escape_special_glob_characters)/**/*[.]($image_extensions)"
+    } else {
+      $path
+    }
+  } | flatten
+
+  let original_size = $image_files | reduce --fold 0b {|it acc|
+    $acc + (ls $it | get size | first)
+  }
+  $image_files | each {|image|
+    $image | optimize_image
+  }
+  let current_size = $image_files | reduce --fold 0b {|it acc|
+    $acc + (ls $it | get size | first)
+  }
+
+  let average = (($original_size + $current_size) / 2)
+  let percent_difference = ((($original_size - $current_size) / $average) * 100)
+  if $current_size < $original_size {
+    log info $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+  } else {
+    log debug $"No space saving achieved attempting to optimize the images"
+  }
+
+  {
+    bytes: $current_size
+    difference: $percent_difference
+  }
 }
 
 # Losslessly optimize the images in a ZIP archive such as an EPUB or CBZ
@@ -1600,11 +1665,27 @@ export def advzip_recompress [
   $archive
 }
 
+# Optimize a ZIP archive using efficient-compression-tool
+# todo Use a temporary file to avoid corruption
+export def optimize_zip_ect [
+  optimization_level: int = 9 # The degree to which to optimize the zip archive from 1 to 9, with 9 being the best compression possible
+  ...args: string # Extra arguments to pass to advzip
+]: path -> path {
+  let archive = $in
+  log debug $"Running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)"
+  let result = do {^ect $"-($optimization_level)" -strip -zip --mt-deflate ...$args $archive} | complete
+  if $result.exit_code != 0 {
+    log error $"Error running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    return null
+  }
+  $archive
+}
+
 # Losslessly optimize the compression of a zip archive as well as image files in it.
 #
 # Uses image_optim to optimize image files.
 export def optimize_zip [
-  optimization_level: int = 4 # The degree to which to optimize the zip archive from 0 to 4, with 4 being the best compression possible
+  optimization_level: int = 9 # The degree to which to optimize the zip archive from 1 to 9, with 9 being the best compression possible
 ]: path -> path {
   let $archive = $in
   log debug $"Optimizing ZIP archive (ansi yellow)($archive)(ansi reset)"
@@ -1613,7 +1694,7 @@ export def optimize_zip [
   if ($output | is-empty) {
     return null
   }
-  let archive = $output | advzip_recompress $optimization_level
+  let archive = $output | optimize_zip_ect $optimization_level
   let current_size = ls $archive | get size | first
   let average = (($original_size + $current_size) / 2)
   let percent_difference = ((($original_size - $current_size) / $average) * 100)
@@ -1877,11 +1958,11 @@ export def comic_file_name_from_metadata [
                 | first
             )
         } else if $title =~ ".+ [0-9]+" {
-            $title
-            | parse --regex '(?P<series>.+) (?P<issue>[0-9]+)'
-            | first
+          $title
+          | parse --regex '(?P<series>.+) (?P<issue>[0-9]+)'
+          | first
         } else {
-            { series: $title, issue: 1 }
+          { series: $title, issue: 1 }
         }
       }
     )
@@ -1890,36 +1971,36 @@ export def comic_file_name_from_metadata [
     }
 
     let series = (
-        if $series == null {
-            if $parsed_title == null {
-                null
-            } else {
-                log debug $"Parsed the series as (ansi purple)'($parsed_title.series)'(ansi reset) from the title"
-                $parsed_title.series
-            }
+      if $series == null {
+        if $parsed_title == null {
+          null
         } else {
-            $series
+          log debug $"Parsed the series as (ansi purple)'($parsed_title.series)'(ansi reset) from the title"
+          $parsed_title.series
         }
+      } else {
+        $series
+      }
     )
     let issue = (
-        if $issue == null {
-            if $parsed_title == null {
-                null
-            } else {
-                log debug $"Parsed the issue as (ansi purple)'($parsed_title.issue)'(ansi reset) from the title"
-                $parsed_title.issue
-            }
+      if $issue == null {
+        if $parsed_title == null {
+          null
         } else {
-            $issue
+          log debug $"Parsed the issue as (ansi purple)'($parsed_title.issue)'(ansi reset) from the title"
+          $parsed_title.issue
         }
+      } else {
+        $issue
+      }
     )
 
-    if $series == null and $issue == null {
-        log error $"Unable to determine the series and issue from the metadata title '($title)'. Pass the Comic Vine issue id with the (ansi green)--comic-vine-issue-id(ansi reset) flag."
-        $file
-    } else {
-        $file | path parse | update stem $"($series) \(($series_year)\) #($issue) \(($issue_year)\)" | path join
-    }
+  if $series == null and $issue == null {
+    log error $"Unable to determine the series and issue from the metadata title '($title)'. Pass the Comic Vine issue id with the (ansi green)--comic-vine-issue-id(ansi reset) flag."
+    $file
+  } else {
+    $file | path parse | update stem $"($series) \(($series_year)\) #($issue) \(($issue_year)\)" | path join
+  }
 }
 
 # Convert a FLAC to an OGA
@@ -2028,25 +2109,25 @@ export def tag_epub_comic_vine [
     let epub = $in
     let opf_file = ({ parent: $working_directory, stem: $comic_vine_issue_id, extension: "opf" } | path join)
     let opf = (
-        ^fetch-ebook-metadata
-            --allowed-plugin "Comicvine"
-            --identifier $"comicvine:($comic_vine_issue_id)"
-            --opf
-        | from xml
+      ^fetch-ebook-metadata
+        --allowed-plugin "Comicvine"
+        --identifier $"comicvine:($comic_vine_issue_id)"
+        --opf
+      | from xml
     )
     log debug $"The opf metadata for Comic Vine issue id (ansi purple_bold)($comic_vine_issue_id)(ansi reset) is:\n($opf)\n"
     # todo edit XML directly?
     (
-        $opf
-        | to xml
-        | save --force $opf_file
+      $opf
+      | to xml
+      | save --force $opf_file
     )
     (
-        ^ebook-meta
-            $epub
-            --authors ($authors | str join "&")
-            --from-opf $"($working_directory)/($comic_vine_issue_id).opf"
-            --title $title
+      ^ebook-meta
+        $epub
+        --authors ($authors | str join "&")
+        --from-opf $"($working_directory)/($comic_vine_issue_id).opf"
+        --title $title
     )
     rm $opf_file
     $epub
@@ -2150,7 +2231,7 @@ export def extract_book_metadata [
 ]: path -> record<opf: record, cover: path> {
   let book = $in
   log debug $"book: ($book)"
-  let opf_file = mktemp --suffix ".xml"
+  let opf_file = mktemp --suffix ".xml" --tmpdir
   # let opf_file = (
   #   {
   #     parent: $working_directory
@@ -2485,7 +2566,9 @@ export def export_book_to_directory [
     | path join
   )
   mv $input.cover $cover
+  log debug $"Renaming book from (ansi yellow)($input.book)(ansi reset) to (ansi yellow)($book)(ansi reset)"
   mv $input.book $book
+  log debug $"Book contents in the directory (ansi purple)($target_directory)(ansi reset)";
   {
     book: $book
     opf: $opf
@@ -2494,14 +2577,12 @@ export def export_book_to_directory [
 }
 
 # todo Pass around opf as metadata instead of a file path.
-export def embed_book_metadata [
-  working_directory: path
-]: [
+export def embed_book_metadata []: [
   record<book: path, cover: path, opf: path> -> record<book: path, cover: path, opf: path>
 ] {
   let input = $in
   let book_format = ($input.book | path parse | get extension)
-  if $book_format == "epub" {
+  if $book_format in ["epub" "pdf"] {
     ^ebook-meta $input.book --cover $input.cover --from-opf $input.opf
   }
   $input

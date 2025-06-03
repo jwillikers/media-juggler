@@ -8,6 +8,7 @@
   ffmpeg,
   file,
   image_optim,
+  jpegli,
   keyfinder-cli,
   lib,
   m4b-tool,
@@ -77,6 +78,7 @@ else
             cbconvert
             efficient-compression-tool
             image_optim
+            jpegli
             minuimus
             # kcc
             udisks
@@ -91,6 +93,7 @@ else
             efficient-compression-tool
             ffmpeg
             image_optim
+            jpegli
             minuimus
             m4b-tool
             tone
@@ -106,6 +109,7 @@ else
             # comictagger
             efficient-compression-tool
             image_optim
+            jpegli
             # kcc
             minuimus
             mupdf-headless
@@ -123,6 +127,7 @@ else
             efficient-compression-tool
             file
             image_optim
+            jpegli
             minuimus
             mupdf-headless
             tesseract
@@ -138,6 +143,7 @@ else
             unstable.beets
             efficient-compression-tool
             image_optim
+            jpegli
             keyfinder-cli
             picard # For mbsubmit Beets plugin
           ]
