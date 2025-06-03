@@ -987,6 +987,47 @@ def main [
         log debug $"Renaming the PDF from ($formats.pdf) to ($renamed_pdf)";
         mv $formats.pdf $renamed_pdf
       }
+      # Update the metadata in the PDF file.
+      let renamed_pdf = (
+        $renamed_pdf | (
+          fetch_book_metadata
+          # Use Comic Vine to ensure series information is correct.
+          --allowed-plugins ["Comicvine"]
+          # todo Get the EPUB metadata from sources besides Comic Vine as well?
+          # I think it probably isn't necessary at this point.
+          # This still doesn't actually use Comic Vine, but it does still en up working.
+          # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
+          --authors $authors
+          --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
+          --isbn $isbn
+          --title $title
+          $temporary_directory
+        )
+        | export_book_to_directory ($renamed_pdf | path dirname)
+        | embed_book_metadata
+        | (
+          let input = $in;
+          (
+            let args = (
+              []
+              | append (
+                if $isbn != null {
+                  $"--isbn=($isbn)"
+                }
+              )
+            );
+            ^ebook-meta
+              $input.book
+              ...$args
+              --authors ($authors | str join "&")
+              --title $title
+              --identifier $"comicvine:($comic_vine_id)"
+              --identifier $"comicvine-volume:($comic_metadata.series_id)"
+          );
+          $input
+        )
+        | get book
+      )
       let comic_info = $formats.cbz | extract_comic_info $temporary_directory;
       log debug "Extracted ComicInfo.xml";
       log debug $"Cover image: ($comic_metadata._cover_image | to nuon)";

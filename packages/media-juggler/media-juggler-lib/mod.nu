@@ -521,7 +521,7 @@ export def pdf_to_text []: path -> string {
 # Convert the first 10 and last 10 pages of an EPUB file to text
 export def epub_to_text []: path -> string {
   let epub = $in
-  let text_file = mktemp --suffix .txt
+  let text_file = mktemp --suffix .txt --tmpdir
   # todo Get a smaller portion of the EPUB's pages?
   ^ebook-convert $epub $text_file
   let text = open $text_file
@@ -1477,6 +1477,20 @@ export def acsm_to_epub [
   ({ parent: $working_directory, stem: $book_id, extension: "epub" } | path join)
 }
 
+# Optimize image using efficient-compression-tool
+export def optimize_image_ect []: path -> path {
+  let path = $in
+  log debug $"Running command: (ansi yellow)^ect -9 -strip --mt-deflate ($path)(ansi reset)"
+  let result = do {
+    ^ect -9 -strip --mt-deflate $path
+  } | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^ect -9 -strip --mt-deflate ($path)(ansi reset)\n($result.stderr)\n"
+    return $path
+  }
+  $path
+}
+
 # Optimize images using efficient-compression-tool
 export def optimize_images_ect []: list<path> -> record<bytes: filesize, difference: float> {
   let paths = $in
@@ -1512,47 +1526,98 @@ export def optimize_images_ect []: list<path> -> record<bytes: filesize, differe
   )
 }
 
-# Losslessly optimize images
-export def optimize_images []: list<path> -> record<bytes: filesize, difference: float> {
-  let paths = $in
-  # Ignore config paths to ensure that lossy compression is not enabled.
-  log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths | str join ' ')(ansi reset)"
-  let result = do {(
-    ^image_optim
-    --config-paths ""
-    --recursive
-    --threads ((^nproc | into int) / 2) ...$paths
-  )} | complete
+# Losslessly optimize jpegs with jpegli
+export def optimize_jpeg []: path -> path {
+  let jpeg = $in
+  let original_size = ls $jpeg | get size | first
+  let temporary_png = mktemp --suffix .png --tmpdir
+  let result = do {^djpegli $jpeg $temporary_png} | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" --recursive ($paths)(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^djpegli ($jpeg) ($temporary_png)(ansi reset)\n($result.stderr)\n"
+    return $jpeg
+  }
+  let temporary_jpeg = mktemp --suffix .jpeg --tmpdir
+  let result = do {^cjpegli --quality 100 $temporary_png $temporary_jpeg} | complete
+  rm --force $temporary_png
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^djpegli --quality 100 ($temporary_png) ($temporary_jpeg)(ansi reset)\n($result.stderr)\n"
+    return $jpeg
+  }
+  let current_size = ls $temporary_jpeg | get size | first
+  let average = (($original_size + $current_size) / 2)
+  let percent_difference = ((($original_size - $current_size) / $average) * 100)
+  if $current_size < $original_size {
+    log info $"JPEG (ansi yellow)($jpeg)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    mv --force $temporary_jpeg $jpeg
+  } else {
+    log debug $"No space saving achieved attempting to optimize the jpeg with jpegli (ansi yellow)($jpeg)(ansi reset)"
+    rm --force $temporary_jpeg
+  }
+  $jpeg
+}
+
+# Losslessly optimize an image with image_optim
+export def image_optim []: path -> path {
+  let path = $in
+  log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)"
+  let result = do {
+    ^image_optim --config-paths "" --threads ((^nproc | into int) / 2) $path
+  } | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)\n($result.stderr)\n"
     return null
   }
   log debug $"image_optim stdout:\n($result.stdout)\n"
-  let result = (
-    $result.stdout
-    | lines --skip-empty
-    | last
-    | (
-      let line = $in;
-      log debug $"image_optim line: ($line)";
-      if "------" in $line {
-          { difference: 0.0, bytes: (0.0 | into filesize) }
-      } else {
-        $line
-        | parse --regex 'Total:\s+(?P<difference>.+)%\s+(?P<bytes>.+)'
-        | first
-        | (
-          let i = $in;
-          {
-            difference: ($i.difference | into float),
-            bytes: ($i.bytes | into filesize),
-          }
-        )
-      }
-    )
-  )
-  $paths | optimize_images_ect
-  $result
+  $path
+}
+
+# Losslessly optimize an image
+#
+# Use jpegli for jpegs and image_optim for everything else.
+export def optimize_image []: path -> path {
+  let path = $in
+  if ($path | path parse | get extension) in ["jpg" "jpeg"] {
+    $path | optimize_jpeg
+  } else {
+    $path | image_optim | optimize_image_ect
+  }
+  $path
+}
+
+# Losslessly optimize images
+export def optimize_images []: list<path> -> record<bytes: filesize, difference: float> {
+  let paths = $in
+
+  let image_files = $paths | each {|path|
+    if ($path | path type) == "dir" {
+      glob --no-dir --no-symlink $"($path | escape_special_glob_characters)/**/*[.]($image_extensions)"
+    } else {
+      $path
+    }
+  } | flatten
+
+  let original_size = $image_files | reduce --fold 0b {|it acc|
+    $acc + (ls $it | get size | first)
+  }
+  $image_files | each {|image|
+    $image | optimize_image
+  }
+  let current_size = $image_files | reduce --fold 0b {|it acc|
+    $acc + (ls $it | get size | first)
+  }
+
+  let average = (($original_size + $current_size) / 2)
+  let percent_difference = ((($original_size - $current_size) / $average) * 100)
+  if $current_size < $original_size {
+    log info $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+  } else {
+    log debug $"No space saving achieved attempting to optimize the images"
+  }
+
+  {
+    bytes: $current_size
+    difference: $percent_difference
+  }
 }
 
 # Losslessly optimize the images in a ZIP archive such as an EPUB or CBZ
@@ -2166,7 +2231,7 @@ export def extract_book_metadata [
 ]: path -> record<opf: record, cover: path> {
   let book = $in
   log debug $"book: ($book)"
-  let opf_file = mktemp --suffix ".xml"
+  let opf_file = mktemp --suffix ".xml" --tmpdir
   # let opf_file = (
   #   {
   #     parent: $working_directory
@@ -2517,7 +2582,7 @@ export def embed_book_metadata []: [
 ] {
   let input = $in
   let book_format = ($input.book | path parse | get extension)
-  if $book_format == "epub" {
+  if $book_format in ["epub" "pdf"] {
     ^ebook-meta $input.book --cover $input.cover --from-opf $input.opf
   }
   $input

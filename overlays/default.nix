@@ -9,6 +9,9 @@
   efficient-compression-tool = _final: prev: {
     efficient-compression-tool = prev.callPackage ./efficient-compression-tool/package.nix { };
   };
+  jpegli = _final: prev: {
+    jpegli = prev.callPackage ./jpegli/package.nix { };
+  };
   m4b-tool = inputs.m4b-tool.overlay;
   calibre-acsm-plugin-libcrypto = _final: _prev: {
     # calibre = prev.calibre.overrideAttrs (prevAttrs:
