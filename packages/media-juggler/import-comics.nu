@@ -222,6 +222,9 @@ def main [
   --title: string # The title of the comic or manga issue
   --upload-ereader-cbz # Upload the E-Reader specific format to the server
   --use-rsync
+  --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
+  --imprint: string # Set the publisher/imprint. This is embedded in the ComicInfo.xml file and used for the publisher in EPUB and PDF metadata.
+  --publisher: string # Set the publisher in the metadata. Note that the imprint is preferred over this for EPUB and PDF metadata.
 ] {
   if ($files | is-empty) {
     log error "No files provided"
@@ -969,6 +972,25 @@ def main [
     )
     | upsert_comic_info {tag: "Manga", value: $manga}
     | upsert_comic_info {tag: "Title", value: $title}
+    | upsert_comic_info {tag: "Format", value: "Digital"}
+    | upsert_comic_info {tag: "LanguageISO", value: "en"}
+    | (
+      let input = $in;
+      if ($imprint | is-not-empty) {
+        $input | upsert_comic_info {tag: "Imprint", value: $imprint}
+      } else {
+        $input
+      }
+    )
+    | (
+      let input = $in;
+      if ($publisher | is-not-empty) {
+        $input | upsert_comic_info {tag: "Publisher", value: $publisher}
+      } else {
+        $input
+      }
+    )
+    #todo Web link to BookBrainz Edition
     # todo Incorporate Comic Vine issue id and series id in Notes section of ComicInfo.xml or sidecar metadata.opf
     # This will allow easily updating the metadata in the future without having to redo all the lookup work.
     | {
@@ -1021,7 +1043,11 @@ def main [
                 }
               )
               | append (
-                if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
+                if ($imprint | is-not-empty) {
+                  $"--publisher=($imprint)"
+                } else if ($publisher | is-not-empty) {
+                  $"--publisher=($publisher)"
+                } else if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
                   $"--publisher=($comic_metadata.imprint)"
                 } else if "publisher" in $comic_metadata and ($comic_metadata.publisher | is-not-empty) {
                   $"--publisher=($comic_metadata.publisher)"
@@ -1031,7 +1057,7 @@ def main [
                 if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
                   $"--language=($comic_metadata.language)"
                 } else {
-                  "--language=eng"
+                  "--language=en"
                 }
               )
               | append (
@@ -1042,6 +1068,11 @@ def main [
               | append (
                 if "genres" in $comic_metadata and ($comic_metadata.genres | is-not-empty) {
                   $"--tags=($comic_metadata.genres | str join ',')"
+                }
+              )
+              | append (
+                if ($bookbrainz_edition_id | is-not-empty) {
+                  $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
                 }
               )
               | append (
@@ -1113,7 +1144,11 @@ def main [
                 }
               )
               | append (
-                if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
+                if ($imprint | is-not-empty) {
+                  $"--publisher=($imprint)"
+                } else if ($publisher | is-not-empty) {
+                  $"--publisher=($publisher)"
+                } else if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
                   $"--publisher=($comic_metadata.imprint)"
                 } else if "publisher" in $comic_metadata and ($comic_metadata.publisher | is-not-empty) {
                   $"--publisher=($comic_metadata.publisher)"
@@ -1123,7 +1158,7 @@ def main [
                 if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
                   $"--language=($comic_metadata.language)"
                 } else {
-                  "--language=eng"
+                  "--language=en"
                 }
               )
               | append (
@@ -1134,6 +1169,11 @@ def main [
               | append (
                 if "genres" in $comic_metadata and ($comic_metadata.genres | is-not-empty) {
                   $"--tags=($comic_metadata.genres | str join ',')"
+                }
+              )
+              | append (
+                if ($bookbrainz_edition_id | is-not-empty) {
+                  $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
                 }
               )
               | append (

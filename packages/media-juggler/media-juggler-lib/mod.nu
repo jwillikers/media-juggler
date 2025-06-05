@@ -1738,7 +1738,9 @@ export def optimize_pdf [
 ]: path -> path {
   let $pdf = $in
   let original_size = ls $pdf | get size | first
+  let start = date now
   let result = do {^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf} | complete
+  let duration = (date now) - $start
   if $result.exit_code != 0 {
     log info $"Error running '^systemd-inhibit minuimus.pl (...$args) ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
@@ -1747,9 +1749,9 @@ export def optimize_pdf [
   let average = (($original_size + $current_size) / 2)
   let percent_difference = ((($original_size - $current_size) / $average) * 100)
   if $current_size < $original_size {
-    log info $"PDF (ansi yellow)($pdf)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    log info $"PDF (ansi yellow)($pdf)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
   } else {
-    log debug $"No space saving achieved attempting to optimize the PDF (ansi yellow)($pdf)(ansi reset)"
+    log debug $"No space saving achieved attempting to optimize the PDF (ansi yellow)($pdf)(ansi reset). Optimization lasted (ansi green)($duration)(ansi reset)"
   }
   $pdf
 }
