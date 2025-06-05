@@ -319,7 +319,7 @@ def main [
   let temporary_directory = (mktemp --directory "import-comics.XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
-  try {
+  # try {
 
   let file = (
     if ($original_file | is_ssh_path) {
@@ -679,8 +679,10 @@ def main [
     | update $input_format (
       if $comic_vine_issue_id == null {
         let target = $formats | get $input_format | comic_file_name_from_metadata $temporary_directory --issue-year $issue_year
-        log debug $"Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-        mv ($formats | get $input_format) $target
+        if ($formats | get $input_format) != $target {
+          log debug $"Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+          mv --force ($formats | get $input_format) $target
+        }
         $target
       } else {
         $formats | get $input_format
@@ -689,10 +691,14 @@ def main [
     | (
       let i = $in;
       if $input_format == "pdf" and "cbz" in $i {
-        # Rename the CBZ according to the name of the PDF
         let target = $i | get $input_format | path parse | update extension cbz | path join
-        mv $i.cbz $target
-        $i | update cbz $target
+        if $i.cbz != $target {
+          # Rename the CBZ according to the name of the PDF
+          mv --force $i.cbz $target
+          $i | update cbz $target
+        } else {
+          $i
+        }
       } else {
         $i
       }
@@ -887,29 +893,32 @@ def main [
       let fetched = (
         fetch-ebook-metadata --allowed-plugins ["Google"] --authors $authors --title $title | get opf
       )
-      let fetched_isbn_for_google = $fetched | isbn_from_opf
-      log debug $"Fetched ISBN: (ansi purple)($fetched_isbn_for_google)(ansi reset)"
-      let fetched_title_for_google = $fetched | title_from_opf
-      log debug $"Fetched title from Google: (ansi purple)($fetched_title_for_google)(ansi reset)"
+      if ($fetched | is-not-empty) {
+        let fetched_isbn_for_google = $fetched | isbn_from_opf
+        log debug $"Fetched ISBN: (ansi purple)($fetched_isbn_for_google)(ansi reset)"
+        let fetched_title_for_google = $fetched | title_from_opf
+        log debug $"Fetched title from Google: (ansi purple)($fetched_title_for_google)(ansi reset)"
 
-      # Use the ISBN from Google ISBN to look it up
-      let fetched = fetch-ebook-metadata --isbn $fetched_isbn_for_google | get opf
+        # Use the ISBN from Google ISBN to look it up
+        let fetched = fetch-ebook-metadata --isbn $fetched_isbn_for_google | get opf
+        if ($fetched | is-not-empty) {
+          let fetched_isbn = $fetched | isbn_from_opf
+          log debug $"Fetched ISBN: (ansi purple)($fetched_isbn)(ansi reset)"
+          let fetched_title = $fetched | title_from_opf
+          log debug $"Fetched title: (ansi purple)($fetched_title)(ansi reset)"
+          let fetched_series = $fetched | series_from_opf
+          log debug $"Fetched series: (ansi purple)($fetched_series)(ansi reset)"
+          let fetched_issue = $fetched | issue_from_opf
+          log debug $"Fetched issue: (ansi purple)($fetched_issue)(ansi reset)"
 
-      let fetched_isbn = $fetched | isbn_from_opf
-      log debug $"Fetched ISBN: (ansi purple)($fetched_isbn)(ansi reset)"
-      let fetched_title = $fetched | title_from_opf
-      log debug $"Fetched title: (ansi purple)($fetched_title)(ansi reset)"
-      let fetched_series = $fetched | series_from_opf
-      log debug $"Fetched series: (ansi purple)($fetched_series)(ansi reset)"
-      let fetched_issue = $fetched | issue_from_opf
-      log debug $"Fetched issue: (ansi purple)($fetched_issue)(ansi reset)"
-
-      if $fetched_isbn != null and $fetched_isbn == $fetched_isbn_for_google and $fetched_series == $comic_metadata.series and $fetched_issue == $comic_metadata.issue {
-        log debug $"Found the ISBN (ansi purple)($fetched_isbn)(ansi reset) from the fetched metadata"
-        $fetched_isbn
-      } else if $fetched_isbn_for_google != null and $fetched_title_for_google == $title {
-        log debug $"Found the ISBN (ansi purple)($fetched_isbn_for_google)(ansi reset) from the fetched metadata"
-        $fetched_isbn_for_google
+          if $fetched_isbn != null and $fetched_isbn == $fetched_isbn_for_google and $fetched_series == $comic_metadata.series and $fetched_issue == $comic_metadata.issue {
+            log debug $"Found the ISBN (ansi purple)($fetched_isbn)(ansi reset) from the fetched metadata"
+            $fetched_isbn
+          } else if $fetched_isbn_for_google != null and $fetched_title_for_google == $title {
+            log debug $"Found the ISBN (ansi purple)($fetched_isbn_for_google)(ansi reset) from the fetched metadata"
+            $fetched_isbn_for_google
+          }
+        }
       }
     } else {
       $isbn
@@ -1120,7 +1129,9 @@ def main [
       )
       let stem = ($formats.cbz | path parse | get stem)
       let renamed_epub = ({ parent: ($epub | path parse | get parent), stem: $stem, extension: "epub" } | path join)
-      mv $epub $renamed_epub
+      if $epub != $renamed_epub {
+        mv --force $epub $renamed_epub
+      }
       $formats | update epub $renamed_epub
     # Rename the PDF
     } else if "pdf" in $formats {
@@ -1128,7 +1139,7 @@ def main [
       let renamed_pdf = ({ parent: ($formats.pdf | path parse | get parent), stem: $stem, extension: "pdf" } | path join)
       if $formats.pdf != $renamed_pdf {
         log debug $"Renaming the PDF from ($formats.pdf) to ($renamed_pdf)";
-        mv $formats.pdf $renamed_pdf
+        mv --force $formats.pdf $renamed_pdf
       }
       # Update the metadata in the PDF file.
       let renamed_pdf = (
@@ -1424,10 +1435,10 @@ def main [
     }
   } else {
     mkdir $destination
-    mv ($formats | get $output_format) $destination
+    mv --force ($formats | get $output_format) $destination
     if $output_format == "pdf" {
-      mv $formats.comic_info $destination
-      mv $formats.cover $destination
+      mv --force $formats.comic_info $destination
+      mv --force $formats.cover $destination
     }
   }
 
@@ -1534,7 +1545,7 @@ def main [
       }
     }
     if $no_copy_to_ereader and not $upload_ereader_cbz {
-      mv $formats.ereader_cbz $destination
+      mv --force $formats.ereader_cbz $destination
     }
   }
 
@@ -1580,16 +1591,16 @@ def main [
   {
     file: $original_file
   }
-  } catch {|err|
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
-    {
-      file: $original_file
-      error: $err.msg
-    }
-  }
+  # } catch {|err|
+  #   if not $keep_tmp {
+  #     rm --force --recursive $temporary_directory
+  #   }
+  #   log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
+  #   {
+  #     file: $original_file
+  #     error: $err.msg
+  #   }
+  # }
   }
 
   if $ereader != null and not $no_copy_to_ereader {
