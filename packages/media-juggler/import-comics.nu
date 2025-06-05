@@ -990,6 +990,14 @@ def main [
         $input
       }
     )
+    | (
+      let input = $in;
+      if ($bookbrainz_edition_id | is-not-empty) {
+        $input | upsert_comic_info {tag: "Web", value: $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"}
+      } else {
+        $input
+      }
+    )
     #todo Web link to BookBrainz Edition
     # todo Incorporate Comic Vine issue id and series id in Notes section of ComicInfo.xml or sidecar metadata.opf
     # This will allow easily updating the metadata in the future without having to redo all the lookup work.
