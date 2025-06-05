@@ -622,6 +622,12 @@ export def isbn_from_pages [
   }
 }
 
+# Parse fetched metadata from Comic Vine for an issue
+# todo
+export def parse_comic_vine_issue_metadata []: record -> table {
+  let metadata = $in | get md
+}
+
 # Extract the issue from ComicInfo.xml metadata
 #
 # todo Add tests
@@ -1526,7 +1532,9 @@ export def optimize_images_ect []: list<path> -> record<bytes: filesize, differe
   )
 }
 
-# Losslessly optimize jpegs with jpegli
+# Visually losslessly optimize jpegs with jpegli
+#
+# Not truly lossless.
 export def optimize_jpeg []: path -> path {
   let jpeg = $in
   let original_size = ls $jpeg | get size | first
@@ -1544,10 +1552,10 @@ export def optimize_jpeg []: path -> path {
     return $jpeg
   }
   let current_size = ls $temporary_jpeg | get size | first
-  let average = (($original_size + $current_size) / 2)
-  let percent_difference = ((($original_size - $current_size) / $average) * 100)
   if $current_size < $original_size {
-    log info $"JPEG (ansi yellow)($jpeg)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
+    log debug $"JPEG (ansi yellow)($jpeg)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
     mv --force $temporary_jpeg $jpeg
   } else {
     log debug $"No space saving achieved attempting to optimize the jpeg with jpegli (ansi yellow)($jpeg)(ansi reset)"
@@ -1564,19 +1572,21 @@ export def image_optim []: path -> path {
     ^image_optim --config-paths "" --threads ((^nproc | into int) / 2) $path
   } | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)\nstdout:\n($result.stdout)\nstderr:\n($result.stderr)\n"
     return null
   }
-  log debug $"image_optim stdout:\n($result.stdout)\n"
   $path
 }
 
-# Losslessly optimize an image
+# Optimize an image
 #
-# Use jpegli for jpegs and image_optim for everything else.
-export def optimize_image []: path -> path {
+# Lossless by default.
+# When lossy compression is allowed, use jpegli for jpegs and image_optim for everything else.
+export def optimize_image [
+  allow_lossy = false
+]: path -> path {
   let path = $in
-  if ($path | path parse | get extension) in ["jpg" "jpeg"] {
+  if $allow_lossy and ($path | path parse | get extension) in ["jpg" "jpeg"] {
     $path | optimize_jpeg
   } else {
     $path | image_optim | optimize_image_ect
@@ -1585,12 +1595,13 @@ export def optimize_image []: path -> path {
 }
 
 # Losslessly optimize images
-export def optimize_images []: list<path> -> record<bytes: filesize, difference: float> {
+export def optimize_images []: list<path> -> list<path> {
   let paths = $in
 
   let image_files = $paths | each {|path|
     if ($path | path type) == "dir" {
-      glob --no-dir --no-symlink $"($path | escape_special_glob_characters)/**/*[.]($image_extensions)"
+      let glob_expression = [($path | escape_special_glob_characters) "**" $"*[.]{($image_extensions | str join ',')}"] | path join
+      glob --no-dir --no-symlink $glob_expression
     } else {
       $path
     }
@@ -1606,35 +1617,29 @@ export def optimize_images []: list<path> -> record<bytes: filesize, difference:
     $acc + (ls $it | get size | first)
   }
 
-  let average = (($original_size + $current_size) / 2)
-  let percent_difference = ((($original_size - $current_size) / $average) * 100)
   if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
     log info $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
   } else {
     log debug $"No space saving achieved attempting to optimize the images"
   }
 
-  {
-    bytes: $current_size
-    difference: $percent_difference
-  }
+  $image_files
 }
 
 # Losslessly optimize the images in a ZIP archive such as an EPUB or CBZ
-export def optimize_images_in_zip []: [path -> path] {
+export def optimize_images_in_zip []: path -> path {
   let archive = ($in | path expand)
+  let original_size = ls $archive | get size | first
   log debug $"Optimizing images in (ansi yellow)($archive)(ansi reset)"
   let temporary_directory = (mktemp --directory)
   let extraction_path = ($temporary_directory | path join "extracted")
   log debug $"Extracting zip archive to (ansi yellow)($extraction_path)(ansi reset)"
   ^unzip -q $archive -d $extraction_path
   ^chmod --recursive +rw $extraction_path
-  let reduction = [$extraction_path] | optimize_images
+  [$extraction_path] | optimize_images
   log debug "Image optimization complete"
-  if $reduction.difference > 0 {
-    let filename = $archive | path basename
-    log info $"The archive (ansi yellow)($filename)(ansi reset) was reduced by (ansi purple_bold)($reduction.bytes)(ansi reset), a (ansi purple_bold)($reduction.difference)%(ansi reset) reduction in size"
-  }
   log debug $"Compressing directory (ansi yellow)($extraction_path)(ansi reset) as (ansi yellow)($archive)(ansi reset)"
   let temporary_archive = $archive | path parse | update parent $temporary_directory | path join
   rm --force $temporary_archive
@@ -1645,6 +1650,14 @@ export def optimize_images_in_zip []: [path -> path] {
   mv --force $temporary_archive $archive
   rm --force --recursive $temporary_directory
   log debug $"Finished compressing (ansi yellow)($archive)(ansi reset)"
+  let current_size = ls $archive | get size | first
+  if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
+    log debug $"Images in ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+  } else {
+    log debug $"No space saving achieved attempting to optimize the images in the ZIP archive (ansi yellow)($archive)(ansi reset)"
+  }
   $archive
 }
 
@@ -1672,11 +1685,20 @@ export def optimize_zip_ect [
   ...args: string # Extra arguments to pass to advzip
 ]: path -> path {
   let archive = $in
+  let original_size = ls $archive | get size | first
   log debug $"Running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)"
   let result = do {^ect $"-($optimization_level)" -strip -zip --mt-deflate ...$args $archive} | complete
   if $result.exit_code != 0 {
     log error $"Error running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
+  }
+  let current_size = ls $archive | get size | first
+  if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
+    log info $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+  } else {
+    log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
   }
   $archive
 }
@@ -1696,9 +1718,9 @@ export def optimize_zip [
   }
   let archive = $output | optimize_zip_ect $optimization_level
   let current_size = ls $archive | get size | first
-  let average = (($original_size + $current_size) / 2)
-  let percent_difference = ((($original_size - $current_size) / $average) * 100)
   if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
     log info $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
   } else {
     log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
@@ -2506,7 +2528,7 @@ export def fetch_book_metadata [
       $current.cover
     }
   )
-  [$cover_file] | optimize_images
+  $cover_file | optimize_image
   {
     book: $book
     opf: $updated.opf
