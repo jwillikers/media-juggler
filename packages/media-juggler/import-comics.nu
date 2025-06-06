@@ -339,7 +339,7 @@ def main [
         }
         return {
           file: $original_file
-          error: $"The file (ansi yellow)($original_file)(ansi clear) does not exist!"
+          error: $"The file (ansi yellow)($original_file)(ansi reset) does not exist!"
         }
       }
       if $keep {
