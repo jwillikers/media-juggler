@@ -982,7 +982,18 @@ def main [
     | upsert_comic_info {tag: "Manga", value: $manga}
     | upsert_comic_info {tag: "Title", value: $title}
     | upsert_comic_info {tag: "Format", value: "Digital"}
-    | upsert_comic_info {tag: "LanguageISO", value: "en"}
+    | (
+      let input = $in;
+      if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
+        if ($comic_metadata.language | str downcase) in ["eng" "english"] {
+          $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
+        } else {
+          $input | upsert_comic_info {tag: "LanguageISO", value: $comic_metadata.language}
+        }
+      } else {
+        $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
+      }
+    )
     | (
       let input = $in;
       if ($imprint | is-not-empty) {
@@ -1072,7 +1083,11 @@ def main [
               )
               | append (
                 if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
-                  $"--language=($comic_metadata.language)"
+                  if ($comic_metadata.language | str downcase) in ["eng" "english"] {
+                    "--language=en"
+                  } else {
+                    $"--language=($comic_metadata.language)"
+                  }
                 } else {
                   "--language=en"
                 }
@@ -1175,7 +1190,11 @@ def main [
               )
               | append (
                 if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
-                  $"--language=($comic_metadata.language)"
+                  if ($comic_metadata.language | str downcase) in ["eng" "english"] {
+                    "--language=en"
+                  } else {
+                    $"--language=($comic_metadata.language)"
+                  }
                 } else {
                   "--language=en"
                 }
