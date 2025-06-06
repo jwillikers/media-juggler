@@ -241,6 +241,11 @@ def main [
     exit 1
   }
 
+  if $bookbrainz_edition_id != null and ($files | length) > 1 {
+    log error "Setting the BookBrainz Edition ID for multiple files is not allowed as it will result in overwriting the final file"
+    exit 1
+  }
+
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-comics"] | path join
   let optimized_files_cache_file = [$cache_directory optimized.json] | path join
   mkdir $cache_directory
