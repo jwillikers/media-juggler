@@ -319,7 +319,7 @@ def main [
   let temporary_directory = (mktemp --directory "import-comics.XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
-  # try {
+  try {
 
   let file = (
     if ($original_file | is_ssh_path) {
@@ -1610,16 +1610,16 @@ def main [
   {
     file: $original_file
   }
-  # } catch {|err|
-  #   if not $keep_tmp {
-  #     rm --force --recursive $temporary_directory
-  #   }
-  #   log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
-  #   {
-  #     file: $original_file
-  #     error: $err.msg
-  #   }
-  # }
+  } catch {|err|
+    if not $keep_tmp {
+      rm --force --recursive $temporary_directory
+    }
+    log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
+    {
+      file: $original_file
+      error: $err.msg
+    }
+  }
   }
 
   if $ereader != null and not $no_copy_to_ereader {
