@@ -333,6 +333,15 @@ def main [
       }
       $target
     } else {
+      if not ($original_file | path exists) {
+        if not $keep_tmp {
+          rm --force --recursive $temporary_directory
+        }
+        return {
+          file: $original_file
+          error: $"The file (ansi yellow)($original_file)(ansi clear) does not exist!"
+        }
+      }
       if $keep {
         let target = [$temporary_directory ($original_file | path basename)] | path join
         log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
