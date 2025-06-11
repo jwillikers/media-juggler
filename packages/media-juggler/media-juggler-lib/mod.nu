@@ -1739,10 +1739,11 @@ export def optimize_pdf [
   let $pdf = $in
   let original_size = ls $pdf | get size | first
   let start = date now
+  log info $"Running the command '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($pdf)'"
   let result = do {^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf} | complete
   let duration = (date now) - $start
   if $result.exit_code != 0 {
-    log info $"Error running '^systemd-inhibit minuimus.pl (...$args) ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    log info $"Error running '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
   let current_size = ls $pdf | get size | first
