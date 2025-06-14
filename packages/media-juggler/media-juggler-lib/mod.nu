@@ -25,7 +25,7 @@ export const image_extensions = [
   webp
 ]
 
-export const audiobook_companion_document_file_extensions = [
+export const audiobook_accompanying_document_file_extensions = [
   cbz
   epub
   pdf
@@ -213,6 +213,16 @@ export def sanitize_file_name []: string -> string {
   } else {
     $name | str replace --all '/' '⁄'
   }
+}
+
+export def use_unicode_in_title []: string -> string {
+  let title = $in
+  $title | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…"
+  mut new_title = $title
+  while '"' in $new_title {
+    $new_title = $new_title | str replace '"' '“' | str replace '"' '”'
+  }
+  $new_title
 }
 
 # Get the type of a path via SSH
@@ -620,6 +630,12 @@ export def isbn_from_pages [
   } else {
     []
   }
+}
+
+# Parse fetched metadata from Comic Vine for an issue
+# todo
+export def parse_comic_vine_issue_metadata []: record -> table {
+  let metadata = $in | get md
 }
 
 # Extract the issue from ComicInfo.xml metadata
@@ -1526,7 +1542,9 @@ export def optimize_images_ect []: list<path> -> record<bytes: filesize, differe
   )
 }
 
-# Losslessly optimize jpegs with jpegli
+# Visually losslessly optimize jpegs with jpegli
+#
+# Not truly lossless.
 export def optimize_jpeg []: path -> path {
   let jpeg = $in
   let original_size = ls $jpeg | get size | first
@@ -1544,10 +1562,10 @@ export def optimize_jpeg []: path -> path {
     return $jpeg
   }
   let current_size = ls $temporary_jpeg | get size | first
-  let average = (($original_size + $current_size) / 2)
-  let percent_difference = ((($original_size - $current_size) / $average) * 100)
   if $current_size < $original_size {
-    log info $"JPEG (ansi yellow)($jpeg)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
+    log debug $"JPEG (ansi yellow)($jpeg)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
     mv --force $temporary_jpeg $jpeg
   } else {
     log debug $"No space saving achieved attempting to optimize the jpeg with jpegli (ansi yellow)($jpeg)(ansi reset)"
@@ -1564,19 +1582,21 @@ export def image_optim []: path -> path {
     ^image_optim --config-paths "" --threads ((^nproc | into int) / 2) $path
   } | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)\nstdout:\n($result.stdout)\nstderr:\n($result.stderr)\n"
     return null
   }
-  log debug $"image_optim stdout:\n($result.stdout)\n"
   $path
 }
 
-# Losslessly optimize an image
+# Optimize an image
 #
-# Use jpegli for jpegs and image_optim for everything else.
-export def optimize_image []: path -> path {
+# Lossless by default.
+# When lossy compression is allowed, use jpegli for jpegs and image_optim for everything else.
+export def optimize_image [
+  allow_lossy = false
+]: path -> path {
   let path = $in
-  if ($path | path parse | get extension) in ["jpg" "jpeg"] {
+  if $allow_lossy and ($path | path parse | get extension) in ["jpg" "jpeg"] {
     $path | optimize_jpeg
   } else {
     $path | image_optim | optimize_image_ect
@@ -1585,12 +1605,13 @@ export def optimize_image []: path -> path {
 }
 
 # Losslessly optimize images
-export def optimize_images []: list<path> -> record<bytes: filesize, difference: float> {
+export def optimize_images []: list<path> -> list<path> {
   let paths = $in
 
   let image_files = $paths | each {|path|
     if ($path | path type) == "dir" {
-      glob --no-dir --no-symlink $"($path | escape_special_glob_characters)/**/*[.]($image_extensions)"
+      let glob_expression = [($path | escape_special_glob_characters) "**" $"*[.]{($image_extensions | str join ',')}"] | path join
+      glob --no-dir --no-symlink $glob_expression
     } else {
       $path
     }
@@ -1606,35 +1627,29 @@ export def optimize_images []: list<path> -> record<bytes: filesize, difference:
     $acc + (ls $it | get size | first)
   }
 
-  let average = (($original_size + $current_size) / 2)
-  let percent_difference = ((($original_size - $current_size) / $average) * 100)
   if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
     log info $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
   } else {
     log debug $"No space saving achieved attempting to optimize the images"
   }
 
-  {
-    bytes: $current_size
-    difference: $percent_difference
-  }
+  $image_files
 }
 
 # Losslessly optimize the images in a ZIP archive such as an EPUB or CBZ
-export def optimize_images_in_zip []: [path -> path] {
+export def optimize_images_in_zip []: path -> path {
   let archive = ($in | path expand)
+  let original_size = ls $archive | get size | first
   log debug $"Optimizing images in (ansi yellow)($archive)(ansi reset)"
   let temporary_directory = (mktemp --directory)
   let extraction_path = ($temporary_directory | path join "extracted")
   log debug $"Extracting zip archive to (ansi yellow)($extraction_path)(ansi reset)"
   ^unzip -q $archive -d $extraction_path
   ^chmod --recursive +rw $extraction_path
-  let reduction = [$extraction_path] | optimize_images
+  [$extraction_path] | optimize_images
   log debug "Image optimization complete"
-  if $reduction.difference > 0 {
-    let filename = $archive | path basename
-    log info $"The archive (ansi yellow)($filename)(ansi reset) was reduced by (ansi purple_bold)($reduction.bytes)(ansi reset), a (ansi purple_bold)($reduction.difference)%(ansi reset) reduction in size"
-  }
   log debug $"Compressing directory (ansi yellow)($extraction_path)(ansi reset) as (ansi yellow)($archive)(ansi reset)"
   let temporary_archive = $archive | path parse | update parent $temporary_directory | path join
   rm --force $temporary_archive
@@ -1645,6 +1660,14 @@ export def optimize_images_in_zip []: [path -> path] {
   mv --force $temporary_archive $archive
   rm --force --recursive $temporary_directory
   log debug $"Finished compressing (ansi yellow)($archive)(ansi reset)"
+  let current_size = ls $archive | get size | first
+  if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
+    log debug $"Images in ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+  } else {
+    log debug $"No space saving achieved attempting to optimize the images in the ZIP archive (ansi yellow)($archive)(ansi reset)"
+  }
   $archive
 }
 
@@ -1672,11 +1695,20 @@ export def optimize_zip_ect [
   ...args: string # Extra arguments to pass to advzip
 ]: path -> path {
   let archive = $in
+  let original_size = ls $archive | get size | first
   log debug $"Running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)"
   let result = do {^ect $"-($optimization_level)" -strip -zip --mt-deflate ...$args $archive} | complete
   if $result.exit_code != 0 {
     log error $"Error running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
+  }
+  let current_size = ls $archive | get size | first
+  if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
+    log info $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+  } else {
+    log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
   }
   $archive
 }
@@ -1696,9 +1728,9 @@ export def optimize_zip [
   }
   let archive = $output | optimize_zip_ect $optimization_level
   let current_size = ls $archive | get size | first
-  let average = (($original_size + $current_size) / 2)
-  let percent_difference = ((($original_size - $current_size) / $average) * 100)
   if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
     log info $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
   } else {
     log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
@@ -1716,18 +1748,21 @@ export def optimize_pdf [
 ]: path -> path {
   let $pdf = $in
   let original_size = ls $pdf | get size | first
+  let start = date now
+  log info $"Running the command '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($pdf)'"
   let result = do {^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf} | complete
+  let duration = (date now) - $start
   if $result.exit_code != 0 {
-    log info $"Error running '^systemd-inhibit minuimus.pl (...$args) ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    log info $"Error running '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
   let current_size = ls $pdf | get size | first
   let average = (($original_size + $current_size) / 2)
   let percent_difference = ((($original_size - $current_size) / $average) * 100)
   if $current_size < $original_size {
-    log info $"PDF (ansi yellow)($pdf)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    log info $"PDF (ansi yellow)($pdf)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
   } else {
-    log debug $"No space saving achieved attempting to optimize the PDF (ansi yellow)($pdf)(ansi reset)"
+    log debug $"No space saving achieved attempting to optimize the PDF (ansi yellow)($pdf)(ansi reset). Optimization lasted (ansi green)($duration)(ansi reset)"
   }
   $pdf
 }
@@ -2506,7 +2541,7 @@ export def fetch_book_metadata [
       $current.cover
     }
   )
-  [$cover_file] | optimize_images
+  $cover_file | optimize_image
   {
     book: $book
     opf: $updated.opf
@@ -2536,7 +2571,7 @@ export def export_book_to_directory [
     | get content
   )
   # todo Handle missing title?
-  let sanitized_title_for_filename = $title | str replace --all "/" "-"
+  let sanitized_title_for_filename = $title | sanitize_file_name | use_unicode_in_title
   let target_directory = [$working_directory $sanitized_title_for_filename] | path join
   mkdir $target_directory
   let opf = (
@@ -3356,7 +3391,7 @@ export def parse_audiobook_metadata_from_files []: list<path> -> record {
 }
 
 # Convert the series table to a value suitable for the group tag
-export def convert_series_for_group_tag []: table<name: string, index: string> -> string {
+export def convert_series_for_group_tag []: list -> string { #table<name: string, index: string> -> string {
   let series = $in
   $series | each {|s|
     if index in $s and ($s.index | is-not-empty) {
@@ -3625,6 +3660,7 @@ export def into_tone_format []: record -> record {
 export def tracks_into_tone_format []: record<book: record, tracks: table> -> table<metadata: record<meta: record>, file: path> {
   let metadata = $in
   $metadata.tracks | par-each {|track|
+  try {
     {
       book: $metadata.book
       track: $track
@@ -3636,6 +3672,10 @@ export def tracks_into_tone_format []: record<book: record, tracks: table> -> ta
         file: $track.file
       }
     )
+  } catch {|err|
+    log error $"Parse failed!\n($err)\n($err.msg)\n"
+    return null
+  }
   } | sort-by metadata.meta.trackNumber
 }
 
@@ -3696,7 +3736,12 @@ export def tone_tag_tracks [
   working_directory: directory
   ...tone_args: string
 ]: record -> list<path> {
-  $in | tracks_into_tone_format | par-each {|track|
+  let tracks_in_tone_format = $in | tracks_into_tone_format
+  if ($tracks_in_tone_format | is-empty) {
+    return null
+  }
+  $tracks_in_tone_format | par-each {|track|
+    # log
     $track.metadata | tone_tag $track.file ...$tone_args
   }
 }
@@ -3882,6 +3927,16 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
     return null
   }
   let genres_and_tags = $input | select --ignore-errors genres tags | parse_genres_and_tags
+  # let genres = (
+  #   if ($genres_and_tags.genres | is-not-empty) {
+  #     $genres_and_tags.genres | default scope "series"
+  #   }
+  # )
+  # let tags = (
+  #   if ($genres_and_tags.tags | is-not-empty) {
+  #     $genres_and_tags.tags | default scope "series"
+  #   }
+  # )
   let series = {
     id: $input.id
     name: $input.name
@@ -4349,7 +4404,7 @@ export def submit_acoustid_fingerprints [
 # Parse the works from MusicBrainz recording relationships
 export def parse_works_from_musicbrainz_relations []: table -> table {
   let relations = $in
-  if ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
+  if ($relations | describe) == "list<nothing>" or ($relations | is-empty) or "target-type" not-in ($relations | columns) or "type" not-in ($relations | columns) {
     return null
   }
   let work_relations = $relations | where target-type == "work" | where type == "performance"
@@ -4535,15 +4590,22 @@ export def parse_series_from_musicbrainz_release []: record -> table<name: strin
   let release_series = (
     $metadata
     | get --ignore-errors relations
-    | parse_series_from_musicbrainz_relations
-    | default "release" scope
+    | (
+      let input = $in;
+      if ($input | is-not-empty) {
+        $input | parse_series_from_musicbrainz_relations | default "release" scope
+      }
+    )
   )
   let release_group_series = (
     $metadata
-    | get --ignore-errors release-group
-    | get --ignore-errors relations
-    | parse_series_from_musicbrainz_relations
-    | default "release group" scope
+    | get --ignore-errors release-group.relations
+    | (
+      let input = $in;
+      if ($input | is-not-empty) {
+        $input | parse_series_from_musicbrainz_relations | default "release group" scope
+      }
+    )
   )
   # There could also be recording series, but I haven't come across that yet
   let work_series = (
@@ -4555,10 +4617,18 @@ export def parse_series_from_musicbrainz_release []: record -> table<name: strin
     | get --ignore-errors relations
     | flatten
     | parse_works_from_musicbrainz_relations
-    | get --ignore-errors relations
-    | flatten
-    | parse_series_from_musicbrainz_relations
-    | default "work" scope
+    | (
+      let input = $in;
+      if ($input | is-not-empty) {
+        (
+          $input
+          | get --ignore-errors relations
+          | flatten
+          | parse_series_from_musicbrainz_relations
+          | default "work" scope
+        )
+      }
+    )
   )
   $release_series | append $release_group_series | append $work_series # | sort-by scope
 }
@@ -4576,17 +4646,29 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
   let release = (
     $metadata
     | get --ignore-errors tags
-    | wrap tags
-    | parse_genres_and_tags
-    | default "release" scope
+    | (
+      let input = $in;
+      if ($input | is-not-empty) {
+        {tags: $input, genres: []}
+      } else {
+        {tags: [], genres: []}
+      }
+    )
+    | parse_genres_and_tags | default "release" scope
   )
   let release_group = (
     $metadata
     | get --ignore-errors release-group
     | get --ignore-errors tags
-    | wrap tags
-    | parse_genres_and_tags
-    | default "release group" scope
+    | (
+      let input = $in;
+      if ($input | is-not-empty) {
+        {tags: $input, genres: []}
+      } else {
+        {tags: [], genres: []}
+      }
+    )
+    | parse_genres_and_tags | default "release group" scope
   )
   let recording = (
     $metadata
@@ -4596,9 +4678,15 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
     | get --ignore-errors recording
     | get --ignore-errors tags
     | flatten
-    | wrap tags
-    | parse_genres_and_tags
-    | default "recording" scope
+    | (
+      let input = $in;
+      if ($input | is-not-empty) {
+        {tags: $input, genres: []}
+      } else {
+        {tags: [], genres: []}
+      }
+    )
+    | parse_genres_and_tags | default "recording" scope
   )
   let genres = (
     $release
@@ -4806,9 +4894,9 @@ export def parse_musicbrainz_release []: record -> record {
                   role: $contributor.role
                 }
               }
-            )
+            ) | uniq
           }
-        ) | uniq
+        )
         let musicbrainz_works = (
           if ($works | is-not-empty) {
             (
@@ -4897,7 +4985,12 @@ export def parse_musicbrainz_release []: record -> record {
             }
           }
         )
-        let musicbrainz_artist_ids = $track | get --ignore-errors artist-credit.artist.id | uniq
+        let musicbrainz_artist_ids = (
+          let ids = $track | get --ignore-errors artist-credit.artist.id;
+          if ($ids | is-not-empty) {
+            $ids | uniq
+          }
+        )
         let disc_subtitle = (
           if "title" in $media and ($media.title | is-not-empty) {
             $media.title
@@ -4967,7 +5060,12 @@ export def parse_musicbrainz_release []: record -> record {
         }
       }
     }
-  ) | uniq
+  )
+  let primary_authors = (
+    if ($primary_authors | is-not-empty) {
+      $primary_authors | uniq
+    }
+  )
   let contributors = (
     $primary_authors
     | each {|primary_author|
@@ -5019,7 +5117,12 @@ export def parse_musicbrainz_release []: record -> record {
     "cover-art-archive" in $metadata and $metadata.cover-art-archive.front
   )
 
-  let musicbrainz_artist_ids = $metadata | get --ignore-errors artist-credit.artist.id | uniq
+  let musicbrainz_artist_ids = (
+    let ids = $metadata | get --ignore-errors artist-credit.artist.id;
+    if ($ids | is-not-empty) {
+      $ids | uniq
+    }
+  )
   let musicbrainz_release_types = (
     []
     | append (
@@ -5142,7 +5245,12 @@ export def fetch_and_parse_musicbrainz_release [
   if ($response | is-empty) {
     return null
   }
-  $response | parse_musicbrainz_release
+  try {
+    $response | parse_musicbrainz_release
+  # try {
+  } catch {|err|
+    log error $"Parse failed!\n($err)\n($err.msg)\n"
+  }
 }
 
 
@@ -5582,7 +5690,6 @@ export def tag_audiobook [
 
   if ($metadata | is-empty) or "book" not-in $metadata or "musicbrainz_release_id" not-in $metadata.book or ($metadata.book.musicbrainz_release_id | is-empty) {
     log error "Unable to determine the MusicBrainz Release ID. Aborting. Please supply the MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
-    log debug $"$metadata: ($metadata | to nuon)"
     return null
   }
   # Tag the files
@@ -5865,7 +5972,8 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
-]: table -> table<index: int, start: duration, length: duration, title: string> {
+]: record -> table<index: int, start: duration, length: duration, title: string> {
+# ]: table -> table<index: int, start: duration, length: duration, title: string> {
   let release = $in
   if "musicbrainz_release_group_id" not-in $release.book or ($release.book.musicbrainz_release_group_id | is-empty) {
     return null
@@ -5919,7 +6027,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   }
   # Don't parallelize for the sake of the MusicBrainz API
   let candidates = $candidates | each {|candidate|
-    let received_metadata = fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels tags url-rels]
+    let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels tags url-rels]
     if ($received_metadata | is-empty) {
       log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
       return null
@@ -6189,7 +6297,8 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     } else {
       $musicbrainz_metadata | update book.series (
         $musicbrainz_metadata.book.series | each {|series|
-          $series | merge ($series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay)
+          let scope = $series.scope
+          $series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | insert scope $scope
         }
       )
     }
@@ -6204,36 +6313,28 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
       (
         $musicbrainz_metadata
         | upsert book.genres (
-          $musicbrainz_metadata.book.series | each {|series|
-            if ($series | get --ignore-errors genres | is-empty) {
-              $series.genres
-            } else {
-              $series.genres | default ($series.scope + " series") scope
-            }
-          } | (
-            let input = $in;
-            if ($input | is-not-empty) and "genres" in ($input | columns) {
-              $input.genres | uniq-by name scope | append $musicbrainz_metadata.book.genres
-            } else {
-              $input
-            }
-          )
+          $musicbrainz_metadata.book.series | reduce {|series, acc|
+            let genres = (
+              if ($series | get --ignore-errors genres | is-empty) {
+                $series.genres
+              } else {
+                $series.genres | default ($series.scope + " series") scope
+              }
+            )
+            $genres | append $acc
+          } | uniq-by name scope | append $musicbrainz_metadata.book.genres
         )
         | upsert book.tags (
-          $musicbrainz_metadata.book.series | each {|series|
-            if ($series | get --ignore-errors tags | is-empty) {
-              $series.tags
-            } else {
-              $series.tags | default ($series.scope + " series") scope
-            }
-          } | (
-            let input = $in;
-            if ($input | is-not-empty) and "tags" in ($input | columns) {
-              $input.tags | uniq-by name scope | append $musicbrainz_metadata.book.tags
-            } else {
-              $input
-            }
-          )
+          $musicbrainz_metadata.book.series | reduce {|series, acc|
+            let tags = (
+              if ($series | get --ignore-errors tags | is-empty) {
+                $series.tags
+              } else {
+                $series.tags | default ($series.scope + " series") scope
+              }
+            )
+            $tags | append $acc
+          } | uniq-by name scope | append $musicbrainz_metadata.book.tags
         )
       )
     }
@@ -6352,6 +6453,9 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     )
     | tone_tag_tracks $working_directory ...$tone_args
   )
+  if ($files | is-empty) {
+    return null
+  }
 
   # Clean up
   if ($front_cover | is-not-empty) {
@@ -6368,7 +6472,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
 # Genres and tags are then sorted by count from highest to lowest and then by name
 #
 # Any genres in the input table will be in the output genres table.
-export def parse_genres_and_tags []: record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> -> record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> {
+export def parse_genres_and_tags []: record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> -> record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> { # record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> -> record<genres: table<name: string, count: int>, tags: table<name: string, count: int>> {
   let input = $in
   if ($input | is-empty) {
     return null
@@ -6472,7 +6576,7 @@ export def append_to_musicbrainz_query [
 }
 
 # Escape special Lucene characters in a string with a backslash
-export def escape_special_lucene_characters []: string -> string {
+export def escape_special_lucene_characters []: any -> string {
   let input = $in
   if ($input | describe) != "string" {
     return $input

@@ -218,10 +218,14 @@ def main [
   # --series: string # The name of the series
   # --series-year: string # The initial publication year of the series, also referred to as the volume
   --skip-ocr # Don't attempt to parse the ISBN from images using OCR
+  --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
   --title: string # The title of the comic or manga issue
   --upload-ereader-cbz # Upload the E-Reader specific format to the server
   --use-rsync
+  --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
+  --imprint: string # Set the publisher/imprint. This is embedded in the ComicInfo.xml file and used for the publisher in EPUB and PDF metadata.
+  --publisher: string # Set the publisher in the metadata. Note that the imprint is preferred over this for EPUB and PDF metadata.
 ] {
   if ($files | is-empty) {
     log error "No files provided"
@@ -235,6 +239,11 @@ def main [
 
   if $isbn != null and ($files | length) > 1 {
     log error "Setting the ISBN for multiple files is not allowed as it will result in overwriting the final file"
+    exit 1
+  }
+
+  if $bookbrainz_edition_id != null and ($files | length) > 1 {
+    log error "Setting the BookBrainz Edition ID for multiple files is not allowed as it will result in overwriting the final file"
     exit 1
   }
 
@@ -330,6 +339,15 @@ def main [
       }
       $target
     } else {
+      if not ($original_file | path exists) {
+        if not $keep_tmp {
+          rm --force --recursive $temporary_directory
+        }
+        return {
+          file: $original_file
+          error: $"The file (ansi yellow)($original_file)(ansi reset) does not exist!"
+        }
+      }
       if $keep {
         let target = [$temporary_directory ($original_file | path basename)] | path join
         log debug $"Copying the file (ansi yellow)($original_file)(ansi reset) to (ansi yellow)($target)(ansi reset)"
@@ -676,8 +694,10 @@ def main [
     | update $input_format (
       if $comic_vine_issue_id == null {
         let target = $formats | get $input_format | comic_file_name_from_metadata $temporary_directory --issue-year $issue_year
-        log debug $"Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-        mv ($formats | get $input_format) $target
+        if ($formats | get $input_format) != $target {
+          log debug $"Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+          mv --force ($formats | get $input_format) $target
+        }
         $target
       } else {
         $formats | get $input_format
@@ -686,10 +706,14 @@ def main [
     | (
       let i = $in;
       if $input_format == "pdf" and "cbz" in $i {
-        # Rename the CBZ according to the name of the PDF
         let target = $i | get $input_format | path parse | update extension cbz | path join
-        mv $i.cbz $target
-        $i | update cbz $target
+        if $i.cbz != $target {
+          # Rename the CBZ according to the name of the PDF
+          mv --force $i.cbz $target
+          $i | update cbz $target
+        } else {
+          $i
+        }
       } else {
         $i
       }
@@ -761,7 +785,7 @@ def main [
   let tag_result = (
     $formats.cbz | tag_cbz $comictagger --comic-vine-issue-id $comic_vine_issue_id
   )
-  log debug $"The ComicTagger result is:\n(ansi green)($tag_result.result)(ansi reset)\n"
+  log debug $"The ComicTagger result is:\n(ansi green)($tag_result.result | to nuon)(ansi reset)\n"
 
   if ($tag_result.result.status == "match_failure") {
     # todo Add stderr from ComicTagger here
@@ -802,6 +826,15 @@ def main [
       $writers | sort | uniq
     }
   )
+  if ($authors | is-empty) {
+    if not $keep_tmp {
+      rm --force --recursive $temporary_directory
+    }
+    return {
+      file: $original_file
+      error: "No authors found in Comic Vine metadata!"
+    }
+  }
   log debug $"The authors are (ansi purple)'($authors)'(ansi reset)"
 
   # We keep the name of the series in the title to keep things organized.
@@ -850,6 +883,7 @@ def main [
       $title
     }
   )
+  let title = $title | use_unicode_in_title
 
   let previous_title = ($comic_metadata | get title)
   log info $"Rewriting the title from (ansi yellow)'($previous_title)'(ansi reset) to (ansi yellow)'($title)'(ansi reset)"
@@ -875,34 +909,76 @@ def main [
       let fetched = (
         fetch-ebook-metadata --allowed-plugins ["Google"] --authors $authors --title $title | get opf
       )
-      let fetched_isbn_for_google = $fetched | isbn_from_opf
-      log debug $"Fetched ISBN: (ansi purple)($fetched_isbn_for_google)(ansi reset)"
-      let fetched_title_for_google = $fetched | title_from_opf
-      log debug $"Fetched title from Google: (ansi purple)($fetched_title_for_google)(ansi reset)"
+      if ($fetched | is-not-empty) {
+        let fetched_isbn_for_google = $fetched | isbn_from_opf
+        log debug $"Fetched ISBN: (ansi purple)($fetched_isbn_for_google)(ansi reset)"
+        let fetched_title_for_google = $fetched | title_from_opf
+        log debug $"Fetched title from Google: (ansi purple)($fetched_title_for_google)(ansi reset)"
 
-      # Use the ISBN from Google ISBN to look it up
-      let fetched = fetch-ebook-metadata --isbn $fetched_isbn_for_google | get opf
+        # Use the ISBN from Google ISBN to look it up
+        let fetched = fetch-ebook-metadata --isbn $fetched_isbn_for_google | get opf
+        if ($fetched | is-not-empty) {
+          let fetched_isbn = $fetched | isbn_from_opf
+          log debug $"Fetched ISBN: (ansi purple)($fetched_isbn)(ansi reset)"
+          let fetched_title = $fetched | title_from_opf
+          log debug $"Fetched title: (ansi purple)($fetched_title)(ansi reset)"
+          let fetched_series = $fetched | series_from_opf
+          log debug $"Fetched series: (ansi purple)($fetched_series)(ansi reset)"
+          let fetched_issue = $fetched | issue_from_opf
+          log debug $"Fetched issue: (ansi purple)($fetched_issue)(ansi reset)"
 
-      let fetched_isbn = $fetched | isbn_from_opf
-      log debug $"Fetched ISBN: (ansi purple)($fetched_isbn)(ansi reset)"
-      let fetched_title = $fetched | title_from_opf
-      log debug $"Fetched title: (ansi purple)($fetched_title)(ansi reset)"
-      let fetched_series = $fetched | series_from_opf
-      log debug $"Fetched series: (ansi purple)($fetched_series)(ansi reset)"
-      let fetched_issue = $fetched | issue_from_opf
-      log debug $"Fetched issue: (ansi purple)($fetched_issue)(ansi reset)"
-
-      if $fetched_isbn != null and $fetched_isbn == $fetched_isbn_for_google and $fetched_series == $comic_metadata.series and $fetched_issue == $comic_metadata.issue {
-        log debug $"Found the ISBN (ansi purple)($fetched_isbn)(ansi reset) from the fetched metadata"
-        $fetched_isbn
-      } else if $fetched_isbn_for_google != null and $fetched_title_for_google == $title {
-        log debug $"Found the ISBN (ansi purple)($fetched_isbn_for_google)(ansi reset) from the fetched metadata"
-        $fetched_isbn_for_google
+          if $fetched_isbn != null and $fetched_isbn == $fetched_isbn_for_google and $fetched_series == $comic_metadata.series and $fetched_issue == $comic_metadata.issue {
+            log debug $"Found the ISBN (ansi purple)($fetched_isbn)(ansi reset) from the fetched metadata"
+            $fetched_isbn
+          } else if $fetched_isbn_for_google != null and $fetched_title_for_google == $title {
+            log debug $"Found the ISBN (ansi purple)($fetched_isbn_for_google)(ansi reset) from the fetched metadata"
+            $fetched_isbn_for_google
+          }
+        }
       }
     } else {
       $isbn
     }
   )
+
+  # Obtain metadata using Calibre
+  let comic_vine_id = (if $comic_vine_issue_id == null { $comic_metadata.issue_id } else { $comic_vine_issue_id });
+  let fetched_from_calibre = (
+    if $input_format in ["epub" "pdf"] {
+      $formats | get $input_format | (
+        fetch_book_metadata
+        # Use Comic Vine to ensure series information is correct.
+        --allowed-plugins ["Comicvine"]
+        # todo Get the EPUB metadata from sources besides Comic Vine as well?
+        # I think it probably isn't necessary at this point.
+        # This still doesn't actually use Comic Vine, but it does still en up working.
+        # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
+        --authors $authors
+        --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
+        --isbn $isbn
+        --title $title
+        $temporary_directory
+      )
+    }
+  )
+
+  # todo?
+  # Get the authors from Calibre if they are missing in the Comic Vine metadata.
+  # let authors = (
+  #   if ($authors | is-empty) {
+  #     $fetched_from_calibre.opf
+  #     | get content
+  #     | where tag == "metadata"
+  #     | first
+  #     | get content
+  #     | where tag == "creator"
+  #     | where attributes.role == "aut"
+  #     | par-each {|creator| $creator | get content | first | get content }
+  #     | sort
+  #   } else {
+  #     $authors
+  #   }
+  # )
 
   # Add the ISBN to the ComicInfo
   log info "Updating the ComicInfo"
@@ -921,6 +997,57 @@ def main [
     )
     | upsert_comic_info {tag: "Manga", value: $manga}
     | upsert_comic_info {tag: "Title", value: $title}
+    | upsert_comic_info {tag: "Format", value: "Digital"}
+    | (
+      let input = $in;
+      if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
+        if ($comic_metadata.language | str downcase) in ["eng" "english"] {
+          $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
+        } else {
+          $input | upsert_comic_info {tag: "LanguageISO", value: $comic_metadata.language}
+        }
+      } else {
+        $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
+      }
+    )
+    | (
+      let input = $in;
+      if ($imprint | is-not-empty) {
+        $input | upsert_comic_info {tag: "Imprint", value: $imprint}
+      } else {
+        $input
+      }
+    )
+    | (
+      let input = $in;
+      if ($publisher | is-not-empty) {
+        $input | upsert_comic_info {tag: "Publisher", value: $publisher}
+      } else {
+        $input
+      }
+    )
+    | (
+      let input = $in;
+      if ($bookbrainz_edition_id | is-not-empty) and ($comic_vine_id | is-not-empty) {
+        $input | upsert_comic_info {
+          tag: "Web",
+          value: $"https://bookbrainz.org/edition/($bookbrainz_edition_id) https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
+        }
+      } else if ($bookbrainz_edition_id | is-not-empty) {
+        $input | upsert_comic_info {
+          tag: "Web",
+          value: $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"
+        }
+      } else if ($comic_vine_id | is-not-empty) {
+        $input | upsert_comic_info {
+          tag: "Web",
+          value: $"https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
+        }
+      } else {
+        $input
+      }
+    )
+    #todo Web link to BookBrainz Edition
     # todo Incorporate Comic Vine issue id and series id in Notes section of ComicInfo.xml or sidecar metadata.opf
     # This will allow easily updating the metadata in the future without having to redo all the lookup work.
     | {
@@ -930,26 +1057,31 @@ def main [
     | inject_comic_info
   )
 
+  # PDFs must be optimized before embedding metadata, as the embedded metadata will be scrubbed.
+  let updated_optimized_file_hashes = (
+    $optimized_file_hashes | update sha256 (
+      $optimized_file_hashes.sha256 | append (
+        if "pdf" in $formats and not $skip_optimization {
+          let hash = $formats.pdf | open --raw | hash sha256
+          if $hash not-in $optimized_file_hashes.sha256 {
+            log debug "Optimizing the PDF"
+            $formats.pdf | optimize_pdf | open --raw | hash sha256
+          }
+        }
+      ) | uniq | sort
+    )
+  )
+  if $updated_optimized_file_hashes != $optimized_file_hashes {
+    $updated_optimized_file_hashes | save --force $optimized_files_cache_file
+  }
+  let optimized_file_hashes = $updated_optimized_file_hashes
+
   let formats = (
     # Update the metadata in the EPUB and rename it to match the filename of the CBZ
-    let comic_vine_id = (if $comic_vine_issue_id == null { $comic_metadata.issue_id } else { $comic_vine_issue_id });
     if "epub" in $formats {
       # Update the metadata in the EPUB file.
       let epub = (
-        $formats.epub | (
-          fetch_book_metadata
-          # Use Comic Vine to ensure series information is correct.
-          --allowed-plugins ["Comicvine"]
-          # todo Get the EPUB metadata from sources besides Comic Vine as well?
-          # I think it probably isn't necessary at this point.
-          # This still doesn't actually use Comic Vine, but it does still en up working.
-          # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
-          --authors $authors
-          --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
-          --isbn $isbn
-          --title $title
-          $temporary_directory
-        )
+        $fetched_from_calibre
         | export_book_to_directory ($formats | get "epub" | path dirname)
         | embed_book_metadata
         | (
@@ -960,6 +1092,70 @@ def main [
               | append (
                 if $isbn != null {
                   $"--isbn=($isbn)"
+                }
+              )
+              | append (
+                if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+                  [$"--series=($comic_metadata.series)" $"--index=($comic_metadata.issue)"]
+                }
+              )
+              | append (
+                if ($imprint | is-not-empty) {
+                  $"--publisher=($imprint)"
+                } else if ($publisher | is-not-empty) {
+                  $"--publisher=($publisher)"
+                } else if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
+                  $"--publisher=($comic_metadata.imprint)"
+                } else if "publisher" in $comic_metadata and ($comic_metadata.publisher | is-not-empty) {
+                  $"--publisher=($comic_metadata.publisher)"
+                }
+              )
+              | append (
+                if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
+                  if ($comic_metadata.language | str downcase) in ["eng" "english"] {
+                    "--language=en"
+                  } else {
+                    $"--language=($comic_metadata.language)"
+                  }
+                } else {
+                  "--language=en"
+                }
+              )
+              | append (
+                if "description" in $comic_metadata and ($comic_metadata.description | is-not-empty) {
+                  $"--comments=($comic_metadata.description)"
+                }
+              )
+              | append (
+                if "genres" in $comic_metadata and ($comic_metadata.genres | is-not-empty) {
+                  $"--tags=($comic_metadata.genres | str join ',')"
+                }
+              )
+              | append (
+                if ($bookbrainz_edition_id | is-not-empty) {
+                  $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
+                }
+              )
+              | append (
+                let year = (
+                  if "year" in $comic_metadata and ($comic_metadata.year | is-not-empty) {
+                    $comic_metadata.year
+                  }
+                );
+                let month = (
+                  if "month" in $comic_metadata and ($comic_metadata.month | is-not-empty) {
+                    $comic_metadata.month
+                  }
+                );
+                let day = (
+                  if "day" in $comic_metadata and ($comic_metadata.day | is-not-empty) {
+                    $comic_metadata.day
+                  }
+                );
+                if ($year | is-not-empty) and ($month | is-not-empty) and ($year | is-not-empty) {
+                  $"--date=($year)-($month)-($day)"
+                } else if ($year | is-not-empty) {
+                  $"--date=($year)"
                 }
               )
             );
@@ -977,7 +1173,9 @@ def main [
       )
       let stem = ($formats.cbz | path parse | get stem)
       let renamed_epub = ({ parent: ($epub | path parse | get parent), stem: $stem, extension: "epub" } | path join)
-      mv $epub $renamed_epub
+      if $epub != $renamed_epub {
+        mv --force $epub $renamed_epub
+      }
       $formats | update epub $renamed_epub
     # Rename the PDF
     } else if "pdf" in $formats {
@@ -985,24 +1183,12 @@ def main [
       let renamed_pdf = ({ parent: ($formats.pdf | path parse | get parent), stem: $stem, extension: "pdf" } | path join)
       if $formats.pdf != $renamed_pdf {
         log debug $"Renaming the PDF from ($formats.pdf) to ($renamed_pdf)";
-        mv $formats.pdf $renamed_pdf
+        mv --force $formats.pdf $renamed_pdf
       }
       # Update the metadata in the PDF file.
       let renamed_pdf = (
-        $renamed_pdf | (
-          fetch_book_metadata
-          # Use Comic Vine to ensure series information is correct.
-          --allowed-plugins ["Comicvine"]
-          # todo Get the EPUB metadata from sources besides Comic Vine as well?
-          # I think it probably isn't necessary at this point.
-          # This still doesn't actually use Comic Vine, but it does still en up working.
-          # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
-          --authors $authors
-          --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
-          --isbn $isbn
-          --title $title
-          $temporary_directory
-        )
+        $fetched_from_calibre
+        | update book ($renamed_pdf)
         | export_book_to_directory ($renamed_pdf | path dirname)
         | embed_book_metadata
         | (
@@ -1013,6 +1199,70 @@ def main [
               | append (
                 if $isbn != null {
                   $"--isbn=($isbn)"
+                }
+              )
+              | append (
+                if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+                  [$"--series=($comic_metadata.series)" $"--index=($comic_metadata.issue)"]
+                }
+              )
+              | append (
+                if ($imprint | is-not-empty) {
+                  $"--publisher=($imprint)"
+                } else if ($publisher | is-not-empty) {
+                  $"--publisher=($publisher)"
+                } else if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
+                  $"--publisher=($comic_metadata.imprint)"
+                } else if "publisher" in $comic_metadata and ($comic_metadata.publisher | is-not-empty) {
+                  $"--publisher=($comic_metadata.publisher)"
+                }
+              )
+              | append (
+                if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
+                  if ($comic_metadata.language | str downcase) in ["eng" "english"] {
+                    "--language=en"
+                  } else {
+                    $"--language=($comic_metadata.language)"
+                  }
+                } else {
+                  "--language=en"
+                }
+              )
+              | append (
+                if "description" in $comic_metadata and ($comic_metadata.description | is-not-empty) {
+                  $"--comments=($comic_metadata.description)"
+                }
+              )
+              | append (
+                if "genres" in $comic_metadata and ($comic_metadata.genres | is-not-empty) {
+                  $"--tags=($comic_metadata.genres | str join ',')"
+                }
+              )
+              | append (
+                if ($bookbrainz_edition_id | is-not-empty) {
+                  $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
+                }
+              )
+              | append (
+                let year = (
+                  if "year" in $comic_metadata and ($comic_metadata.year | is-not-empty) {
+                    $comic_metadata.year
+                  }
+                );
+                let month = (
+                  if "month" in $comic_metadata and ($comic_metadata.month | is-not-empty) {
+                    $comic_metadata.month
+                  }
+                );
+                let day = (
+                  if "day" in $comic_metadata and ($comic_metadata.day | is-not-empty) {
+                    $comic_metadata.day
+                  }
+                );
+                if ($year | is-not-empty) and ($month | is-not-empty) and ($year | is-not-empty) {
+                  $"--date=($year)-($month)-($day)"
+                } else if ($year | is-not-empty) {
+                  $"--date=($year)"
                 }
               )
             );
@@ -1040,7 +1290,7 @@ def main [
         } | path join
       );
       http get --raw $cover_url | save --force $cover;
-      [$cover] | optimize_images;
+      $cover | optimize_image;
       log debug $"Downloaded cover (ansi yellow)($cover)(ansi reset)";
       $formats
       | update pdf $renamed_pdf
@@ -1095,10 +1345,10 @@ def main [
         }
       ) | append (
         if "pdf" in $formats {
+          # Just update the hash of the file with the updated metadata here.
           let hash = $formats.pdf | open --raw | hash sha256
           if $hash not-in $optimized_file_hashes.sha256 {
-            log debug "Optimizing the PDF"
-            $formats.pdf | optimize_pdf | open --raw | hash sha256
+            $hash
           }
         }
       ) | append (
@@ -1233,10 +1483,10 @@ def main [
     }
   } else {
     mkdir $destination
-    mv ($formats | get $output_format) $destination
+    mv --force ($formats | get $output_format) $destination
     if $output_format == "pdf" {
-      mv $formats.comic_info $destination
-      mv $formats.cover $destination
+      mv --force $formats.comic_info $destination
+      mv --force $formats.cover $destination
     }
   }
 
@@ -1343,7 +1593,7 @@ def main [
       }
     }
     if $no_copy_to_ereader and not $upload_ereader_cbz {
-      mv $formats.ereader_cbz $destination
+      mv --force $formats.ereader_cbz $destination
     }
   }
 

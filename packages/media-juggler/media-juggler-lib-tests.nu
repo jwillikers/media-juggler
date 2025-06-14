@@ -4794,5 +4794,5 @@ def main [] {
   test_escape_special_lucene_characters
   test_append_to_musicbrainz_query
   test_has_bad_video_stream
-  echo "All tests passed!"
+  echo $"(ansi green)All tests passed!(ansi reset)"
 }

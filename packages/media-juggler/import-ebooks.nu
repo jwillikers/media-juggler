@@ -254,7 +254,7 @@ def main [
       $target
     }
   )
-  [$cover] | optimize_images
+  $cover | optimize_image
 
   let original_book_files = [($original_file | split_ssh_path | get path)] | append $original_cover | append $original_opf
   log debug $"The original files for the book are (ansi yellow)($original_book_files)(ansi reset)"

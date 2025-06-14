@@ -6,9 +6,6 @@
   image_optim = _final: prev: {
     image_optim = prev.image_optim.override { withPngout = true; };
   };
-  efficient-compression-tool = _final: prev: {
-    efficient-compression-tool = prev.callPackage ./efficient-compression-tool/package.nix { };
-  };
   jpegli = _final: prev: {
     jpegli = prev.callPackage ./jpegli/package.nix { };
   };
