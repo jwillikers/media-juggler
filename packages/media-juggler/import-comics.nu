@@ -218,6 +218,7 @@ def main [
   # --series: string # The name of the series
   # --series-year: string # The initial publication year of the series, also referred to as the volume
   --skip-ocr # Don't attempt to parse the ISBN from images using OCR
+  --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
   --title: string # The title of the comic or manga issue
   --upload-ereader-cbz # Upload the E-Reader specific format to the server
@@ -1046,7 +1047,7 @@ def main [
   let updated_optimized_file_hashes = (
     $optimized_file_hashes | update sha256 (
       $optimized_file_hashes.sha256 | append (
-        if "pdf" in $formats {
+        if "pdf" in $formats and not $skip_optimization {
           let hash = $formats.pdf | open --raw | hash sha256
           if $hash not-in $optimized_file_hashes.sha256 {
             log debug "Optimizing the PDF"
