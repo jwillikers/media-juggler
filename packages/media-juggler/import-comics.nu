@@ -883,6 +883,7 @@ def main [
       $title
     }
   )
+  let title = $title | use_unicode_in_title
 
   let previous_title = ($comic_metadata | get title)
   log info $"Rewriting the title from (ansi yellow)'($previous_title)'(ansi reset) to (ansi yellow)'($title)'(ansi reset)"

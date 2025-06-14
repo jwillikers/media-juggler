@@ -215,6 +215,16 @@ export def sanitize_file_name []: string -> string {
   }
 }
 
+export def use_unicode_in_title []: string -> string {
+  let title = $in
+  $title | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…"
+  mut new_title = $title
+  while '"' in $new_title {
+    $new_title = $new_title | str replace '"' '“' | str replace '"' '”'
+  }
+  $new_title
+}
+
 # Get the type of a path via SSH
 export def "ssh_path_type" []: path -> string {
   let input = $in
@@ -2561,7 +2571,7 @@ export def export_book_to_directory [
     | get content
   )
   # todo Handle missing title?
-  let sanitized_title_for_filename = $title | str replace --all "/" "-"
+  let sanitized_title_for_filename = $title | sanitize_file_name | use_unicode_in_title
   let target_directory = [$working_directory $sanitized_title_for_filename] | path join
   mkdir $target_directory
   let opf = (
