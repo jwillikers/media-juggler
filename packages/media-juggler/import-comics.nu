@@ -1027,8 +1027,21 @@ def main [
     )
     | (
       let input = $in;
-      if ($bookbrainz_edition_id | is-not-empty) {
-        $input | upsert_comic_info {tag: "Web", value: $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"}
+      if ($bookbrainz_edition_id | is-not-empty) and ($comic_vine_id | is-not-empty) {
+        $input | upsert_comic_info {
+          tag: "Web",
+          value: $"https://bookbrainz.org/edition/($bookbrainz_edition_id) https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
+        }
+      } else if ($bookbrainz_edition_id | is-not-empty) {
+        $input | upsert_comic_info {
+          tag: "Web",
+          value: $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"
+        }
+      } else if ($comic_vine_id | is-not-empty) {
+        $input | upsert_comic_info {
+          tag: "Web",
+          value: $"https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
+        }
       } else {
         $input
       }
