@@ -551,7 +551,7 @@ def main [
       # todo Add series subdirectory here
       | append (
         if $output_format == "pdf" {
-          $book.book | path parse | get stem | sanitize_file_name
+          $book.book | path parse | get stem | use_unicode_in_title | sanitize_file_name
         } else {
           null
         }
@@ -564,7 +564,7 @@ def main [
       let components = $book.book | path parse;
       {
         parent: $target_directory
-        stem: ($components.stem | sanitize_file_name)
+        stem: ($components.stem | use_unicode_in_title | sanitize_file_name)
         extension: $components.extension
       } | path join
     )

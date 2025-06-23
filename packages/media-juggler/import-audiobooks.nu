@@ -558,7 +558,7 @@ def main [
 
   let relative_destination_directory = (
     [
-      ($metadata.book.title | sanitize_file_name)
+      ($metadata.book.title | use_unicode_in_title | sanitize_file_name)
     ]
     | prepend (
       if ($metadata.book | get --ignore-errors series | is-not-empty) {
@@ -599,11 +599,11 @@ def main [
         )
         if ($primary_series | is-not-empty) {
           log info $"Primary series is ($primary_series)"
-          $primary_series.name | sanitize_file_name
+          $primary_series.name | use_unicode_in_title | sanitize_file_name
         }
       }
     )
-    | prepend ($primary_authors.name | str join ", " | sanitize_file_name)
+    | prepend ($primary_authors.name | str join ", " | use_unicode_in_title | sanitize_file_name)
     | path join
   )
 
@@ -617,7 +617,7 @@ def main [
       # For multiple files, prefix the name with the index
       let stem = (
         if ($metadata.tracks | length) == 1 {
-          $track.title | sanitize_file_name
+          $track.title | use_unicode_in_title | sanitize_file_name
         } else {
           ($track.index | fill --alignment r --character '0' --width $number_of_digits) + " " + $track.title
         }
@@ -639,8 +639,10 @@ def main [
     (
       ^ebook-meta
       ($audiobook.accompanying_documents | first)
-      --title $metadata.book.title
       --authors ($primary_authors | str join "&")
+      --author-sort
+      --title ($metadata.book.title | use_unicode_in_title)
+      --title-sort
     )
   }
 
@@ -650,7 +652,7 @@ def main [
       let stem = (
         # For a single file, rename the file to match the book.
         if ($audiobook.accompanying_documents | length) == 1 {
-          $metadata.book.title | sanitize_file_name
+          $metadata.book.title | use_unicode_in_title | sanitize_file_name
         # For multiple files, leave the names as is.
         } else {
           $document | path parse | get stem

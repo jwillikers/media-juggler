@@ -883,6 +883,42 @@ def main [
       $title
     }
   )
+  let title = (
+    let imprint = (
+      let imprint = (
+        if ($imprint | is-not-empty) {
+          $imprint
+        } else {
+          if ("imprint" in $comic_metadata) {
+            $comic_metadata.imprint
+          }
+        }
+      );
+      if ($imprint | is-not-empty) {
+        $imprint | str downcase
+      }
+    );
+    let publisher = (
+      let publisher = (
+        if ($publisher | is-not-empty) {
+          $publisher
+        } else {
+          if ("publisher" in $comic_metadata) {
+            $comic_metadata.publisher
+          }
+        }
+      );
+      if ($publisher | is-not-empty) {
+        $publisher | str downcase
+      }
+    );
+    # Kodansha names everything using the Volume word on its website.
+    if "kodansha" in [$imprint $publisher] {
+      $title | str replace ", Vol. " ", Volume "
+    } else {
+      $title
+    }
+  )
   let title = $title | use_unicode_in_title
 
   let previous_title = ($comic_metadata | get title)
@@ -1163,7 +1199,9 @@ def main [
               $input.book
               ...$args
               --authors ($authors | str join "&")
+              --author-sort
               --title $title
+              --title-sort
               --identifier $"comicvine:($comic_vine_id)"
               --identifier $"comicvine-volume:($comic_metadata.series_id)"
           );
@@ -1186,7 +1224,7 @@ def main [
         mv --force $formats.pdf $renamed_pdf
       }
       # Update the metadata in the PDF file.
-      let renamed_pdf = (
+      let updated_pdf = (
         $fetched_from_calibre
         | update book ($renamed_pdf)
         | export_book_to_directory ($renamed_pdf | path dirname)
@@ -1270,7 +1308,9 @@ def main [
               $input.book
               ...$args
               --authors ($authors | str join "&")
+              --author-sort
               --title $title
+              --title-sort
               --identifier $"comicvine:($comic_vine_id)"
               --identifier $"comicvine-volume:($comic_metadata.series_id)"
           );
@@ -1278,6 +1318,12 @@ def main [
         )
         | get book
       )
+      # For some reason the PDF ends up with a different name when updating the metadata.
+      # todo Fix that.
+      if $updated_pdf != $renamed_pdf {
+        log debug $"Renaming the PDF from ($updated_pdf) to ($renamed_pdf)";
+        mv --force $updated_pdf $renamed_pdf
+      }
       let comic_info = $formats.cbz | extract_comic_info $temporary_directory;
       log debug "Extracted ComicInfo.xml";
       log debug $"Cover image: ($comic_metadata._cover_image | to nuon)";
@@ -1412,13 +1458,13 @@ def main [
 
   # todo Functions archive_epub, upload_cbz, and perhaps copy_cbz_to_ereader
 
-  let authors_subdirectory = $authors | str join ", " | sanitize_file_name
+  let authors_subdirectory = $authors | str join ", " | use_unicode_in_title | sanitize_file_name
   # todo How to handle multiple series?
   let series_subdirectory = (
     # Don't use a series subdirectory if the series is only one issue long.
     # This may change if more issues are published in the future, fyi.
     if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-      $comic_metadata.series | sanitize_file_name
+      $comic_metadata.series | use_unicode_in_title | sanitize_file_name
     }
   )
   let target_directory = (
@@ -1426,7 +1472,7 @@ def main [
     | append $series_subdirectory
     | append (
       if $output_format == "pdf" {
-        $formats.pdf | path parse | get stem | sanitize_file_name
+        $formats.pdf | path parse | get stem | use_unicode_in_title | sanitize_file_name
       } else {
         null
       }
@@ -1438,7 +1484,7 @@ def main [
     let components = ($formats | get $output_format | path parse);
     {
       parent: $target_directory
-      stem: ($components.stem | sanitize_file_name)
+      stem: ($components.stem | use_unicode_in_title | sanitize_file_name)
       extension: $components.extension
     } | path join
   )
