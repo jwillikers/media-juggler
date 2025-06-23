@@ -1470,13 +1470,6 @@ def main [
   let target_directory = (
     [$destination $authors_subdirectory]
     | append $series_subdirectory
-    | append (
-      if $output_format == "pdf" {
-        $formats.pdf | path parse | get stem | use_unicode_in_title | sanitize_file_name
-      } else {
-        null
-      }
-    )
     | path join
   )
   log debug $"Target directory: ($target_directory)"
@@ -1491,18 +1484,22 @@ def main [
   log debug $"Target destination: ($target_destination)"
   let comic_info_target_destination = (
     if $output_format == "pdf" {
-      [
-        $target_directory
-        ($formats.comic_info | path basename)
-      ] | path join
+      let components = ($formats | get $output_format | path parse);
+      {
+        parent: $target_directory
+        stem: (($components.stem | use_unicode_in_title | sanitize_file_name) + "_ComicInfo")
+        extension: "xml"
+      } | path join
     }
   )
   let cover_target_destination = (
     if $output_format == "pdf" {
-      [
-        $target_directory
-        ($formats.cover | path basename)
-      ] | path join
+      let components = ($formats | get $output_format | path parse);
+      {
+        parent: $target_directory
+        stem: (($components.stem | use_unicode_in_title | sanitize_file_name) + "_cover")
+        extension: ($formats.cover | path parse | get extension)
+      } | path join
     }
   )
 
