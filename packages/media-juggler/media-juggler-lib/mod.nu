@@ -4354,7 +4354,7 @@ export def submit_acoustid_fingerprints [
   user_key: string # The user's API key for the AcoustID server
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
-]: table<musicbrainz_recording_id: string, duration: duration, fingerprint: string> -> table<index: int, submission_id: string, submission_status: string> {
+]: table<musicbrainz_recording_id: string, duration: duration, fingerprint: string, title: string> -> table<index: int, submission_id: string, submission_status: string> {
   let fingerprints = $in
   let endpoint = "https://api.acoustid.org/v2/submit"
   let submission_string = $fingerprints | enumerate | reduce --fold "" {|it, acc|
@@ -4366,7 +4366,10 @@ export def submit_acoustid_fingerprints [
       $acc
     } else {
       let duration_seconds = ($it.item.duration / 1sec) | math round
-      $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&fingerprint.($it.index)=($it.item.fingerprint)"
+      # todo I need to incorporate more metadata in the submissions: https://acoustid.org/webservice#submit
+      # It seems it isn't associated properly with a release without it.
+      # Submissions through Picard work just fine though.
+      $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.title)&fingerprint.($it.index)=($it.item.fingerprint)"
     }
   }
   if ($submission_string | is-empty) {
@@ -5789,8 +5792,8 @@ export def tag_audiobook [
       # log info $"$tracks: ($tracks | reject embedded_pictures)"
       let acoustid_submissions = (
         $tracks
-        | select musicbrainz_recording_id duration acoustid_fingerprint
-        | rename musicbrainz_recording_id duration fingerprint
+        | select musicbrainz_recording_id duration acoustid_fingerprint title
+        | rename musicbrainz_recording_id duration fingerprint title
         | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
       )
       if ($acoustid_submissions | is-not-empty) {
