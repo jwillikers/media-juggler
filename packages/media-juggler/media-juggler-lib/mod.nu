@@ -6256,10 +6256,10 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
       (
         $musicbrainz_metadata
         | upsert book.genres (
-          $musicbrainz_metadata.book.series | reduce {|series, acc|
+          $musicbrainz_metadata.book.series | reduce --fold [] {|series, acc|
             let genres = (
               if ($series | get --ignore-errors genres | is-empty) {
-                $series.genres
+                []
               } else {
                 $series.genres | default ($series.scope + " series") scope
               }
@@ -6268,10 +6268,10 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
           } | uniq-by name scope | append ($musicbrainz_metadata.book | get --ignore-errors genres)
         )
         | upsert book.tags (
-          $musicbrainz_metadata.book.series | reduce {|series, acc|
+          $musicbrainz_metadata.book.series | reduce --fold [] {|series, acc|
             let tags = (
               if ($series | get --ignore-errors tags | is-empty) {
-                $series.tags
+                []
               } else {
                 $series.tags | default ($series.scope + " series") scope
               }
