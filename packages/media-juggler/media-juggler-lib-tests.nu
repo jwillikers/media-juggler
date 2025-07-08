@@ -2265,6 +2265,56 @@ def test_has_distributor_in_common_name_only_right [] {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
+def test_has_distributor_in_common_no_distributor_left [] {
+  let left = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  let right: table<id: string, name: string, entity: string, role: string> = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Libro.fm" label distributor]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  assert equal ($left | has_distributor_in_common $right) false
+}
+
+def test_has_distributor_in_common_no_distributor_right [] {
+  let left = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Libro.fm" label distributor]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  let right: table<id: string, name: string, entity: string, role: string> = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  assert equal ($left | has_distributor_in_common $right) false
+}
+
+def test_has_distributor_in_common_no_distributor_both [] {
+  let left = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  let right: table<id: string, name: string, entity: string, role: string> = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  assert equal ($left | has_distributor_in_common $right) true
+}
+
 def test_has_distributor_in_common [] {
   test_has_distributor_in_common_left_empty
   test_has_distributor_in_common_right_empty
@@ -2275,6 +2325,9 @@ def test_has_distributor_in_common [] {
   test_has_distributor_in_common_same_id_different_entity
   test_has_distributor_in_common_name_only_left
   test_has_distributor_in_common_name_only_right
+  test_has_distributor_in_common_no_distributor_left
+  test_has_distributor_in_common_no_distributor_right
+  test_has_distributor_in_common_no_distributor_both
 }
 
 def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags [] {

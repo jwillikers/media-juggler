@@ -4288,6 +4288,7 @@ export def fetch_release_ids_by_acoustid_fingerprints [
     let matches = (
       $chunk | par-each {|fingerprint|
         let result = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key --retries $retries --retry-delay $retry_delay
+        # log info $"result: ($result)"
         if $result == null {
           log error $"Failed to lookup AcoustID fingerprint on the AcoustID server."
           return null
@@ -5247,7 +5248,6 @@ export def fetch_and_parse_musicbrainz_release [
   }
   try {
     $response | parse_musicbrainz_release
-  # try {
   } catch {|err|
     log error $"Parse failed!\n($err)\n($err.msg)\n"
   }
@@ -5436,6 +5436,12 @@ export def has_distributor_in_common [
   }
   let left_distributors = $left | where role == "distributor"
   let right_distributors = $right | where role == "distributor"
+  if ($left_distributors | is-empty) and ($right_distributors | is-empty) {
+    return true
+  }
+  if ($left_distributors | is-empty) or ($right_distributors | is-empty) {
+    return false
+  }
   let joined_on_id = (
     $left_distributors
     | rename id left_name left_entity
