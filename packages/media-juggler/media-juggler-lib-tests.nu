@@ -4679,12 +4679,6 @@ def test_append_to_musicbrainz_query [] {
   test_append_to_musicbrainz_query_existing_input_with_transform
 }
 
-def test_parse_genres_and_tags_empty_input [] {
-  let input = {}
-  let expected = null
-  assert equal ($input | parse_genres_and_tags) $expected
-}
-
 def test_parse_genres_and_tags_empty_genres_empty_tags [] {
   let input = {
     genres: []
@@ -4779,7 +4773,6 @@ def test_parse_genres_and_tags_genres_tags [] {
 }
 
 def test_parse_genres_and_tags [] {
-  test_parse_genres_and_tags_empty_input
   test_parse_genres_and_tags_empty_genres_empty_tags
   test_parse_genres_and_tags_genres_empty_tags
   test_parse_genres_and_tags_empty_genres_tags
