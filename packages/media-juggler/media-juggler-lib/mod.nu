@@ -3893,7 +3893,7 @@ export def fetch_and_parse_musicbrainz_work [
 ]: string -> record {
   let musicbrainz_work_id = $in
   let update_function = {|type id| $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay | parse_musicbrainz_work}
-  do $cache "work" $musicbrainz_work_id $update_function
+  do $cache "work" $musicbrainz_work_id $update_function null
 }
 
 # Get a Series
@@ -5157,6 +5157,7 @@ export def parse_musicbrainz_release []: record -> record {
 
 # Fetch the given release id from MusicBrainz and parse it into a normalized data structure
 export def fetch_and_parse_musicbrainz_release [
+  cache: closure
   includes: list<string> = [
     aliases
     artist-credits
@@ -5180,15 +5181,12 @@ export def fetch_and_parse_musicbrainz_release [
   --retries: int = 3
   --retry-delay: duration = 5sec
 ]: string -> record {
-  let response = $in | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay $includes
-  if ($response | is-empty) {
-    return null
+  let musicbrainz_release_id = $in
+  let update_cache = {|type id|
+    $id | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay $includes | parse_musicbrainz_release
   }
-  try {
-    $response | parse_musicbrainz_release
-  } catch {|err|
-    log error $"Parse failed!\n($err)\n($err.msg)\n"
-  }
+  let includes_checksum = $includes | sort | uniq | str join | hash sha256
+  do $cache "release" $musicbrainz_release_id $update_cache $includes_checksum
 }
 
 # Get the embedded AcoustID fingerprint or calculate it for the audio files which do not have one.
@@ -5597,7 +5595,7 @@ export def tag_audiobook [
         } else {
           log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
           let $release_candidates = $release_candidates | get id | each {|candidate|
-            let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [label-rels recordings url-rels]
+            let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay $cache [label-rels recordings url-rels]
             if ($received_metadata | is-empty) {
               log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
               null
@@ -5912,6 +5910,7 @@ export def filter_musicbrainz_chapters_releases [
 # Input is the parsed metadata of the MusicBrainz release.
 # The output is the chapters in a table formatted for a tone JSON file
 export def look_up_chapters_from_similar_musicbrainz_release [
+  cache: closure # Function to call to check for or update cached values. Looks like {|type, id, update_function| ...}
   duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
@@ -5970,7 +5969,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   }
   # Don't parallelize for the sake of the MusicBrainz API
   let candidates = $candidates | each {|candidate|
-    let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels tags url-rels]
+    let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay $cache [recordings label-rels tags url-rels]
     if ($received_metadata | is-empty) {
       log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
       return null
@@ -6157,7 +6156,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     )
   )
   let musicbrainz_metadata = (
-    $existing_metadata.book.musicbrainz_release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
+    $existing_metadata.book.musicbrainz_release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay $cache
   )
   if ($musicbrainz_metadata | is-empty) {
     log error $"Failed to fetch MusicBrainz Release (ansi yellow)($existing_metadata.book.musicbrainz_release_id)(ansi reset)"
@@ -6331,7 +6330,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
 
   let chapters = (
     if "chapters" not-in $musicbrainz_metadata.book or ($musicbrainz_metadata.book.chapters | is-empty) {
-      let chapters = $musicbrainz_metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
+      let chapters = $musicbrainz_metadata | look_up_chapters_from_similar_musicbrainz_release $cache $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
       if ($chapters | is-not-empty) {
         $chapters
       } else {

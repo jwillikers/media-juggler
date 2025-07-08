@@ -68,10 +68,38 @@ def main [
     }
   )
 
-  let cache_function = {|type, id, update_function|
-    let cached_file = [$cache_directory $type $"($id).json"] | path join
+  let cache_function = {|type, id, update_function, additional_hash|
+    let filename = (
+      if ($additional_hash | is-not-empty) {
+        $"($id)_($additional_hash).json"
+      } else {
+        $"($id).json"
+      }
+    )
+    let cached_file = [$cache_directory $type $filename] | path join
     try {
-      open $cached_file
+      let data = open $cached_file
+      # The integer duration must be converted to a Nushell duration when loading a release from a JSON file.
+      if $type == "release" {
+        $data | update tracks (
+          $data.tracks | each {|track|
+            $track | update duration ($track.duration | into duration)
+          }
+        ) | (
+          let input = $in;
+          if "chapters" in $input.book {
+            $input | update book.chapters (
+              $input.book.chapters | each {|chapter|
+                $chapter | update start ($chapter.start | into duration) | update length ($chapter.length | into duration)
+              }
+            )
+          } else {
+            $input
+          }
+        )
+      } else {
+        $data
+      }
     } catch {
       let result = do $update_function $type $id
       mkdir ($cached_file | path dirname)
