@@ -6331,7 +6331,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
               }
             )
             $genres | append $acc
-          } | uniq-by name scope | append $musicbrainz_metadata.book.genres
+          } | uniq-by name scope | append ($musicbrainz_metadata.book | get --ignore-errors genres)
         )
         | upsert book.tags (
           $musicbrainz_metadata.book.series | reduce {|series, acc|
@@ -6343,7 +6343,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
               }
             )
             $tags | append $acc
-          } | uniq-by name scope | append $musicbrainz_metadata.book.tags
+          } | uniq-by name scope | append ($musicbrainz_metadata.book | get --ignore-errors tags)
         )
       )
     }
