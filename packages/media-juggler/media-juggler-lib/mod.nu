@@ -3891,7 +3891,7 @@ export def parse_musicbrainz_work []: record -> record<id: string, title: string
 
 # Fetch and parse a MusicBrainz Work by ID
 export def fetch_and_parse_musicbrainz_work [
-  cache: closure
+  cache: closure # Closure that returns parsed work information given a type and a work id
   --retries: int = 3
   --retry-delay: duration = 3sec
 ]: string -> record {
@@ -3968,7 +3968,6 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
 
 # Fetch and parse a MusicBrainz Series by ID.
 export def fetch_and_parse_musicbrainz_series [
-  # cache: directory # Cache directory where parsed series are stored in files named according to mbid, i.e. mbid.json.
   cache: closure # Closure that returns parsed series information given a type and a series id
   --retries: int = 3
   --retry-delay: duration = 3sec

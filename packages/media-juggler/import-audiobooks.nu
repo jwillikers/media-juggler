@@ -70,10 +70,10 @@ def main [
     }
   )
 
-  let cache_function = {|type, id, update_function, additional_hash|
+  let cache_function = {|type, id, update_function, filename_suffix|
     let filename = (
-      if ($additional_hash | is-not-empty) {
-        $"($id)_($additional_hash).json"
+      if ($filename_suffix | is-not-empty) {
+        $"($id)_($filename_suffix).json"
       } else {
         $"($id).json"
       }
