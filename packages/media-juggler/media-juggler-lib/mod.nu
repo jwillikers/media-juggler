@@ -3762,7 +3762,7 @@ export def fetch_musicbrainz_release_group_for_release []: string -> table {
 
 # Fetch the front cover image of a release from the Cover Art Archive
 export def fetch_release_front_cover [
-  working_directory: directory
+  download_directory: directory
   size: string = original # original, 1200, 500, or 250
   --retries: int = 3
   --retry-delay: duration = 3sec
@@ -3786,7 +3786,11 @@ export def fetch_release_front_cover [
     }
   )
   let filename = $download_url | url parse | get path | path basename
-  let destination = $working_directory | path join $filename
+  let destination = $download_directory | path join $filename
+  # If the path exists, skip the download.
+  if ($destination | path exists) {
+    return $destination
+  }
   http get --headers [User-Agent $user_agent] $download_url | save --force $destination
   $destination
 }
@@ -5488,6 +5492,7 @@ export def filter_musicbrainz_releases [
 # I might add logic here in the future to allow ordering recordings based on the natural order of the titles, but track number is usually embedded.
 export def tag_audiobook [
   working_directory: directory
+  cover_art_directory: directory
   cache: closure # Function to call to check for or update cached values. Looks like {|type, id, update_function| ...}
   submit_all_acoustid_fingerprints = false # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
   combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
@@ -5639,6 +5644,7 @@ export def tag_audiobook [
     | (
       tag_audiobook_tracks_by_musicbrainz_release_id
       $working_directory
+      $cover_art_directory
       $cache
       $combine_chapter_parts
       --retries $retries
@@ -6132,6 +6138,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
 # The audio_duration value is used to avoid recalculating the duration of the audio.
 export def tag_audiobook_tracks_by_musicbrainz_release_id [
   working_directory: directory
+  cover_art_directory: directory
   cache: closure
   combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
   duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
@@ -6351,7 +6358,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
 
   let front_cover = (
     if "front_cover_available" in $musicbrainz_metadata.book and $musicbrainz_metadata.book.front_cover_available {
-      $musicbrainz_metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
+      $musicbrainz_metadata.book.musicbrainz_release_id | fetch_release_front_cover $cover_art_directory
     }
   )
 
@@ -6397,11 +6404,6 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   )
   if ($files | is-empty) {
     return null
-  }
-
-  # Clean up
-  if ($front_cover | is-not-empty) {
-    rm $front_cover
   }
 
   $musicbrainz_metadata

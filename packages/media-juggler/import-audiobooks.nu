@@ -59,6 +59,8 @@ def main [
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-audiobooks"] | path join
   let optimized_files_cache_file = [$cache_directory optimized.json] | path join
   mkdir $cache_directory
+  let cover_art_directory = [$cache_directory "covers"] | path join
+  mkdir $cover_art_directory
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-audiobooks-config.json"] | path join
   let config: record = (
     try {
@@ -560,6 +562,7 @@ def main [
     | (
       tag_audiobook
       $temporary_directory
+      $cover_art_directory
       $cache_function
       $submit_all_acoustid_fingerprints
       $combine_chapter_parts
