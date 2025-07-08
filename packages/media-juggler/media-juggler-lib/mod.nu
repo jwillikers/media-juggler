@@ -3927,16 +3927,6 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
     return null
   }
   let genres_and_tags = $input | select --ignore-errors genres tags | parse_genres_and_tags
-  # let genres = (
-  #   if ($genres_and_tags.genres | is-not-empty) {
-  #     $genres_and_tags.genres | default scope "series"
-  #   }
-  # )
-  # let tags = (
-  #   if ($genres_and_tags.tags | is-not-empty) {
-  #     $genres_and_tags.tags | default scope "series"
-  #   }
-  # )
   let series = {
     id: $input.id
     name: $input.name
@@ -3980,17 +3970,10 @@ export def fetch_and_parse_musicbrainz_series [
   --retry-delay: duration = 3sec
 ]: string -> record {
   let musicbrainz_series_id = $in
-  # let cached_series_file = {parent: $cache, stem: $musicbrainz_series_id, extension: "json"} | path join
   let update_cache = {|type id|
     $id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay | parse_musicbrainz_series
-    # $series | save $cached_series_file
-    # $series
   }
-  do $cache "series" $musicbrainz_series_id $update_cache
-  # if ($cached | is-empty) {
-  #   # open $cached_series_file
-  # } else {
-  # }
+  do $cache "series" $musicbrainz_series_id $update_cache null
 }
 
 # Build a tree of subseries going up through the parent series
@@ -5207,7 +5190,6 @@ export def fetch_and_parse_musicbrainz_release [
     log error $"Parse failed!\n($err)\n($err.msg)\n"
   }
 }
-
 
 # Get the embedded AcoustID fingerprint or calculate it for the audio files which do not have one.
 export def get_acoustid_fingerprint [
