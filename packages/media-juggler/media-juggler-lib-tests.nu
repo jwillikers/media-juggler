@@ -1561,78 +1561,6 @@ def test_parse_audible_asin_from_musicbrainz_release [] {
   test_parse_audible_asin_from_musicbrainz_release_bakemonogatari_part_01
 }
 
-def test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
-  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
-  let expected = [
-    [name count];
-    ["chapters" 1]
-    ["light novel" 1]
-    ["unabridged" 1]
-  ]
-  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
-}
-
-def test_parse_tags_from_musicbrainz_release_baccano_vol_1 [] {
-  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
-  let expected = [
-    [name count];
-    ["light novel" 1]
-    ["unabridged" 1]
-  ]
-  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
-}
-
-def test_parse_tags_from_musicbrainz_release [] {
-  test_parse_tags_from_musicbrainz_release_baccano_vol_1
-  test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01
-}
-
-def test_parse_genres_from_musicbrainz_release_bakemonogatari_part_01 [] {
-  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
-  let expected = [
-    [name count];
-    ["fiction" 1]
-    ["light novel" 1]
-    ["mystery" 1]
-    ["paranormal" 1]
-    ["psychological" 1]
-    ["romance" 1]
-    ["school life" 1]
-    ["supernatural" 1]
-    ["vampire" 1]
-  ]
-  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
-}
-
-def test_parse_genres_from_musicbrainz_release_baccano_vol_1 [] {
-  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
-  let expected = [
-    [name count];
-    ["adventure" 1]
-    ["fantasy" 1]
-    ["fiction" 1]
-    ["historical fantasy" 1]
-    ["light novel" 1]
-    ["mystery" 1]
-    ["paranormal" 1]
-    ["supernatural" 1]
-    ["urban fantasy" 1]
-  ]
-  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
-}
-
-def test_parse_genres_from_musicbrainz_release_only_genres_baccano_vol_1 [] {
-  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
-  let expected = []
-  assert equal ($input | parse_genres --musicbrainz-genres-only) $expected
-}
-
-def test_parse_genres_from_musicbrainz_release [] {
-  test_parse_genres_from_musicbrainz_release_baccano_vol_1
-  test_parse_genres_from_musicbrainz_release_bakemonogatari_part_01
-  test_parse_genres_from_musicbrainz_release_only_genres_baccano_vol_1
-}
-
 def test_parse_chapters_from_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = [
@@ -4815,7 +4743,6 @@ def main [] {
   test_parse_series_from_musicbrainz_release
   test_parse_audible_asin_from_url
   test_parse_audible_asin_from_musicbrainz_release
-  test_parse_tags_from_musicbrainz_release
   test_parse_chapters_from_tone
   test_chapters_into_tone_format
   test_parse_chapters_from_musicbrainz_release

@@ -4732,54 +4732,6 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
   }
 }
 
-# Parse tags from a MusicBrainz release, release group, and recordings
-#
-# The tags should also be parsed from associated series and works, but these require separate API calls.
-export def parse_tags_from_musicbrainz_release []: record -> table {
-  let metadata = $in
-  if ($metadata | is-empty) {
-    return null
-  }
-  let tags = (
-    []
-    | append (
-      $metadata
-      | get --ignore-errors tags
-    )
-    | append (
-      $metadata
-      | get --ignore-errors release-group
-      | get --ignore-errors tags
-    )
-    # recordings
-    | append (
-      $metadata
-      | get --ignore-errors media
-      | get --ignore-errors tracks
-      | flatten
-      | get recording
-      | get --ignore-errors tags
-      | flatten
-    )
-  )
-  if ($tags | is-empty) or "name" not-in ($tags | columns) or "count" not-in ($tags | columns) {
-    return null
-  }
-  (
-    $tags
-    | select name count
-    | uniq
-    # sort by the count, highest to lowest, and then name alphabetically
-    | sort-by --custom {|a, b|
-      if $a.count == $b.count {
-        $a.name < $b.name
-      } else {
-        $a.count > $b.count
-      }
-    }
-  )
-}
-
 # Parse the artist names and ids from the MusicBrainz artist credits
 export def parse_musicbrainz_artist_credit []: list -> table {
   $in | enumerate | select index item.artist.id item.name | rename index id name
