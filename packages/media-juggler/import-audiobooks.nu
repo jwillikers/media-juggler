@@ -640,9 +640,7 @@ def main [
       ^ebook-meta
       ($audiobook.accompanying_documents | first)
       --authors ($primary_authors | str join "&")
-      --author-sort
       --title ($metadata.book.title | use_unicode_in_title)
-      --title-sort
     )
   }
 

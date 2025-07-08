@@ -1199,9 +1199,7 @@ def main [
               $input.book
               ...$args
               --authors ($authors | str join "&")
-              --author-sort
               --title $title
-              --title-sort
               --identifier $"comicvine:($comic_vine_id)"
               --identifier $"comicvine-volume:($comic_metadata.series_id)"
           );
@@ -1308,9 +1306,7 @@ def main [
               $input.book
               ...$args
               --authors ($authors | str join "&")
-              --author-sort
               --title $title
-              --title-sort
               --identifier $"comicvine:($comic_vine_id)"
               --identifier $"comicvine-volume:($comic_metadata.series_id)"
           );
