@@ -29,7 +29,7 @@ I plan on coming back to improve these scripts after that.
 
 This repository provides a collection of scripts to make it easier to add various digital media to my collection.
 This includes things like music, audiobooks, ebooks, and comics.
-When purchasing media, it often needs to be renamed, converted, tagged with _correct_ information, and finally uploaded to the appropriate location in my S3-compatible object storage.
+When purchasing media, it often needs to be renamed, converted, tagged with _correct_ information, losslessly optimized to reduce files size, and finally uploaded to the appropriate location on my media server.
 The utilities here aim to automate this as much as possible.
 Ultimately, the workflow should be as simple as downloading the media to the corresponding import directory on my computer.
 There's quite a bit of initial set up that needs to be completed first, though, so that's where we'll begin.
@@ -163,6 +163,17 @@ chmod +x ~/Downloads/ComicTagger-x86_64.AppImage
 import-comics.nu ~/Downloads/ComicTagger-x86_64.AppImage file.acsm
 ----
 
+=== Optimizations
+
+I make use of several utilities to decrease file sizes.
+I only optimize images, ebooks, and comics.
+I don't really mess with audio although I have some experimental options for messing around with that.
+Images are optimized with image_optim using its default settings followed by `efficient-compression-tool`, which can typically gain a small improvement for PNGs.
+For comic book archives and EPUBs, this is easy enough as these are just ZIP archives of files.
+I also optimize the ZIP archive compression with `efficient-compression-tool`.
+For PDFs, I use `minuimus` and `pdfsizeopt`, with a couple tweaks to use `oxipng` with max settings followed by `efficient-compression-tool`.
+This often leads to significant space savings for manga from Fanatical and Humble Bundle, usually 25-35%, but it takes a long time, like 16 hours for a 200 MiB PDF.
+
 == Develop
 
 The `nix develop` command can be used to enter or run commands in an environment with all of the necessary dependencies.
@@ -229,7 +240,7 @@ Refer to the project's link:CODE_OF_CONDUCT.adoc[Code of Conduct] for details.
 
 This repository is licensed under the link:LICENSE[MIT license].
 
-© 2024 Jordan Williams
+© 2024-2025 Jordan Williams
 
 == Authors
 

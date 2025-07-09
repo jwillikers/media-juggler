@@ -1561,78 +1561,6 @@ def test_parse_audible_asin_from_musicbrainz_release [] {
   test_parse_audible_asin_from_musicbrainz_release_bakemonogatari_part_01
 }
 
-def test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
-  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
-  let expected = [
-    [name count];
-    ["chapters" 1]
-    ["light novel" 1]
-    ["unabridged" 1]
-  ]
-  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
-}
-
-def test_parse_tags_from_musicbrainz_release_baccano_vol_1 [] {
-  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
-  let expected = [
-    [name count];
-    ["light novel" 1]
-    ["unabridged" 1]
-  ]
-  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
-}
-
-def test_parse_tags_from_musicbrainz_release [] {
-  test_parse_tags_from_musicbrainz_release_baccano_vol_1
-  test_parse_tags_from_musicbrainz_release_bakemonogatari_part_01
-}
-
-def test_parse_genres_from_musicbrainz_release_bakemonogatari_part_01 [] {
-  let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
-  let expected = [
-    [name count];
-    ["fiction" 1]
-    ["light novel" 1]
-    ["mystery" 1]
-    ["paranormal" 1]
-    ["psychological" 1]
-    ["romance" 1]
-    ["school life" 1]
-    ["supernatural" 1]
-    ["vampire" 1]
-  ]
-  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
-}
-
-def test_parse_genres_from_musicbrainz_release_baccano_vol_1 [] {
-  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
-  let expected = [
-    [name count];
-    ["adventure" 1]
-    ["fantasy" 1]
-    ["fiction" 1]
-    ["historical fantasy" 1]
-    ["light novel" 1]
-    ["mystery" 1]
-    ["paranormal" 1]
-    ["supernatural" 1]
-    ["urban fantasy" 1]
-  ]
-  assert equal ($input | parse_tags_from_musicbrainz_release) $expected
-}
-
-def test_parse_genres_from_musicbrainz_release_only_genres_baccano_vol_1 [] {
-  let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
-  let expected = []
-  assert equal ($input | parse_genres --musicbrainz-genres-only) $expected
-}
-
-def test_parse_genres_from_musicbrainz_release [] {
-  test_parse_genres_from_musicbrainz_release_baccano_vol_1
-  test_parse_genres_from_musicbrainz_release_bakemonogatari_part_01
-  test_parse_genres_from_musicbrainz_release_only_genres_baccano_vol_1
-}
-
 def test_parse_chapters_from_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = [
@@ -2265,6 +2193,56 @@ def test_has_distributor_in_common_name_only_right [] {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
+def test_has_distributor_in_common_no_distributor_left [] {
+  let left = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  let right: table<id: string, name: string, entity: string, role: string> = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Libro.fm" label distributor]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  assert equal ($left | has_distributor_in_common $right) false
+}
+
+def test_has_distributor_in_common_no_distributor_right [] {
+  let left = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Libro.fm" label distributor]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  let right: table<id: string, name: string, entity: string, role: string> = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  assert equal ($left | has_distributor_in_common $right) false
+}
+
+def test_has_distributor_in_common_no_distributor_both [] {
+  let left = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  let right: table<id: string, name: string, entity: string, role: string> = [
+    [id name entity role];
+    ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
+    ["3e822ea5-fb7e-4048-bffa-f8af76e55538" Tomoseshunsaku artist illustrator]
+    ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Dragonsteel" label publisher]
+  ]
+  assert equal ($left | has_distributor_in_common $right) true
+}
+
 def test_has_distributor_in_common [] {
   test_has_distributor_in_common_left_empty
   test_has_distributor_in_common_right_empty
@@ -2275,6 +2253,9 @@ def test_has_distributor_in_common [] {
   test_has_distributor_in_common_same_id_different_entity
   test_has_distributor_in_common_name_only_left
   test_has_distributor_in_common_name_only_right
+  test_has_distributor_in_common_no_distributor_left
+  test_has_distributor_in_common_no_distributor_right
+  test_has_distributor_in_common_no_distributor_both
 }
 
 def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags [] {
@@ -4626,12 +4607,6 @@ def test_append_to_musicbrainz_query [] {
   test_append_to_musicbrainz_query_existing_input_with_transform
 }
 
-def test_parse_genres_and_tags_empty_input [] {
-  let input = {}
-  let expected = null
-  assert equal ($input | parse_genres_and_tags) $expected
-}
-
 def test_parse_genres_and_tags_empty_genres_empty_tags [] {
   let input = {
     genres: []
@@ -4726,7 +4701,6 @@ def test_parse_genres_and_tags_genres_tags [] {
 }
 
 def test_parse_genres_and_tags [] {
-  test_parse_genres_and_tags_empty_input
   test_parse_genres_and_tags_empty_genres_empty_tags
   test_parse_genres_and_tags_genres_empty_tags
   test_parse_genres_and_tags_empty_genres_tags
@@ -4769,7 +4743,6 @@ def main [] {
   test_parse_series_from_musicbrainz_release
   test_parse_audible_asin_from_url
   test_parse_audible_asin_from_musicbrainz_release
-  test_parse_tags_from_musicbrainz_release
   test_parse_chapters_from_tone
   test_chapters_into_tone_format
   test_parse_chapters_from_musicbrainz_release

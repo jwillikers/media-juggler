@@ -59,6 +59,8 @@ def main [
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-audiobooks"] | path join
   let optimized_files_cache_file = [$cache_directory optimized.json] | path join
   mkdir $cache_directory
+  let cover_art_directory = [$cache_directory "covers"] | path join
+  mkdir $cover_art_directory
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-audiobooks-config.json"] | path join
   let config: record = (
     try {
@@ -68,10 +70,38 @@ def main [
     }
   )
 
-  let cache_function = {|type, id, update_function|
-    let cached_file = [$cache_directory $type $"($id).json"] | path join
+  let cache_function = {|type, id, update_function, filename_suffix|
+    let filename = (
+      if ($filename_suffix | is-not-empty) {
+        $"($id)_($filename_suffix).json"
+      } else {
+        $"($id).json"
+      }
+    )
+    let cached_file = [$cache_directory $type $filename] | path join
     try {
-      open $cached_file
+      let data = open $cached_file
+      # The integer duration must be converted to a Nushell duration when loading a release from a JSON file.
+      if $type == "release" {
+        $data | update tracks (
+          $data.tracks | each {|track|
+            $track | update duration ($track.duration | into duration)
+          }
+        ) | (
+          let input = $in;
+          if "chapters" in $input.book {
+            $input | update book.chapters (
+              $input.book.chapters | each {|chapter|
+                $chapter | update start ($chapter.start | into duration) | update length ($chapter.length | into duration)
+              }
+            )
+          } else {
+            $input
+          }
+        )
+      } else {
+        $data
+      }
     } catch {
       let result = do $update_function $type $id
       mkdir ($cached_file | path dirname)
@@ -532,6 +562,7 @@ def main [
     | (
       tag_audiobook
       $temporary_directory
+      $cover_art_directory
       $cache_function
       $submit_all_acoustid_fingerprints
       $combine_chapter_parts
@@ -558,7 +589,7 @@ def main [
 
   let relative_destination_directory = (
     [
-      ($metadata.book.title | sanitize_file_name)
+      ($metadata.book.title | use_unicode_in_title | sanitize_file_name)
     ]
     | prepend (
       if ($metadata.book | get --ignore-errors series | is-not-empty) {
@@ -599,11 +630,11 @@ def main [
         )
         if ($primary_series | is-not-empty) {
           log info $"Primary series is ($primary_series)"
-          $primary_series.name | sanitize_file_name
+          $primary_series.name | use_unicode_in_title | sanitize_file_name
         }
       }
     )
-    | prepend ($primary_authors.name | str join ", " | sanitize_file_name)
+    | prepend ($primary_authors.name | str join ", " | use_unicode_in_title | sanitize_file_name)
     | path join
   )
 
@@ -617,7 +648,7 @@ def main [
       # For multiple files, prefix the name with the index
       let stem = (
         if ($metadata.tracks | length) == 1 {
-          $track.title | sanitize_file_name
+          $track.title | use_unicode_in_title | sanitize_file_name
         } else {
           ($track.index | fill --alignment r --character '0' --width $number_of_digits) + " " + $track.title
         }
@@ -639,8 +670,8 @@ def main [
     (
       ^ebook-meta
       ($audiobook.accompanying_documents | first)
-      --title $metadata.book.title
       --authors ($primary_authors | str join "&")
+      --title ($metadata.book.title | use_unicode_in_title)
     )
   }
 
@@ -650,7 +681,7 @@ def main [
       let stem = (
         # For a single file, rename the file to match the book.
         if ($audiobook.accompanying_documents | length) == 1 {
-          $metadata.book.title | sanitize_file_name
+          $metadata.book.title | use_unicode_in_title | sanitize_file_name
         # For multiple files, leave the names as is.
         } else {
           $document | path parse | get stem

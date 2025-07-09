@@ -549,13 +549,6 @@ def main [
     let target_subdirectory = (
       [$authors_subdirectory]
       # todo Add series subdirectory here
-      | append (
-        if $output_format == "pdf" {
-          $book.book | path parse | get stem | sanitize_file_name
-        } else {
-          null
-        }
-      )
       | path join
     )
     let target_directory = [$destination $target_subdirectory] | path join
@@ -564,25 +557,29 @@ def main [
       let components = $book.book | path parse;
       {
         parent: $target_directory
-        stem: ($components.stem | sanitize_file_name)
+        stem: ($components.stem | use_unicode_in_title | sanitize_file_name)
         extension: $components.extension
       } | path join
     )
     log debug $"Target destination: ($target_destination)"
     let opf_target_destination = (
       if $output_format == "pdf" {
-        [
-          $target_directory
-          ($book.opf | path basename)
-        ] | path join
+        let components = $book.book | path parse;
+        {
+          parent: $target_directory
+          stem: (($components.stem | use_unicode_in_title | sanitize_file_name) + "_metadata")
+          extension: "opf"
+        } | path join
       }
     )
     let cover_target_destination = (
       if $output_format == "pdf" {
-        [
-          $target_directory
-          ($book.cover | path basename)
-        ] | path join
+        let components = $book.book | path parse;
+        {
+          parent: $target_directory
+          stem: (($components.stem | use_unicode_in_title | sanitize_file_name) + "_cover")
+          extension: ($book.cover | path parse | get extension)
+        } | path join
       }
     )
     if $skip_upload {

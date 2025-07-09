@@ -3762,7 +3762,7 @@ export def fetch_musicbrainz_release_group_for_release []: string -> table {
 
 # Fetch the front cover image of a release from the Cover Art Archive
 export def fetch_release_front_cover [
-  working_directory: directory
+  download_directory: directory
   size: string = original # original, 1200, 500, or 250
   --retries: int = 3
   --retry-delay: duration = 3sec
@@ -3786,7 +3786,11 @@ export def fetch_release_front_cover [
     }
   )
   let filename = $download_url | url parse | get path | path basename
-  let destination = $working_directory | path join $filename
+  let destination = $download_directory | path join $filename
+  # If the path exists, skip the download.
+  if ($destination | path exists) {
+    return $destination
+  }
   http get --headers [User-Agent $user_agent] $download_url | save --force $destination
   $destination
 }
@@ -3887,13 +3891,13 @@ export def parse_musicbrainz_work []: record -> record<id: string, title: string
 
 # Fetch and parse a MusicBrainz Work by ID
 export def fetch_and_parse_musicbrainz_work [
-  cache: closure
+  cache: closure # Closure that returns parsed work information given a type and a work id
   --retries: int = 3
   --retry-delay: duration = 3sec
 ]: string -> record {
   let musicbrainz_work_id = $in
   let update_function = {|type id| $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay | parse_musicbrainz_work}
-  do $cache "work" $musicbrainz_work_id $update_function
+  do $cache "work" $musicbrainz_work_id $update_function null
 }
 
 # Get a Series
@@ -3927,16 +3931,6 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
     return null
   }
   let genres_and_tags = $input | select --ignore-errors genres tags | parse_genres_and_tags
-  # let genres = (
-  #   if ($genres_and_tags.genres | is-not-empty) {
-  #     $genres_and_tags.genres | default scope "series"
-  #   }
-  # )
-  # let tags = (
-  #   if ($genres_and_tags.tags | is-not-empty) {
-  #     $genres_and_tags.tags | default scope "series"
-  #   }
-  # )
   let series = {
     id: $input.id
     name: $input.name
@@ -3974,23 +3968,15 @@ export def parse_musicbrainz_series []: record -> record<id: string, name: strin
 
 # Fetch and parse a MusicBrainz Series by ID.
 export def fetch_and_parse_musicbrainz_series [
-  # cache: directory # Cache directory where parsed series are stored in files named according to mbid, i.e. mbid.json.
   cache: closure # Closure that returns parsed series information given a type and a series id
   --retries: int = 3
   --retry-delay: duration = 3sec
 ]: string -> record {
   let musicbrainz_series_id = $in
-  # let cached_series_file = {parent: $cache, stem: $musicbrainz_series_id, extension: "json"} | path join
   let update_cache = {|type id|
     $id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay | parse_musicbrainz_series
-    # $series | save $cached_series_file
-    # $series
   }
-  do $cache "series" $musicbrainz_series_id $update_cache
-  # if ($cached | is-empty) {
-  #   # open $cached_series_file
-  # } else {
-  # }
+  do $cache "series" $musicbrainz_series_id $update_cache null
 }
 
 # Build a tree of subseries going up through the parent series
@@ -4288,6 +4274,7 @@ export def fetch_release_ids_by_acoustid_fingerprints [
     let matches = (
       $chunk | par-each {|fingerprint|
         let result = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key --retries $retries --retry-delay $retry_delay
+        # log info $"result: ($result)"
         if $result == null {
           log error $"Failed to lookup AcoustID fingerprint on the AcoustID server."
           return null
@@ -4353,7 +4340,7 @@ export def submit_acoustid_fingerprints [
   user_key: string # The user's API key for the AcoustID server
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
-]: table<musicbrainz_recording_id: string, duration: duration, fingerprint: string> -> table<index: int, submission_id: string, submission_status: string> {
+]: table<musicbrainz_recording_id: string, duration: duration, fingerprint: string, title: string> -> table<index: int, submission_id: string, submission_status: string> {
   let fingerprints = $in
   let endpoint = "https://api.acoustid.org/v2/submit"
   let submission_string = $fingerprints | enumerate | reduce --fold "" {|it, acc|
@@ -4365,7 +4352,10 @@ export def submit_acoustid_fingerprints [
       $acc
     } else {
       let duration_seconds = ($it.item.duration / 1sec) | math round
-      $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&fingerprint.($it.index)=($it.item.fingerprint)"
+      # todo I need to incorporate more metadata in the submissions: https://acoustid.org/webservice#submit
+      # It seems it isn't associated properly with a release without it.
+      # Submissions through Picard work just fine though.
+      $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.title)&fingerprint.($it.index)=($it.item.fingerprint)"
     }
   }
   if ($submission_string | is-empty) {
@@ -4726,54 +4716,6 @@ export def parse_genres_and_tags_from_musicbrainz_release []: record -> record<g
     genres: $genres
     tags: $tags
   }
-}
-
-# Parse tags from a MusicBrainz release, release group, and recordings
-#
-# The tags should also be parsed from associated series and works, but these require separate API calls.
-export def parse_tags_from_musicbrainz_release []: record -> table {
-  let metadata = $in
-  if ($metadata | is-empty) {
-    return null
-  }
-  let tags = (
-    []
-    | append (
-      $metadata
-      | get --ignore-errors tags
-    )
-    | append (
-      $metadata
-      | get --ignore-errors release-group
-      | get --ignore-errors tags
-    )
-    # recordings
-    | append (
-      $metadata
-      | get --ignore-errors media
-      | get --ignore-errors tracks
-      | flatten
-      | get recording
-      | get --ignore-errors tags
-      | flatten
-    )
-  )
-  if ($tags | is-empty) or "name" not-in ($tags | columns) or "count" not-in ($tags | columns) {
-    return null
-  }
-  (
-    $tags
-    | select name count
-    | uniq
-    # sort by the count, highest to lowest, and then name alphabetically
-    | sort-by --custom {|a, b|
-      if $a.count == $b.count {
-        $a.name < $b.name
-      } else {
-        $a.count > $b.count
-      }
-    }
-  )
 }
 
 # Parse the artist names and ids from the MusicBrainz artist credits
@@ -5218,6 +5160,7 @@ export def parse_musicbrainz_release []: record -> record {
 
 # Fetch the given release id from MusicBrainz and parse it into a normalized data structure
 export def fetch_and_parse_musicbrainz_release [
+  cache: closure
   includes: list<string> = [
     aliases
     artist-credits
@@ -5241,18 +5184,13 @@ export def fetch_and_parse_musicbrainz_release [
   --retries: int = 3
   --retry-delay: duration = 5sec
 ]: string -> record {
-  let response = $in | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay $includes
-  if ($response | is-empty) {
-    return null
+  let musicbrainz_release_id = $in
+  let update_cache = {|type id|
+    $id | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay $includes | parse_musicbrainz_release
   }
-  try {
-    $response | parse_musicbrainz_release
-  # try {
-  } catch {|err|
-    log error $"Parse failed!\n($err)\n($err.msg)\n"
-  }
+  let includes_checksum = $includes | sort | uniq | str join | hash sha256
+  do $cache "release" $musicbrainz_release_id $update_cache $includes_checksum
 }
-
 
 # Get the embedded AcoustID fingerprint or calculate it for the audio files which do not have one.
 export def get_acoustid_fingerprint [
@@ -5436,6 +5374,12 @@ export def has_distributor_in_common [
   }
   let left_distributors = $left | where role == "distributor"
   let right_distributors = $right | where role == "distributor"
+  if ($left_distributors | is-empty) and ($right_distributors | is-empty) {
+    return true
+  }
+  if ($left_distributors | is-empty) or ($right_distributors | is-empty) {
+    return false
+  }
   let joined_on_id = (
     $left_distributors
     | rename id left_name left_entity
@@ -5547,6 +5491,7 @@ export def filter_musicbrainz_releases [
 # I might add logic here in the future to allow ordering recordings based on the natural order of the titles, but track number is usually embedded.
 export def tag_audiobook [
   working_directory: directory
+  cover_art_directory: directory
   cache: closure # Function to call to check for or update cached values. Looks like {|type, id, update_function| ...}
   submit_all_acoustid_fingerprints = false # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
   combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
@@ -5654,7 +5599,7 @@ export def tag_audiobook [
         } else {
           log debug $"Found multiple MusicBrainz releases with a perfect score. Attempting to narrow down further based on the distributor and track lengths"
           let $release_candidates = $release_candidates | get id | each {|candidate|
-            let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [label-rels recordings url-rels]
+            let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay $cache [label-rels recordings url-rels]
             if ($received_metadata | is-empty) {
               log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
               null
@@ -5698,6 +5643,7 @@ export def tag_audiobook [
     | (
       tag_audiobook_tracks_by_musicbrainz_release_id
       $working_directory
+      $cover_art_directory
       $cache
       $combine_chapter_parts
       --retries $retries
@@ -5783,8 +5729,8 @@ export def tag_audiobook [
       # log info $"$tracks: ($tracks | reject embedded_pictures)"
       let acoustid_submissions = (
         $tracks
-        | select musicbrainz_recording_id duration acoustid_fingerprint
-        | rename musicbrainz_recording_id duration fingerprint
+        | select musicbrainz_recording_id duration acoustid_fingerprint title
+        | rename musicbrainz_recording_id duration fingerprint title
         | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
       )
       if ($acoustid_submissions | is-not-empty) {
@@ -5969,6 +5915,7 @@ export def filter_musicbrainz_chapters_releases [
 # Input is the parsed metadata of the MusicBrainz release.
 # The output is the chapters in a table formatted for a tone JSON file
 export def look_up_chapters_from_similar_musicbrainz_release [
+  cache: closure # Function to call to check for or update cached values. Looks like {|type, id, update_function| ...}
   duration_threshold: duration = 3sec # The allowed drift between the duration of the release and a candidate chapters release
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
@@ -6027,7 +5974,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   }
   # Don't parallelize for the sake of the MusicBrainz API
   let candidates = $candidates | each {|candidate|
-    let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay [recordings label-rels tags url-rels]
+    let received_metadata = $candidate | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay $cache [recordings label-rels tags url-rels]
     if ($received_metadata | is-empty) {
       log error $"Error fetching metadata for MusicBrainz Release (ansi yellow)($candidate)(ansi reset)"
       return null
@@ -6190,6 +6137,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
 # The audio_duration value is used to avoid recalculating the duration of the audio.
 export def tag_audiobook_tracks_by_musicbrainz_release_id [
   working_directory: directory
+  cover_art_directory: directory
   cache: closure
   combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
   duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
@@ -6214,7 +6162,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     )
   )
   let musicbrainz_metadata = (
-    $existing_metadata.book.musicbrainz_release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay
+    $existing_metadata.book.musicbrainz_release_id | fetch_and_parse_musicbrainz_release --retries $retries --retry-delay $retry_delay $cache
   )
   if ($musicbrainz_metadata | is-empty) {
     log error $"Failed to fetch MusicBrainz Release (ansi yellow)($existing_metadata.book.musicbrainz_release_id)(ansi reset)"
@@ -6313,28 +6261,28 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
       (
         $musicbrainz_metadata
         | upsert book.genres (
-          $musicbrainz_metadata.book.series | reduce {|series, acc|
+          $musicbrainz_metadata.book.series | reduce --fold [] {|series, acc|
             let genres = (
               if ($series | get --ignore-errors genres | is-empty) {
-                $series.genres
+                []
               } else {
                 $series.genres | default ($series.scope + " series") scope
               }
             )
             $genres | append $acc
-          } | uniq-by name scope | append $musicbrainz_metadata.book.genres
+          } | uniq-by name scope | append ($musicbrainz_metadata.book | get --ignore-errors genres)
         )
         | upsert book.tags (
-          $musicbrainz_metadata.book.series | reduce {|series, acc|
+          $musicbrainz_metadata.book.series | reduce --fold [] {|series, acc|
             let tags = (
               if ($series | get --ignore-errors tags | is-empty) {
-                $series.tags
+                []
               } else {
                 $series.tags | default ($series.scope + " series") scope
               }
             )
             $tags | append $acc
-          } | uniq-by name scope | append $musicbrainz_metadata.book.tags
+          } | uniq-by name scope | append ($musicbrainz_metadata.book | get --ignore-errors tags)
         )
       )
     }
@@ -6388,7 +6336,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
 
   let chapters = (
     if "chapters" not-in $musicbrainz_metadata.book or ($musicbrainz_metadata.book.chapters | is-empty) {
-      let chapters = $musicbrainz_metadata | look_up_chapters_from_similar_musicbrainz_release $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
+      let chapters = $musicbrainz_metadata | look_up_chapters_from_similar_musicbrainz_release $cache $chapters_duration_threshold --retries $retries --retry-delay $retry_delay
       if ($chapters | is-not-empty) {
         $chapters
       } else {
@@ -6409,7 +6357,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
 
   let front_cover = (
     if "front_cover_available" in $musicbrainz_metadata.book and $musicbrainz_metadata.book.front_cover_available {
-      $musicbrainz_metadata.book.musicbrainz_release_id | fetch_release_front_cover $working_directory
+      $musicbrainz_metadata.book.musicbrainz_release_id | fetch_release_front_cover $cover_art_directory
     }
   )
 
@@ -6455,11 +6403,6 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   )
   if ($files | is-empty) {
     return null
-  }
-
-  # Clean up
-  if ($front_cover | is-not-empty) {
-    rm $front_cover
   }
 
   $musicbrainz_metadata
