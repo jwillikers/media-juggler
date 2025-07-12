@@ -254,7 +254,13 @@ def main [
       $target
     }
   )
-  $cover | optimize_image
+  let cover = (
+    if ($cover | is-not-empty) {
+      $cover | optimize_image
+    } else {
+      $cover
+    }
+  )
 
   let original_book_files = [($original_file | split_ssh_path | get path)] | append $original_cover | append $original_opf
   log debug $"The original files for the book are (ansi yellow)($original_book_files)(ansi reset)"
