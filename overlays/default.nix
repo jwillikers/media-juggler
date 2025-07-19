@@ -1,39 +1,26 @@
 { inputs }:
 {
-  unstablePackages = final: _prev: {
-    unstable = import inputs.nixpkgs-unstable { inherit (final) system; };
+  additionalPackages = _final: prev: {
+    flexigif = prev.callPackage ./flexigif/package.nix { };
+    imgdataopt = prev.callPackage ./imgdataopt/package.nix { };
+    jpeg2png = prev.callPackage ./jpeg2png/package.nix { };
+    jpegli = prev.callPackage ./jpegli/package.nix { };
+    pdfsizeopt = prev.callPackage ./pdfsizeopt/package.nix { };
+    sam2p = prev.callPackage ./sam2p/package.nix { };
+    tif22pnm = prev.callPackage ./tif22pnm/package.nix { };
+    minuimus = prev.callPackage ./minuimus/package.nix { withPngout = true; };
+  };
+  calibre-plugins = _final: prev: {
+    calibre-plugins = prev.callPackage ./calibre-plugins/package.nix { };
   };
   image_optim = _final: prev: {
     image_optim = prev.image_optim.override { withPngout = true; };
   };
-  jpegli = _final: prev: {
-    jpegli = prev.callPackage ./jpegli/package.nix { };
-  };
   m4b-tool = inputs.m4b-tool.overlay;
-  calibre-acsm-plugin-libcrypto = _final: _prev: {
-    # calibre = prev.calibre.overrideAttrs (prevAttrs:
-    # let
-    #   openssl = prev.calibre.overrideAttrs (prevAttrs:
-    #   );
-    # in
-    # {
-    #   buildInputs = prevAttrs.buildInputs ++ [ final.openssl_legacy ];
-    #   preFixup = (
-    #     builtins.replaceStrings
-    #       [
-    #         ''
-    #           ''${gappsWrapperArgs[@]} \
-    #         ''
-    #       ]
-    #       [
-    #         ''
-    #           ''${gappsWrapperArgs[@]} \
-    #           --set ACSM_LIBCRYPTO ${final.openssl_legacy.out}/lib/libcrypto.so \
-    #           --set ACSM_LIBSSL ${final.openssl_legacy.out}/lib/libssl.so \
-    #         ''
-    #       ]
-    #       prevAttrs.preFixup
-    #   );
-    # });
+  media-juggler = _final: prev: {
+    media-juggler = prev.callPackage ./media-juggler/package.nix { };
+  };
+  unstablePackages = final: _prev: {
+    unstable = import inputs.nixpkgs-unstable { inherit (final) system; };
   };
 }

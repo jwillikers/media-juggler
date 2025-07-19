@@ -47,17 +47,17 @@
     let
       overlays = import ./overlays { inherit inputs; };
       overlaysList = with overlays; [
-        calibre-acsm-plugin-libcrypto
-        jpegli
+        additionalPackages
+        calibre-plugins
         overlays.m4b-tool
-        unstablePackages
+        media-juggler
         image_optim
+        unstablePackages
       ];
     in
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        # pkgs = import nixpkgs { inherit system; }; # overlays = overlaysList; };
         pkgs = import nixpkgs {
           inherit system;
           overlays = overlaysList;
@@ -66,7 +66,6 @@
             permittedInsecurePackages = [ "python-2.7.18.8" ];
           };
         };
-        packages = import ./packages { inherit pkgs; };
         pre-commit = pre-commit-hooks.lib.${system}.run (
           import ./pre-commit-hooks.nix { inherit pkgs treefmtEval; }
         );
@@ -108,19 +107,20 @@
               (builtins.attrValues treefmtEval.config.build.programs)
             ]
             ++ pre-commit.enabledPackages;
-          inputsFrom = with packages; [
+          inputsFrom = with pkgs; [
             media-juggler
           ];
         };
         formatter = treefmtEval.config.build.wrapper;
-        packages = packages // {
-          default = self.packages.${system}.media-juggler;
+        packages = {
+          inherit (pkgs) media-juggler;
+          inherit (pkgs) calibre-plugins;
+          default = pkgs.media-juggler;
         };
       }
     )
     // {
       inherit overlays;
       hmModules.media-juggler = import ./home-manager-module.nix self;
-      # media-juggler = import ./home-manager-module.nix {};
     };
 }
