@@ -47,8 +47,6 @@
     let
       overlays = import ./overlays { inherit inputs; };
       overlaysList = with overlays; [
-        additionalPackages
-        calibre-plugins
         overlays.m4b-tool
         media-juggler
         image_optim
@@ -121,6 +119,7 @@
     )
     // {
       inherit overlays;
-      hmModules.media-juggler = import ./home-manager-module.nix self;
+      homeModules.media-juggler = import ./home-manager-module.nix self;
+      default = overlays.media-juggler;
     };
 }

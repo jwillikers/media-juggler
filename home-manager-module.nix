@@ -86,8 +86,10 @@ self:
     ];
   };
 
-  nixpkgs.overlays = [
-    self.overlays.calibre-acsm-plugin-libcrypto
-    self.overlays.unstablePackages
+  nixpkgs.overlays = with self.overlays; [
+    m4b-tool
+    media-juggler
+    image_optim
+    unstablePackages
   ];
 }
