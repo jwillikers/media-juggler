@@ -5,7 +5,7 @@
   };
   m4b-tool = inputs.m4b-tool.overlay;
   media-juggler = _final: prev: {
-    calibre-plugins = prev.callPackage ./calibre-plugins/package.nix { };
+    calibre-plugins = prev.recurseIntoAttrs (prev.callPackage ./calibre-plugins { });
     flexigif = prev.callPackage ./flexigif/package.nix { };
     imgdataopt = prev.callPackage ./imgdataopt/package.nix { };
     jpeg2png = prev.callPackage ./jpeg2png/package.nix { };
