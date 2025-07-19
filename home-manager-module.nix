@@ -10,40 +10,40 @@ self:
     activation = {
       copy-calibre-plugins = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
-          pkgs.calibrePlugins.acsm + "/lib/calibre/calibre-plugins/calibre-plugin.zip"
+          pkgs.calibre-plugins.acsm + "/lib/calibre/calibre-plugins/calibre-plugin.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
-          pkgs.calibrePlugins.comicvine + "/lib/calibre/calibre-plugins/Comicvine.zip"
+          pkgs.calibre-plugins.comicvine + "/lib/calibre/calibre-plugins/Comicvine.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
-          pkgs.calibrePlugins.dedrm + "/lib/calibre/calibre-plugins/DeDRM_plugin.zip"
+          pkgs.calibre-plugins.dedrm + "/lib/calibre/calibre-plugins/DeDRM_plugin.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
-          pkgs.calibrePlugins.dedrm + "/lib/calibre/calibre-plugins/Obok_plugin.zip"
+          pkgs.calibre-plugins.dedrm + "/lib/calibre/calibre-plugins/Obok_plugin.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
-          pkgs.calibrePlugins.embedcomicmetadata + "/lib/calibre/calibre-plugins/EmbedComicMetadata.zip"
+          pkgs.calibre-plugins.embedcomicmetadata + "/lib/calibre/calibre-plugins/EmbedComicMetadata.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin='${
-          pkgs.calibrePlugins.extract_isbn + "/lib/calibre/calibre-plugins/Extract ISBN.zip"
+          pkgs.calibre-plugins.extract_isbn + "/lib/calibre/calibre-plugins/Extract ISBN.zip"
         }'
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
-          pkgs.calibrePlugins.goodreads + "/lib/calibre/calibre-plugins/Goodreads.zip"
+          pkgs.calibre-plugins.goodreads + "/lib/calibre/calibre-plugins/Goodreads.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
-          pkgs.calibrePlugins.kobo-metadata + "/lib/calibre/calibre-plugins/KoboMetadata.zip"
+          pkgs.calibre-plugins.kobo-metadata + "/lib/calibre/calibre-plugins/KoboMetadata.zip"
         }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin='${
-          pkgs.calibrePlugins.modify_epub + "/lib/calibre/calibre-plugins/Modify ePub.zip"
+          pkgs.calibre-plugins.modify_epub + "/lib/calibre/calibre-plugins/Modify ePub.zip"
         }'
         chmod +w ${config.xdg.configHome}/calibre/plugins/*.zip
       '';
     };
     file = {
-      # "${config.xdg.configHome}/calibre/plugins/Comicvine.zip".source = pkgs.calibrePlugins.comicvine + "/lib/calibre/calibre-plugins/Comicvine.zip";
-      # "${config.xdg.configHome}/calibre/plugins/DeACSM.zip".source = pkgs.calibrePlugins.acsm + "/lib/calibre/calibre-plugins/DeACSM.zip";
-      # "${config.xdg.configHome}/calibre/plugins/DeDRM.zip".source = pkgs.calibrePlugins.dedrm + "/lib/calibre/calibre-plugins/DeDRM.zip";
-      # "${config.xdg.configHome}/calibre/plugins/EmbedComicMetadata.zip".source = pkgs.calibrePlugins.embedcomicmetadata + "/lib/calibre/calibre-plugins/EmbedComicMetadata.zip";
+      # "${config.xdg.configHome}/calibre/plugins/Comicvine.zip".source = pkgs.calibre-plugins.comicvine + "/lib/calibre/calibre-plugins/Comicvine.zip";
+      # "${config.xdg.configHome}/calibre/plugins/DeACSM.zip".source = pkgs.calibre-plugins.acsm + "/lib/calibre/calibre-plugins/DeACSM.zip";
+      # "${config.xdg.configHome}/calibre/plugins/DeDRM.zip".source = pkgs.calibre-plugins.dedrm + "/lib/calibre/calibre-plugins/DeDRM.zip";
+      # "${config.xdg.configHome}/calibre/plugins/EmbedComicMetadata.zip".source = pkgs.calibre-plugins.embedcomicmetadata + "/lib/calibre/calibre-plugins/EmbedComicMetadata.zip";
 
       # todo Comic Vine API key for Calibre plugin from SOPS
       # "${config.xdg.configHome}/calibre/plugins/comicvine.json".contents = ''
