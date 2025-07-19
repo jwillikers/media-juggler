@@ -1,11 +1,5 @@
 { inputs }:
 {
-  unstablePackages = final: _prev: {
-    unstable = import inputs.nixpkgs-unstable { inherit (final) system; };
-  };
-  image_optim = _final: prev: {
-    image_optim = prev.image_optim.override { withPngout = true; };
-  };
   additionalPackages = _final: prev: {
     flexigif = prev.callPackage ./flexigif/package.nix { };
     imgdataopt = prev.callPackage ./imgdataopt/package.nix { };
@@ -16,5 +10,17 @@
     tif22pnm = prev.callPackage ./tif22pnm/package.nix { };
     minuimus = prev.callPackage ./minuimus/package.nix { withPngout = true; };
   };
+  calibre-plugins = _final: prev: {
+    calibre-plugins = prev.callPackage ./calibre-plugins/package.nix { };
+  };
+  image_optim = _final: prev: {
+    image_optim = prev.image_optim.override { withPngout = true; };
+  };
   m4b-tool = inputs.m4b-tool.overlay;
+  media-juggler = _final: prev: {
+    media-juggler = prev.callPackage ./media-juggler/package.nix { };
+  };
+  unstablePackages = final: _prev: {
+    unstable = import inputs.nixpkgs-unstable { inherit (final) system; };
+  };
 }
