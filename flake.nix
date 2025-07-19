@@ -47,8 +47,6 @@
     let
       overlays = import ./overlays { inherit inputs; };
       overlaysList = with overlays; [
-        additionalPackages
-        calibre-plugins
         overlays.m4b-tool
         media-juggler
         image_optim
