@@ -47,17 +47,15 @@
     let
       overlays = import ./overlays { inherit inputs; };
       overlaysList = with overlays; [
-        calibre-acsm-plugin-libcrypto
-        jpegli
+        additionalPackages
         overlays.m4b-tool
-        unstablePackages
         image_optim
+        unstablePackages
       ];
     in
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        # pkgs = import nixpkgs { inherit system; }; # overlays = overlaysList; };
         pkgs = import nixpkgs {
           inherit system;
           overlays = overlaysList;
@@ -121,6 +119,5 @@
     // {
       inherit overlays;
       hmModules.media-juggler = import ./home-manager-module.nix self;
-      # media-juggler = import ./home-manager-module.nix {};
     };
 }

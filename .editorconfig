@@ -11,7 +11,7 @@ trim_trailing_whitespace = true
 
 [*.{diff,patch}]
 trim_trailing_whitespace = false
-insert_final_newline = false
+insert_final_newline = unset
 
 [*.{adoc,diff,patch}]
 indent_size = unset
