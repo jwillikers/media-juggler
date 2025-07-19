@@ -121,6 +121,6 @@
     )
     // {
       inherit overlays;
-      hmModules.media-juggler = import ./home-manager-module.nix self;
+      homeModules.media-juggler = import ./home-manager-module.nix self;
     };
 }
