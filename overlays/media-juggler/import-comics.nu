@@ -325,7 +325,7 @@ def main [
   let temporary_directory = (mktemp --directory "import-comics.XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
-  try {
+  # try {
 
   let file = (
     if ($original_file | is_ssh_path) {
@@ -687,6 +687,7 @@ def main [
       $formats
     }
   )
+  log debug $"import-comics: formats: ($formats)"
 
   # Rename input file according to metadata
   let formats = (
@@ -695,7 +696,7 @@ def main [
       if $comic_vine_issue_id == null {
         let target = $formats | get $input_format | comic_file_name_from_metadata $temporary_directory --issue-year $issue_year
         if ($formats | get $input_format) != $target {
-          log debug $"Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+          log debug $"import-comics: Renaming (ansi yellow)($formats | get $input_format)(ansi reset) to (ansi yellow)($target)(ansi reset)"
           mv --force ($formats | get $input_format) $target
         }
         $target
@@ -703,22 +704,24 @@ def main [
         $formats | get $input_format
       }
     )
-    | (
-      let i = $in;
-      if $input_format == "pdf" and "cbz" in $i {
-        let target = $i | get $input_format | path parse | update extension cbz | path join
-        if $i.cbz != $target {
-          # Rename the CBZ according to the name of the PDF
-          mv --force $i.cbz $target
-          $i | update cbz $target
-        } else {
-          $i
-        }
-      } else {
-        $i
-      }
-    )
   )
+  let formats = (
+    if $input_format == "pdf" and "cbz" in $formats {
+      let target = $formats | get $input_format | path parse | update extension cbz | path join
+      log debug $"import-comics: target: ($target)";
+      if $formats.cbz != $target {
+        # Rename the CBZ according to the name of the PDF
+        log debug $"import-comics: Renaming (ansi yellow)($formats.cbz)(ansi reset) to (ansi yellow)($target)(ansi reset)"
+        mv --force $formats.cbz $target
+        $formats | update cbz $target
+      } else {
+        $formats
+      }
+    } else {
+      $formats
+    }
+  )
+  log debug $"import-comics: formats: ($formats)"
 
   # If the input format is EPUB, optimize the images before generating the CBZ.
   # This avoids optimizing the same images twice.
@@ -734,10 +737,10 @@ def main [
       $optimized_file_hashes.sha256 | append (
         if "epub" in $formats {
           # todo I might need to fix this to work with larger files
-          let hash = $formats.epub | open --raw | hash sha256
+          let hash = open --raw $formats.epub | hash sha256
           if $hash not-in $optimized_file_hashes.sha256 {
             log debug "Optimizing the EPUB"
-            $formats.epub | polish_epub | optimize_images_in_zip | open --raw | hash sha256
+            open --raw ($formats.epub | polish_epub | optimize_images_in_zip) | hash sha256
           }
         }
       ) | uniq | sort
@@ -1098,10 +1101,10 @@ def main [
     $optimized_file_hashes | update sha256 (
       $optimized_file_hashes.sha256 | append (
         if "pdf" in $formats and not $skip_optimization {
-          let hash = $formats.pdf | open --raw | hash sha256
+          let hash = open --raw $formats.pdf | hash sha256
           if $hash not-in $optimized_file_hashes.sha256 {
             log debug "Optimizing the PDF"
-            $formats.pdf | optimize_pdf | open --raw | hash sha256
+            open --raw ($formats.pdf | optimize_pdf) | hash sha256
           }
         }
       ) | uniq | sort
@@ -1379,16 +1382,16 @@ def main [
           # todo I could use a separate cache for that for just images optimized and use the normal cache here.
           # todo I might need to fix this to work with larger files
           # todo Expire the cache?
-          # let hash = $formats.epub | open --raw | hash sha256
+          # let hash = open --raw $formats.epub | hash sha256
           # if $hash not-in $optimized_file_hashes.sha256 {
             log debug "Optimizing the EPUB ZIP compression"
-            $formats.epub | optimize_zip_ect | open --raw | hash sha256
+            open --raw ($formats.epub | optimize_zip_ect) | hash sha256
           # }
         }
       ) | append (
         if "pdf" in $formats {
           # Just update the hash of the file with the updated metadata here.
-          let hash = $formats.pdf | open --raw | hash sha256
+          let hash = open --raw $formats.pdf | hash sha256
           if $hash not-in $optimized_file_hashes.sha256 {
             $hash
           }
@@ -1413,16 +1416,16 @@ def main [
           } else if $image_format != "jxl" {
             if $images_optimized {
               # Just optimize the ZIP compression in this case
-              let hash = $formats.cbz | open --raw | hash sha256
+              let hash = open --raw $formats.cbz | hash sha256
               if $hash not-in $optimized_file_hashes.sha256 {
                 log debug "Optimizing the CBZ archive's ZIP compression"
-                $formats.cbz | optimize_zip_ect | open --raw | hash sha256
+                open --raw ($formats.cbz | optimize_zip_ect) | hash sha256
               }
             } else {
-              let hash = $formats.cbz | open --raw | hash sha256
+              let hash = open --raw $formats.cbz | hash sha256
               if $hash not-in $optimized_file_hashes.sha256 {
                 log debug "Optimizing the CBZ"
-                $formats.cbz | optimize_zip | open --raw | hash sha256
+                open --raw ($formats.cbz | optimize_zip) | hash sha256
               }
             }
           }
@@ -1678,16 +1681,16 @@ def main [
   {
     file: $original_file
   }
-  } catch {|err|
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
-    {
-      file: $original_file
-      error: $err.msg
-    }
-  }
+  # } catch {|err|
+  #   if not $keep_tmp {
+  #     rm --force --recursive $temporary_directory
+  #   }
+  #   log error $"Import of (ansi red)($original_file)(ansi reset) failed!\n($err.msg)\n"
+  #   {
+  #     file: $original_file
+  #     error: $err.msg
+  #   }
+  # }
   }
 
   if $ereader != null and not $no_copy_to_ereader {
