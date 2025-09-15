@@ -4355,7 +4355,7 @@ export def submit_acoustid_fingerprints [
       # todo I need to incorporate more metadata in the submissions: https://acoustid.org/webservice#submit
       # It seems it isn't associated properly with a release without it.
       # Submissions through Picard work just fine though.
-      $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.title)&fingerprint.($it.index)=($it.item.fingerprint)"
+      $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.index)&fingerprint.($it.index)=($it.item.fingerprint)"
     }
   }
   if ($submission_string | is-empty) {
