@@ -35,7 +35,8 @@ stdenv.mkDerivation (finalAttrs: {
     libjpeg
     libpng
     zlib
-  ] ++ lib.optionals stdenv.cc.isClang [ llvmPackages.openmp ];
+  ]
+  ++ lib.optionals stdenv.cc.isClang [ llvmPackages.openmp ];
 
   makeFlags =
     lib.optionals (!stdenv.hostPlatform.isx86_64) [
