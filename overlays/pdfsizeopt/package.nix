@@ -45,20 +45,19 @@ let
 
       nativeBuildInputs = previousAttrs.nativeBuildInputs ++ [ automake ];
 
-      preConfigure =
-        ''
-          # https://ghostscript.com/doc/current/Make.htm
-          export CCAUX=$CC_FOR_BUILD
-          rm -rf jpeg libpng zlib jasper expat tiff lcms lcms2 lcms2mt jbig2dec freetype cups/libs ijs openjpeg
+      preConfigure = ''
+        # https://ghostscript.com/doc/current/Make.htm
+        export CCAUX=$CC_FOR_BUILD
+        rm -rf jpeg libpng zlib jasper expat tiff lcms lcms2 lcms2mt jbig2dec freetype cups/libs ijs openjpeg
 
-          sed "s@if ( test -f \$(INCLUDE)[^ ]* )@if ( true )@; s@INCLUDE=/usr/include@INCLUDE=/no-such-path@" -i base/unix-aux.mak
-          sed "s@^ZLIBDIR=.*@ZLIBDIR=${zlib.dev}/include@" -i configure.ac
+        sed "s@if ( test -f \$(INCLUDE)[^ ]* )@if ( true )@; s@INCLUDE=/usr/include@INCLUDE=/no-such-path@" -i base/unix-aux.mak
+        sed "s@^ZLIBDIR=.*@ZLIBDIR=${zlib.dev}/include@" -i configure.ac
 
-          autoreconf -i
-        ''
-        + lib.optionalString stdenv.hostPlatform.isDarwin ''
-          export DARWIN_LDFLAGS_SO_PREFIX=$out/lib/
-        '';
+        autoreconf -i
+      ''
+      + lib.optionalString stdenv.hostPlatform.isDarwin ''
+        export DARWIN_LDFLAGS_SO_PREFIX=$out/lib/
+      '';
 
       configureFlags = previousAttrs.configureFlags ++ [
         "--without-x"

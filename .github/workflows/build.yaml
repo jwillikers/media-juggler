@@ -1,20 +1,21 @@
-name: Build
+name: Build Nix package
 "on":
   pull_request:
     branches: ["main"]
     paths:
+      - '**.json'
       - '**.nix'
+      - '**.nu'
       - .github/workflows/build.yaml
       - flake.lock
-      - packages/**
   push:
     branches: ["main"]
     paths:
+      - '**.json'
       - '**.nix'
+      - '**.nu'
       - .github/workflows/build.yaml
       - flake.lock
-      - packages/**
-  workflow_dispatch:
 
 jobs:
   build:
@@ -22,5 +23,5 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: DeterminateSystems/nix-installer-action@v20
-      - name: Build media-juggler
-        run: nix build '.#media-juggler'
+      - name: Build Nix package
+        run: nix build

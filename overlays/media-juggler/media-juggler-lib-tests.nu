@@ -1704,7 +1704,7 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
         [unabridged 1 "release group"]
         [unabridged 1 recording]
       ]
-      publication_date: ("2024-05-14T00:00:00-05:00" | into datetime)
+      publication_date: ("2024-05-14T00:00:00" | into datetime)
       series: [
         [name id index scope];
         [
@@ -1769,19 +1769,19 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
     ]
   }
   let actual = ($input | parse_musicbrainz_release)
-  # assert equal ($actual | get book | columns) ($expected | get book | columns)
-  # assert equal ($actual | get book | get artist_credit) ($expected | get book | get artist_credit)
-  # assert equal ($actual | get book | get series) ($expected | get book | get series)
-  # assert equal ($actual | get book | get tags) ($expected | get book | get tags)
-  # assert equal ($actual | get book | get genres) ($expected | get book | get genres)
-  # assert equal ($actual | get book | get contributors) ($expected | get book | get contributors)
-  # assert equal ($actual | get book) ($expected | get book)
-  # assert equal ($actual | get tracks | first | columns) ($expected | get tracks | first | columns)
-  # assert equal ($actual | get tracks | first | get artist_credit) ($expected | get tracks | first | get artist_credit)
-  # assert equal ($actual | get tracks | first | get contributors) ($expected | get tracks | first | get contributors)
-  # assert equal ($actual | get tracks | first | get musicbrainz_works) ($expected | get tracks | first | get musicbrainz_works)
-  # assert equal ($actual | get tracks | first) ($expected | get tracks | first)
-  # assert equal ($actual | get tracks) ($expected | get tracks)
+  assert equal ($actual | get book | columns) ($expected | get book | columns)
+  assert equal ($actual | get book | get artist_credit) ($expected | get book | get artist_credit)
+  assert equal ($actual | get book | get series) ($expected | get book | get series)
+  assert equal ($actual | get book | get tags) ($expected | get book | get tags)
+  assert equal ($actual | get book | get genres) ($expected | get book | get genres)
+  assert equal ($actual | get book | get contributors) ($expected | get book | get contributors)
+  assert equal ($actual | get book) ($expected | get book)
+  assert equal ($actual | get tracks | first | columns) ($expected | get tracks | first | columns)
+  assert equal ($actual | get tracks | first | get artist_credit) ($expected | get tracks | first | get artist_credit)
+  assert equal ($actual | get tracks | first | get contributors) ($expected | get tracks | first | get contributors)
+  assert equal ($actual | get tracks | first | get musicbrainz_works) ($expected | get tracks | first | get musicbrainz_works)
+  assert equal ($actual | get tracks | first) ($expected | get tracks | first)
+  assert equal ($actual | get tracks) ($expected | get tracks)
   assert equal $actual $expected
 }
 
@@ -1821,7 +1821,7 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
         [chapters 1 release]
         [unabridged 1 "release group"]
       ]
-      publication_date: ("2020-03-24T00:00:00-05:00" | into datetime)
+      publication_date: ("2020-03-24T00:00:00" | into datetime)
       series: [
         [name id index scope];
         [
