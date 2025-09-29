@@ -1704,7 +1704,7 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
         [unabridged 1 "release group"]
         [unabridged 1 recording]
       ]
-      publication_date: ("2024-05-14T00:00:00-05:00" | into datetime)
+      publication_date: ("2024-05-14T00:00:00" | into datetime)
       series: [
         [name id index scope];
         [
@@ -1821,7 +1821,7 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
         [chapters 1 release]
         [unabridged 1 "release group"]
       ]
-      publication_date: ("2020-03-24T00:00:00-05:00" | into datetime)
+      publication_date: ("2020-03-24T00:00:00" | into datetime)
       series: [
         [name id index scope];
         [
