@@ -18,7 +18,7 @@ name: Build Nix package
       - flake.lock
 
 jobs:
-  treefmt:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
