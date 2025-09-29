@@ -47,6 +47,7 @@ def main [
   --submit-all-acoustid-fingerprints # AcoustID fingerprints are only submitted for files where one or both of the AcoustID fingerprints and MusicBrainz Recording IDs are updated from the values present in the embedded metadata. Set this to true to submit all AcoustIDs regardless of this.
   --preferred-mp3-container: string = "m4b" # The preferred container for mp3 files. Can be either mp3 or m4b.
   --preferred-container: string = "ogg" # The preferred container for the output audio. Use either m4b or ogg.
+  --skip-upload # Skip uploading audio files to the server. Useful to only tag audiobook files and submit AcoustID fingerprints.
   --tone-tag-args: list<string> = [] # Additional arguments to pass to the tone tag command
   --transcode-bitrate: string = "" # The bitrate to use when transcoding audio. For opus, it defaults to 24k for mono and 32k for stereo recordings. For further details, see here: https://wiki.xiph.org/Opus_Recommended_Settings
   --use-rsync # Use rsync instead of scp to transfer files
@@ -702,12 +703,14 @@ def main [
   # if top_part matches top_part, and audiobook_directory matches bottom_part, use existing path.
 
   if ($target_destination_directory | is_ssh_path) {
-    $audiobook.files | append $audiobook.accompanying_documents | each {|file|
-      log info $"Uploading (ansi yellow)($file.file)(ansi reset) to (ansi yellow)($file.destination)(ansi reset)"
-      if $use_rsync {
-        $file.file | rsync $file.destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
-      } else {
-        $file.file | scp --mkdir $file.destination
+    if not $skip_upload {
+      $audiobook.files | append $audiobook.accompanying_documents | each {|file|
+        log info $"Uploading (ansi yellow)($file.file)(ansi reset) to (ansi yellow)($file.destination)(ansi reset)"
+        if $use_rsync {
+          $file.file | rsync $file.destination "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
+        } else {
+          $file.file | scp --mkdir $file.destination
+        }
       }
     }
   } else {
@@ -726,7 +729,9 @@ def main [
       }
       | each {|file|
         if ($file | is_ssh_path) {
-          $file | ssh rm
+          if not $skip_upload {
+            $file | ssh rm
+          }
         } else {
           rm $file
         }
@@ -739,7 +744,9 @@ def main [
       }
       | each {|file|
         if ($file | is_ssh_path) {
-          $file | ssh rm
+          if not $skip_upload {
+            $file | ssh rm
+          }
         } else {
           rm $file
         }
