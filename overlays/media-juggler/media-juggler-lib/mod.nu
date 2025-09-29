@@ -6372,10 +6372,14 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
       if "audio_duration" in $track and ($track.audio_duration | is-not-empty) {
         $track.audio_duration
       } else {
-        log error "Missing track audio duration for some reason!"
+        log error $"The track (ansi green)($track)(ansi reset) is missing the field audio_duration!"
         return null
       }
     )
+    if ($track.duration | is-empty) {
+      log error $"The track (ansi green)($track)(ansi reset) has an empty duration field!"
+      return null
+    }
     if ($track.duration - $duration | math abs) > $duration_threshold {
       log error $"The (ansi green)($track)(ansi reset) is ($duration) long, but the MusicBrainz track is ($track.duration) long, which is outside the acceptable duration threshold of ($duration_threshold)"
       return null
