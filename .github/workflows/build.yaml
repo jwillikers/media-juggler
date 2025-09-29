@@ -1,0 +1,27 @@
+name: Build Nix package
+"on":
+  pull_request:
+    branches: ["main"]
+    paths:
+      - '**.json'
+      - '**.nix'
+      - '**.nu'
+      - .github/workflows/build.yaml
+      - flake.lock
+  push:
+    branches: ["main"]
+    paths:
+      - '**.json'
+      - '**.nix'
+      - '**.nu'
+      - .github/workflows/build.yaml
+      - flake.lock
+
+jobs:
+  treefmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: DeterminateSystems/nix-installer-action@v20
+      - name: Build Nix package
+        run: nix build

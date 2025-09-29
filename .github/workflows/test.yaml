@@ -1,0 +1,29 @@
+name: Run tests
+"on":
+  pull_request:
+    branches: ["main"]
+    paths:
+      - '**.json'
+      - '**.nix'
+      - '**.nu'
+      - .github/workflows/test.yaml
+      - flake.lock
+  push:
+    branches: ["main"]
+    paths:
+      - '**.json'
+      - '**.nix'
+      - '**.nu'
+      - .github/workflows/test.yaml
+      - flake.lock
+
+jobs:
+  treefmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: DeterminateSystems/nix-installer-action@v20
+      - name: Run tests
+        run: |
+          nix develop --command nu overlays/media-juggler/media-juggler-lib-tests.nu
+          nix develop --command nu overlays/media-juggler/import-music-tests.nu
