@@ -248,13 +248,11 @@ def main [
         $item | ssh ls --expand-path | where type == file | get name | each {|file| $"($server):($file)"}
       }
     } else {
-      let item = (
-        if $item_type == "dir" {
-          glob --no-dir --no-symlink (($original_item | path expand | escape_special_glob_characters) + "/**/*")
-        } else {
-          [($original_item | path expand)]
-        }
-      )
+      if $item_type == "dir" {
+        glob --no-dir --no-symlink (($original_item | path expand | escape_special_glob_characters) + "/**/*")
+      } else {
+        [($original_item | path expand)]
+      }
     }
   )
 
@@ -303,6 +301,7 @@ def main [
       $item | beet_import --library $beets_library --search-id $search_id $beets_directory $beets_config
     }
   )
+  log debug $"music_files: ($music_files)"
 
   let music_file_destinations = (
     $music_files
@@ -313,6 +312,7 @@ def main [
       ] | path join
     }
   )
+  log debug $"music_file_destinations: ($music_file_destinations)"
   if $skip_upload {
     (
       $music_files
@@ -326,12 +326,12 @@ def main [
     (
       $music_files
       | zip $music_file_destinations
-      | each {||
-        log info $"Uploading (ansi yellow)($in.0)(ansi reset) to (ansi yellow)($in.1)(ansi reset)"
+      | each {|x|
+        log info $"Uploading (ansi yellow)($x.0)(ansi reset) to (ansi yellow)($x.1)(ansi reset)"
         if $use_rsync {
-          $in.0 | rsync $in.1 "--mkpath"
+          $x.0 | rsync $x.1 "--mkpath"
         } else {
-          $in.0 | scp $in.1 --mkdir
+          $x.0 | scp $x.1 --mkdir
         }
       }
     )

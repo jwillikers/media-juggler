@@ -4310,7 +4310,9 @@ export def fetch_release_ids_by_acoustid_fingerprints [
 # This is the output of the fetch_release_ids_by_acoustid_fingerprints function.
 #
 # Returns the releases to which all tracks belong.
+# export def determine_releases_from_acoustid_fingerprint_matches []: table<file: path, fingerprint: string, duration: duration, matches: table<id: string, recordings: table>> -> list<string> {
 export def determine_releases_from_acoustid_fingerprint_matches []: table<file: path, fingerprint: string, duration: duration, matches: table<id: string, recordings: table<id: string, releases: table<id: string>>, score: float>> -> list<string> {
+# table<file: path, fingerprint: string, duration: duration, matches: table<id: string, recordings: table<id: string, releases: table<id: string>>, score: float>> -> list<string>
   let tracks = $in
   if ($tracks | is-empty) {
     return null
@@ -4332,6 +4334,105 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<file: 
   }
 }
 
+# Parse the bit rate of an audio file from the output of the ffprobe command.
+#
+# Returns an integer representing the bit rate or null if there is a parsing error.
+export def parse_ffprobe_audio_bit_rate []: [record<streams: table, format: record> -> int] {
+  let ffprobe_output = $in
+  if ($ffprobe_output | is-empty) {
+    log error "parse_ffprobe_audio_bit_rate: provided ffprobe output is empty"
+    return null
+  }
+  let streams = $ffprobe_output | get --ignore-errors streams
+  if ($streams | is-empty) {
+    log error $"parse_ffprobe_audio_bit_rate: no streams in ffprobe output: ($ffprobe_output)"
+    return null
+  }
+  let audio_streams = $streams | where codec_type == "audio"
+  if ($audio_streams | is-empty) {
+    log error $"parse_ffprobe_audio_bit_rate: no audio streams in ffprobe output: ($streams)"
+    return null
+  }
+  if ($audio_streams | length) > 1 {
+    log warning $"parse_ffprobe_audio_bit_rate: multiple audio streams in ffprobe output: ($audio_streams)\nOnly the first audio stream will be used."
+  }
+  let audio_stream = $audio_streams | first
+  let bit_rate = (
+    if "bit_rate" in $audio_stream {
+      $audio_stream | get bit_rate
+    } else {
+      # log warning $"parse_ffprobe_audio_bit_rate: no bit rate for audio stream: ($audio_stream)."
+      return null
+    }
+  )
+  $bit_rate | into int
+}
+
+# Get the bit rate of an audio file in kibibits-per-second from the output of the file command.
+export def parse_file_audio_bit_rate []: [string -> int] {
+  let file_output = $in
+  if ($file_output | is-empty) {
+    return null
+  }
+  let parsed = $file_output | parse --regex '(?P<bit_rate>[0-9]+) kbps'
+  if ($parsed | is-empty) {
+    return null
+  }
+  if ($parsed | length) > 1 {
+    log error $"parse_file_audio_bit_rate: Parsed more than one audio bit rate from the file output: ($file_output)"
+    return null
+  }
+  let bit_rate = $parsed.bit_rate | first | into int
+  if ($bit_rate) <= 0 {
+    log error $"parse_file_audio_bit_rate: Parsed invalid bit rate (ansi purple)($bit_rate)(ansi reset) from the file output: ($file_output)"
+    return null
+  }
+  $bit_rate
+}
+
+# Parse the audio format of a media file from the output of the ffprobe command.
+#
+# Returns the format of the file from ffprobe or null if there is a parse error.
+export def parse_ffprobe_file_format []: [record -> int] {
+  let ffprobe_output = $in
+  if ($ffprobe_output | is-empty) {
+    log error "parse_ffprobe_file_format: provided ffprobe output is empty"
+    return null
+  }
+  let format = $ffprobe_output | get --ignore-errors format
+  if ($format | is-empty) {
+    log error $"parse_ffprobe_file_format: no format in ffprobe output: ($ffprobe_output)"
+    return null
+  }
+  let file_format = $format | get --ignore-errors format_name
+  if ($file_format | is-empty) {
+    log error $"parse_ffprobe_file_format: no file format in ffprobe output: ($format)"
+    return null
+  }
+  let file_format = (
+    if $file_format == "mov,mp4,m4a,3gp,3g2,mj2" {
+      let compatible_brands = $format.tags.compatible_brands | str downcase | split row " "
+      if "m4a" in $compatible_brands {
+        "m4a"
+      } else if "m4b" in $compatible_brands {
+        "m4b"
+      } else {
+        let file_extension = $format.filename | path split | get extension
+        if $file_extension in ["aac", "m4a"] {
+          "m4a"
+        } else if $file_extension in ["m4b"] {
+          "m4b"
+        } else {
+          $file_extension
+        }
+      }
+    } else {
+      $file_format
+    }
+  )
+  $file_format
+}
+
 # Submit AcoustID fingerprints to the AcoustID server
 #
 # Requires an AcoustID application API key and an AcoustID user API key.
@@ -4340,7 +4441,7 @@ export def submit_acoustid_fingerprints [
   user_key: string # The user's API key for the AcoustID server
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
-]: table<musicbrainz_recording_id: string, duration: duration, fingerprint: string, title: string> -> table<index: int, submission_id: string, submission_status: string> {
+]: table<index: int, musicbrainz_recording_id: string, duration: duration, fingerprint: string, title: string, track_artist_credit: string, disc_number: int, release_title: string, release_artist_credit: string, release_date: datetime, bit_rate: int, file_format: string> -> table<index: int, submission_id: string, submission_status: string> {
   let fingerprints = $in
   let endpoint = "https://api.acoustid.org/v2/submit"
   let submission_string = $fingerprints | enumerate | reduce --fold "" {|it, acc|
@@ -4351,11 +4452,28 @@ export def submit_acoustid_fingerprints [
       log error "Duration longer than what is supported on the AcoustID Server. Skipping submission"
       $acc
     } else {
+      # The submission format is documented here: https://acoustid.org/webservice#submit
+
+      # AcoustID seems to expect the bit rate in kbps from the example.
       let duration_seconds = ($it.item.duration / 1sec) | math round
-      # todo I need to incorporate more metadata in the submissions: https://acoustid.org/webservice#submit
-      # It seems it isn't associated properly with a release without it.
-      # Submissions through Picard work just fine though.
-      $acc + $"&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.title)&fingerprint.($it.index)=($it.item.fingerprint)"
+      let file_format = $it.item.file_format | str upcase
+      let year = $it.item.release_date | format date '%Y'
+      let track_submission = $"&trackno.($it.index)=($it.item.index)&fileformat.($it.index)=($file_format)&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.item.title)&artist.($it.index)=($it.item.track_artist_credit)&album.($it.index)=($it.item.release_title)&albumartist.($it.index)=($it.item.release_artist_credit)&year.($it.index)=($year)&fingerprint.($it.index)=($it.item.fingerprint)"
+      let track_submission = (
+        if "bit_rate" in $it.item and $it.item.bit_rate != null {
+          $track_submission + $"&bitrate.($it.index)=($it.item.bit_rate)"
+        } else {
+          $track_submission
+        }
+      )
+      let track_submission = (
+        if "disc_number" in $it.item and $it.item.disc_number != null {
+          $track_submission + $"&discno.($it.index)=($it.item.disc_number)"
+        } else {
+          $track_submission
+        }
+      )
+      $acc + $track_submission
     }
   }
   if ($submission_string | is-empty) {
@@ -4364,7 +4482,7 @@ export def submit_acoustid_fingerprints [
 
   # todo include fileformat and bitrate?
   let submission_string = $"format=json&client=($client_key)&clientversion=($media_juggler_version)&user=($user_key)" + $submission_string
-  # log info $"submission_string: ($submission_string)"
+  log debug $"submit_acoustid_fingerprints: submission_string: ($submission_string)"
 
   let request = {||
     (
@@ -4745,6 +4863,14 @@ export def parse_audible_asin_from_musicbrainz_release []: record -> list<string
   }
 }
 
+# Convert the artist-credit from MusicBrainz into a single string.
+export def artist_credit_to_string []: table<joinphrase: string, name: string, artist: record> -> string {
+  let artist_credit = $in
+  $artist_credit | reduce --fold '' {|it, acc|
+    $acc + $it.name + $it.joinphrase
+  }
+}
+
 # Parse the data of a MusicBrainz release
 export def parse_musicbrainz_release []: record -> record {
   let metadata = $in
@@ -4938,6 +5064,11 @@ export def parse_musicbrainz_release []: record -> record {
             $media.title
           }
         )
+        let artist_credit_string = (
+          if "artist-credit" in $track.recording and ($track.recording.artist-credit | is-not-empty) {
+            $track.recording.artist-credit | artist_credit_to_string
+          }
+        )
         (
           {
             index: $track.position
@@ -4954,6 +5085,7 @@ export def parse_musicbrainz_release []: record -> record {
           | upsert_if_value musicbrainz_works $musicbrainz_works
           | upsert_if_value contributors $track_contributors
           | upsert_if_value duration $length
+          | upsert_if_value artist_credit $artist_credit_string
           # AcoustID metadata may be supplemented in the provided track metadata
           | upsert_if_present acoustid_fingerprint $track
           | upsert_if_present acoustid_track_id $track
@@ -5112,6 +5244,12 @@ export def parse_musicbrainz_release []: record -> record {
     }
   )
 
+  let artist_credit_string = (
+    if "artist-credit" in $metadata and ($metadata.artist-credit | is-not-empty) {
+      $metadata.artist-credit | artist_credit_to_string
+    }
+  )
+
   # Book metadata
   let book = (
     {}
@@ -5122,6 +5260,7 @@ export def parse_musicbrainz_release []: record -> record {
       }
     )
     | upsert_if_value musicbrainz_release_types $musicbrainz_release_types
+    | upsert_if_value artist_credit $artist_credit_string
     | upsert_if_present title $metadata
     | upsert_if_value title_sort $title_sort
     | upsert_if_value contributors $contributors
@@ -5282,7 +5421,15 @@ export def get_musicbrainz_ids_by_acoustid [
     return null
   }
   # log info $"acoustid_responses: ($acoustid_responses | to nuon)"
-  let release_ids = $acoustid_responses | determine_releases_from_acoustid_fingerprint_matches
+  let release_ids = (
+    if "releases" in ($acoustid_responses | get matches | first | get recordings | first | columns)  {
+      $acoustid_responses | determine_releases_from_acoustid_fingerprint_matches
+    } else {
+      log warning "No releases available in the acoustid responses!"
+      log debug $"acoustid_responses: (ansi yellow)($acoustid_responses)(ansi reset)"
+      null
+    }
+  )
   if ($release_ids | is-empty) {
     log error "No common release ids found for the AcoustID fingerprints"
     return null
@@ -5729,14 +5876,43 @@ export def tag_audiobook [
       # log info $"$tracks: ($tracks | reject embedded_pictures)"
       let acoustid_submissions = (
         $tracks
-        | select musicbrainz_recording_id duration acoustid_fingerprint title
-        | rename musicbrainz_recording_id duration fingerprint title
+        | select index musicbrainz_recording_id duration acoustid_fingerprint title artist_credit disc_number file
+        | rename index musicbrainz_recording_id duration fingerprint title track_artist_credit disc_number file
+        | default $metadata.book.title release_title
+        | default $metadata.book.artist_credit release_artist_credit
+        | default $metadata.book.publication_date release_date
+        # | each {|track|
+        #   if "disc_number" not-in $track or $track.disc_number == null {
+        #     $track | upsert disc_number null
+        #   } else {
+        #     $track | upsert disc_number $track.disc_number
+        #   }
+        # }
+        | each {|track|
+          let bit_rate = ^file --brief $track.file | parse_file_audio_bit_rate
+          if $bit_rate == null {
+            log info "tag_audiobook: Failed to parse audio bit rate from file --brief output"
+            $track
+          } else {
+            $track | upsert bit_rate $bit_rate
+          }
+        }
+        | each {|track|
+          let file_format = $track.file | ffprobe | parse_ffprobe_file_format
+          if $file_format == null {
+            log error "tag_audiobook: Failed to parse file format from ffprobe output"
+            $track
+          } else {
+            $track | upsert file_format $file_format
+          }
+        }
+        | reject file
         | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
       )
       if ($acoustid_submissions | is-not-empty) {
         log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
       } else {
-        log error $"Failed to submit AcoustID fingerprints!"
+        log error $"tag_audiobook: Failed to submit AcoustID fingerprints!"
       }
     }
   }
@@ -5983,6 +6159,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   }
 
   # log info $"$release ($release)"
+  # log info $"candidates: ($candidates)"
   let candidates = $candidates | filter_musicbrainz_chapters_releases $release $duration_threshold
   if ($candidates | length) > 1 {
     log warning $"More than one MusicBrainz Release candidate for chapters found: ($candidates | get book.id). Please add or vote up the chapters tag on the desired release."
@@ -6195,10 +6372,14 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
       if "audio_duration" in $track and ($track.audio_duration | is-not-empty) {
         $track.audio_duration
       } else {
-        log error "Missing track audio duration for some reason!"
+        log error $"The track (ansi green)($track)(ansi reset) is missing the field audio_duration!"
         return null
       }
     )
+    if ($track.duration | is-empty) {
+      log error $"The track (ansi green)($track)(ansi reset) has an empty duration field!"
+      return null
+    }
     if ($track.duration - $duration | math abs) > $duration_threshold {
       log error $"The (ansi green)($track)(ansi reset) is ($duration) long, but the MusicBrainz track is ($track.duration) long, which is outside the acceptable duration threshold of ($duration_threshold)"
       return null

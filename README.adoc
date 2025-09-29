@@ -156,6 +156,13 @@ chmod +x ~/Downloads/ComicTagger-x86_64.AppImage
 // todo Document getting Audible activation bytes and setting environment variable AUDIBLE_ACTIVATION_BYTES
 // todo Document getting and setting various api keys for Beets
 
+. Enable debugging by setting the log level for Nushell.
++
+[,sh]
+----
+$env.NU_LOG_LEVEL = "DEBUG"
+----
+
 . Now, the provided scripts can be run like so.
 +
 [,sh]
