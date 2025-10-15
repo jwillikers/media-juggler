@@ -5511,16 +5511,32 @@ export def equivalent_track_durations [
 # If both sets are empty, true is returned.
 export def has_distributor_in_common [
   right: table<id: string, name: string, entity: string, role: string>
-]: table<id: string, name: string, entity: string, role: string> -> bool {
+]: [
+  table<id: string, name: string, entity: string, role: string> -> bool
+  nothing -> bool
+] {
   let left = $in
+  # log debug $"has_distributor_in_common: right: ($right | to json)"
+  # log debug $"has_distributor_in_common: left: ($left | to json)"
   if ($right | is-empty) and ($left | is-empty) {
     return true
   }
-  if ($right | is-empty) or ($left | is-empty) {
-    return false
-  }
-  let left_distributors = $left | where role == "distributor"
-  let right_distributors = $right | where role == "distributor"
+  let right_distributors = (
+    if ($right | is-empty) {
+      []
+    } else {
+      $right | where role == "distributor"
+    }
+  )
+  let left_distributors = (
+    if ($left | is-empty) {
+      []
+    } else {
+      $left | where role == "distributor"
+    }
+  )
+  # log debug $"has_distributor_in_common: right_distributors: ($right_distributors | to json)"
+  # log debug $"has_distributor_in_common: left_distributors: ($left_distributors | to json)"
   if ($left_distributors | is-empty) and ($right_distributors | is-empty) {
     return true
   }
@@ -6047,12 +6063,15 @@ export def filter_musicbrainz_chapters_releases [
 
   let candidates = $candidates | filter {|candidate|
     if ($release.tracks | length) >= ($candidate.tracks | length) {
+      log debug $"Disqualified MusicBrainz Release chapters candidate (ansi green)($candidate.book.musicbrainz_release_id)(ansi reset) because it has (ansi purple)($candidate.tracks | length)(ansi reset) which is less than (ansi purple)($release.tracks | length)(ansi reset)"
       return false
     }
     if ((($release.tracks | get duration | math sum) - ($candidate.tracks | get duration | math sum)) | math abs) > $duration_threshold {
+      log debug $"Disqualified MusicBrainz Release chapters candidate (ansi green)($candidate.book.musicbrainz_release_id)(ansi reset) because it's total duration (ansi purple)($candidate.tracks | get duration | math sum)(ansi reset) is above the threshold (ansi purple)($duration_threshold)(ansi reset) compared against the duration of the release (ansi purple)($release.tracks | get duration | math sum)(ansi reset)"
       return false
     }
     if not ($candidate.book | get --ignore-errors contributors | has_distributor_in_common ($release.book | get --ignore-errors contributors)) {
+      log debug $"Disqualified MusicBrainz Release chapters candidate (ansi green)($candidate.book.musicbrainz_release_id)(ansi reset) because it does not share the same distributors"
       return false
     }
     true
@@ -6161,6 +6180,10 @@ export def look_up_chapters_from_similar_musicbrainz_release [
   # log info $"$release ($release)"
   # log info $"candidates: ($candidates)"
   let candidates = $candidates | filter_musicbrainz_chapters_releases $release $duration_threshold
+  if ($candidates | is-empty) {
+    log warning $"No MusicBrainz Release candidates for chapters found. Please add or vote up the chapters tag on the desired release."
+    return null
+  }
   if ($candidates | length) > 1 {
     log warning $"More than one MusicBrainz Release candidate for chapters found: ($candidates | get book.id). Please add or vote up the chapters tag on the desired release."
     return null
@@ -6871,9 +6894,9 @@ export def search_for_musicbrainz_release [
 export def lengths_to_start_offsets []: list<duration> -> list<duration> {
   let lengths = $in | enumerate
   $lengths | each {|i|
-      $lengths | where index < $i.index | reduce --fold 0ms {|it,acc|
-          $it.item + $acc
-      }
+    $lengths | where index < $i.index | reduce --fold 0ms {|it,acc|
+      $it.item + $acc
+    }
   }
 }
 
