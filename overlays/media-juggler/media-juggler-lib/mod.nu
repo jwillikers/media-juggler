@@ -2977,6 +2977,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       $series | uniq-by name
     }
   )
+  # log debug $"Parsed series from tone metadata: ($series | to json)"
   let genres = (
     if "genre" in $metadata {
       $metadata.genre | parse_multi_value_tag
@@ -3395,7 +3396,7 @@ export def parse_audiobook_metadata_from_files []: list<path> -> record {
 export def convert_series_for_group_tag []: list -> string { #table<name: string, index: string> -> string {
   let series = $in
   $series | each {|s|
-    if index in $s and ($s.index | is-not-empty) {
+    if "index" in $s and ($s.index | is-not-empty) {
       $s.name + " #" + $s.index
     } else {
       $s.name
@@ -3457,6 +3458,7 @@ export def into_tone_format []: record -> record {
       $series | uniq-by name | convert_series_for_group_tag
     }
   )
+  # log debug $"group: ($group | to json)"
   let publication_date = (
     if "publication_date" in $metadata.book and ($metadata.book.publication_date | is-not-empty) {
       $metadata.book.publication_date | format date '%Y-%m-%dT%H:%M:%SZ'
@@ -5168,6 +5170,7 @@ export def parse_musicbrainz_release []: record -> record {
   )
 
   let series = $metadata | parse_series_from_musicbrainz_release
+  # log debug $"series: ($series | to json)"
 
   let audible_asin = (
     let audible_asins = $metadata | parse_audible_asin_from_musicbrainz_release;
@@ -5906,15 +5909,33 @@ export def tag_audiobook [
         #   }
         # }
         | each {|track|
-          let bit_rate = ^file --brief $track.file | parse_file_audio_bit_rate
-          if $bit_rate == null {
+          let bit_rate = (
+            # todo Uncomment this if neededed
+            # try {
+              ^file --brief $track.file | parse_file_audio_bit_rate
+            # } catch {|error|
+            #   null
+            # }
+          )
+          # log info $"track: ($track | to json)"
+          # log info $"track columns: ($track | columns)"
+          # log info $"bit_rate: ($bit_rate)"
+          if ($bit_rate | is-empty) {
             log info "tag_audiobook: Failed to parse audio bit rate from file --brief output"
             $track
           } else {
             $track | upsert bit_rate $bit_rate
           }
         }
+        # Somehow this makes things magically work...
+        # WTF?
         | each {|track|
+          log debug $"track: ($track | to json)"
+          log debug $"track columns: ($track | columns)"
+        }
+        | each {|track|
+          # log info $"track: ($track | to json)"
+          # log info $"track columns: ($track | columns)"
           let file_format = $track.file | ffprobe | parse_ffprobe_file_format
           if $file_format == null {
             log error "tag_audiobook: Failed to parse file format from ffprobe output"
@@ -6450,8 +6471,15 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     } else {
       $musicbrainz_metadata | update book.series (
         $musicbrainz_metadata.book.series | each {|series|
+          log debug $"series: ($series | to json)"
           let scope = $series.scope
-          $series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | insert scope $scope
+          let index = $series.index
+          (
+            $series.id
+            | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay
+            | insert scope $scope
+            | insert index $index
+          )
         }
       )
     }
