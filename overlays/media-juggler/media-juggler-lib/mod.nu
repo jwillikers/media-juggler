@@ -1361,6 +1361,7 @@ export def merge_into_m4b [
     --audio-format $audio_format
     --audio-extension $audio_extension
     --jobs ((^nproc | into int) / 2)
+    --no-conversion
     --no-interaction
     --output-file $output_file
     ...$args
