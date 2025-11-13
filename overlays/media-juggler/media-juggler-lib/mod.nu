@@ -4446,39 +4446,50 @@ export def submit_acoustid_fingerprints [
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
 ]: table<index: int, musicbrainz_recording_id: string, duration: duration, fingerprint: string, title: string, track_artist_credit: string, disc_number: int, release_title: string, release_artist_credit: string, release_date: datetime, bit_rate: int, file_format: string> -> table<index: int, submission_id: string, submission_status: string> {
   let fingerprints = $in
+  # log debug "submit_acoustid_fingerprints: Begin"
+  # log debug $"fingerprints: ($fingerprints)"
   let endpoint = "https://api.acoustid.org/v2/submit"
-  let submission_string = $fingerprints | enumerate | reduce --fold "" {|it, acc|
-    # Currently, the server doesn't accept durations longer than 32767 seconds.
-    # Issue: https://github.com/acoustid/acoustid-server/issues/43
-    # PR: https://github.com/acoustid/acoustid-server/pull/179
-    if ($it.item.duration > 32767sec) {
-      log error "Duration longer than what is supported on the AcoustID Server. Skipping submission"
-      $acc
-    } else {
-      # The submission format is documented here: https://acoustid.org/webservice#submit
+  let submission_string = (
+    $fingerprints | enumerate | reduce --fold "" {|it, acc|
+      # Currently, the server doesn't accept durations longer than 32767 seconds.
+      # Issue: https://github.com/acoustid/acoustid-server/issues/43
+      # PR: https://github.com/acoustid/acoustid-server/pull/179
+      if ($it.item.duration > 32767sec) {
+        log error "Duration longer than what is supported on the AcoustID Server. Skipping submission"
+        $acc
+      } else {
+        # The submission format is documented here: https://acoustid.org/webservice#submit
 
-      # AcoustID seems to expect the bit rate in kbps from the example.
-      let duration_seconds = ($it.item.duration / 1sec) | math round
-      let file_format = $it.item.file_format | str upcase
-      let year = $it.item.release_date | format date '%Y'
-      let track_submission = $"&trackno.($it.index)=($it.item.index)&fileformat.($it.index)=($file_format)&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.item.title)&artist.($it.index)=($it.item.track_artist_credit)&album.($it.index)=($it.item.release_title)&albumartist.($it.index)=($it.item.release_artist_credit)&year.($it.index)=($year)&fingerprint.($it.index)=($it.item.fingerprint)"
-      let track_submission = (
-        if "bit_rate" in $it.item and $it.item.bit_rate != null {
-          $track_submission + $"&bitrate.($it.index)=($it.item.bit_rate)"
-        } else {
-          $track_submission
-        }
-      )
-      let track_submission = (
-        if "disc_number" in $it.item and $it.item.disc_number != null {
-          $track_submission + $"&discno.($it.index)=($it.item.disc_number)"
-        } else {
-          $track_submission
-        }
-      )
-      $acc + $track_submission
+        # AcoustID seems to expect the bit rate in kbps from the example.
+        let duration_seconds = ($it.item.duration / 1sec) | math round
+        # log debug $"duration_seconds: ($duration_seconds)"
+        let file_format = $it.item.file_format | str upcase
+        # log debug $"file_format: ($file_format)"
+        let year = $it.item.release_date | format date '%Y'
+        # log debug $"year: ($year)"
+        let track_submission = $"&trackno.($it.index)=($it.item.index)&fileformat.($it.index)=($file_format)&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.item.title)&artist.($it.index)=($it.item.track_artist_credit)&album.($it.index)=($it.item.release_title)&albumartist.($it.index)=($it.item.release_artist_credit)&year.($it.index)=($year)&fingerprint.($it.index)=($it.item.fingerprint)"
+        # log debug $"track_submission: ($track_submission)"
+        let track_submission = (
+          if "bit_rate" in $it.item and $it.item.bit_rate != null {
+            $track_submission + $"&bitrate.($it.index)=($it.item.bit_rate)"
+          } else {
+            $track_submission
+          }
+        )
+        # log debug $"track_submission: ($track_submission)"
+        let track_submission = (
+          if "disc_number" in $it.item and $it.item.disc_number != null {
+            $track_submission + $"&discno.($it.index)=($it.item.disc_number)"
+          } else {
+            $track_submission
+          }
+        )
+        # log debug $"track_submission: ($track_submission)"
+        # log debug $"acc + track_submission: ($acc + $track_submission)"
+        $acc + $track_submission
+      }
     }
-  }
+  )
   if ($submission_string | is-empty) {
     return null
   }
@@ -5927,12 +5938,9 @@ export def tag_audiobook [
             $track | upsert bit_rate $bit_rate
           }
         }
-        # Somehow this makes things magically work...
-        # WTF?
-        | each {|track|
-          log debug $"track: ($track | to json)"
-          log debug $"track columns: ($track | columns)"
-        }
+        # The release date is converted to a string somehow by the default command above.
+        # Convert it back to a datetime here to fix it.
+        | update release_date {|d| $d | into datetime}
         | each {|track|
           # log info $"track: ($track | to json)"
           # log info $"track columns: ($track | columns)"
@@ -5947,6 +5955,7 @@ export def tag_audiobook [
         | reject file
         | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
       )
+      log debug $"AcoustID submissions: ($acoustid_submissions | to nuon)"
       if ($acoustid_submissions | is-not-empty) {
         log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
       } else {
