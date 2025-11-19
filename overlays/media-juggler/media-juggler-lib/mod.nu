@@ -4420,7 +4420,7 @@ export def parse_ffprobe_file_format []: [record -> int] {
       } else if "m4b" in $compatible_brands {
         "m4b"
       } else {
-        let file_extension = $format.filename | path split | get extension
+        let file_extension = $format.filename | path parse | get extension
         if $file_extension in ["aac", "m4a"] {
           "m4a"
         } else if $file_extension in ["m4b"] {
@@ -4470,7 +4470,7 @@ export def submit_acoustid_fingerprints [
         let track_submission = $"&trackno.($it.index)=($it.item.index)&fileformat.($it.index)=($file_format)&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.item.title)&artist.($it.index)=($it.item.track_artist_credit)&album.($it.index)=($it.item.release_title)&albumartist.($it.index)=($it.item.release_artist_credit)&year.($it.index)=($year)&fingerprint.($it.index)=($it.item.fingerprint)"
         # log debug $"track_submission: ($track_submission)"
         let track_submission = (
-          if "bit_rate" in $it.item and $it.item.bit_rate != null {
+          if "bit_rate" in $it.item and $it.item.bit_rate != null and $it.item.bit_rate > 0 {
             $track_submission + $"&bitrate.($it.index)=($it.item.bit_rate)"
           } else {
             $track_submission
@@ -5911,7 +5911,7 @@ export def tag_audiobook [
         | rename index musicbrainz_recording_id duration fingerprint title track_artist_credit disc_number file
         | default $metadata.book.title release_title
         | default $metadata.book.artist_credit release_artist_credit
-        | default $metadata.book.publication_date release_date
+        # | default $metadata.book.publication_date release_date
         # | each {|track|
         #   if "disc_number" not-in $track or $track.disc_number == null {
         #     $track | upsert disc_number null
@@ -5921,7 +5921,7 @@ export def tag_audiobook [
         # }
         | each {|track|
           let bit_rate = (
-            # todo Uncomment this if neededed
+            # todo Uncomment this if needed
             # try {
               ^file --brief $track.file | parse_file_audio_bit_rate
             # } catch {|error|
@@ -5933,14 +5933,14 @@ export def tag_audiobook [
           # log info $"bit_rate: ($bit_rate)"
           if ($bit_rate | is-empty) {
             log info "tag_audiobook: Failed to parse audio bit rate from file --brief output"
-            $track
+            $track | upsert bit_rate 0
           } else {
             $track | upsert bit_rate $bit_rate
           }
         }
         # The release date is converted to a string somehow by the default command above.
         # Convert it back to a datetime here to fix it.
-        | update release_date {|d| $d | into datetime}
+        | upsert release_date ($metadata.book.publication_date | into datetime)
         | each {|track|
           # log info $"track: ($track | to json)"
           # log info $"track columns: ($track | columns)"
