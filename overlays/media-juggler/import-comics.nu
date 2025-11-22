@@ -224,6 +224,10 @@ def main [
   --upload-ereader-cbz # Upload the E-Reader specific format to the server
   --use-rsync
   --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
+  --hardcover-edition-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
+  --hardcover-book-slug: string # The Hardcover Book Slug (only embedded in the metadata right now)
+  --wikidata-work-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
+  --wikidata-edition-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
   --imprint: string # Set the publisher/imprint. This is embedded in the ComicInfo.xml file and used for the publisher in EPUB and PDF metadata.
   --publisher: string # Set the publisher in the metadata. Note that the imprint is preferred over this for EPUB and PDF metadata.
 ] {
@@ -244,6 +248,26 @@ def main [
 
   if $bookbrainz_edition_id != null and ($files | length) > 1 {
     log error "Setting the BookBrainz Edition ID for multiple files is not allowed as it will result in overwriting the final file"
+    exit 1
+  }
+
+  if $hardcover_edition_id != null and ($files | length) > 1 {
+    log error "Setting the Hardcover Edition ID for multiple files is not allowed as it will result in overwriting the final file"
+    exit 1
+  }
+
+  if $wikidata_edition_id != null and ($files | length) > 1 {
+    log error "Setting the Wikidata Edition ID for multiple files is not allowed as it will result in overwriting the final file"
+    exit 1
+  }
+
+  if $wikidata_work_id != null and ($files | length) > 1 {
+    log error "Setting the Wikidata Work ID for multiple files is not allowed as it will result in overwriting the final file"
+    exit 1
+  }
+
+  if $hardcover_book_slug != null and ($files | length) > 1 {
+    log error "Setting the Hardcover Book Slug for multiple files is not allowed as it will result in overwriting the final file"
     exit 1
   }
 
@@ -1067,26 +1091,48 @@ def main [
     )
     | (
       let input = $in;
-      if ($bookbrainz_edition_id | is-not-empty) and ($comic_vine_id | is-not-empty) {
-        $input | upsert_comic_info {
-          tag: "Web",
-          value: $"https://bookbrainz.org/edition/($bookbrainz_edition_id) https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
+      let bookbrainz_url = (
+        if ($bookbrainz_edition_id | is-not-empty) {
+          $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"
+        } else {
+          ""
         }
-      } else if ($bookbrainz_edition_id | is-not-empty) {
-        $input | upsert_comic_info {
-          tag: "Web",
-          value: $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"
+      );
+      let comic_vine_url = (
+        if ($comic_vine_id | is-not-empty) {
+          $"https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
+        } else {
+          ""
         }
-      } else if ($comic_vine_id | is-not-empty) {
-        $input | upsert_comic_info {
-          tag: "Web",
-          value: $"https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
+      );
+      let hardcover_url = (
+        # todo Since the book slug URL can change, figure out how to use this with just the edition id?
+        if ($hardcover_edition_id | is-not-empty) and ($hardcover_book_slug | is-not-empty) {
+          $"https://hardcover.app/books/($hardcover_book_slug)/editions/($hardcover_edition_id)"
+        } else {
+          ""
         }
-      } else {
+      );
+      let wikidata_url = (
+        # To avoid ambiguity, only include one wikidata link, preferring the edition id if possible.
+        if ($wikidata_edition_id | is-not-empty) {
+          $"https://www.wikidata.org/wiki/($wikidata_edition_id)"
+        } else if ($wikidata_work_id | is-not-empty) {
+          $"https://www.wikidata.org/wiki/($wikidata_work_id)"
+        } else {
+          ""
+        }
+      );
+      let urls = $"($bookbrainz_url) ($comic_vine_url) ($hardcover_url) ($wikidata_url)" | str trim | str replace --all --regex '\w{2,}' ' ';
+      if ($urls | is-empty) {
         $input
+      } else {
+        $input | upsert_comic_info {
+          tag: "Web",
+          value: $urls,
+        }
       }
     )
-    #todo Web link to BookBrainz Edition
     # todo Incorporate Comic Vine issue id and series id in Notes section of ComicInfo.xml or sidecar metadata.opf
     # This will allow easily updating the metadata in the future without having to redo all the lookup work.
     | {
@@ -1173,6 +1219,26 @@ def main [
               | append (
                 if ($bookbrainz_edition_id | is-not-empty) {
                   $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
+                }
+              )
+              | append (
+                if ($hardcover_edition_id | is-not-empty) {
+                  $"--identifier=hardcover-edition:($hardcover_edition_id)"
+                }
+              )
+              | append (
+                if ($hardcover_book_slug | is-not-empty) {
+                  $"--identifier=hardcover:($hardcover_book_slug)"
+                }
+              )
+              | append (
+                if ($wikidata_edition_id | is-not-empty) {
+                  $"--identifier=wikidata-edition:($wikidata_edition_id)"
+                }
+              )
+              | append (
+                if ($wikidata_work_id | is-not-empty) {
+                  $"--identifier=wikidata-work:($wikidata_work_id)"
                 }
               )
               | append (
@@ -1280,6 +1346,26 @@ def main [
               | append (
                 if ($bookbrainz_edition_id | is-not-empty) {
                   $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
+                }
+              )
+              | append (
+                if ($hardcover_edition_id | is-not-empty) {
+                  $"--identifier=hardcover-edition:($hardcover_edition_id)"
+                }
+              )
+              | append (
+                if ($hardcover_book_slug | is-not-empty) {
+                  $"--identifier=hardcover:($hardcover_book_slug)"
+                }
+              )
+              | append (
+                if ($wikidata_edition_id | is-not-empty) {
+                  $"--identifier=wikidata-edition:($wikidata_edition_id)"
+                }
+              )
+              | append (
+                if ($wikidata_work_id | is-not-empty) {
+                  $"--identifier=wikidata-work:($wikidata_work_id)"
                 }
               )
               | append (
