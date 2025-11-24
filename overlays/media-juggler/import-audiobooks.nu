@@ -1,5 +1,6 @@
 #!/usr/bin/env nu
 
+# todo Incorporate Hardcover.app edition id in metadata as HardcoverEditionID.
 # todo Consider using bragibooks instead: https://github.com/djdembeck/bragibooks
 # tone can rename files as needed
 
