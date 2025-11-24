@@ -1414,19 +1414,41 @@ def main [
       log debug $"Cover image: ($comic_metadata._cover_image | to nuon)";
       let cover_url = $comic_metadata._cover_image | last;
       let cover = (
-        {
-          parent: $temporary_directory
-          stem: "cover"
-          extension: ($cover_url | path parse | get extension)
-        } | path join
+        let cover = (
+          {
+            parent: $temporary_directory
+            stem: "cover"
+            extension: ($cover_url | path parse | get extension)
+          } | path join
+        );
+        try {
+          http get --headers [User-Agent $user_agent] --raw $cover_url | save --force $cover;
+          log debug $"Downloaded cover (ansi yellow)($cover)(ansi reset)";
+          $cover
+        } catch {|error|
+          log error $"Failed to downloaded cover from (ansi yellow)($cover_url)(ansi reset): ($error)";
+          # Attempt to extract the existing cover from the PDF
+          let cover = (
+            {
+              parent: $temporary_directory
+              stem: "cover"
+            } | path join
+          );
+          let result = (^ebook-meta --get-cover $cover $renamed_pdf | complete)
+          if $result.exit_code == 0 {
+            $cover | rename_image_with_extension
+          } else {
+            null
+          }
+        }
       );
-      http get --raw $cover_url | save --force $cover;
-      $cover | optimize_image;
-      log debug $"Downloaded cover (ansi yellow)($cover)(ansi reset)";
+      if ($cover | is-not-empty) {
+        $cover | optimize_image;
+      }
       $formats
       | update pdf $renamed_pdf
       | insert comic_info $comic_info
-      | insert cover $cover
+      | upsert_if_value cover $cover
       | (
         let input = $in;
         log debug "Updating PDF in table";
@@ -1578,7 +1600,7 @@ def main [
     }
   )
   let cover_target_destination = (
-    if $output_format == "pdf" {
+    if $output_format == "pdf" and "cover" in $formats and ($formats.cover | is-not-empty) {
       let components = ($formats | get $output_format | path parse);
       {
         parent: $target_directory
@@ -1602,11 +1624,13 @@ def main [
       } else {
         $formats.comic_info | scp $comic_info_target_destination --mkdir
       }
-      log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
-      if $use_rsync {
-        $formats.cover | rsync $cover_target_destination "--mkpath"
-      } else {
-        $formats.cover | scp $cover_target_destination --mkdir
+      if ($cover_target_destination | is-not-empty) {
+        log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
+        if $use_rsync {
+          $formats.cover | rsync $cover_target_destination "--mkpath"
+        } else {
+          $formats.cover | scp $cover_target_destination --mkdir
+        }
       }
     }
   } else {
@@ -1614,7 +1638,9 @@ def main [
     mv --force ($formats | get $output_format) $destination
     if $output_format == "pdf" {
       mv --force $formats.comic_info $destination
-      mv --force $formats.cover $destination
+      if "cover" in $formats and ($formats.cover | is-not-empty) {
+        mv --force $formats.cover $destination
+      }
     }
   }
 
@@ -1666,7 +1692,7 @@ def main [
     }
   )
   let cover_archival_destination = (
-    if "pdf" in $formats and $archive_pdf {
+    if "pdf" in $formats and $archive_pdf and "cover" in $formats and ($formats.cover | is-not-empty) {
       let components = ($formats.cover | path parse);
       {
         parent: $archival_target_directory
@@ -1696,11 +1722,13 @@ def main [
       } else {
         $formats.comic_info | scp $comic_info_archival_destination --mkdir
       }
-      log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($cover_archival_destination)(ansi reset)"
-      if $use_rsync {
-        $formats.cover | rsync $cover_archival_destination "--mkpath"
-      } else {
-        $formats.cover | scp $cover_archival_destination --mkdir
+      if ($cover_archival_destination | is-not-empty) {
+        log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($cover_archival_destination)(ansi reset)"
+        if $use_rsync {
+          $formats.cover | rsync $cover_archival_destination "--mkpath"
+        } else {
+          $formats.cover | scp $cover_archival_destination --mkdir
+        }
       }
     }
   }
