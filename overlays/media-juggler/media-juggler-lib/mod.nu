@@ -4930,6 +4930,7 @@ export def parse_musicbrainz_release []: record -> record {
         )
         let track_contributors = (
           if ($track.recording | is-not-empty) and "relations" in ($track.recording | columns) {
+            # todo Ignore special [unknown] MusicBrainz artist?
             let parsed_contributors = $track.recording.relations | append $work_relations | parse_contributors
             # If artist roles exist at the release level and not at the track level, use them for the track.
             let parsed_contributors = (
@@ -4979,6 +4980,7 @@ export def parse_musicbrainz_release []: record -> record {
             ) | uniq
           }
         )
+        # todo Include Wikidata Work ID if present.
         let musicbrainz_works = (
           if ($works | is-not-empty) {
             (
