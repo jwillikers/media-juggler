@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: DeterminateSystems/nix-installer-action@v20
+      - uses: DeterminateSystems/nix-installer-action@v21
       - name: Run tests
         run: |
           nix develop --command nu overlays/media-juggler/media-juggler-lib-tests.nu
