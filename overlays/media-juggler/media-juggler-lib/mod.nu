@@ -1361,6 +1361,7 @@ export def merge_into_m4b [
     --audio-format $audio_format
     --audio-extension $audio_extension
     --jobs ((^nproc | into int) / 2)
+    --no-conversion
     --no-interaction
     --output-file $output_file
     ...$args
@@ -2976,6 +2977,7 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       $series | uniq-by name
     }
   )
+  # log debug $"Parsed series from tone metadata: ($series | to json)"
   let genres = (
     if "genre" in $metadata {
       $metadata.genre | parse_multi_value_tag
@@ -3394,7 +3396,7 @@ export def parse_audiobook_metadata_from_files []: list<path> -> record {
 export def convert_series_for_group_tag []: list -> string { #table<name: string, index: string> -> string {
   let series = $in
   $series | each {|s|
-    if index in $s and ($s.index | is-not-empty) {
+    if "index" in $s and ($s.index | is-not-empty) {
       $s.name + " #" + $s.index
     } else {
       $s.name
@@ -3456,6 +3458,7 @@ export def into_tone_format []: record -> record {
       $series | uniq-by name | convert_series_for_group_tag
     }
   )
+  # log debug $"group: ($group | to json)"
   let publication_date = (
     if "publication_date" in $metadata.book and ($metadata.book.publication_date | is-not-empty) {
       $metadata.book.publication_date | format date '%Y-%m-%dT%H:%M:%SZ'
@@ -4417,7 +4420,7 @@ export def parse_ffprobe_file_format []: [record -> int] {
       } else if "m4b" in $compatible_brands {
         "m4b"
       } else {
-        let file_extension = $format.filename | path split | get extension
+        let file_extension = $format.filename | path parse | get extension
         if $file_extension in ["aac", "m4a"] {
           "m4a"
         } else if $file_extension in ["m4b"] {
@@ -4443,39 +4446,50 @@ export def submit_acoustid_fingerprints [
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
 ]: table<index: int, musicbrainz_recording_id: string, duration: duration, fingerprint: string, title: string, track_artist_credit: string, disc_number: int, release_title: string, release_artist_credit: string, release_date: datetime, bit_rate: int, file_format: string> -> table<index: int, submission_id: string, submission_status: string> {
   let fingerprints = $in
+  # log debug "submit_acoustid_fingerprints: Begin"
+  # log debug $"fingerprints: ($fingerprints)"
   let endpoint = "https://api.acoustid.org/v2/submit"
-  let submission_string = $fingerprints | enumerate | reduce --fold "" {|it, acc|
-    # Currently, the server doesn't accept durations longer than 32767 seconds.
-    # Issue: https://github.com/acoustid/acoustid-server/issues/43
-    # PR: https://github.com/acoustid/acoustid-server/pull/179
-    if ($it.item.duration > 32767sec) {
-      log error "Duration longer than what is supported on the AcoustID Server. Skipping submission"
-      $acc
-    } else {
-      # The submission format is documented here: https://acoustid.org/webservice#submit
+  let submission_string = (
+    $fingerprints | enumerate | reduce --fold "" {|it, acc|
+      # Currently, the server doesn't accept durations longer than 32767 seconds.
+      # Issue: https://github.com/acoustid/acoustid-server/issues/43
+      # PR: https://github.com/acoustid/acoustid-server/pull/179
+      if ($it.item.duration > 32767sec) {
+        log error "Duration longer than what is supported on the AcoustID Server. Skipping submission"
+        $acc
+      } else {
+        # The submission format is documented here: https://acoustid.org/webservice#submit
 
-      # AcoustID seems to expect the bit rate in kbps from the example.
-      let duration_seconds = ($it.item.duration / 1sec) | math round
-      let file_format = $it.item.file_format | str upcase
-      let year = $it.item.release_date | format date '%Y'
-      let track_submission = $"&trackno.($it.index)=($it.item.index)&fileformat.($it.index)=($file_format)&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.item.title)&artist.($it.index)=($it.item.track_artist_credit)&album.($it.index)=($it.item.release_title)&albumartist.($it.index)=($it.item.release_artist_credit)&year.($it.index)=($year)&fingerprint.($it.index)=($it.item.fingerprint)"
-      let track_submission = (
-        if "bit_rate" in $it.item and $it.item.bit_rate != null {
-          $track_submission + $"&bitrate.($it.index)=($it.item.bit_rate)"
-        } else {
-          $track_submission
-        }
-      )
-      let track_submission = (
-        if "disc_number" in $it.item and $it.item.disc_number != null {
-          $track_submission + $"&discno.($it.index)=($it.item.disc_number)"
-        } else {
-          $track_submission
-        }
-      )
-      $acc + $track_submission
+        # AcoustID seems to expect the bit rate in kbps from the example.
+        let duration_seconds = ($it.item.duration / 1sec) | math round
+        # log debug $"duration_seconds: ($duration_seconds)"
+        let file_format = $it.item.file_format | str upcase
+        # log debug $"file_format: ($file_format)"
+        let year = $it.item.release_date | format date '%Y'
+        # log debug $"year: ($year)"
+        let track_submission = $"&trackno.($it.index)=($it.item.index)&fileformat.($it.index)=($file_format)&mbid.($it.index)=($it.item.musicbrainz_recording_id)&duration.($it.index)=($duration_seconds)&track.($it.index)=($it.item.title)&artist.($it.index)=($it.item.track_artist_credit)&album.($it.index)=($it.item.release_title)&albumartist.($it.index)=($it.item.release_artist_credit)&year.($it.index)=($year)&fingerprint.($it.index)=($it.item.fingerprint)"
+        # log debug $"track_submission: ($track_submission)"
+        let track_submission = (
+          if "bit_rate" in $it.item and $it.item.bit_rate != null and $it.item.bit_rate > 0 {
+            $track_submission + $"&bitrate.($it.index)=($it.item.bit_rate)"
+          } else {
+            $track_submission
+          }
+        )
+        # log debug $"track_submission: ($track_submission)"
+        let track_submission = (
+          if "disc_number" in $it.item and $it.item.disc_number != null {
+            $track_submission + $"&discno.($it.index)=($it.item.disc_number)"
+          } else {
+            $track_submission
+          }
+        )
+        # log debug $"track_submission: ($track_submission)"
+        # log debug $"acc + track_submission: ($acc + $track_submission)"
+        $acc + $track_submission
+      }
     }
-  }
+  )
   if ($submission_string | is-empty) {
     return null
   }
@@ -4916,6 +4930,7 @@ export def parse_musicbrainz_release []: record -> record {
         )
         let track_contributors = (
           if ($track.recording | is-not-empty) and "relations" in ($track.recording | columns) {
+            # todo Ignore special [unknown] MusicBrainz artist?
             let parsed_contributors = $track.recording.relations | append $work_relations | parse_contributors
             # If artist roles exist at the release level and not at the track level, use them for the track.
             let parsed_contributors = (
@@ -4965,6 +4980,7 @@ export def parse_musicbrainz_release []: record -> record {
             ) | uniq
           }
         )
+        # todo Include Wikidata Work ID if present.
         let musicbrainz_works = (
           if ($works | is-not-empty) {
             (
@@ -5167,6 +5183,7 @@ export def parse_musicbrainz_release []: record -> record {
   )
 
   let series = $metadata | parse_series_from_musicbrainz_release
+  # log debug $"series: ($series | to json)"
 
   let audible_asin = (
     let audible_asins = $metadata | parse_audible_asin_from_musicbrainz_release;
@@ -5896,7 +5913,7 @@ export def tag_audiobook [
         | rename index musicbrainz_recording_id duration fingerprint title track_artist_credit disc_number file
         | default $metadata.book.title release_title
         | default $metadata.book.artist_credit release_artist_credit
-        | default $metadata.book.publication_date release_date
+        # | default $metadata.book.publication_date release_date
         # | each {|track|
         #   if "disc_number" not-in $track or $track.disc_number == null {
         #     $track | upsert disc_number null
@@ -5905,15 +5922,30 @@ export def tag_audiobook [
         #   }
         # }
         | each {|track|
-          let bit_rate = ^file --brief $track.file | parse_file_audio_bit_rate
-          if $bit_rate == null {
+          let bit_rate = (
+            # todo Uncomment this if needed
+            # try {
+              ^file --brief $track.file | parse_file_audio_bit_rate
+            # } catch {|error|
+            #   null
+            # }
+          )
+          # log info $"track: ($track | to json)"
+          # log info $"track columns: ($track | columns)"
+          # log info $"bit_rate: ($bit_rate)"
+          if ($bit_rate | is-empty) {
             log info "tag_audiobook: Failed to parse audio bit rate from file --brief output"
-            $track
+            $track | upsert bit_rate 0
           } else {
             $track | upsert bit_rate $bit_rate
           }
         }
+        # The release date is converted to a string somehow by the default command above.
+        # Convert it back to a datetime here to fix it.
+        | upsert release_date ($metadata.book.publication_date | into datetime)
         | each {|track|
+          # log info $"track: ($track | to json)"
+          # log info $"track columns: ($track | columns)"
           let file_format = $track.file | ffprobe | parse_ffprobe_file_format
           if $file_format == null {
             log error "tag_audiobook: Failed to parse file format from ffprobe output"
@@ -5925,6 +5957,7 @@ export def tag_audiobook [
         | reject file
         | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
       )
+      log debug $"AcoustID submissions: ($acoustid_submissions | to nuon)"
       if ($acoustid_submissions | is-not-empty) {
         log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
       } else {
@@ -6449,8 +6482,15 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     } else {
       $musicbrainz_metadata | update book.series (
         $musicbrainz_metadata.book.series | each {|series|
+          log debug $"series: ($series | to json)"
           let scope = $series.scope
-          $series.id | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay | insert scope $scope
+          let index = $series.index
+          (
+            $series.id
+            | fetch_and_parse_musicbrainz_series $cache --retries $retries --retry-delay $retry_delay
+            | insert scope $scope
+            | insert index $index
+          )
         }
       )
     }
