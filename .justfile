@@ -27,8 +27,8 @@ run derivation="update-nix-direnv":
 alias t := test
 
 test:
-    nu packages/update-nix-direnv/update-nix-direnv-tests.nu
-    nu packages/update-nixos-release/update-nixos-release-tests.nu
+    nu overlays/media-juggler/media-juggler-lib-tests.nu
+    nu overlays/media-juggler/import-music-tests.nu
 
 alias u := update
 alias up := update

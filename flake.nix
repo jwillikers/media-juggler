@@ -17,7 +17,7 @@
         treefmt-nix.follows = "treefmt-nix";
       };
     };
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     pre-commit-hooks = {
       url = "github:cachix/pre-commit-hooks.nix";
@@ -47,10 +47,10 @@
     let
       overlays = import ./overlays { inherit inputs; };
       overlaysList = with overlays; [
+        cbconvert
         overlays.m4b-tool
         media-juggler
         image_optim
-        unstablePackages
       ];
     in
     flake-utils.lib.eachDefaultSystem (
@@ -61,7 +61,7 @@
           overlays = overlaysList;
           config = {
             allowUnfree = true;
-            permittedInsecurePackages = [ "python-2.7.18.8" ];
+            permittedInsecurePackages = [ "python-2.7.18.12" ];
           };
         };
         pre-commit = pre-commit-hooks.lib.${system}.run (

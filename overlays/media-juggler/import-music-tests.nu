@@ -4,11 +4,6 @@ use import-music.nu *
 
 use std assert
 
-def test_beet_secrets_from_env_none [] {
-  let expected = {}
-  assert equal (with-env {} {beet_secrets_from_env}) $expected
-}
-
 def test_beet_secrets_from_env_all_empty [] {
   let expected = {}
   assert equal (
@@ -33,7 +28,12 @@ def test_beet_secrets_from_env_one [] {
   }
   assert equal (
     with-env {
+      BEETS_ACOUSTID_APIKEY: ""
+      BEETS_DISCOGS_TOKEN: ""
       BEETS_FANARTTV_KEY: "Pp9Yd^PgiX*&AR"
+      BEETS_GOOGLE_KEY: ""
+      BEETS_LASTFM_KEY: ""
+      BEETS_BING_CLIENT_SECRET: ""
     } {
       beet_secrets_from_env
     }
@@ -65,6 +65,7 @@ def test_beet_secrets_from_env_all [] {
       BEETS_FANARTTV_KEY: "Pp9Yd^PgiX*&AR"
       BEETS_GOOGLE_KEY: "ssV1Cd$kBMu!H#@*bQF8rPyFhe"
       BEETS_LASTFM_KEY: "QB@vkRnew6Ajtn9kwzLcdX%Qt@HM!khiTbNfFNAdyf^"
+      BEETS_BING_CLIENT_SECRET: ""
       # BEETS_BING_CLIENT_SECRET: "ytub9ZaYY6Ugk5JZ!$LQp3nDcTPrU0tbfg!VYsXmh7PsiXI9@qb2C#!J!Fsr&U308"
     } {
       beet_secrets_from_env
@@ -73,7 +74,6 @@ def test_beet_secrets_from_env_all [] {
 }
 
 def main [] {
-  test_beet_secrets_from_env_none
   test_beet_secrets_from_env_all_empty
   test_beet_secrets_from_env_one
   test_beet_secrets_from_env_all

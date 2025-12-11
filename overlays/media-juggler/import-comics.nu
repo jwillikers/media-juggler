@@ -287,7 +287,7 @@ def main [
   let destination = (
     if ($destination | is-not-empty) {
       $destination
-    } else if ($config | get --ignore-errors destination | is-not-empty) {
+    } else if ($config | get --optional destination | is-not-empty) {
       $config.destination
     }
   )
@@ -468,7 +468,7 @@ def main [
       let covers = (
         $"($file | path dirname | escape_special_glob_characters)/cover.*"
         | ssh glob "--no-dir" "--no-symlink"
-        | filter {|f|
+        | where {|f|
           let components = ($f | path parse);
           $components.stem == "cover" and $components.extension in $image_extensions
         }
