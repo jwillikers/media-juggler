@@ -117,7 +117,7 @@ def main [
       $audible_activation_bytes
     } else if "AUDIBLE_ACTIVATION_BYTES" in $env {
       $env.AUDIBLE_ACTIVATION_BYTES
-    } else if ($config | get --ignore-errors audible_activation_bytes | is-not-empty) {
+    } else if ($config | get --optional audible_activation_bytes | is-not-empty) {
       $config.audible_activation_bytes
     } else {
       null
@@ -129,7 +129,7 @@ def main [
       $acoustid_client_key
     } else if "MEDIA_JUGGLER_ACOUSTID_CLIENT_KEY" in $env {
       $env.MEDIA_JUGGLER_ACOUSTID_CLIENT_KEY
-    } else if ($config | get --ignore-errors acoustid_client_key | is-not-empty) {
+    } else if ($config | get --optional acoustid_client_key | is-not-empty) {
       $config.acoustid_client_key
     } else {
       null
@@ -141,7 +141,7 @@ def main [
       $acoustid_user_key
     } else if "MEDIA_JUGGLER_ACOUSTID_USER_KEY" in $env {
       $env.MEDIA_JUGGLER_ACOUSTID_USER_KEY
-    } else if ($config | get --ignore-errors acoustid_user_key | is-not-empty) {
+    } else if ($config | get --optional acoustid_user_key | is-not-empty) {
       $config.acoustid_user_key
     } else {
       null
@@ -151,21 +151,21 @@ def main [
   let keep = (
     if $keep != null {
       $keep
-    } else if ($config | get --ignore-errors keep | is-not-empty) {
+    } else if ($config | get --optional keep | is-not-empty) {
       $config.keep
     }
   )
   let merge = (
     if $merge != null {
       $merge
-    } else if ($config | get --ignore-errors merge | is-not-empty) {
+    } else if ($config | get --optional merge | is-not-empty) {
       $config.merge
     }
   )
   let use_rsync = (
     if $use_rsync != null {
       $use_rsync
-    } else if ($config | get --ignore-errors use_rsync | is-not-empty) {
+    } else if ($config | get --optional use_rsync | is-not-empty) {
       $config.use_rsync
     }
   )
@@ -173,7 +173,7 @@ def main [
   let destination = (
     if ($destination | is-not-empty) {
       $destination
-    } else if ($config | get --ignore-errors destination | is-not-empty) {
+    } else if ($config | get --optional destination | is-not-empty) {
       $config.destination
     }
   )
@@ -576,7 +576,7 @@ def main [
   if ($metadata | is-empty) {
     return {audiobook: $audiobook.directory error: $"Failed to retrieve metadata for the audiobook (ansi yellow)($audiobook.directory)(ansi reset)"}
   }
-  if ($metadata.book | get --ignore-errors contributors | is-empty) {
+  if ($metadata.book | get --optional contributors | is-empty) {
     return {audiobook: $audiobook.directory error: $"Missing contributors for the audiobook (ansi yellow)($audiobook.directory)(ansi reset)"}
   }
   # This issue should be caught before here, but check just to be safe.
@@ -594,7 +594,7 @@ def main [
       ($metadata.book.title | use_unicode_in_title | sanitize_file_name)
     ]
     | prepend (
-      if ($metadata.book | get --ignore-errors series | is-not-empty) {
+      if ($metadata.book | get --optional series | is-not-empty) {
         # First series will eventually be the primary series.
         # todo Nest under subseries of the primary series.
         let primary_series = (
@@ -725,7 +725,7 @@ def main [
     log debug "Deleting the original files"
     (
       $audiobook.original_files
-      | filter {|file|
+      | where {|file|
         $file not-in ($audiobook.files | get destination)
       }
       | each {|file|
@@ -740,7 +740,7 @@ def main [
     )
     (
       $audiobook.accompanying_documents
-      | filter {|file|
+      | where {|file|
         $file.file != $file.destination
       }
       | each {|file|

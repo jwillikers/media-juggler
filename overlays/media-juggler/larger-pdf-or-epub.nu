@@ -7,7 +7,7 @@ def main [
     (
     glob *.{pdf}
     | sort
-    | filter {||
+    | where {||
         $in
         | path parse
         | update extension "epub"

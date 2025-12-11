@@ -81,6 +81,5 @@ self:
     m4b-tool
     media-juggler
     image_optim
-    unstablePackages
   ];
 }

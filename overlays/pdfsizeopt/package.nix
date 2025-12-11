@@ -73,6 +73,9 @@ let
       # Parallel install is broken.
       enableParallelInstalling = false;
 
+      # As of NixOS 25.11 the installCheckPhase fails with a segmentation fault.
+      doInstallCheck = false;
+
       # The doc output is empty, so it is removed here.
       outputs = [
         "out"

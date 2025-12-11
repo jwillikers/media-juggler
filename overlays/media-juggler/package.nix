@@ -1,6 +1,6 @@
 {
   advancecomp,
-  # beets,
+  beets,
   calibre,
   cbconvert,
   chromaprint,
@@ -21,7 +21,6 @@
   tesseract,
   tone,
   udisks,
-  unstable,
   util-linux,
   zip,
 }:
@@ -39,7 +38,7 @@ else
     doCheck = true;
 
     buildInputs = [
-      unstable.beets
+      beets
       advancecomp
       calibre
       cbconvert
@@ -141,7 +140,7 @@ else
         --prefix PATH : ${
           lib.makeBinPath [
             # todo optimize flacs like minuimus does?
-            unstable.beets
+            beets
             efficient-compression-tool
             image_optim
             # jpegli

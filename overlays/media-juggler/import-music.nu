@@ -172,7 +172,7 @@ def main [
   let destination = (
     if ($destination | is-not-empty) {
       $destination
-    } else if ($config | get --ignore-errors destination | is-not-empty) {
+    } else if ($config | get --optional destination | is-not-empty) {
       $config.destination
     }
   )
