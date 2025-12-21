@@ -721,6 +721,33 @@ def main [
     }
   }
 
+  # Use an OPF file to get the ISBN into audiobookshelf.
+  # ffprobe doesn't show the ISBN metadata tag, which is why the workaround is necessary.
+  if ($metadata.book | get --optional isbn | is-not-empty) {
+    let opf = $'<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:identifier opf:scheme="ISBN">($metadata.book.isbn)</dc:identifier>
+  </metadata>
+</package>
+'
+    let opf_file = [$temporary_directory "metadata.opf"] | path join
+    $opf | save --force $opf_file
+    if ($target_destination_directory | is_ssh_path) {
+      if not $skip_upload {
+        log info $"Uploading (ansi yellow)($opf_file)(ansi reset) to (ansi yellow)($destination)(ansi reset)"
+        if $use_rsync {
+          $opf_file | rsync ($target_destination_directory | path join "metadata.opf") "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
+        } else {
+          $opf_file | scp --mkdir ($target_destination_directory | path join "metadata.opf")
+        }
+      }
+    } else {
+      mkdir $target_destination_directory
+      mv $opf_file ($target_destination_directory | path join "metadata.opf")
+    }
+  }
+
   if not $keep {
     log debug "Deleting the original files"
     (
