@@ -3763,6 +3763,38 @@ export def fetch_musicbrainz_release_group_for_release []: string -> table {
   http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/?query=($query)"
 }
 
+# Attempt to download a file, retrying up to the given number of retries
+#
+# Sometimes, there is a "Connection reset" exception when attempting to download a file.
+# This function just retries when this happens.
+# See the Nushell bug here: https://github.com/nushell/nushell/issues/17231
+export def retry_download [
+  download_request: closure # The function to call
+  destination: path # The path to save the downloaded file to
+  retries: int # The number of retries to perform
+  delay: duration # The amount of time to wait between successive executions of the request closure
+]: [
+  nothing -> path
+] {
+  for attempt in 1..($retries - 1) {
+    try {
+      do $download_request | save --force $destination
+    } catch {|error|
+      log warning $"Error downloading file to ($destination): ($error.debug)"
+      sleep $delay
+      continue
+    }
+    return $destination
+  }
+  try {
+    do $download_request | save --force $destination
+  } catch {|error|
+    log warning $"Error downloading file to ($destination): ($error.debug)"
+    return null
+  }
+  $destination
+}
+
 # Fetch the front cover image of a release from the Cover Art Archive
 export def fetch_release_front_cover [
   download_directory: directory
@@ -3794,7 +3826,12 @@ export def fetch_release_front_cover [
   if ($destination | path exists) {
     return $destination
   }
-  http get --headers [User-Agent $user_agent] $download_url | save --force $destination
+  let download_request = {http get --headers [User-Agent $user_agent] $download_url}
+  let destination = retry_download $download_request $destination $retries $retry_delay
+  if ($destination | is-empty) {
+    log error $"Error downloading cover image from ($download_url) to ($destination)"
+    return null
+  }
   $destination
 }
 
@@ -4201,7 +4238,6 @@ export def parse_audible_asin_from_url []: string -> string {
     $parsed | get path | path parse | get stem | str upcase
   }
 }
-
 
 # Call a function, retrying up to the given number of retries
 export def retry [
@@ -6637,7 +6673,16 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
 
   let front_cover = (
     if "front_cover_available" in $musicbrainz_metadata.book and $musicbrainz_metadata.book.front_cover_available {
-      $musicbrainz_metadata.book.musicbrainz_release_id | fetch_release_front_cover $cover_art_directory
+      let cover_file = (
+        $musicbrainz_metadata.book.musicbrainz_release_id
+        | fetch_release_front_cover $cover_art_directory
+      )
+      if ($cover_file | is-empty) {
+        log error $"Failed to fetch front cover for MusicBrainz Release (ansi yellow)($musicbrainz_metadata.book.musicbrainz_release_id)(ansi reset). Aborting."
+        exit 1
+      } else {
+        $cover_file
+      }
     }
   )
 
