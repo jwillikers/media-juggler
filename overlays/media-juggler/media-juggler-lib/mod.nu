@@ -3833,7 +3833,10 @@ export def fetch_musicbrainz_release [
   ]
   --retries: int = 3
   --retry-delay: duration = 5sec
-]: string -> record {
+]: [
+  string -> record
+  string -> nothing
+] {
   let release_id = $in
   let url = "https://musicbrainz.org/ws/2/release"
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_id)/?inc=($includes | str join '+')"}
@@ -4891,8 +4894,13 @@ export def artist_credit_to_string []: table<joinphrase: string, name: string, a
 }
 
 # Parse the data of a MusicBrainz release
-export def parse_musicbrainz_release []: record -> record {
+export def parse_musicbrainz_release []: [
+  record -> record
+] {
   let metadata = $in
+  if ($metadata | is-empty) {
+    return null
+  }
 
   let release_artist_credits = (
     if "artist-credit" in $metadata and ($metadata.artist-credit | is-not-empty) {
@@ -5347,7 +5355,12 @@ export def fetch_and_parse_musicbrainz_release [
 ]: string -> record {
   let musicbrainz_release_id = $in
   let update_cache = {|type id|
-    $id | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay $includes | parse_musicbrainz_release
+    let release = (
+      $id | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay $includes
+    )
+    if ($release | is-not-empty) {
+      $release | parse_musicbrainz_release
+    }
   }
   let includes_checksum = $includes | sort | uniq | str join | hash sha256
   do $cache "release" $musicbrainz_release_id $update_cache $includes_checksum
@@ -6192,7 +6205,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
     try {
       retry_http $request $retries $retry_delay
     } catch {|error|
-      log error $"Error searching for similar releases: ($url)?query=($query)\t($error.debug.msg)"
+      log error $"Error searching for similar releases: ($url)?query=($query)\t($error.debug)"
       return null
     }
   )
