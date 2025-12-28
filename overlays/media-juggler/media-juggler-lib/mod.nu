@@ -4245,9 +4245,21 @@ export def retry [
   should_retry: closure # A closure which determines whether to retry or not based on the result of the request closure. True means retry, false means stop.
   retries: int # The number of retries to perform
   delay: duration # The amount of time to wait between successive executions of the request closure
+  ignore_exceptions: bool # Whether to ignore exceptions thrown by the request closure and retry
 ]: nothing -> any {
   for attempt in 1..($retries - 1) {
-    let response = do $request
+    let response = (
+      try {
+        do $request
+      } catch {|error|
+        if $ignore_exceptions {
+          log warning $"Error during request attempt ($attempt): ($error.debug)"
+          continue
+        } else {
+          throw $error
+        }
+      }
+    )
     if not (do $should_retry $response) {
       return $response
     }
@@ -4262,11 +4274,12 @@ export def retry_http [
   retries: int # The number of retries to perform
   delay: duration # The amount of time to wait between successive executions of the request closure
   http_status_codes_to_retry: list<int> = [408 429 500 502 503 504] # HTTP status codes where the request will be retries
+  ignore_exceptions: bool = true # Whether to ignore exceptions thrown by the request closure and retry
 ]: nothing -> any {
   let should_retry = {|result|
     $result.status in $http_status_codes_to_retry
   }
-  retry $request $should_retry $retries $delay
+  retry $request $should_retry $retries $delay $ignore_exceptions
 }
 
 # Find release and recording ids linked to an AcoustID fingerprint
