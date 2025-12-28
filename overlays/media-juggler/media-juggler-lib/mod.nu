@@ -3860,7 +3860,10 @@ export def fetch_musicbrainz_work [
   includes: list<string> = [series-rels genres tags]
   --retries: int = 3
   --retry-delay: duration = 5sec
-]: string -> record {
+]: [
+  string -> record
+  string -> nothing
+] {
   let work_id = $in
   let url = "https://musicbrainz.org/ws/2/work"
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($work_id)/?inc=($includes | str join '+')"}
@@ -3902,7 +3905,14 @@ export def fetch_and_parse_musicbrainz_work [
   --retry-delay: duration = 3sec
 ]: string -> record {
   let musicbrainz_work_id = $in
-  let update_function = {|type id| $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay | parse_musicbrainz_work}
+  let update_function = {|type id|
+    let work = (
+      $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay
+    )
+    if ($work | is-not-empty) {
+      $work | parse_musicbrainz_work
+    }
+  }
   do $cache "work" $musicbrainz_work_id $update_function null
 }
 
@@ -3911,7 +3921,10 @@ export def fetch_musicbrainz_series [
   includes: list<string> = [series-rels genres tags]
   --retries: int = 3
   --retry-delay: duration = 5sec
-]: string -> record {
+]: [
+  string -> record
+  string -> nothing
+] {
   let series_id = $in
   let url = "https://musicbrainz.org/ws/2/series"
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($series_id)/?inc=($includes | str join '+')"}
@@ -3980,7 +3993,12 @@ export def fetch_and_parse_musicbrainz_series [
 ]: string -> record {
   let musicbrainz_series_id = $in
   let update_cache = {|type id|
-    $id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay | parse_musicbrainz_series
+    let series = (
+      $id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay
+    )
+    if ($series | is-not-empty) {
+      $series | parse_musicbrainz_series
+    }
   }
   do $cache "series" $musicbrainz_series_id $update_cache null
 }
