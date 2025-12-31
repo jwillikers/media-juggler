@@ -37,7 +37,12 @@ export const musicbrainz_non_genre_tags = [
   "audiobook"
   "chapters"
   "explicit"
+  # "light novel"
   "novel"
+  "novelette"
+  "novella"
+  "short story"
+  "short story collection"
   "unabridged"
 ]
 
