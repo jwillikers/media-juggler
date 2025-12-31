@@ -4454,6 +4454,7 @@ export def parse_file_audio_bit_rate []: [string -> int] {
   }
   let parsed = $file_output | parse --regex '(?P<bit_rate>[0-9]+) kbps'
   if ($parsed | is-empty) {
+    log error $"parse_file_audio_bit_rate: Failed to parse bit rate from the output of: ($file_output)"
     return null
   }
   if ($parsed | length) > 1 {
@@ -6015,6 +6016,8 @@ export def tag_audiobook [
           let bit_rate = (
             # todo Uncomment this if needed
             # try {
+              # todo Fix this not outputting anything useful for id3 2.4.0?
+              # log info $"tag_audiobook: Parsing audio bit rate for file: ($track.file)";
               ^file --brief $track.file | parse_file_audio_bit_rate
             # } catch {|error|
             #   null
