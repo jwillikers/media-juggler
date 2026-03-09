@@ -3697,8 +3697,17 @@ export def fpcalc []: list<path> -> table<file: path, fingerprint: string, durat
     let file = $file | path expand
     let result = do {^fpcalc -json $file} | complete
     if $result.exit_code != 0 {
-      log error $"Error running '^fpcalc -json ($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
-      return null
+      if ("ERROR: Empty fingerprint" in $result.stderr) {
+        log info $"Empty track '($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+        return {
+          file: $file
+          fingerprint: ""
+          duration: 0ms
+        }
+      } else {
+        log error $"Error running '^fpcalc -json ($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+        return null
+      }
     }
     let track = $result.stdout | from json
     {
@@ -5453,6 +5462,7 @@ export def get_acoustid_fingerprint [
         and ($metadata.track.acoustid_fingerprint | is-not-empty)
         and "duration" in $metadata.track
         and ($metadata.track.duration | is-not-empty)
+        and ($metadata.track.duration != 0ms)
       ) {
         {
           file: $file
@@ -5478,6 +5488,7 @@ export def get_acoustid_fingerprint_track [
     not $ignore_existing
     and ($track | get --optional acoustid_fingerprint | is-not-empty)
     and ($track | get --optional duration | is-not-empty)
+    and ($track.duration != 0ms)
   ) {
     $track
   } else {
@@ -6000,6 +6011,10 @@ export def tag_audiobook [
       # log info $"$tracks: ($tracks | reject embedded_pictures)"
       let acoustid_submissions = (
         $tracks
+        # Missing AcoustID fingerprints are possible for tracks with very short durations.
+        # Filter those out.
+        | where {|track| ($track | get --optional acoustid_fingerprint | is-not-empty) }
+        | where {|track| ($track | get --optional duration | is-not-empty) and $track.duration != 0ms }
         | select index musicbrainz_recording_id duration acoustid_fingerprint title artist_credit disc_number file
         | rename index musicbrainz_recording_id duration fingerprint title track_artist_credit disc_number file
         | default $metadata.book.title release_title
@@ -7014,7 +7029,7 @@ export def search_for_musicbrainz_release [
     try {
       retry_http $request $retries $retry_delay
     } catch {|error|
-      log error $"Error searching for a release: ($url)?&query=($query)\t($error.debug.msg)"
+      log error $"Error searching for a release: ($url)?&query=($query)\t($error.debug)"
       return null
     }
   )
