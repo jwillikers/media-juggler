@@ -3280,7 +3280,14 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     | (
       let input = $in;
       if "chapters" in $metadata and ($metadata.chapters | is-not-empty) {
-        $input | upsert chapters ($metadata.chapters | parse_chapters_from_tone)
+        # It's possible to get chapters from the metadata which aren't in the required format.
+        # The case where this happened returned chapters without the title field.
+        # This just drops any chapters where the title field is missing.
+        let chapters = (
+          $metadata.chapters
+          | where {|chapter| $chapter | get --optional title | is-not-empty }
+        )
+        $input | upsert chapters ($chapters | parse_chapters_from_tone)
       } else {
         $input
       }
