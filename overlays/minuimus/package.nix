@@ -52,11 +52,11 @@
 }:
 stdenv.mkDerivation {
   pname = "minuimus";
-  version = "4.1";
+  version = "4.2";
 
   src = fetchzip {
     url = "https://birds-are-nice.me/software/minuimus.zip";
-    hash = "sha256-QRi1JgIQzhn4ojkZ9rDpQg76MA+FgNFtPusCzDhewZ4=";
+    hash = "sha256-0K5GphAx28iopziR68iDXRZ2W8cttGtvx3UYxbEXTpY=";
     stripRoot = false;
   };
 

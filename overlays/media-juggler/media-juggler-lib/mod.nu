@@ -37,7 +37,12 @@ export const musicbrainz_non_genre_tags = [
   "audiobook"
   "chapters"
   "explicit"
+  # "light novel"
   "novel"
+  "novelette"
+  "novella"
+  "short story"
+  "short story collection"
   "unabridged"
 ]
 
@@ -3275,7 +3280,14 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
     | (
       let input = $in;
       if "chapters" in $metadata and ($metadata.chapters | is-not-empty) {
-        $input | upsert chapters ($metadata.chapters | parse_chapters_from_tone)
+        # It's possible to get chapters from the metadata which aren't in the required format.
+        # The case where this happened returned chapters without the title field.
+        # This just drops any chapters where the title field is missing.
+        let chapters = (
+          $metadata.chapters
+          | where {|chapter| $chapter | get --optional title | is-not-empty }
+        )
+        $input | upsert chapters ($chapters | parse_chapters_from_tone)
       } else {
         $input
       }
@@ -3692,8 +3704,17 @@ export def fpcalc []: list<path> -> table<file: path, fingerprint: string, durat
     let file = $file | path expand
     let result = do {^fpcalc -json $file} | complete
     if $result.exit_code != 0 {
-      log error $"Error running '^fpcalc -json ($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
-      return null
+      if ("ERROR: Empty fingerprint" in $result.stderr) {
+        log info $"Empty track '($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+        return {
+          file: $file
+          fingerprint: ""
+          duration: 0ms
+        }
+      } else {
+        log error $"Error running '^fpcalc -json ($file)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+        return null
+      }
     }
     let track = $result.stdout | from json
     {
@@ -3763,6 +3784,38 @@ export def fetch_musicbrainz_release_group_for_release []: string -> table {
   http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/?query=($query)"
 }
 
+# Attempt to download a file, retrying up to the given number of retries
+#
+# Sometimes, there is a "Connection reset" exception when attempting to download a file.
+# This function just retries when this happens.
+# See the Nushell bug here: https://github.com/nushell/nushell/issues/17231
+export def retry_download [
+  download_request: closure # The function to call
+  destination: path # The path to save the downloaded file to
+  retries: int # The number of retries to perform
+  delay: duration # The amount of time to wait between successive executions of the request closure
+]: [
+  nothing -> path
+] {
+  for attempt in 1..($retries - 1) {
+    try {
+      do $download_request | save --force $destination
+    } catch {|error|
+      log warning $"Error downloading file to ($destination): ($error.debug)"
+      sleep $delay
+      continue
+    }
+    return $destination
+  }
+  try {
+    do $download_request | save --force $destination
+  } catch {|error|
+    log warning $"Error downloading file to ($destination): ($error.debug)"
+    return null
+  }
+  $destination
+}
+
 # Fetch the front cover image of a release from the Cover Art Archive
 export def fetch_release_front_cover [
   download_directory: directory
@@ -3794,7 +3847,12 @@ export def fetch_release_front_cover [
   if ($destination | path exists) {
     return $destination
   }
-  http get --headers [User-Agent $user_agent] $download_url | save --force $destination
+  let download_request = {http get --headers [User-Agent $user_agent] $download_url}
+  let destination = retry_download $download_request $destination $retries $retry_delay
+  if ($destination | is-empty) {
+    log error $"Error downloading cover image from ($download_url) to ($destination)"
+    return null
+  }
   $destination
 }
 
@@ -3833,7 +3891,10 @@ export def fetch_musicbrainz_release [
   ]
   --retries: int = 3
   --retry-delay: duration = 5sec
-]: string -> record {
+]: [
+  string -> record
+  string -> nothing
+] {
   let release_id = $in
   let url = "https://musicbrainz.org/ws/2/release"
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_id)/?inc=($includes | str join '+')"}
@@ -3857,7 +3918,10 @@ export def fetch_musicbrainz_work [
   includes: list<string> = [series-rels genres tags]
   --retries: int = 3
   --retry-delay: duration = 5sec
-]: string -> record {
+]: [
+  string -> record
+  string -> nothing
+] {
   let work_id = $in
   let url = "https://musicbrainz.org/ws/2/work"
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($work_id)/?inc=($includes | str join '+')"}
@@ -3899,7 +3963,14 @@ export def fetch_and_parse_musicbrainz_work [
   --retry-delay: duration = 3sec
 ]: string -> record {
   let musicbrainz_work_id = $in
-  let update_function = {|type id| $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay | parse_musicbrainz_work}
+  let update_function = {|type id|
+    let work = (
+      $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay
+    )
+    if ($work | is-not-empty) {
+      $work | parse_musicbrainz_work
+    }
+  }
   do $cache "work" $musicbrainz_work_id $update_function null
 }
 
@@ -3908,7 +3979,10 @@ export def fetch_musicbrainz_series [
   includes: list<string> = [series-rels genres tags]
   --retries: int = 3
   --retry-delay: duration = 5sec
-]: string -> record {
+]: [
+  string -> record
+  string -> nothing
+] {
   let series_id = $in
   let url = "https://musicbrainz.org/ws/2/series"
   let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($series_id)/?inc=($includes | str join '+')"}
@@ -3977,7 +4051,12 @@ export def fetch_and_parse_musicbrainz_series [
 ]: string -> record {
   let musicbrainz_series_id = $in
   let update_cache = {|type id|
-    $id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay | parse_musicbrainz_series
+    let series = (
+      $id | fetch_musicbrainz_series --retries $retries --retry-delay $retry_delay
+    )
+    if ($series | is-not-empty) {
+      $series | parse_musicbrainz_series
+    }
   }
   do $cache "series" $musicbrainz_series_id $update_cache null
 }
@@ -4181,16 +4260,27 @@ export def parse_audible_asin_from_url []: string -> string {
   }
 }
 
-
 # Call a function, retrying up to the given number of retries
 export def retry [
   request: closure # The function to call
   should_retry: closure # A closure which determines whether to retry or not based on the result of the request closure. True means retry, false means stop.
   retries: int # The number of retries to perform
   delay: duration # The amount of time to wait between successive executions of the request closure
+  ignore_exceptions: bool # Whether to ignore exceptions thrown by the request closure and retry
 ]: nothing -> any {
   for attempt in 1..($retries - 1) {
-    let response = do $request
+    let response = (
+      try {
+        do $request
+      } catch {|error|
+        if $ignore_exceptions {
+          log warning $"Error during request attempt ($attempt): ($error.debug)"
+          continue
+        } else {
+          throw $error
+        }
+      }
+    )
     if not (do $should_retry $response) {
       return $response
     }
@@ -4205,11 +4295,12 @@ export def retry_http [
   retries: int # The number of retries to perform
   delay: duration # The amount of time to wait between successive executions of the request closure
   http_status_codes_to_retry: list<int> = [408 429 500 502 503 504] # HTTP status codes where the request will be retries
+  ignore_exceptions: bool = true # Whether to ignore exceptions thrown by the request closure and retry
 ]: nothing -> any {
   let should_retry = {|result|
     $result.status in $http_status_codes_to_retry
   }
-  retry $request $should_retry $retries $delay
+  retry $request $should_retry $retries $delay $ignore_exceptions
 }
 
 # Find release and recording ids linked to an AcoustID fingerprint
@@ -4379,6 +4470,7 @@ export def parse_file_audio_bit_rate []: [string -> int] {
   }
   let parsed = $file_output | parse --regex '(?P<bit_rate>[0-9]+) kbps'
   if ($parsed | is-empty) {
+    log error $"parse_file_audio_bit_rate: Failed to parse bit rate from the output of: ($file_output)"
     return null
   }
   if ($parsed | length) > 1 {
@@ -4891,8 +4983,13 @@ export def artist_credit_to_string []: table<joinphrase: string, name: string, a
 }
 
 # Parse the data of a MusicBrainz release
-export def parse_musicbrainz_release []: record -> record {
+export def parse_musicbrainz_release []: [
+  record -> record
+] {
   let metadata = $in
+  if ($metadata | is-empty) {
+    return null
+  }
 
   let release_artist_credits = (
     if "artist-credit" in $metadata and ($metadata.artist-credit | is-not-empty) {
@@ -5347,7 +5444,12 @@ export def fetch_and_parse_musicbrainz_release [
 ]: string -> record {
   let musicbrainz_release_id = $in
   let update_cache = {|type id|
-    $id | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay $includes | parse_musicbrainz_release
+    let release = (
+      $id | fetch_musicbrainz_release --retries $retries --retry-delay $retry_delay $includes
+    )
+    if ($release | is-not-empty) {
+      $release | parse_musicbrainz_release
+    }
   }
   let includes_checksum = $includes | sort | uniq | str join | hash sha256
   do $cache "release" $musicbrainz_release_id $update_cache $includes_checksum
@@ -5367,6 +5469,7 @@ export def get_acoustid_fingerprint [
         and ($metadata.track.acoustid_fingerprint | is-not-empty)
         and "duration" in $metadata.track
         and ($metadata.track.duration | is-not-empty)
+        and ($metadata.track.duration != 0ms)
       ) {
         {
           file: $file
@@ -5392,6 +5495,7 @@ export def get_acoustid_fingerprint_track [
     not $ignore_existing
     and ($track | get --optional acoustid_fingerprint | is-not-empty)
     and ($track | get --optional duration | is-not-empty)
+    and ($track.duration != 0ms)
   ) {
     $track
   } else {
@@ -5914,6 +6018,10 @@ export def tag_audiobook [
       # log info $"$tracks: ($tracks | reject embedded_pictures)"
       let acoustid_submissions = (
         $tracks
+        # Missing AcoustID fingerprints are possible for tracks with very short durations.
+        # Filter those out.
+        | where {|track| ($track | get --optional acoustid_fingerprint | is-not-empty) }
+        | where {|track| ($track | get --optional duration | is-not-empty) and $track.duration != 0ms }
         | select index musicbrainz_recording_id duration acoustid_fingerprint title artist_credit disc_number file
         | rename index musicbrainz_recording_id duration fingerprint title track_artist_credit disc_number file
         | default $metadata.book.title release_title
@@ -5930,6 +6038,8 @@ export def tag_audiobook [
           let bit_rate = (
             # todo Uncomment this if needed
             # try {
+              # todo Fix this not outputting anything useful for id3 2.4.0?
+              # log info $"tag_audiobook: Parsing audio bit rate for file: ($track.file)";
               ^file --brief $track.file | parse_file_audio_bit_rate
             # } catch {|error|
             #   null
@@ -6192,7 +6302,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
     try {
       retry_http $request $retries $retry_delay
     } catch {|error|
-      log error $"Error searching for similar releases: ($url)?query=($query)\t($error.debug.msg)"
+      log error $"Error searching for similar releases: ($url)?query=($query)\t($error.debug)"
       return null
     }
   )
@@ -6606,7 +6716,16 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
 
   let front_cover = (
     if "front_cover_available" in $musicbrainz_metadata.book and $musicbrainz_metadata.book.front_cover_available {
-      $musicbrainz_metadata.book.musicbrainz_release_id | fetch_release_front_cover $cover_art_directory
+      let cover_file = (
+        $musicbrainz_metadata.book.musicbrainz_release_id
+        | fetch_release_front_cover $cover_art_directory
+      )
+      if ($cover_file | is-empty) {
+        log error $"Failed to fetch front cover for MusicBrainz Release (ansi yellow)($musicbrainz_metadata.book.musicbrainz_release_id)(ansi reset). Aborting."
+        exit 1
+      } else {
+        $cover_file
+      }
     }
   )
 
@@ -6917,7 +7036,7 @@ export def search_for_musicbrainz_release [
     try {
       retry_http $request $retries $retry_delay
     } catch {|error|
-      log error $"Error searching for a release: ($url)?&query=($query)\t($error.debug.msg)"
+      log error $"Error searching for a release: ($url)?&query=($query)\t($error.debug)"
       return null
     }
   )
