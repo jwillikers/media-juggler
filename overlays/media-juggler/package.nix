@@ -27,10 +27,10 @@
   zip,
 }:
 if lib.versionOlder nushell.version "0.99" then
-  throw "import-comics is not available for Nushell ${nushell.version}"
+  throw "media-juggler is not available for Nushell ${nushell.version}"
 else
   stdenvNoCC.mkDerivation {
-    pname = "import-comics";
+    pname = "media-juggler";
     version = "0.1.0";
 
     src = ./.;
