@@ -49,9 +49,8 @@
       overlaysList = with overlays; [
         cbconvert
         overlays.m4b-tool
-        media-juggler
         image_optim
-        isbntools
+        media-juggler
       ];
     in
     flake-utils.lib.eachDefaultSystem (
