@@ -25,7 +25,7 @@ endif::[]
 :Jellyfin: https://jellyfin.org/[Jellyfin]
 :Kavita: https://www.kavitareader.com/[Kavita]
 :KOReader: https://koreader.rocks/[KOReader]
-:Libro.fm: https://libro.fm/[Libro.fm]
+:Libro-fm: https://libro.fm/[Libro.fm]
 :Linux: https://www.linuxfoundation.org/[Linux]
 :Lix: https://lix.systems[Lix]
 :MetronInfo: https://metron-project.github.io/docs/category/metroninfo[MetronInfo]
@@ -81,7 +81,7 @@ For music, DRM isn't so much an issue, so I've listed my favorite sources of hig
 I've include a list of DRM-Free sources of video games, even though I don't have scripts that import video games.
 
 .DRM-Free Audiobooks
-* {Libro.fm}
+* {Libro-fm}
 * {Humble-Bundle}
 * https://www.dragonsteelbooks.com/[Dragonsteel]
 
