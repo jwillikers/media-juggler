@@ -78,13 +78,13 @@
             type = "app";
             program = builtins.toString (
               pkgs.writers.writeNu "update-packages" ''
-                ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.acsm --build --flake --version branch
-                ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.comicvine --build --flake
-                ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.embedcomicmetadata --build --flake --version branch
-                ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.extract_isbn --build --flake
-                ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.goodreads --build --flake
-                ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.kobo-metadata --build --flake
-                ^${pkgs.lib.getExe pkgs.nix-update} calibrePlugins.modify_epub --build --flake
+                ^${pkgs.lib.getExe pkgs.nix-update} calibre-plugins.acsm --build --flake --version branch
+                ^${pkgs.lib.getExe pkgs.nix-update} calibre-plugins.comicvine --build --flake
+                ^${pkgs.lib.getExe pkgs.nix-update} calibre-plugins.embedcomicmetadata --build --flake --version branch
+                ^${pkgs.lib.getExe pkgs.nix-update} calibre-plugins.extract_isbn --build --flake
+                ^${pkgs.lib.getExe pkgs.nix-update} calibre-plugins.goodreads --build --flake
+                ^${pkgs.lib.getExe pkgs.nix-update} calibre-plugins.kobo-metadata --build --flake
+                ^${pkgs.lib.getExe pkgs.nix-update} calibre-plugins.modify_epub --build --flake
                 ^${pkgs.lib.getExe treefmtEval.config.build.wrapper}
               ''
             );

@@ -502,7 +502,7 @@ direnv allow
 +
 [,sh]
 ----
-nix run .#calibrePlugins.acsm
+nix build .#calibre-plugins.acsm
 ----
 
 == Future Work
