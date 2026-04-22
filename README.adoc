@@ -112,6 +112,7 @@ I've include a list of DRM-Free sources of video games, even though I don't have
 == How It Works
 
 You purchase DRM-Free media, then point these scripts at it to automatically tag, convert, and upload it the correct location on your media server.
+Files are automatically removed after being imported.
 The scripts also perform lossless optimization to reduce file sizes where applicable.
 Comics in the EPUB format are converted to CBZ, which can lose information such as chapters, but provides a better reading experience on {KOReader}.
 There are scripts for each type of media, which can be found under `overlays/media-juggler/`.
@@ -171,6 +172,17 @@ For comics and the like, {ComicInfo} and {MetronInfo} metadata files are incorpo
 While PDFs technically support embedding metadata, it's not well supported in practice.
 PDFs are embedded with the limited fields supported by the `ebook-meta` utility from Calibre.
 For comics in PDF formats, I sidecar ComicInfo and MetronInfo metadata files with the PDFs, even though sidecar metadata is not supported by {Kavita}.
+
+=== Optimizations
+
+I make use of several utilities to losslessly decrease file sizes.
+I only optimize images, ebooks, and comics.
+I don't really mess with audio although I have some experimental options for messing around with that.
+Images are optimized with https://github.com/toy/image_optim[image_optim] using its default settings followed by https://github.com/fhanau/Efficient-Compression-Tool[Efficient Compression Tool], which can typically gain a small improvement for PNGs.
+For comic book archives and EPUBs, this is easy enough as these are just ZIP archives of files.
+I also optimize the ZIP archive compression with Efficient Compression Tool.
+For PDFs, I use https://birds-are-nice.me/software/minuimus.html[minuimus] and https://github.com/pts/pdfsizeopt[pdfsizeopt], with a couple tweaks to use https://github.com/oxipng/oxipng[oxipng] with max settings followed by Efficient Compression Tool.
+This often leads to significant space savings for manga from {Fanatical} and {Humble-Bundle}, usually 25-35%, but it takes a long time on my crappy laptop, like 16 hours for a 200 MiB PDF.
 
 == Usage
 
@@ -386,23 +398,59 @@ The Hardcover API key will expire in one year and reset on January 1st.
 $env.NU_LOG_LEVEL = "DEBUG"
 ----
 
-. Now, the provided scripts can be run like so.
+. The `rsync` utility is recommended for transferring files over the network.
+Install `rsync` on the server and pass the `--use-rsync` flag to the script.
+
+. Be sure to backup any files before attempting to import them.
+The import process automatically deletes files after import, so if it's your only copy, it may be deleted when an import fails or converted in a way that is irreversible.
+
+. Now, the provided scripts can be run as follows.
++
+[NOTE]
+====
+SSH-style paths like `server:/path/to/file` are supported.
+In this case, the media is copied to the machine before being imported.
+====
++
+import-audiobooks.nu::
++
+Providing a MusicBrainz release ID is recommended for books containing audio files longer than about 9 hours, as AcoustID doesn't yet support fingerprints for such tracks.
 +
 [,sh]
 ----
-import-comics.nu ~/Downloads/ComicTagger-x86_64.AppImage file.acsm
+import-audiobooks.nu --use-rsync file.m4b --musicbrainz-release-id 2cfe3579-56f3-4360-8165-d02b6b2252bb
 ----
 
-=== Optimizations
+import-comics.nu::
++
+The `import-comics.nu` requires the path to the {ComicTagger} AppImage as its first positional argument.
+Providing a Wikidata, BookBrainz, or ISBN-13 identifier with CLI flags is recommended.
+The script defaults to preferences for Manga.
+Pass `--manga No` for comics and `--manga Yes` for manga read from left-to-right.
+The default value of `--manga` is `YesAndRightToLeft`.
++
+[,sh]
+----
+import-comics.nu --use-rsync ~/Downloads/ComicTagger-x86_64.AppImage file.epub --isbn 9781234561234
+----
 
-I make use of several utilities to losslessly decrease file sizes.
-I only optimize images, ebooks, and comics.
-I don't really mess with audio although I have some experimental options for messing around with that.
-Images are optimized with https://github.com/toy/image_optim[image_optim] using its default settings followed by https://github.com/fhanau/Efficient-Compression-Tool[Efficient Compression Tool], which can typically gain a small improvement for PNGs.
-For comic book archives and EPUBs, this is easy enough as these are just ZIP archives of files.
-I also optimize the ZIP archive compression with Efficient Compression Tool.
-For PDFs, I use https://birds-are-nice.me/software/minuimus.html[minuimus] and https://github.com/pts/pdfsizeopt[pdfsizeopt], with a couple tweaks to use https://github.com/oxipng/oxipng[oxipng] with max settings followed by Efficient Compression Tool.
-This often leads to significant space savings for manga from {Fanatical} and {Humble-Bundle}, usually 25-35%, but it takes a long time on my crappy laptop, like 16 hours for a 200 MiB PDF.
+import-ebooks.nu::
++
+Providing an ISBN-13 identifier with CLI flag is recommended.
++
+[,sh]
+----
+import-ebooks.nu --use-rsync file.epub --isbn 9781234561235
+----
+
+import-music.nu::
+The `import-music.nu` script can take a list of files, a zip archive, or a directory as its argument.
+Files should be organized in folders for each album or single.
++
+[,sh]
+----
+import-music.nu --use-rsync album.zip
+----
 
 == Develop
 
