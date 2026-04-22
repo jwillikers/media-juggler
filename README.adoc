@@ -452,6 +452,18 @@ Files should be organized in folders for each album or single.
 import-music.nu --use-rsync album.zip
 ----
 
+=== Importing Multiple Items
+
+The scripts only support importing a single item at a time when providing an identifier.
+To batch import files, the command can be called for each file and identifier from with a script.
+The command below does this for each file in the current directory, using {Nushell}.
+It provides the Wikidata edition ID for each comic.
+
+[,nushell]
+----
+ls | get name | sort --natural | zip [Q139382000 Q139398001 Q139398002] | each {|| overlays/media-juggler/import-comics.nu --use-rsync ~/Downloads/ComicTagger-x86_64.AppImage $in.0 --wikidata-edition-id $in.1}
+----
+
 == Develop
 
 The `nix develop` command can be used to enter or run commands in an environment with all of the necessary dependencies.
