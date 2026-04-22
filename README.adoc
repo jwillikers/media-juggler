@@ -74,7 +74,7 @@ DRM prevents that.
 In many jurisdictions, circumventing DRM in any way is criminalized.
 This is the case in the United States thanks to Section 1201 of the https://en.wikipedia.org/wiki/Digital_Millennium_Copyright_Act[Digital Millennium Copyright Act], often abbreviated as the DMCA, which makes DRM circumvention illegal, even for https://en.wikipedia.org/wiki/Fair_use[_fair use_] purposes.
 
-Thus, for self-hosting media, it's important vote with your wallet and purchase DRM-Free media.
+Thus, for self-hosting media, it's important to vote with your wallet and purchase DRM-Free media.
 It's not always straightforward to find where you can purchase legitimate, DRM-Free content and many sellers don't describe things in detail.
 Below are lists of my favorite sources for DRM-Free media.
 For music, DRM isn't so much an issue, so I've listed my favorite sources of high-quality music.
