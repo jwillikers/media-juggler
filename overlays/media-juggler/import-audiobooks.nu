@@ -39,10 +39,10 @@ def main [
   --combine-chapter-parts # Combine chapters split into multiple parts into individual chapters
   --lossy-to-lossy # Allow transcoding lossy formats to other lossy formats. This is irreversible and has the potential to introduce artifacts and degrade quality. It's recommended to keep the original lossy files for archival purposes when doing this.
   --musicbrainz-release-id: string
-  --hardcover-edition-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
-  --hardcover-book-slug: string # The Hardcover Book Slug (only embedded in the metadata right now)
-  --wikidata-work-id: string # The Wikidata Work ID (only embedded in the metadata right now)
-  --wikidata-edition-id: string # The Wikidata Edition ID (only embedded in the metadata right now)
+  # --hardcover-edition-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
+  # --hardcover-book-slug: string # The Hardcover Book Slug (only embedded in the metadata right now)
+  # --wikidata-work-id: string # The Wikidata Work ID (only embedded in the metadata right now)
+  # --wikidata-edition-id: string # The Wikidata Edition ID (only embedded in the metadata right now)
   --keep # Keep the original file
   --delay-between-imports: duration = 1min # When importing multiple books, pause for this amount between imports. This reduces load on various endpoints by spreading out workload over time. For metadata refreshes, this should probably be increased to as large a delay as you can tolerate.
   --destination: directory = "meerkat:/var/media/audiobooks" # The directory under which to copy files.
@@ -59,7 +59,6 @@ def main [
     log error "No files provided"
     exit 1
   }
-
 
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-audiobooks"] | path join
   let optimized_files_cache_file = [$cache_directory optimized.json] | path join
@@ -254,57 +253,6 @@ def main [
   if $musicbrainz_release_id != null {
     if $musicbrainz_release_id !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' {
       log error $"Invalid MusicBrainz release ID (ansi purple)($musicbrainz_release_id)(ansi reset)"
-      exit 1
-    }
-  }
-
-  if $hardcover_edition_id != null and ($audiobooks | length) > 1 {
-    log error "Setting the Hardcover edition ID for multiple files is not allowed as it will result in overwriting the final file"
-    exit 1
-  }
-
-  if $hardcover_edition_id != null {
-    if $hardcover_edition_id !~ '^[0-9]+$' {
-      log error $"The Hardcover edition ID (ansi purple)($hardcover_edition_id)(ansi reset) is not an integer"
-      exit 1
-    }
-  }
-
-  # todo Require Hardcover API token when Hardcover identifiers are not passed.
-  # if ($hardcover_edition_id == null or $hardcover_book_slug == null) and ($env | get --optional MEDIA_JUGGLER_HARDCOVER_API_TOKEN | is-empty) {
-  #   log error "The environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN must be set to a Hardcover API key if --hardcover-book-slug and --hardcover-api-key are not provided."
-  #   exit 1
-  # }
-
-  if $wikidata_edition_id != null and ($audiobooks | length) > 1 {
-    log error "Setting the Wikidata Edition ID for multiple files is not allowed as it will result in overwriting the final file"
-    exit 1
-  }
-  if $wikidata_edition_id != null {
-    if $wikidata_edition_id !~ '^Q[0-9]+$' {
-      log error $"The Wikidata edition ID (ansi purple)($wikidata_edition_id)(ansi reset) must be formatted as the letter 'Q' followed by an integer"
-      exit 1
-    }
-  }
-
-  if $wikidata_work_id != null and ($audiobooks | length) > 1 {
-    log error "Setting the Wikidata Work ID for multiple files is not allowed as it will result in overwriting the final file"
-    exit 1
-  }
-  if $wikidata_work_id != null {
-    if $wikidata_work_id !~ '^Q[0-9]+$' {
-      log error $"The Wikidata work ID (ansi purple)($wikidata_work_id)(ansi reset) must be formatted as the letter 'Q' followed by an integer"
-      exit 1
-    }
-  }
-
-  if $hardcover_book_slug != null and ($audiobooks | length) > 1 {
-    log error "Setting the Hardcover Book Slug for multiple files is not allowed as it will result in overwriting the final file"
-    exit 1
-  }
-  if $hardcover_book_slug != null {
-    if $hardcover_book_slug =~ '^[0-9]+$' {
-      log error $"The Hardcover book slug (ansi purple)($hardcover_book_slug)(ansi reset) is most likely invalid since it is an integer"
       exit 1
     }
   }
@@ -737,6 +685,7 @@ def main [
   # This is to accommodate external subseries management since this script doesn't yet support nesting series / subseries directories.
   # Note that if anything is renamed in the path hierarchy, such subdirectories will be dropped.
   # if top_part matches top_part, and audiobook_directory matches bottom_part, use existing path.
+  # todo Just use featured series from Hardcover?
 
   if ($target_destination_directory | is_ssh_path) {
     if not $skip_upload {
@@ -758,29 +707,91 @@ def main [
 
   # Use an OPF file to get the ISBN into audiobookshelf.
   # ffprobe doesn't show the ISBN metadata tag, which is why the workaround is necessary.
-  if ($metadata.book | get --optional isbn | is-not-empty) {
-    let opf = $'<?xml version="1.0" encoding="utf-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
-    <dc:identifier opf:scheme="ISBN">($metadata.book.isbn)</dc:identifier>
-  </metadata>
-</package>
-'
-    let opf_file = [$temporary_directory "metadata.opf"] | path join
-    $opf | save --force $opf_file
-    if ($target_destination_directory | is_ssh_path) {
-      if not $skip_upload {
-        log info $"Uploading (ansi yellow)($opf_file)(ansi reset) to (ansi yellow)($destination)(ansi reset)"
-        if $use_rsync {
-          $opf_file | rsync ($target_destination_directory | path join "metadata.opf") "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
-        } else {
-          $opf_file | scp --mkdir ($target_destination_directory | path join "metadata.opf")
+  let opf = {
+    tag: "package",
+    attributes: {
+      xmlns: "http://www.idpf.org/2007/opf"
+      "unique-identifier": "uuid_id"
+      version: "2.0"
+    },
+    content: [
+      [tag, attributes, content];
+      [
+        metadata
+        {
+          "xmlns:dc": "http://purl.org/dc/elements/1.1/"
+          "xmlns:opf": "http://www.idpf.org/2007/opf"
         }
+        []
+      ]
+    ]
+  }
+  let identifiers = [
+    [opf_id variable];
+    [ISBN isbn]
+    [asin amazon_asin]
+    [audible-asin audible_asin]
+    [hardcover-edition hardcover_edition_id]
+    [hardcover-slug hardcover_book_slug]
+    [musicbrainz-release musicbrainz_release_id]
+    [openlibrary-edition open_library_edition_id]
+    [wikidata-edition wikidata_edition_id]
+  ]
+  # log debug $"metadata.book: ($metadata.book)"
+  let opf = (
+    $identifiers | reduce --fold $opf {|id, acc|
+      if ($metadata.book | get --optional $id.variable | is-not-empty) {
+        let opf_metadata = $acc.content | where tag == metadata | first
+        let identifiers = $opf_metadata | get content
+        $acc | update content (
+          $acc.content
+          | where tag != metadata
+          | append [
+            [tag, attributes, content];
+            [
+              metadata
+              {
+                "xmlns:dc": "http://purl.org/dc/elements/1.1/"
+                "xmlns:opf": "http://www.idpf.org/2007/opf"
+              }
+              (
+                $identifiers | append [
+                  [tag, attributes, content];
+                  [
+                    "dc:identifier"
+                    {
+                      "opf:scheme": $id.opf_id
+                    }
+                    [
+                      [tag, attributes, content];
+                      [null, null, ($metadata.book | get $id.variable)]
+                    ]
+                  ]
+                ]
+              )
+            ]
+          ]
+        )
+      } else {
+        $acc
       }
-    } else {
-      mkdir $target_destination_directory
-      mv $opf_file ($target_destination_directory | path join "metadata.opf")
     }
+  )
+  # log debug $"opf: ($opf | to xml)"
+  let opf_file = [$temporary_directory "metadata.opf"] | path join
+  $opf | to xml | save --force $opf_file
+  if ($target_destination_directory | is_ssh_path) {
+    if not $skip_upload {
+      log info $"Uploading (ansi yellow)($opf_file)(ansi reset) to (ansi yellow)($destination)(ansi reset)"
+      if $use_rsync {
+        $opf_file | rsync ($target_destination_directory | path join "metadata.opf") "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
+      } else {
+        $opf_file | scp --mkdir ($target_destination_directory | path join "metadata.opf")
+      }
+    }
+  } else {
+    mkdir $target_destination_directory
+    mv $opf_file ($target_destination_directory | path join "metadata.opf")
   }
 
   if not $keep {
