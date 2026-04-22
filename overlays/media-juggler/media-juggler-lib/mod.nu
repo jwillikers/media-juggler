@@ -1553,6 +1553,7 @@ export def inject_metron_info []: [
 }
 
 # Convert an Adobe Digital Editions ACSM to an EPUB
+# todo Technically, I think this can also produce a PDF.
 export def acsm_to_epub [
   working_directory: directory # The scratch-space directory to use
 ]: [path -> path] {
@@ -2782,6 +2783,65 @@ export def wikidata_search_editions_by_isbn [
   )
   if ($response.status != 200) {
     log error $"HTTP error (ansi red)($response.status)(ansi reset) searching for Wikidata editions with ISBN-13 ($isbn) with SPARQL query ($sparql_query) at (ansi yellow)($wikidata_sparql_api_url)($sparql_query | url encode)(ansi reset): ($response.body)"
+    return null
+  }
+  let bindings = $response.body | from json | get results.bindings
+  if ($bindings | is-empty) {
+    return null
+  }
+  (
+    $bindings
+    | get edition
+    | where type == "uri"
+    | get value
+    | str replace "http://www.wikidata.org/entity/" ""
+  )
+}
+
+# Search for editions on Wikidata by Amazon ASIN.
+#
+# Requires the environment variable MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN to set to a Wikidata access token.
+# The environment variable WIKIDATA_USERNAME must also be set to your Wikidata username.
+export def wikidata_search_editions_by_asin [
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> list<string>] {
+  let asin = $in
+  for var in [WIKIDATA_USERNAME MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      return null
+    }
+  }
+
+  let sparql_query = $"SELECT DISTINCT ?edition WHERE {
+    ?edition wdt:P31/wdt:P279* wd:Q3331189/wd:Q122731938.
+    ?edition wdt:P5749 '($asin)'.
+  }"
+
+  let request = {
+    (
+      http get
+        --full
+        --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+          "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
+          "X-Authenticated-User": $env.WIKIDATA_USERNAME
+        }
+        $"($wikidata_sparql_api_url)($sparql_query | url encode)"
+    )
+  }
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error getting Wikidata edition by Amazon ASIN ($asin) from (ansi yellow)($wikidata_sparql_api_url)($sparql_query | url encode)(ansi reset): ($error.debug)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP error (ansi red)($response.status)(ansi reset) searching for Wikidata editions with Amazon ASIN ($asin) with SPARQL query ($sparql_query) at (ansi yellow)($wikidata_sparql_api_url)($sparql_query | url encode)(ansi reset): ($response.body)"
     return null
   }
   let bindings = $response.body | from json | get results.bindings
@@ -4060,12 +4120,28 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
           $metadata.additionalFields."bookBrainz Work Id" | parse_multi_value_tag | wrap bookbrainz_work_id
         }
       )
+      let open_library_work_id = (
+        if "openLibrary Work Id" in $metadata.additionalFields {
+          $metadata.additionalFields."openLibrary Work Id" | parse_multi_value_tag | wrap open_library_work_id
+        }
+      )
+      let wikidata_work_id = (
+        if "wikidata Work Id" in $metadata.additionalFields {
+          $metadata.additionalFields."wikidata Work Id" | parse_multi_value_tag | wrap wikidata_work_id
+        }
+      )
       let names = (
         if "work" in $metadata.additionalFields {
           $metadata.additionalFields.work | parse_multi_value_tag | wrap name
         }
       )
-      $ids | merge_or_input $names | merge_or_input $bookbrainz_work_id
+      (
+        $ids
+        | merge_or_input $names
+        | merge_or_input $bookbrainz_work_id
+        | merge_or_input $open_library_work_id
+        | merge_or_input $wikidata_work_id
+      )
     }
   )
 
@@ -4203,6 +4279,10 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
         | upsert_if_present script $metadata.additionalFields
         | upsert_if_present musicbrainz_release_group_id $metadata.additionalFields "musicBrainz Release Group Id"
         | upsert_if_present musicbrainz_release_id $metadata.additionalFields "musicBrainz Album Id"
+        | upsert_if_present hardcover_book_slug $metadata.additionalFields "hardcover Book Slug"
+        | upsert_if_present hardcover_edition_id $metadata.additionalFields "hardcover Edition Id"
+        | upsert_if_present open_library_edition_id $metadata.additionalFields "openLibrary Edition Id"
+        | upsert_if_present wikidata_edition_id $metadata.additionalFields "wikidata Edition Id"
         | upsert_if_value musicbrainz_release_country $musicbrainz_release_country
         | upsert_if_value musicbrainz_release_status $musicbrainz_release_status
         | upsert_if_value musicbrainz_release_types $musicbrainz_album_types
@@ -4469,6 +4549,10 @@ export def into_tone_format []: record -> record {
     | upsert_if_value "MusicBrainz Album Artist Id" ($primary_authors | get --optional id | join_multi_value)
     | upsert_if_present "MusicBrainz Release Group Id" $metadata.book musicbrainz_release_group_id
     | upsert_if_present "MusicBrainz Album Id" $metadata.book musicbrainz_release_id
+    | upsert_if_present "Hardcover Book Slug" $metadata.book hardcover_book_slug
+    | upsert_if_present "Hardcover Edition Id" $metadata.book hardcover_edition_id
+    | upsert_if_present "OpenLibrary Edition Id" $metadata.book open_library_edition_id
+    | upsert_if_present "Wikidata Edition Id" $metadata.book wikidata_edition_id
     | upsert_if_present "MusicBrainz Album Release Country" $metadata.book musicbrainz_release_country
     | upsert_if_present "MusicBrainz Album Status" $metadata.book musicbrainz_release_status
     | upsert_if_present script $metadata.book
@@ -4494,6 +4578,8 @@ export def into_tone_format []: record -> record {
     )
     | upsert_if_value "MusicBrainz Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional id | join_multi_value)
     | upsert_if_value "BookBrainz Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional bookbrainz_work_id | join_multi_value)
+    | upsert_if_value "OpenLibrary Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional open_library_work_id | join_multi_value)
+    | upsert_if_value "Wikidata Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional wikidata_work_id | join_multi_value)
     | upsert_if_value "MusicBrainz Label Id" ($metadata.track | get --optional publishers | get --optional id | join_multi_value)
     | upsert_if_value "work" ($metadata.track | get --optional musicbrainz_works | get --optional name | join_multi_value)
     | (
@@ -4850,7 +4936,7 @@ export def fetch_musicbrainz_release [
 
 # Get a MusicBrainz Work by id
 export def fetch_musicbrainz_work [
-  includes: list<string> = [series-rels genres tags]
+  includes: list<string> = [series-rels genres tags url-rels]
   --retries: int = 3
   --retry-delay: duration = 5sec
 ]: [
@@ -6017,17 +6103,16 @@ export def parse_musicbrainz_release []: [
             ) | uniq
           }
         )
-        # todo Include Wikidata Work ID if present.
         let musicbrainz_works = (
           if ($works | is-not-empty) {
             (
               $works
               | each {|work|
                 if ($work | get --optional relations | is-empty) {
-                  $work | default [] bookbrainz_work_id
+                  $work | default [] bookbrainz_work_id open_library_work_id wikidata_work_id
                 } else {
+                  let url_relations = $work.relations | where target-type == "url";
                   let bookbrainz_work_id = (
-                    let url_relations = $work.relations | where target-type == "url";
                     if ($url_relations | is-not-empty) {
                       let bookbrainz_url_relations = $url_relations | where type == "BookBrainz"
                       if ($bookbrainz_url_relations | is-not-empty) {
@@ -6043,16 +6128,81 @@ export def parse_musicbrainz_release []: [
                             if ($bookbrainz_work_urls | length) > 1 {
                               log warning $"Multiple BookBrainz Works are linked for the MusicBrainz Work ($work.id)"
                             }
-                            $bookbrainz_work_urls.id | first
+                            $bookbrainz_work_urls.resource | first | str replace "https://bookbrainz.org/work/" "" | str replace "http://bookbrainz.org/work/" ""
                           }
                         }
                       }
                     }
                   )
-                  $work | insert bookbrainz_work_id $bookbrainz_work_id
+                  let open_library_work_id = (
+                    if ($url_relations | is-not-empty) {
+                      let open_library_url_relations = $url_relations | where type == "other databases"
+                      if ($open_library_url_relations | is-not-empty) {
+                        let open_library_urls = $open_library_url_relations | get --optional url
+                        if ($open_library_urls | is-not-empty) {
+                          let open_library_work_urls = $open_library_urls | where {|url|
+                            (
+                              ($url.resource | str starts-with "https://openlibrary.org/works/")
+                              or ($url.resource | str starts-with "http://openlibrary.org/works/")
+                            )
+                          }
+                          if ($open_library_work_urls | is-not-empty) {
+                            if ($open_library_work_urls | length) > 1 {
+                              log warning $"Multiple Open Library Works are linked for the MusicBrainz Work ($work.id)"
+                            }
+                            $open_library_work_urls.resource | first | str replace "https://openlibrary.org/works/" "" | str replace "http://openlibrary.org/works/" ""
+                          }
+                        }
+                      }
+                    }
+                  )
+                  let wikidata_work_id = (
+                    if ($url_relations | is-not-empty) {
+                      let wikidata_url_relations = $url_relations | where type == "wikidata"
+                      if ($wikidata_url_relations | is-not-empty) {
+                        let wikidata_urls = $wikidata_url_relations | get --optional url
+                        if ($wikidata_urls | is-not-empty) {
+                          let wikidata_work_urls = $wikidata_urls | where {|url|
+                            (
+                              ($url.resource | str starts-with "https://www.wikidata.org/wiki/Q")
+                              or ($url.resource | str starts-with "http://www.wikidata.org/wiki/Q")
+                            )
+                          }
+                          if ($wikidata_work_urls | is-not-empty) {
+                            if ($wikidata_work_urls | length) > 1 {
+                              log warning $"Multiple Wikidata Works are linked for the MusicBrainz Work ($work.id)"
+                            }
+                            $wikidata_work_urls.resource | first | str replace "https://www.wikidata.org/wiki/" "" | str replace "http://www.wikidata.org/wiki/" ""
+                          }
+                        }
+                      }
+                    }
+                  )
+                  let work = (
+                    if ($bookbrainz_work_id | is-empty) {
+                      $work | default [] bookbrainz_work_id
+                    } else {
+                      $work | insert bookbrainz_work_id $bookbrainz_work_id
+                    }
+                  )
+                  let work = (
+                    if ($open_library_work_id | is-empty) {
+                      $work | default [] open_library_work_id
+                    } else {
+                      $work | insert open_library_work_id $open_library_work_id
+                    }
+                  )
+                  let work = (
+                    if ($wikidata_work_id | is-empty) {
+                      $work | default [] wikidata_work_id
+                    } else {
+                      $work | insert wikidata_work_id $wikidata_work_id
+                    }
+                  )
+                  $work
                 }
               }
-              | select id title bookbrainz_work_id
+              | select id title bookbrainz_work_id open_library_work_id wikidata_work_id
               | uniq
             )
           }
@@ -6147,6 +6297,7 @@ export def parse_musicbrainz_release []: [
     } | flatten | sort-by index
   )
 
+  # log debug $"tracks: ($tracks)"
   let primary_authors = (
     if "contributors" in ($tracks | columns) and ($tracks.contributors | is-not-empty) {
       let writers = $tracks.contributors | flatten | where entity == "artist" | where role == "writer"
@@ -6232,6 +6383,7 @@ export def parse_musicbrainz_release []: [
       $audible_asins | first
     }
   )
+
   let genres_and_tags = $metadata | parse_genres_and_tags_from_musicbrainz_release
 
   # Chapters can come from multi-track releases, otherwise, they need to found in another release
@@ -6323,6 +6475,12 @@ export def parse_musicbrainz_release []: [
     | upsert_if_value musicbrainz_release_status $musicbrainz_release_status
     | upsert_if_present amazon_asin $metadata asin
     | upsert_if_value audible_asin $audible_asin
+    | upsert_if_present hardcover_edition_id $metadata
+    | upsert_if_present hardcover_book_slug $metadata
+    | upsert_if_present open_library_edition_id $metadata
+    | upsert_if_present open_library_work_id $metadata
+    | upsert_if_present wikidata_edition_id $metadata
+    | upsert_if_present wikidata_work_id $metadata
     | upsert_if_value genres $genres_and_tags.genres
     | upsert_if_value tags $genres_and_tags.tags
     | upsert_if_value publication_date $publication_date
@@ -6861,12 +7019,6 @@ export def tag_audiobook [
     log error "Unable to determine the MusicBrainz Release ID. Aborting. Please supply the MusicBrainz Release ID with the '--musicbrainz-release-id' flag"
     return null
   }
-
-  # todo Lookup Hardcover edition via ISBN and tag HardcoverEditionID and HardcoverBookSlug
-  # todo Featured series from Hardcover.
-  # todo Lookup Wikidata edition id via MusicBrainz Release ID and tag WikidataEditionID.
-  # todo Tag Wikidata work id as well?
-  # todo Tag with Open Library edition ID.
 
   # Tag the files
   let metadata = (
@@ -7458,6 +7610,123 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
     log error $"Failed to fetch MusicBrainz Release (ansi yellow)($existing_metadata.book.musicbrainz_release_id)(ansi reset)"
     return null
   }
+
+  # Look up the Hardcover IDs for the book based on ISBN or Audible ASIN.
+  let hardcover_edition = (
+    if (($musicbrainz_metadata.book | get --optional isbn | is-not-empty) or ($musicbrainz_metadata.book | get --optional audible_asin | is-not-empty)) and (($musicbrainz_metadata.book | get --optional hardcover_edition_id | is-empty) or ($musicbrainz_metadata.book | get --optional hardcover_book_slug | is-empty)) {
+      let id = (
+        if ($musicbrainz_metadata.book | get --optional isbn | is-not-empty) {
+          { type: "isbn_13", value: $musicbrainz_metadata.book.isbn }
+        } else if ($musicbrainz_metadata.book | get --optional audible_asin | is-not-empty) {
+          { type: "asin", value: $musicbrainz_metadata.book.audible_asin }
+        }
+      )
+      let editions = $id.value | hardcover_search_editions_by_exact_field --retries $retries --retry-delay $retry_delay $id.type
+      if ($editions | is-empty) {
+        # No editions found.
+        log warning $"No Hardcover editions found for ($id.type) (ansi purple)($id.value)(ansi reset)"
+        null
+      } else {
+        # Reading format (1=Physical, 2=Audio, 3=Both, 4=Ebook)
+        let audiobook_editions = $editions | where reading_format_id == 2
+        if ($audiobook_editions | is-empty) {
+          log warning $"No Hardcover audiobooks editions found for ($id.type) (ansi purple)($id.value)(ansi reset), matching non-audiobook editions: ($editions)"
+          null
+        } else if ($editions | length) == 1 {
+          $audiobook_editions | first
+        } else {
+          log warning $"Multiple Hardcover audiobooks editions found for the ($id.type) (ansi purple)($id.value)(ansi reset): ($audiobook_editions)"
+          null
+        }
+      }
+    } else {
+      # No ISBN or Audible ASIN, or the Hardcover edition id and book slug metadata is already available.
+    }
+  )
+  let musicbrainz_metadata = (
+    if ($hardcover_edition | is-empty) {
+      $musicbrainz_metadata
+    } else {
+      (
+        $musicbrainz_metadata
+        | upsert book.hardcover_edition_id ($hardcover_edition.id | into string)
+        | upsert book.hardcover_book_slug $hardcover_edition.book.slug
+      )
+    }
+  )
+
+  # Query Wikidata by ISBN or Amazon ASIN if there is no Wikidata edition ID.
+  # I could also just query by MusicBrainz release ID...
+  let wikidata_edition_id = (
+    if ($musicbrainz_metadata.book | get --optional wikidata_edition_id | is-empty) and (($musicbrainz_metadata.book | get --optional isbn | is-not-empty) or ($musicbrainz_metadata.book | get --optional amazon_asin | is-not-empty)) {
+      let id = (
+        if ($musicbrainz_metadata.book | get --optional isbn | is-not-empty) {
+          { type: "ISBN", value: $musicbrainz_metadata.book.isbn }
+        } else if ($musicbrainz_metadata.book | get --optional amazon_asin | is-not-empty) {
+          { type: "Amazon ASIN", value: $musicbrainz_metadata.book.amazon_asin }
+        }
+      )
+      let editions = (
+        if ($musicbrainz_metadata.book | get --optional isbn | is-not-empty) {
+          $musicbrainz_metadata.book.isbn | wikidata_search_editions_by_isbn --retries $retries --retry-delay $retry_delay
+        } else if ($musicbrainz_metadata.book | get --optional amazon_asin | is-not-empty) {
+          $musicbrainz_metadata.book.amazon_asin | wikidata_search_editions_by_asin --retries $retries --retry-delay $retry_delay
+        }
+      )
+      if ($editions | is-empty) {
+        # No editions found.
+        log warning $"No Wikidata editions found for ($id.type) (ansi purple)($id.value)(ansi reset)"
+        null
+      } else if ($editions | length) == 1 {
+        $editions | first
+      } else {
+        log warning $"Multiple Wikidata editions found for the ($id.type) (ansi purple)($id.value)(ansi reset): ($editions)"
+        null
+      }
+    } else {
+      null
+    }
+  )
+  let musicbrainz_metadata = (
+    if ($wikidata_edition_id | is-empty) {
+      $musicbrainz_metadata
+    } else {
+      $musicbrainz_metadata | upsert book.wikidata_edition_id $wikidata_edition_id
+    }
+  )
+
+  # Pull Open Library identifiers from Wikidata.
+  let wikidata_edition_identifiers = (
+    if ($wikidata_edition_id | is-not-empty) and (($musicbrainz_metadata.book | get --optional open_library_edition_id | is-empty)) {
+      $wikidata_edition_id | wikidata_get_edition_identifiers --retries $retries --retry-delay $retry_delay
+    } else {
+      null
+    }
+  )
+  let open_library_edition_id = (
+    if ($musicbrainz_metadata.book | get --optional open_library_edition_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let open_library_edition_ids = $wikidata_edition_identifiers | get --optional "Open Library ID"
+      if ($open_library_edition_ids | is-empty) {
+        log warning $"No Open Library edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($open_library_edition_ids | length) == 1 {
+        $open_library_edition_ids | first
+      } else {
+        log warning $"Multiple Open Library edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($open_library_edition_ids)"
+        null
+      }
+    } else {
+      null
+    }
+  )
+  let musicbrainz_metadata = (
+    if ($open_library_edition_id | is-empty) {
+      $musicbrainz_metadata
+    } else {
+      $musicbrainz_metadata | upsert book.open_library_edition_id $open_library_edition_id
+    }
+  )
+  # log debug $"musicbrainz_metadata: ($musicbrainz_metadata)"
 
   # log info $"audiobook_files: ($audiobook_files)"
   # log info $"musicbrainz_metadata: ($musicbrainz_metadata)"

@@ -132,6 +132,7 @@ else
             efficient-compression-tool
             file
             image_optim
+            isbntools
             # jpegli
             minuimus
             mupdf-headless
