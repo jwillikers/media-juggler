@@ -38,7 +38,7 @@
   };
   m4b-tool = inputs.m4b-tool.overlay;
   media-juggler = _final: prev: {
-    calibre-plugins = prev.recurseIntoAttrs (prev.callPackage ./calibre-plugins { });
+    calibre-plugins = prev.lib.recurseIntoAttrs (prev.callPackage ./calibre-plugins { });
     flexigif = prev.callPackage ./flexigif/package.nix { };
     imgdataopt = prev.callPackage ./imgdataopt/package.nix { };
     isbntools = prev.callPackage ./isbntools/package.nix { };
