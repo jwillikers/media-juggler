@@ -36,14 +36,12 @@
   image_optim = _final: prev: {
     image_optim = prev.image_optim.override { withPngout = true; };
   };
-  isbntools = _final: prev: {
-    isbntools = prev.callPackage ./isbntools/package.nix { };
-  };
   m4b-tool = inputs.m4b-tool.overlay;
   media-juggler = _final: prev: {
-    calibre-plugins = prev.recurseIntoAttrs (prev.callPackage ./calibre-plugins { });
+    calibre-plugins = prev.lib.recurseIntoAttrs (prev.callPackage ./calibre-plugins { });
     flexigif = prev.callPackage ./flexigif/package.nix { };
     imgdataopt = prev.callPackage ./imgdataopt/package.nix { };
+    isbntools = prev.callPackage ./isbntools/package.nix { };
     jpeg2png = prev.callPackage ./jpeg2png/package.nix { };
     jpegli = prev.callPackage ./jpegli/package.nix { };
     media-juggler = prev.callPackage ./media-juggler/package.nix { };

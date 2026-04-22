@@ -65,7 +65,7 @@ let
       ];
 
       # Fallback to c17 since the c23 standard will break everything.
-      env.NIX_CFLAGS_COMPILE = "-std=c17 -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-incompatible-pointer-types";
+      env.NIX_CFLAGS_COMPILE = "-std=c17 -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-missing-prototypes";
 
       # The buildsystem doesn't link zlib correctly, so it has to be added here.
       NIX_LDFLAGS = "-lz";
