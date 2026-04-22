@@ -466,6 +466,11 @@ This migration will greatly reduce the complexity of the manga import process wh
 A similar change for eBooks, where I embed data directly in EPUBs without {Calibre}, may also be possible.
 This would remove reliance on Calibre plugins and make it possible to incorporate metadata from {BookBrainz}.
 
+I'd also like to incorporate chapters from the Table of Contents section of editions in Open Library in the ComicInfo.xml as bookmarks.
+
+.import-audiobooks.nu Todo
+* [ ] Incorporate Hardcover and Wikidata ids in the metadata.
+
 .import-comics.nu Todo
 * [ ] Add a flag to embed cover from file.
 * [ ] Switch to using the BookBrainz API, Wikidata, and the Hardcover API, instead of Comic Vine and ComicTagger.
