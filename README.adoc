@@ -1,0 +1,495 @@
+= Media Juggler
+Jordan Williams <jordan@jwillikers.com>
+:experimental:
+:icons: font
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:Asciidoctor_: https://asciidoctor.org/[Asciidoctor]
+:Audiobookshelf: https://www.audiobookshelf.org/[Audiobookshelf]
+:Beets: https://beets.io/[Beets]
+:BookBrainz: https://bookbrainz.org/[BookBrainz]
+:Calibre: https://calibre-ebook.com/[Calibre]
+:Comic-Vine: https://comicvine.gamespot.com/[Comic Vine]
+:ComicInfo: https://anansi-project.github.io/docs/category/comicinfo[ComicInfo]
+:ComicTagger: https://github.com/comictagger/comictagger[ComicTagger]
+:Fanatical: https://www.fanatical.com/en/[Fanatical]
+:just: https://github.com/casey/just[just]
+:Hardcover: https://hardcover.app[Hardcover]
+:Hardcover-Documentation: https://docs.hardcover.app/[Hardcover Documentation]
+:Humble-Bundle: https://www.humblebundle.com/[Humble Bundle]
+:Jellyfin: https://jellyfin.org/[Jellyfin]
+:Kavita: https://www.kavitareader.com/[Kavita]
+:KOReader: https://koreader.rocks/[KOReader]
+:Libro.fm: https://libro.fm/[Libro.fm]
+:Linux: https://www.linuxfoundation.org/[Linux]
+:Lix: https://lix.systems[Lix]
+:MetronInfo: https://metron-project.github.io/docs/category/metroninfo[MetronInfo]
+:MusicBrainz: https://musicbrainz.org/[MusicBrainz]
+:Nix: https://nixos.org/[Nix]
+:nix-direnv: https://github.com/nix-community/nix-direnv[nix-direnv]
+:Nushell: https://www.nushell.sh/[Nushell]
+:Open-Library: https://openlibrary.org[Open Library]
+:Wikidata: https://wikidata.org[Wikidata]
+:Wikidata-REST-API: https://doc.wikimedia.org/Wikibase/master/js/rest-api/[Wikidata REST API]
+:Wikidata-REST-API-Documentation: https://www.wikidata.org/wiki/Wikidata:REST_API[Wikidata REST API Documentation]
+
+Scripts to tag, convert, and upload my music, audiobooks, ebooks, and comics to my self-hosted media services.
+
+[#self-hosted-services]
+.Self-Hosted Services
+[cols="1,1"]
+|===
+|Media
+|Service
+
+|Audiobooks
+|{Audiobookshelf}
+
+|Books, Comics, Manga
+|{Kavita}
+
+|Music
+|{Jellyfin}
+|===
+
+[NOTE]
+====
+I`'m currently putting in a lot of work to add metadata for audiobooks, books, and comics to several data sources to make managing your digital media easier, these include open data sources such as {BookBrainz}, {MusicBrainz}, and {Wikidata}, as well as {Open Library} and {Hardcover}.
+I`'ve also contributed metadata for video games to https://www.pcgamingwiki.com/wiki/Main_Page[PCGamingWiki], which can be used by to manage your save data with https://github.com/mtkennerly/ludusavi[Ludusavi].
+====
+
+== DRM-Free Media Sources
+
+https://en.wikipedia.org/wiki/Digital_rights_management[Digital rights management] or DRM, restricts your ability to use and manage content that you _purchase_.
+DRM traps you within the confines of the limited implementation and ecosystem completely subject to the whims of the distributor.
+It's effectively a tool for vendor lock-in.
+You want to read a book you purchased from Amazon on your Kobo ereader?
+Too bad.
+DRM prevents that.
+In many jurisdictions, circumventing DRM in any way is criminalized.
+This is the case in the United States thanks to Section 1201 of the https://en.wikipedia.org/wiki/Digital_Millennium_Copyright_Act[Digital Millennium Copyright Act], often abbreviated as the DMCA, which makes DRM circumvention illegal, even for https://en.wikipedia.org/wiki/Fair_use[_fair use_] purposes.
+
+Thus, for self-hosting media, it's important vote with your wallet and purchase DRM-Free media.
+It's not always straightforward to find where you can purchase legitimate, DRM-Free content and many sellers don't describe things in detail.
+Below are lists of my favorite sources for DRM-Free media.
+For music, DRM isn't so much an issue, so I've listed my favorite sources of high-quality music.
+I've include a list of DRM-Free sources of video games, even though I don't have scripts that import video games.
+
+.DRM-Free Audiobooks
+* {Libro.fm}
+* {Humble-Bundle}
+* https://www.dragonsteelbooks.com/[Dragonsteel]
+
+.DRM-Free Books
+* https://www.dragonsteelbooks.com/[Dragonsteel]
+* https://www.ebooks.com/en-us/[eBooks.com] (_Not all titles are drm-free_)
+* {Humble-Bundle}
+* {Fanatical}
+
+.DRM-Free Comics
+* {Humble-Bundle}
+* {Fanatical}
+
+.DRM-Free Manga
+* {Humble-Bundle}
+* {Fanatical}
+* https://denpa.pub/[Denpa]
+* https://j-novel.club/[J-Novel Club]
+
+.High-Quality Music
+* https://www.hdtracks.com/[HDtracks]
+* https://us.7digital.com/[7digital]
+
+.DRM-Free Video Games
+* https://itch.io/[itch.io]
+* https://www.gog.com/en/[GOG]
+
+== How It Works
+
+You purchase DRM-Free media, then point these scripts at it to automatically tag, convert, and upload it the correct location on your media server.
+The scripts also perform lossless optimization to reduce file sizes where applicable.
+Comics in the EPUB format are converted to CBZ, which can lose information such as chapters, but provides a better reading experience on {KOReader}.
+There are scripts for each type of media, which can be found under `overlays/media-juggler/`.
+Metadata is retrieved from various sources, as detailed in the <<metadata-sources>> table.
+
+[#metadata-sources]
+.Metadata Sources
+[cols="1,1"]
+|===
+|Media
+|Metadata Source
+
+|Audiobooks
+|{MusicBrainz}
+
+|Books, Light Novels
+|Currently, a bunch of sources through Calibre plugins, including {Hardcover} and {Wikidata}.
+
+|Comics, Manga, Manhwa
+|{Comic-Vine}
+
+|Music
+|{MusicBrainz}
+|===
+
+Several tools are used to facilitate the import process, which are documented in the <<import-tools>> table.
+
+[#import-tools]
+.Import Tools
+[cols="1,1"]
+|===
+|Media
+|Tool
+
+|Audiobooks
+|No external tools
+
+|Books, Light Novels
+|{Calibre}
+
+|Comics, Manga, Manhwa
+|{ComicTagger}, {Calibre}
+
+|Music
+|{Beets}
+|===
+
+Once the media is uploaded on the server, it's automatically picked up by the pertinent service.
+The services for each media type are documented in the <<self-hosted-services>> table.
+
+=== Metadata Handling
+
+Metadata is embedded directly in the media files when possible.
+EPUBs and audio files support natively embedding metadata.
+{Audiobookshelf} can't read the ISBN from the embedded metadata in M4B files, so a sidecar `metadata.opf` file containing the ISBN is placed in the same directory as the audiobook.
+For comics and the like, {ComicInfo} and {MetronInfo} metadata files are incorporated in the CBZ.
+While PDFs technically support embedding metadata, it's not well supported in practice.
+PDFs are embedded with the limited fields supported by the `ebook-meta` utility from Calibre.
+For comics in PDF formats, I sidecar ComicInfo and MetronInfo metadata files with the PDFs, even though sidecar metadata is not supported by {Kavita}.
+
+== Usage
+
+This repository provides a collection of scripts to make it easier to add various digital media to my collection.
+This includes music, audiobooks, ebooks, and comics.
+When purchasing media, it often needs to be renamed, converted, tagged with _correct_ information, losslessly optimized to reduce files size, and finally uploaded to the appropriate location on my media server.
+The utilities here aim to automate this as much as possible.
+Ultimately, the workflow should be as simple as downloading the media to the corresponding import directory on my computer.
+There's quite a bit of initial set up that needs to be completed first, though, so that's where we'll begin.
+
+[IMPORTANT]
+====
+Be sure to increase the `maximum_cover_size` tweak or Calibre will shrink cover images when embedding metadata.
+
+.~/.config/calibre/tweaks.json
+[,json]
+----
+{
+  "maximum_cover_size": [
+    999999999999,
+    999999999999
+  ]
+}
+----
+====
+
+Use this Nix flake in your Home Manager configuration to incorporate these scripts in your project.
+Here's an example of how to incorporate this repository's flake as part of your project.
+
+// todo link to my Home Manager config
+. Add `media-juggler` to `flake.nix` and the provided Home Manager module to the `modules` of your configuration.
++
+.flake.nix
+[,nix]
+----
+{
+  inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    media-juggler.url = "github:jwillikers/media-juggler";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  };
+  outputs =
+    {
+      self,
+      flake-utils,
+      media-juggler,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+        };
+      in
+      {
+        homeConfigurations.jdoe = home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+
+          modules = [
+            media-juggler.hmModules.media-juggler
+          ];
+        };
+      }
+    );
+}
+----
+
+. Apply the updated Home Manager configuration.
++
+[,sh]
+----
+home-manager --flake .#$(id --name --user)@$(hostname --short) switch
+----
+
+. Create an Adobe account in order to use https://www.adobe.com/solutions/ebook/digital-editions.html[Adobe Digital Editions].
+It is recommended to use a dedicated account for this in the event that the account is banned by Adobe.
+Be sure to read the https://github.com/Leseratte10/acsm-calibre-plugin/tree/v0.0.16?tab=readme-ov-file#setup[Setup section of the README] for the Calibre ACSM Input plugin to understand all of the implications.
+. Sign up for a Comic Vine account https://comicvine.gamespot.com/login-signup/[here].
+. Get your Comic Vine API token from https://comicvine.gamespot.com/api/[here].
+This will be used later to configure some of the tools.
+
+// todo
+// . Add your Comic Vine API token to ComicTagger.
+// +
+// [,sh]
+// ----
+// comictagger --only-set-cv-key --cv-api-key <Comic Vine API key>
+// ----
+
+. Create the directory `~/.config/calibre/plugins/`.
++
+[,sh]
+----
+mkdir --parents ~/.config/calibre/plugins/
+----
+
+. Add your Comic Vine API key to the Calibre Comic Vine plugin config file.
++
+.~/.config/calibre/plugins/comicvine.json
+[,json]
+----
+{
+  "api_key": "<Comic Vine API key>",
+  "max_volumes": 2,
+  "requests_rate": 1,
+  "worker_threads": 16
+}
+----
+
+. Sign up for a Hardcover account https://hardcover.app/[here].
+. Get your Hardcover API token from https://hardcover.app/account/api[here].
+
+. Open Calibre.
++
+[,sh]
+----
+setsid calibre &>/dev/null &
+----
+
+. Go to menu:Preferences[Plugins > Get new plugins].
+. Install the https://github.com/RobBrazier/calibre-plugins/tree/main/plugins/hardcover[Hardcover], https://www.mobileread.com/forums/showthread.php?t=291290[KFX Input], and https://github.com/kiwidude68/calibre_plugins/tree/main/barnes_noble[Barnes & Noble] plugins.
+. Restart Calibre to finish installing the plugins.
+. Go to menu:Preferences[Plugins].
+. Select the `Hardcover` plugin.
+. Push the btn:[Customize plugin] button.
+. Add your https://hardcover.app/account/api[Hardcover API Key], everything past the `Bearer` word, to the `API Key` field.
+. Hit btn:[OK].
+
+. Go to menu:Preferences[Plugins].
+. Select the `DeACSM` plugin.
+. Push the btn:[Customize plugin] button.
+. Add keys for Adobe Digital Editions for the DeACSM plugin if needed.
+To import a previously exported activation, go to menu:Preferences[Plugins > DeACSM > Customize plugin > Import existing activation backup (ZIP)].
+For a new activation, go to menu:Preferences[Plugins > DeACSM > Customize plugin > Link to ADE account].
+After a new activation export the activation using menu:Preferences[Plugins > DeACSM > Customize plugin > Export account activation data] and back up this file.
+
+. Hit btn:[Apply].
+. Hit btn:[Close].
+
+. Install the {ComicTagger} AppImage and make it executable.
++
+[,sh]
+----
+curl --location --output-dir ~/Downloads --remote-name https://github.com/comictagger/comictagger/releases/download/1.6.0-beta.10/ComicTagger-x86_64.AppImage
+chmod +x ~/Downloads/ComicTagger-x86_64.AppImage
+----
+
+. Create the plugins directory for ComicTagger.
++
+[,sh]
+----
+mkdir --parents ~/.config/ComicTagger/plugins
+----
+
+. Install the https://github.com/mizaki/metroninfo_ct[metroninfo_ct] plugin for ComicTagger.
++
+[,sh]
+----
+curl --location --output-dir ~/.config/ComicTagger/plugins --remote-name https://github.com/mizaki/metroninfo_ct/releases/download/0.0.3/metroninfo_ct-plugin-0.0.3.zip
+----
+
+// todo Document getting and setting various api keys for Beets
+
+. Set the environment variable `WIKIDATA_USERNAME` to your user's Wikidata username.
+I use the fish shell, thus the syntax below.
++
+[,sh]
+----
+set --export --universal WIKIDATA_USERNAME '<username>'
+----
+
+. Create a Wikidata API token according to the https://www.wikidata.org/wiki/Wikidata:REST_API/Authentication#Setting_up_OAuth_2.0[Setting up OAuth 2.0 instructions].
+.. Create a {Wikidata} account.
+.. Log in to Wikidata.
+.. Register a new OAuth client https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration/propose/oauth2[here].
+... Include the work `test` in the application name to make a temporary token that will last 30 days and not require approval.
+... Check the box `This consumer is for use only by <username>`.
+... For `Applicable project`, select `www.wikidata.org`.
+... For `Applicable grants`, the default permissions should suffice.
+... Check the final box to agree to the terms.
+... Hit btn:[Propose consumer].
+
+. Set the environment variable `MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN` to the access token for your API OAuth2 token created in the previous step.
++
+[,sh]
+----
+set --export --universal MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN '<wikidata-access-token>'
+----
+
+. Set up an API token for {Hardcover}.
+.. Create a {Hardcover} account.
+.. Find your API key from https://hardcover.app/account/api[here].
+.. Set the environment variable `MEDIA_JUGGLER_HARDCOVER_API_TOKEN` to the API key from the previous step.
++
+[,sh]
+----
+set --export --universal MEDIA_JUGGLER_HARDCOVER_API_TOKEN '<hardcover-api-key>'
+----
++
+[NOTE]
+====
+The Hardcover API key will expire in one year and reset on January 1st.
+====
+
+. Enable debugging by setting the log level for Nushell.
++
+[,sh]
+----
+$env.NU_LOG_LEVEL = "DEBUG"
+----
+
+. Now, the provided scripts can be run like so.
++
+[,sh]
+----
+import-comics.nu ~/Downloads/ComicTagger-x86_64.AppImage file.acsm
+----
+
+=== Optimizations
+
+I make use of several utilities to losslessly decrease file sizes.
+I only optimize images, ebooks, and comics.
+I don't really mess with audio although I have some experimental options for messing around with that.
+Images are optimized with https://github.com/toy/image_optim[image_optim] using its default settings followed by https://github.com/fhanau/Efficient-Compression-Tool[Efficient Compression Tool], which can typically gain a small improvement for PNGs.
+For comic book archives and EPUBs, this is easy enough as these are just ZIP archives of files.
+I also optimize the ZIP archive compression with Efficient Compression Tool.
+For PDFs, I use https://birds-are-nice.me/software/minuimus.html[minuimus] and https://github.com/pts/pdfsizeopt[pdfsizeopt], with a couple tweaks to use https://github.com/oxipng/oxipng[oxipng] with max settings followed by Efficient Compression Tool.
+This often leads to significant space savings for manga from {Fanatical} and {Humble-Bundle}, usually 25-35%, but it takes a long time on my crappy laptop, like 16 hours for a 200 MiB PDF.
+
+== Develop
+
+The `nix develop` command can be used to enter or run commands in an environment with all of the necessary dependencies.
+For convenience, direnv can be used to automatically load this environment when entering the project's directory.
+The https://marketplace.visualstudio.com/items?itemName=mkhl.direnv[mkhl.direnv VSCode extension] integrates this environment in VSCode for development.
+Nix also generates the configuration for https://pre-commit.com/[pre-commit], which automates formatting and various checks when committing changes.
+Follow the instructions here to set up your development environment using Nix.
+
+. Install an implementation of {Nix}, such as {Lix} used here.
++
+[,sh]
+----
+curl -sSf -L https://install.lix.systems/lix | sh -s -- install
+----
+
+. Clone this project's repository.
++
+[,sh]
+----
+git clone https://github.com/jwillikers/media-juggler.git
+----
+
+. Change into the project directory.
++
+[,sh]
+----
+cd media-juggler
+----
+
+. Install direnv for your system according to the https://direnv.net/docs/installation.html[direnv installation instructions].
++
+[,sh]
+----
+sudo rpm-ostree install direnv
+sudo systemctl reboot
+----
+
+. Integrate direnv with your shell by following the instructions on the https://direnv.net/docs/hook.html[direnv Setup page].
+
+. Permit the direnv configuration for the repository.
++
+[,sh]
+----
+direnv allow
+----
+
+. Use `nix build` to run the appropriate target.
++
+[,sh]
+----
+nix run .#calibrePlugins.acsm
+----
+
+== Future Work
+
+Currently, the large task I'd like to complete is the migration from using {ComicTagger} and {Comic-Vine} metadata to using metadata from {BookBrainz}, {Wikidata}, and possibly {Hardcover} directly through their APIs.
+For this, I need to produce the {ComicInfo} and {MetronInfo} files from scratch, so it will take a fair amount of work.
+This migration will greatly reduce the complexity of the manga import process which is ridiculously convoluted right now.
+
+A similar change for eBooks, where I embed data directly in EPUBs without {Calibre}, may also be possible.
+This would remove reliance on Calibre plugins and make it possible to incorporate metadata from {BookBrainz}.
+
+.import-comics.nu Todo
+* [ ] Add a flag to embed cover from file.
+* [ ] Switch to using the BookBrainz API, Wikidata, and the Hardcover API, instead of Comic Vine and ComicTagger.
+This will require building the ComicInfo.xml and MetronInfo.xml files from scratch instead of relying on ComicTagger to produce them.
+Comic Vine's data is not open and it's a pain to contribute to.
+* [x] Automatically look up Hardcover, Wikidata, BookBrainz, and Open Library IDs by ISBN.
+* [x] Automatically fetch missing ids from Wikidata, BookBrainz, and Open Library.
+* [ ] Remove the residual files and directory exported by Calibre.
+
+== Contributing
+
+Contributions in the form of issues, feedback, and even pull requests are welcome.
+Make sure to adhere to the project's link:CODE_OF_CONDUCT.adoc[Code of Conduct].
+
+== Code of Conduct
+
+Refer to the project's link:CODE_OF_CONDUCT.adoc[Code of Conduct] for details.
+
+== License
+
+This repository is licensed under the link:LICENSE[MIT license].
+
+© 2026 Jordan Williams
+
+== Authors
+
+mailto:{email}[{author}]

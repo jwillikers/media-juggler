@@ -1,0 +1,296 @@
+diff --git a/minuimus.pl b/minuimus.pl
+index dd09f4b..06574d8 100755
+--- a/minuimus.pl
++++ b/minuimus.pl
+@@ -224,7 +224,7 @@ sub compressfile($%) {
+   if($options{'fix-ext'}){
+     $file=fix_proper_ext($file);
+   }
+-  
++
+   my $freespace=getfreespace();
+   if($freespace < $initialsize/256){
+     print("Possible insufficient free space on $tmpfolder - aborting. Will not attempt to process a file without 2x file size free. File $initialsize, free $freespace.\n");
+@@ -237,7 +237,7 @@ sub compressfile($%) {
+   }else{
+     $oldtime=time;
+   }
+-  
++
+   print("Attempting: $file:$initialsize\n");
+   my $ext=lc($file);
+   $ext=~s/^.*\.//;
+@@ -260,7 +260,7 @@ sub compressfile($%) {
+   if($ext eq 'mp3'){
+     MP3Packer_Wrapper($file);
+   }
+-  
++
+   if($options{'audio'}){
+     if($ext eq 'mp3'){
+       $file=recode_audio($file);
+@@ -293,7 +293,7 @@ sub compressfile($%) {
+       $ext eq 'tiff'){
+       process_tiff($file);
+   }
+-  
++
+   if($ext eq 'chd'){
+     optimise_chd($file)
+   }
+@@ -307,7 +307,7 @@ sub compressfile($%) {
+     $ext=lc($file);
+     $ext=~s/^.*\.//;
+   }
+-  
++
+   if ($options{'srr'}){
+     if(
+       ($ext eq 'png' && is_animated_png($file)==0) ||
+@@ -326,7 +326,7 @@ sub compressfile($%) {
+       $ext=~s/^.*\.//;
+     }
+   }
+- 
++
+   if ($ext eq 'jpg' || $ext eq 'jpeg' || $ext eq 'jfif') {
+     process_jpeg($file, $options{'discard-meta'});
+     leanify($file, $options{'discard-meta'});
+@@ -341,7 +341,7 @@ sub compressfile($%) {
+       $ext=~s/^.*\.//;
+     }
+   }
+-  
++
+   if ($ext eq 'ico' ||
+       $ext eq 'fb2') {
+     leanify($file);
+@@ -428,7 +428,7 @@ sub compressfile($%) {
+     my $outtype='zip';
+     if($ext eq 'zip' && $options{'zip-7z'}){$outtype='7z'}
+     if($ext eq '7z' ){$outtype='7z'}
+-    
++
+     my $ret=compress_zip($file,$outtype);
+     if($ret){
+       if($ret ne $file){
+@@ -511,8 +511,10 @@ sub process_jpeg($$$){
+     $copytype='none';
+   }
+   my $ignoregrey=$_[2]; #Disables the greyscale image detection.
+-  testcommand('jpegoptim');
+-  my $ret=system('jpegoptim', '-T1', '--all-progressive', '-p', '-q', $file);
++  # testcommand('jpegoptim');
++  testcommand('image_optim');
++  # my $ret=system('jpegoptim', '-T1', '--all-progressive', '-p', '-q', $file);
++  my $ret=system('image_optim', $file);
+   if($ret){
+     print "  Aborting processing of JPEG file. May be a damaged file or incorrect extension?\n";
+     return($file);
+@@ -1005,7 +1007,7 @@ sub compress_zip() {
+     $suboptions{'jpg-webp'} && print("  Using JPG-to-WEBP conversion.\n");
+   }
+   $suboptions{'jpg-webp'}=$suboptions{'jpg-webp'} || $options{'jpg-webp-archive'};
+-  
++
+   if($ext eq '.zip' ||
+     $ext eq '.rar' ||
+     $ext eq '.7z' ||
+@@ -1016,7 +1018,7 @@ sub compress_zip() {
+     $suboptions{'misc-png'}=$options{'zip-images'};
+     $suboptions{'png-webp'}=$options{'zip-images'};
+   }
+-  
++
+   my $zipclear=0;
+   if($ext eq '.cbz' || ($ext eq '.zip' && $options{'del-zip-junk'})){
+     system('zip', '-qd',$input_file, '*/', #Looks weird, but actually here to delete empty directories.
+@@ -1039,7 +1041,7 @@ sub compress_zip() {
+   my $tempfolder="$tmpfolder/zipshrink$id";
+   if (-e $tempfolder) {
+     die "Fatal error in archive extraction: Temporary directory already exists. Try clearing old folders from $tmpfolder.";
+-  } 
++  }
+ 
+   mkdir($tempfolder);
+   chdir($tempfolder);
+@@ -1214,9 +1216,10 @@ sub process_woff(){
+ sub compress_png($) {
+   my $file=$_[0];
+ #  $tested_png || test_png();
+-  testcommand('optipng');
+-  testcommand('advdef');
+-  testcommand('advpng');
++  # testcommand('optipng');
++  # testcommand('advdef');
++  # testcommand('advpng');
++  testcommand('image_optim');
+ 
+   my $anim=is_animated_png($file);
+ 
+@@ -1227,14 +1230,15 @@ sub compress_png($) {
+ 
+   print "Compressing $file $anim ...\n";
+ 
+-  system('optipng', '-quiet','-o6', '-nc', '-nb', $file);
++  # system('optipng', '-quiet','-o6', '-nc', '-nb', $file);
++  system('image_optim', $file);
+ 
+-  if ($anim) {
+-    system('advdef', '-z4', '-q', $file);
+-  } else {
+-    system('advpng', '-z4', '-q', $file);
+-    testcommand_nonessential('pngout') && system('pngout', $file);
+-  }
++  # if ($anim) {
++  #   system('advdef', '-z4', '-q', $file);
++  # } else {
++  #   system('advpng', '-z4', '-q', $file);
++  #   testcommand_nonessential('pngout') && system('pngout', $file);
++  # }
+ }
+ 
+ sub generic_image_recode($){
+@@ -1553,7 +1557,7 @@ sub adv_pdf_iterate_objects(){
+   open($fh, '+<:raw', $filename);
+   binmode($fh);
+   my @candidate_streams;
+-  my $count=0;  
++  my $count=0;
+   for my $object (@objects2){
+     $count++;
+     my $offset=$object;
+@@ -1593,7 +1597,7 @@ sub adv_pdf_iterate_objects(){
+         $dict=substring_replace($dict, '/Filter [ /ASCII85Decode ] ', '/Filter /ASCII85Decode ');
+         $dict=substring_replace($dict, '/Filter [ /LZWDecode ] ', '/Filter /LZWDecode ');
+         $dict=substring_replace($dict, '/Filter [ /JBIG2Decode ] ', '/Filter /JBIG2Decode ');
+-        if($dict && ($dict ne $origdict)){ 
++        if($dict && ($dict ne $origdict)){
+           sysseek($fh, $offset, SEEK_SET); #And write the patched dictionary in - for the benefit of later processing.
+           syswrite($fh, $dict, length($dict));
+           $opti_obj++;
+@@ -1681,7 +1685,7 @@ sub advpdf_obj(){
+   sysread($tempfh, $contents, $newlen);
+   close($tempfh);
+   unlink($tempname);
+-  
++
+   if($newlen >= $streamlen){
+     return(0);
+   }
+@@ -1689,7 +1693,7 @@ sub advpdf_obj(){
+   sysseek($fh, $contentsoffset, SEEK_SET);
+   syswrite($fh, $contents, $newlen) || die "write failed";
+   syswrite($fh, "endstream\nendobj\n", 17);
+-  
++
+   #Now for the fun part: Updating the length field in the dictionary. If PDF were a simple text based format, this would be trivial.
+   #But due to the possibility of encountering PDF's weird character encoding, going to have to do this working on raw bytes.
+   #This is going to hurt. Unless you are a C programmer.
+@@ -1760,9 +1764,12 @@ sub pdfsizeopt(){
+   my $tempfile2="$tmpfolder/minu-sizeopt-$$-$counter-b.pdf";
+   $counter++;
+   my @args=($pdfsizeoptpath, '--quiet');
+-  my $optimisers='--use-image-optimizer=optipng,advpng';
+-  `which pngout`;
+-  if(! $?) {$optimisers = $optimisers.",pngout";}
++#   my $optimisers='--use-image-optimizer=optipng,advpng';
++#   `which pngout`;
++#   if(! $?) {$optimisers = $optimisers.",pngout";}
++#  `which imgdataopt`;
++  my $optimisers='--use-image-optimizer=oxipngmax_ect';
++  # my $optimisers='--use-image-optimizer=pngcrush,oxipng,optipng,pngquant,pngout,ect,advpng';
+  `which imgdataopt`;
+   if(! $?) {$optimisers = $optimisers.",imgdataopt";}
+   if(!$no_jbig2){
+@@ -1832,7 +1839,7 @@ sub extract_archive(){
+   my $ext=lc($input_file);
+   $ext=~s/^.*\.//;
+   my $err=1;
+-  
++
+   if($ext eq 'rar' ||
+      $ext eq 'cbr'){
+     testcommand('unrar');
+@@ -2233,7 +2240,7 @@ sub optimise_base64_file(){
+     print("  No space savings achieved processing base64 in $file.\n");
+     return;
+   }
+-  writewholefile($tempfile, $output); 
++  writewholefile($tempfile, $output);
+   if(do_comparison_hash($file, $tempfile)){
+     print("  COMPARISON FAIL AFTER BASE64 OPTIMISATION. SKIPPING FILE.\n");
+     unlink($tempfile);
+@@ -2271,7 +2278,7 @@ sub optimise_base64_object(){
+     $data =~ s/[\r\n]//g;
+     $_=$description.$data;
+   }
+-  return($_);  
++  return($_);
+ }
+ 
+ sub readwholefile(){
+@@ -2672,7 +2679,7 @@ sub get_media_len(){
+   $len =~ /(\d\d):(\d\d):(\d\d)\.(\d\d)/;
+ #  $len =~ s/,.*//;
+ #  $len =~ s/.* //;
+-#  $len =~ m/()@/; 
++#  $len =~ m/()@/;
+   return($3+(60*$2)+(60*60*$1));
+ }
+ 
+@@ -2767,7 +2774,7 @@ sub isnotmonoable($){
+   }
+ 
+   print("    Examined $samples samples.\n");
+-  
++
+   print("  File contains a stereo track, but with mono audio. Downmixing to a single channel if possible.\n");
+   if($issilent){
+     print("  One better: The audio track is silent, and may be discarded.\n");
+@@ -2916,7 +2923,7 @@ sub leanify($){
+       $file_slashed =~ s/\//\\/g;
+       `del "$file_slashed"`; #Yes, it's that bad: unlink() doesn't work.
+       copy($uglyfile, $file);
+-      $postsize = -s $file;      
++      $postsize = -s $file;
+     }
+     unlink($uglyfile);
+   }
+@@ -3054,21 +3061,21 @@ sub denormal_stl($){
+   binmode(FH_OUT);
+   print FH_OUT $header;
+   print FH_OUT $tris;
+-  
++
+   my $n;
+   my $denormaled=0;
+   for($n=0;$n<$tris_dec;$n++){
+     my $t;
+     read($fh_in, $t, 12);
+     if($t ne "\0\0\0\0\0\0\0\0\0\0\0\0"){$denormaled=1;}
+-    
+-    print FH_OUT "\0\0\0\0\0\0\0\0\0\0\0\0";  
++
++    print FH_OUT "\0\0\0\0\0\0\0\0\0\0\0\0";
+     read($fh_in, $t, 12);
+-    print FH_OUT $t;  
++    print FH_OUT $t;
+     read($fh_in, $t, 12);
+-    print FH_OUT $t;  
++    print FH_OUT $t;
+     read($fh_in, $t, 12);
+-    print FH_OUT $t;  
++    print FH_OUT $t;
+     read($fh_in, $t, 2);
+     if($t ne "\0\0"){
+       print("    Found optional data on a file which should have none. This can't happen, ergo this is not a valid STL file.\n");
+@@ -3077,7 +3084,7 @@ sub denormal_stl($){
+       unlink($tempfile);
+       return(0);
+     }
+-    print FH_OUT "\0\0";  
++    print FH_OUT "\0\0";
+   }
+   close($fh_in);
+   close(FH_OUT);
