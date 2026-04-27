@@ -243,10 +243,21 @@ def main [
     exit 1
   }
 
-  if $comic_vine_issue_id != null and ($files | length) > 1 {
-    log error "Setting the comic vine issue id for multiple files is not allowed as it will result in overwriting the final file"
+  if ($files | length) > 1 and (
+    ($comic_vine_issue_id | is-not-empty)
+    or ($isbn | is-not-empty)
+    or ($bookbrainz_edition_id  | is-not-empty)
+    or ($open_library_edition_id  | is-not-empty)
+    or ($hardcover_edition_id | is-not-empty)
+    or ($hardcover_book_slug | is-not-empty)
+    or ($open_library_edition_id | is-not-empty)
+    or ($wikidata_edition_id | is-not-empty)
+    or ($wikidata_work_id | is-not-empty)
+  ) {
+    log error "Setting identifiers for multiple files is not allowed as it will result in overwriting the final file"
     exit 1
   }
+
   let comic_vine_issue_id = (
     if $comic_vine_issue_id != null and ($comic_vine_issue_id | str starts-with "4000-") {
       $comic_vine_issue_id | str replace "4000-" ""
@@ -254,88 +265,41 @@ def main [
       $comic_vine_issue_id
     }
   )
-  if $comic_vine_issue_id != null and $comic_vine_issue_id !~ "^[0-9]+$" {
+  if ($comic_vine_issue_id | is-not-empty) and not (("4000-" + $comic_vine_issue_id) | is_identifier_valid comic_vine_issue_id) {
     log error $"Invalid Comic Vine issue id (ansi purple)($comic_vine_issue_id)(ansi reset). The Comic Vine issue id should be provided as an integer without a prefix or with a prefix of '4000-'"
     exit 1
   }
-
-  if $isbn != null and ($files | length) > 1 {
-    log error "Setting the ISBN for multiple files is not allowed as it will result in overwriting the final file"
+  if not ($isbn | validate_isbn) {
+    log error $"The ISBN (ansi red)($isbn)(ansi reset) is invalid"
     exit 1
   }
-
-  if $bookbrainz_edition_id != null and ($files | length) > 1 {
-    log error "Setting the BookBrainz Edition ID for multiple files is not allowed as it will result in overwriting the final file"
+  if ($bookbrainz_edition_id | is-not-empty) and not ($bookbrainz_edition_id | is_identifier_valid bookbrainz_edition_id) {
+    log error $"Invalid BookBrainz edition ID (ansi purple)($bookbrainz_edition_id)(ansi reset)"
     exit 1
   }
-  if $bookbrainz_edition_id != null {
-    # e0deb9b1-e2ae-4240-99ec-8fc20d477122
-    if $bookbrainz_edition_id !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' {
-      log error $"Invalid BookBrainz edition ID (ansi purple)($bookbrainz_edition_id)(ansi reset)"
-      exit 1
-    }
-  }
-
-  if $open_library_edition_id != null and ($files | length) > 1 {
-    log error "Setting the Open Library edition ID for multiple files is not allowed as it will result in overwriting the final file"
+  if ($hardcover_edition_id | is-not-empty) and not ($hardcover_edition_id | is_identifier_valid hardcover_edition_id) {
+    log error $"The Hardcover edition ID (ansi purple)($hardcover_edition_id)(ansi reset) is not an integer"
     exit 1
   }
-  if $open_library_edition_id != null {
-    # OL61500893M
-    if $open_library_edition_id !~ '^OL[0-9]+M$' {
-      log error $"Invalid Open Library edition ID (ansi purple)($open_library_edition_id)(ansi reset)"
-      exit 1
-    }
-  }
-
-  if $hardcover_edition_id != null and ($files | length) > 1 {
-    log error "Setting the Hardcover edition ID for multiple files is not allowed as it will result in overwriting the final file"
-    exit 1
-  }
-
-  if $hardcover_edition_id != null {
-    if $hardcover_edition_id !~ '^[0-9]+$' {
-      log error $"The Hardcover edition ID (ansi purple)($hardcover_edition_id)(ansi reset) is not an integer"
-      exit 1
-    }
-  }
-
-  if ($hardcover_edition_id == null or $hardcover_book_slug == null) and ($env | get --optional MEDIA_JUGGLER_HARDCOVER_API_TOKEN | is-empty) {
+  if (($hardcover_edition_id | is-empty) or ($hardcover_book_slug | is-empty)) and ($env | get --optional MEDIA_JUGGLER_HARDCOVER_API_TOKEN | is-empty) {
     log error "The environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN must be set to a Hardcover API key if --hardcover-book-slug and --hardcover-api-key are not provided."
     exit 1
   }
-
-  if $wikidata_edition_id != null and ($files | length) > 1 {
-    log error "Setting the Wikidata Edition ID for multiple files is not allowed as it will result in overwriting the final file"
+  if ($hardcover_book_slug | is-not-empty) and not ($hardcover_book_slug | is_identifier_valid hardcover_book_slug) {
+    log error $"The Hardcover book slug (ansi purple)($hardcover_book_slug)(ansi reset) is most likely invalid since it is an integer"
     exit 1
   }
-  if $wikidata_edition_id != null {
-    if $wikidata_edition_id !~ '^Q[0-9]+$' {
-      log error $"The Wikidata edition ID (ansi purple)($wikidata_edition_id)(ansi reset) must be formatted as the letter 'Q' followed by an integer"
-      exit 1
-    }
-  }
-
-  if $wikidata_work_id != null and ($files | length) > 1 {
-    log error "Setting the Wikidata Work ID for multiple files is not allowed as it will result in overwriting the final file"
+  if ($open_library_edition_id | is-not-empty) and not ($open_library_edition_id | is_identifier_valid open_library_edition_id) {
+    log error $"Invalid Open Library edition ID (ansi purple)($open_library_edition_id)(ansi reset)"
     exit 1
   }
-  if $wikidata_work_id != null {
-    if $wikidata_work_id !~ '^Q[0-9]+$' {
-      log error $"The Wikidata work ID (ansi purple)($wikidata_work_id)(ansi reset) must be formatted as the letter 'Q' followed by an integer"
-      exit 1
-    }
-  }
-
-  if $hardcover_book_slug != null and ($files | length) > 1 {
-    log error "Setting the Hardcover Book Slug for multiple files is not allowed as it will result in overwriting the final file"
+  if ($wikidata_edition_id | is-not-empty) and not ($wikidata_edition_id | is_identifier_valid wikidata_item_id) {
+    log error $"The Wikidata edition ID (ansi purple)($wikidata_edition_id)(ansi reset) must be formatted as the letter 'Q' followed by an integer"
     exit 1
   }
-  if $hardcover_book_slug != null {
-    if $hardcover_book_slug =~ '^[0-9]+$' {
-      log error $"The Hardcover book slug (ansi purple)($hardcover_book_slug)(ansi reset) is most likely invalid since it is an integer"
-      exit 1
-    }
+  if ($wikidata_work_id | is-not-empty) and not ($wikidata_work_id | is_identifier_valid wikidata_item_id) {
+    log error $"The Wikidata work ID (ansi purple)($wikidata_work_id)(ansi reset) must be formatted as the letter 'Q' followed by an integer"
+    exit 1
   }
 
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-comics"] | path join

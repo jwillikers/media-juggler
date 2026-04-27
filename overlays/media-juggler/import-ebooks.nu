@@ -43,8 +43,13 @@ def main [
     exit 1
   }
 
-  if $isbn != null and ($files | length) > 1 {
+  if ($isbn | is-not-empty) and ($files | length) > 1 {
     log error "Setting the ISBN for multiple files is not allowed as it can result in overwriting the final file"
+    exit 1
+  }
+
+  if not ($isbn | validate_isbn) {
+    log error $"The ISBN (ansi red)($isbn)(ansi reset) is invalid"
     exit 1
   }
 

@@ -1,0 +1,127 @@
+<MetronInfo noNamespaceSchemaLocation="MetronInfo.xsd">
+  <IDS>
+    <ID source="Comic Vine" primary="true">4000-987377</ID>
+  </IDS>
+  <Publisher id="4010-8736">
+    <Name>Denpa, LLC</Name>
+    <Imprint>Denpa</Imprint>
+  </Publisher>
+  <Series id="4050-150064" lang="eng">
+    <Name>March Comes in Like a Lion</Name>
+    <Format>Trade Paperback</Format>
+    <StartYear>2023</StartYear>
+    <AlternativeNames>
+      <AlternativeName>
+        <Name id="4050-124337" lang="jpn">3月のライオン</Name>
+      </AlternativeName>
+    </AlternativeNames>
+  </Series>
+  <MangaVolume>1</MangaVolume>
+  <CollectionTitle>March Comes in Like a Lion, Vol. 1</CollectionTitle>
+  <Number></Number>
+  <Stories>
+    <Story>March Comes in Like a Lion, Vol. 1</Story>
+  </Stories>
+  <Summary>Summary of March Comes in Like a Lion.
+
+## Chapter Titles
+* Chapter 1
+* Chapter 2
+* Chapter 3
+* Chapter 10: Over the Cuckoo&apos;s Nest</Summary>
+  <Notes>Tagged with ComicTagger 1.6.0b11.dev0 using info from Comic Vine on 2026-04-25 15:19:05. [Issue ID 987377]</Notes>
+  <Prices></Prices>
+  <CoverDate>2023-05-01</CoverDate>
+  <!-- Don't count hidden images -->
+  <PageCount>187</PageCount>
+  <Genres>
+    <Genre>coming-of-age</Genre>
+    <Genre>romance</Genre>
+    <Genre>slice of life</Genre>
+  </Genres>
+  <Tags>
+    <Tag>seinen</Tag>
+    <Tag>shogi</Tag>
+  </Tags>
+  <Arcs></Arcs>
+  <Characters></Characters>
+  <Teams></Teams>
+  <Universes></Universes>
+  <Locations>
+    <Location>Japan</Location>
+  </Locations>
+  <AgeRating>Everyone</AgeRating>
+  <GTIN>
+    <ISBN>9781634428132</ISBN>
+  </GTIN>
+  <URLs>
+    <URL>https://bookbrainz.org/edition/594a8ec2-6301-4c20-ae22-2c43840416b2</URL>
+    <URL>https://comicvine.gamespot.com/issue/4000-987377</URL>
+    <URL>https://hardcover.app/books/march-comes-in-like-a-lion-vol-1/editions/32873036</URL>
+    <URL>https://openlibrary.org/books/OL61662902M</URL>
+    <URL>https://www.wikidata.org/wiki/Q139556252</URL>
+  </URLs>
+  <LastModified>2026-04-25T15:19:07.353022</LastModified>
+  <Credits>
+    <Credit>
+      <Creator id="4040-61078">Chica Umino</Creator>
+      <Roles>
+        <Role>Writer</Role>
+        <Role>Illustrator</Role>
+        <!-- <Role>Story</Role>
+        <Role>Plot</Role>
+        <Role>Penciller</Role> -->
+        <Role>Cover</Role>
+      </Roles>
+    </Credit>
+    <Credit>
+      <Creator id="4040-77011">Glen Isip</Creator>
+      <Roles>
+        <Role>Production</Role>
+      </Roles>
+    </Credit>
+    <Credit>
+      <Creator id="4040-75458">Jocelyne Allen</Creator>
+      <Roles>
+        <Role>Translator</Role>
+      </Roles>
+    </Credit>
+    <Credit>
+      <Creator id="4040-105428">Kai Kyou</Creator>
+      <Roles>
+        <Role>Production</Role>
+      </Roles>
+    </Credit>
+    <Credit>
+      <Creator id="4040-128556">Manabu Senzaki</Creator>
+      <Roles>
+        <Role>Other</Role>
+      </Roles>
+    </Credit>
+    <Credit>
+      <Creator id="4040-71659">Nicole Dochych</Creator>
+      <Roles>
+        <Role>Production</Role>
+      </Roles>
+    </Credit>
+    <Credit>
+      <Creator id="4040-75103">Risa Cho</Creator>
+      <Roles>
+        <Role>Production</Role>
+        <Role>Letterer</Role>
+      </Roles>
+    </Credit>
+    <Credit>
+      <Creator id="4040-108819">Taneli Vatanen</Creator>
+      <Roles>
+        <Role>Digital Art Technician</Role>
+      </Roles>
+    </Credit>
+    <Credit>
+      <Creator id="4040-132327">Varrick Robinson</Creator>
+      <Roles>
+        <Role>Other</Role>
+      </Roles>
+    </Credit>
+  </Credits>
+</MetronInfo>
