@@ -27,3 +27,4 @@ jobs:
         run: |
           nix develop --command nu overlays/media-juggler/media-juggler-lib-tests.nu
           nix develop --command nu overlays/media-juggler/import-music-tests.nu
+          nix develop --command nu overlays/media-juggler/import-comics-tests.nu

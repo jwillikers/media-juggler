@@ -65,6 +65,7 @@ else
     checkPhase = ''
       runHook preCheck
       nu media-juggler-lib-tests.nu
+      nu import-comics-tests.nu
       nu import-music-tests.nu
       runHook postCheck
     '';

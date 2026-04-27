@@ -28,6 +28,7 @@ alias t := test
 
 test:
     nu overlays/media-juggler/media-juggler-lib-tests.nu
+    nu overlays/media-juggler/import-comics-tests.nu
     nu overlays/media-juggler/import-music-tests.nu
 
 alias u := update
