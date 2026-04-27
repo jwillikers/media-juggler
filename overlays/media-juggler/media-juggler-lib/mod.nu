@@ -3314,7 +3314,7 @@ export def tag_epub_comic_vine [
 export def fetch-ebook-metadata [
   ...args: string
   # Remove Comicvine because it can cause trouble, although it does have entries for some Light Novels apparently.
-  --allowed-plugins: list<string> = ["Hardcover" "Barnes & Noble" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
+  --allowed-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
   # --allowed-plugins: list<string> = [Google "Amazon.com"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
   --authors: list<string> # A list of authors to use
   --cover: path # Path to which to download the cover
@@ -3326,7 +3326,7 @@ export def fetch-ebook-metadata [
     if ($allowed_plugins | is-empty) {
       null
     } else {
-      $allowed_plugins | par-each {|plugin| $"--allowed-plugin=($plugin)"}
+      $allowed_plugins | each {|plugin| $"--allowed-plugin=($plugin)"}
     }
   )
   let authors = (
@@ -3496,7 +3496,7 @@ export def rename_image_with_extension [] : path -> path {
 # Fetch metadata for an eBook with Calibre.
 export def fetch_book_metadata [
   working_directory: directory
-  --allowed-plugins: list<string>
+  --allowed-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"]
   --authors: list<string>
   --identifiers: list<string>
   --isbn: string

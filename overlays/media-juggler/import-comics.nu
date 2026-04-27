@@ -202,7 +202,8 @@ def main [
   --cbconvert-pdf-image-quality: string = "90" # The image quality setting to pass to cbconvert when generating a CBZ from a PDF. Lower this as necessary for PDFs with extremely high quality images.
   --clear-comictagger-cache # Clear the ComicTagger cache to force it to pull in updated data
   --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
-  --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library" "Kobo Metadata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
+  --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
+  # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library" "Kobo Metadata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
   --ereader-subdirectory: string = "Books/Manga" # The subdirectory on the e-reader in-which to copy
@@ -269,7 +270,7 @@ def main [
     log error $"Invalid Comic Vine issue id (ansi purple)($comic_vine_issue_id)(ansi reset). The Comic Vine issue id should be provided as an integer without a prefix or with a prefix of '4000-'"
     exit 1
   }
-  if not ($isbn | validate_isbn) {
+  if ($isbn | is-not-empty) and  not ($isbn | validate_isbn) {
     log error $"The ISBN (ansi red)($isbn)(ansi reset) is invalid"
     exit 1
   }
@@ -1520,7 +1521,7 @@ def main [
       log debug $"Fetching book metadata using title (ansi yellow)($title)(ansi reset) and authors (ansi yellow)($authors)(ansi reset)"
       # Kobo Metadata is not working well for getting the right issue number.
       let fetched = (
-        fetch-ebook-metadata --allowed-plugins ["Google"] --authors $authors --title $title | get opf
+        fetch-ebook-metadata --allowed-plugins ["Hardcover" "Open Library" "Wikidata"] --authors $authors --title $title | get opf
       )
       if ($fetched | is-not-empty) {
         let fetched_isbn_for_google = $fetched | isbn_from_opf

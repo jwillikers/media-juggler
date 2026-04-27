@@ -428,7 +428,7 @@ def main [
       let input = $in;
       if ($isbn | is-empty) {
         # Don't use Kobo unless we know the ISBN... or it will probably find something arbitrary and wrong instead of the actual book.
-        let result = $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] $temporary_directory
+        let result = $input | fetch_book_metadata --allowed-plugins ["Hardcover" "Wikidata"] $temporary_directory
         if $result.opf == null {
           {
             book: $input
@@ -466,8 +466,8 @@ def main [
           } else if $fetched_isbn == $isbn {
             $result
           } else {
-            log info "Fetched ISBN doesn't match the ISBN used to search! Will attempt another search with only the Google and Amazon.com metadata sources"
-            let result = $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] --isbn $isbn $temporary_directory
+            log info "Fetched ISBN doesn't match the ISBN used to search! Will attempt another search with only the Hardcover and Wikidata metadata sources"
+            let result = $input | fetch_book_metadata --allowed-plugins ["Hardcover" "Wikidata"] --isbn $isbn $temporary_directory
             if $result.opf == null {
               {
                 book: $input
