@@ -2768,6 +2768,11 @@ export const book_identifiers = {
     url: "https://hardcover.app/books/{{ hardcover_book_slug }}/editions/{{ hardcover_edition_id }}"
     url_parse_expression: "http[s]{0,1}://hardcover.app/books/(?<hardcover_book_slug>[a-zA-Z0-9_-]+)/editions/(?<hardcover_edition_id>[0-9]+)/{0,1}$"
   }
+  metron_issue_id: {
+    match_expression: '^[0-9]+$'
+    url: "https://metron.cloud/issue/{{ metron_issue_id }}"
+    url_parse_expression: '^http[s]{0,1}://metron.cloud/issue/(?<metron_issue_id>[0-9]+)/{0,1}$'
+  }
   open_library_edition_id: {
     match_expression: '^OL[0-9]+M$'
     url: "https://openlibrary.org/books/{{ open_library_edition_id }}"
@@ -2847,22 +2852,42 @@ export def identifier_into_url [
     }
   }
   if $type == "hardcover_edition_id" and ($hardcover_book_slug | is-empty) {
-    log error "The Hardcover book slug must be passed with the --hardcover-book-slug flag when the type is hardcover_edition_id"
-    return null
+    error make {
+      msg: "missing hardcover_book_slug"
+      labels: [
+          {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
+      ]
+      help: "the Hardcover book slug must be passed with the --hardcover-book-slug flag when the type is hardcover_edition_id"
+    }
   }
   if $type != "hardcover_edition_id" and ($hardcover_book_slug | is-not-empty) {
-    log error "The flag --hardcover-book-slug is only valid when the type is hardcover_edition_id"
-    return null
+    error make {
+      msg: "invalid use of --hardcover-book-slug"
+      labels: [
+          {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
+      ]
+      help: "the flag --hardcover-book-slug is only valid when the type is hardcover_edition_id"
+    }
   }
   if not ($id | is_identifier_valid $type) {
-    log error $"The (ansi red)($id)(ansi reset) of type (ansi yellow)($type)(ansi reset) is invalid"
-    return null
+    error make {
+      msg: "invalid identifier"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: $"the (ansi red)($id)(ansi reset) of type (ansi yellow)($type)(ansi reset) is invalid"
+    }
   }
-  if $type == "hardcover_edition_id" and not ($hardcover_book_slug | is_identifier_valid $type) {
-    log error $"The Hardcover book slug (ansi red)($id)(ansi reset) is invalid"
-    return null
+  if $type == "hardcover_edition_id" and not ($hardcover_book_slug | is_identifier_valid "hardcover_book_slug") {
+    error make {
+      msg: "invalid hardcover_book_slug identifier"
+      labels: [
+          {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
+      ]
+      help: $"the Hardcover book slug (ansi red)($hardcover_book_slug)(ansi reset) is invalid"
+    }
   }
-  let url = $book_identifiers | get $type | get url | str replace ("{{" + $type + "}}") $id
+  let url = $book_identifiers | get $type | get url | str replace ("{{ " + $type + " }}") $id
   if $type == "hardcover_edition_id" {
     $url | str replace ("{{ hardcover_book_slug }}") $hardcover_book_slug
   } else {

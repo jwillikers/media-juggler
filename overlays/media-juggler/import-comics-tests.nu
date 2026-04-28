@@ -77,6 +77,16 @@ def test_is_identifier_valid_hardcover_edition_id_invalid [] {
   assert equal ($input | is_identifier_valid "hardcover_edition_id") false
 }
 
+def test_is_identifier_valid_metron_issue_id_valid [] {
+  let input = "57342"
+  assert equal ($input | is_identifier_valid "metron_issue_id") true
+}
+
+def test_is_identifier_valid_metron_issue_id_invalid [] {
+  let input = "4000-57342"
+  assert equal ($input | is_identifier_valid "metron_issue_id") false
+}
+
 def test_is_identifier_valid_open_library_edition_id_valid [] {
   let input = "OL6682530M"
   assert equal ($input | is_identifier_valid "open_library_edition_id") true
@@ -120,6 +130,8 @@ def test_is_identifier_valid [] {
   test_is_identifier_valid_bookbrainz_work_id_invalid
   test_is_identifier_valid_comic_vine_issue_id_valid
   test_is_identifier_valid_comic_vine_issue_id_invalid
+  test_is_identifier_valid_metron_issue_id_valid
+  test_is_identifier_valid_metron_issue_id_invalid
   test_is_identifier_valid_hardcover_book_slug_valid
   test_is_identifier_valid_hardcover_book_slug_invalid
   test_is_identifier_valid_hardcover_edition_id_valid
@@ -332,6 +344,39 @@ def test_identifier_from_url_hardcover_edition_id_valid_edition_http [] {
   assert equal ($input | identifier_from_url "hardcover_edition_id") $expected
 }
 
+def test_identifier_from_url_metron_issue_id_series_url [] {
+  let input = "https://metron.cloud/series/4376/"
+  assert equal ($input | identifier_from_url "metron_issue_id") {}
+}
+
+def test_identifier_from_url_metron_issue_id_valid_issue [] {
+  let input = "https://metron.cloud/issue/57342/"
+  let expected = {
+    metron_issue_id: "57342"
+  }
+  assert equal ($input | identifier_from_url "metron_issue_id") $expected
+}
+
+def test_identifier_from_url_metron_issue_id_invalid_issue [] {
+  let input = "https://metron.cloud/issue/1985-2008-2/"
+  let expected = {}
+  assert equal ($input | identifier_from_url "metron_issue_id") $expected
+}
+
+def test_identifier_from_url_metron_issue_id_invalid_issue_url [] {
+  let input = "https://metron.cloud/issues/57342/"
+  let expected = {}
+  assert equal ($input | identifier_from_url "metron_issue_id") $expected
+}
+
+def test_identifier_from_url_metron_issue_id_valid_issue_http [] {
+  let input = "http://metron.cloud/issue/57342/"
+  let expected = {
+    metron_issue_id: "57342"
+  }
+  assert equal ($input | identifier_from_url "metron_issue_id") $expected
+}
+
 def test_identifier_from_url_open_library_edition_id_work_url [] {
   let input = "https://openlibrary.org/works/OL6682530M/Twenty_thousand_leagues_under_the_sea"
   let expected = {}
@@ -501,6 +546,12 @@ def test_identifier_from_url [] {
   test_identifier_from_url_hardcover_edition_id_invalid_edition_url
   test_identifier_from_url_hardcover_edition_id_valid_edition_http
 
+  test_identifier_from_url_metron_issue_id_series_url
+  test_identifier_from_url_metron_issue_id_valid_issue
+  test_identifier_from_url_metron_issue_id_invalid_issue
+  test_identifier_from_url_metron_issue_id_invalid_issue_url
+  test_identifier_from_url_metron_issue_id_valid_issue_http
+
   test_identifier_from_url_open_library_edition_id_work_url
   test_identifier_from_url_open_library_edition_id_short_url
   test_identifier_from_url_open_library_edition_id_work_url_with_edition
@@ -524,12 +575,167 @@ def test_identifier_from_url [] {
   test_identifier_from_url_wikidata_item_id_valid_item_http
 }
 
+def test_identifier_into_url_empty_id [] {
+  let input = ""
+  assert error {|| ($input | identifier_into_url "bookbrainz_edition_id")}
+}
+
+def test_identifier_into_url_empty_type [] {
+  let input = "Q1234"
+  assert error {|| ($input | identifier_into_url "")}
+}
+
+def test_identifier_into_url_invalid_type [] {
+  let input = "Q1234"
+  assert error {|| ($input | identifier_into_url "comicbrainz_edition_id")}
+}
+
+def test_identifier_into_url_bookbrainz_edition_id_valid [] {
+  let input = "6a2a8813-8085-4058-8897-f8b89e037106"
+  let expected = "https://bookbrainz.org/edition/6a2a8813-8085-4058-8897-f8b89e037106"
+  assert equal ($input | identifier_into_url "bookbrainz_edition_id") $expected
+}
+
+def test_identifier_into_url_bookbrainz_edition_id_invalid [] {
+  let input = "6a2a8813-8085-4058-8897-f8b89e0371067"
+  assert error {|| ($input | identifier_into_url "bookbrainz_edition_id")}
+}
+
+def test_identifier_into_url_bookbrainz_work_id_valid [] {
+  let input = "6a2a8813-8085-4058-8897-f8b89e037106"
+  let expected = "https://bookbrainz.org/work/6a2a8813-8085-4058-8897-f8b89e037106"
+  assert equal ($input | identifier_into_url "bookbrainz_work_id") $expected
+}
+
+def test_identifier_into_url_bookbrainz_work_id_invalid [] {
+  let input = "6a2a8813-8085-4058-8897-f8b89e0371067"
+  assert error {|| ($input | identifier_into_url "bookbrainz_work_id")}
+}
+
+def test_identifier_into_url_comic_vine_issue_id_valid [] {
+  let input = "4000-987377"
+  let expected = "https://comicvine.gamespot.com/issue/4000-987377"
+  assert equal ($input | identifier_into_url "comic_vine_issue_id") $expected
+}
+
+def test_identifier_into_url_comic_vine_issue_id_invalid [] {
+  let input = "4050-987377"
+  assert error {|| ($input | identifier_into_url "comic_vine_issue_id")}
+}
+
+def test_identifier_into_url_hardcover_edition_id_valid [] {
+  let input = "32873036"
+  let expected = "https://hardcover.app/books/march-comes-in-like-a-lion-vol-1/editions/32873036"
+  assert equal ($input | identifier_into_url "hardcover_edition_id" --hardcover-book-slug "march-comes-in-like-a-lion-vol-1") $expected
+}
+
+def test_identifier_into_url_hardcover_edition_id_invalid [] {
+  let input = "32873036-1"
+  assert error {|| ($input | identifier_into_url "hardcover_edition_id" --hardcover-book-slug "march-comes-in-like-a-lion-vol-1")}
+}
+
+def test_identifier_into_url_hardcover_edition_id_hardcover_book_slug_invalid [] {
+  let input = "32873036"
+  assert error {|| ($input | identifier_into_url "hardcover_edition_id" --hardcover-book-slug "march-comes-in-like-a-lion-vol-1/editions")}
+}
+
+def test_identifier_into_url_hardcover_edition_id_hardcover_book_slug_empty [] {
+  let input = "32873036"
+  assert error {|| ($input | identifier_into_url "hardcover_edition_id" --hardcover-book-slug "")}
+}
+
+def test_identifier_into_url_hardcover_edition_id_hardcover_book_slug_missing [] {
+  let input = "32873036"
+  assert error {|| ($input | identifier_into_url "hardcover_edition_id")}
+}
+
+def test_identifier_into_url_hardcover_book_slug_added_for_wrong_type [] {
+  let input = "32873036"
+  assert error {|| ($input | identifier_into_url "bookbrainz_edition_id" --hardcover-book-slug "")}
+}
+
+def test_identifier_into_url_hardcover_book_slug_valid [] {
+  let input = "march-comes-in-like-a-lion-vol-1"
+  let expected = "https://hardcover.app/books/march-comes-in-like-a-lion-vol-1"
+  assert equal ($input | identifier_into_url "hardcover_book_slug") $expected
+}
+
+def test_identifier_into_url_hardcover_book_slug_invalid [] {
+  let input = "march-comes-in-like-a-lion-1-volume-1/editions"
+  assert error {|| ($input | identifier_into_url "hardcover_book_slug")}
+}
+
+def test_identifier_into_url_metron_issue_id_valid [] {
+  let input = "57342"
+  let expected = "https://metron.cloud/issue/57342"
+  assert equal ($input | identifier_into_url "metron_issue_id") $expected
+}
+
+def test_identifier_into_url_metron_issue_id_invalid [] {
+  let input = "4000-57342"
+  assert error {|| ($input | identifier_into_url "metron_issue_id")}
+}
+
+def test_identifier_into_url_open_library_edition_id_valid [] {
+  let input = "OL60495447M"
+  let expected = "https://openlibrary.org/books/OL60495447M"
+  assert equal ($input | identifier_into_url "open_library_edition_id") $expected
+}
+
+def test_identifier_into_url_open_library_edition_id_invalid [] {
+  let input = "OL60495447W"
+  assert error {|| ($input | identifier_into_url "open_library_edition_id")}
+}
+
+def test_identifier_into_url_open_library_work_id_valid [] {
+  let input = "OL60495447W"
+  let expected = "https://openlibrary.org/works/OL60495447W"
+  assert equal ($input | identifier_into_url "open_library_work_id") $expected
+}
+
+def test_identifier_into_url_open_library_work_id_invalid [] {
+  let input = "OL60495447M"
+  assert error {|| ($input | identifier_into_url "open_library_work_id")}
+}
+
+def test_identifier_into_url_wikidata_item_id_valid [] {
+  let input = "Q139580959"
+  let expected = "https://www.wikidata.org/wiki/Q139580959"
+  assert equal ($input | identifier_into_url "wikidata_item_id") $expected
+}
+
+def test_identifier_into_url_wikidata_item_id_invalid [] {
+  let input = "139580959"
+  assert error {|| ($input | identifier_into_url "wikidata_item_id")}
+}
+
 def test_identifier_into_url [] {
   test_identifier_into_url_empty_id
   test_identifier_into_url_empty_type
   test_identifier_into_url_invalid_type
 
-  #
+  test_identifier_into_url_bookbrainz_edition_id_valid
+  test_identifier_into_url_bookbrainz_edition_id_invalid
+  test_identifier_into_url_bookbrainz_work_id_valid
+  test_identifier_into_url_bookbrainz_work_id_invalid
+  test_identifier_into_url_comic_vine_issue_id_valid
+  test_identifier_into_url_comic_vine_issue_id_invalid
+  test_identifier_into_url_hardcover_edition_id_valid
+  test_identifier_into_url_hardcover_edition_id_invalid
+  test_identifier_into_url_hardcover_edition_id_hardcover_book_slug_invalid
+  test_identifier_into_url_hardcover_edition_id_hardcover_book_slug_empty
+  test_identifier_into_url_hardcover_edition_id_hardcover_book_slug_missing
+  test_identifier_into_url_hardcover_book_slug_added_for_wrong_type
+  test_identifier_into_url_hardcover_book_slug_valid
+  test_identifier_into_url_hardcover_book_slug_invalid
+  test_identifier_into_url_metron_issue_id_valid
+  test_identifier_into_url_metron_issue_id_invalid
+  test_identifier_into_url_open_library_edition_id_valid
+  test_identifier_into_url_open_library_edition_id_invalid
+  test_identifier_into_url_open_library_work_id_valid
+  test_identifier_into_url_open_library_work_id_invalid
+  test_identifier_into_url_wikidata_item_id_valid
+  test_identifier_into_url_wikidata_item_id_invalid
 }
 
 def test_from_comic_info_xml [] {
