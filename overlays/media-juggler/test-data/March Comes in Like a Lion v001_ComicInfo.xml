@@ -1,6 +1,13 @@
 <ComicInfo>
   <Title>March Comes in Like a Lion, Vol. 1</Title>
-  <Series>March Comes in Like a Lion</Series>
+  <LocalizedSeries>March Comes in Like a Lion</LocalizedSeries>
+  <Series>3月のライオン</Series>
+  <SeriesGroup>Example Series Group, Another</SeriesGroup>
+  <StoryArc>Example Story Arc</StoryArc>
+  <StoryArcNumber>1</StoryArcNumber>
+  <AlternativeSeries>Example Alternative Series</AlternativeSeries>
+  <AlternativeCount>1</AlternativeCount>
+  <SeriesSort>March Comes in Like a Lion</SeriesSort>
   <Count>3</Count>
   <Volume>1</Volume>
   <Summary>Summary of March Comes in Like a Lion.
@@ -33,6 +40,6 @@
   <GTIN>9781634428132</GTIN>
   <Format>Digital</Format>
   <Manga>YesAndRightToLeft</Manga>
-  <Locations>Japan</Locations>
   <AgeRating>Everyone</AgeRating>
+  <!-- todo Add ComicPageInfo/Pages to be sure it is dropped -->
 </ComicInfo>

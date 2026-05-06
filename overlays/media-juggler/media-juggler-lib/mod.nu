@@ -39,6 +39,7 @@ export const musicbrainz_non_genre_tags = [
   "abridged"
   "accompanying document"
   "audiobook"
+  "book"
   "chapters"
   "explicit"
   # "light novel"
@@ -2961,6 +2962,224 @@ export def identifier_from_url [
     }
   }
   $ids
+}
+
+export const comic_info_fields = [
+  [tag delimiter];
+  [Title null]
+  [LocalizedSeries null]
+  [Series null]
+  [SeriesGroup ","]
+  [StoryArc ","]
+  [StoryArcNumber ","]
+  [AlternativeSeries null]
+  [AlternativeCount null]
+  [SeriesSort null]
+  [Count null]
+  [Number null]
+  [Volume null]
+  [Summary null]
+  [Notes null]
+  [Year null]
+  [Month null]
+  [Day null]
+  [Locations ","]
+  [Characters ","]
+  [Teams ","]
+  [MainCharacterOrTeam null]
+  [ScanInformation null]
+  [Writer ","]
+  [Penciller ","]
+  [Inker ","]
+  [Colorist ","]
+  [Letterer ","]
+  [CoverArtist ","]
+  [Editor ","]
+  [Translator ","]
+  [Publisher null]
+  [Imprint null]
+  [Genre ","]
+  [Tags ","]
+  [Web " "]
+  [PageCount null]
+  [LanguageISO null]
+  [GTIN null]
+  [Format null]
+  [Manga null]
+  [AgeRating null]
+]
+
+# Read a ComicInfo.xml file into the internal data structure
+#
+# https://anansi-project.github.io/docs/comicinfo/documentation
+# https://wiki.kavitareader.com/guides/metadata/comics/
+export def from_comic_info_xml []: [record -> record] {
+  let comic_info_xml = $in
+  if ($comic_info_xml | is-empty) {
+    error make {
+      msg: "empty ComicInfo XML data"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: $"pipe in the ComicInfo XML data"
+    }
+  }
+  let comic_info_xml = ($comic_info_xml | get --optional content)
+  if ($comic_info_xml | is-empty) {
+    error make {
+      msg: "missing content for ComicInfo XML data"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: $"use valid ComicInfo XML data"
+    }
+  }
+
+  # Parse the ComicInfo.xml data into a more usable JSON format.
+  let json = (
+    $comic_info_fields
+    | reduce --fold {} {|comic_info_field, acc|
+      let tags = ($comic_info_xml | where tag == $comic_info_field.tag)
+      if ($tags | is-empty) {
+        return $acc
+      }
+      if ($tags | length) > 1 {
+        error make {
+          msg: "duplicate tag in ComicInfo XML data"
+          labels: [
+              {text: "comic_info_xml" span: (metadata $comic_info_xml).span}
+          ]
+          help: $"duplicate tag in ComicInfo.xml: (ansi red)($comic_info_field.tag)(ansi reset)"
+        }
+      }
+      let value = $tags | first | get content | first | get content
+      if ($value | is-empty) {
+        return $acc
+      }
+      if ($comic_info_field.delimiter | is-empty) {
+        return ($acc | insert $comic_info_field.tag $value)
+      }
+      $acc | insert $comic_info_field.tag ($value | split row $comic_info_field.delimiter | str trim)
+    }
+  )
+
+  let contributor_tags = [
+    [tag role];
+    [Writer writer]
+    [Penciller penciller]
+    [Inker inker]
+    [Colorist colorist]
+    [Letterer letterer]
+    [CoverArtist cover_artist]
+    [Editor editor]
+    [Translator translator]
+  ]
+  let contributors = $contributor_tags | reduce --fold [] {|tag, acc|
+    let contributors = $json | get --optional $tag.tag
+    if ($contributors | is-empty) {
+      return $acc
+    }
+    $acc | append (
+      $contributors | each {|contributor|
+        {
+          contributor: $contributor
+          role: $tag.role
+        }
+      }
+    )
+  } | group-by --to-table contributor | each {|contributor|
+    {
+      contributor: $contributor.contributor
+      roles: $contributor.items.role
+    }
+  }
+
+  # Check for erroneous volume titles in this field.
+  let chapter_title = (
+    if ($json | get --optional "Title" | is-empty) {
+
+    } else {
+      if $json.Title =~ ' (?:Vol\.)|(?:Volume) [0-9.]+$' {
+        # This is almost certainly a volume title and will be omitted.
+      } else {
+        $json.Title
+      }
+    }
+  )
+
+  # Series fields in priority order: SeriesSort, LocalizedSeries, Series
+  let series_fields = [SeriesSort LocalizedSeries Series]
+  let series = (
+    $series_fields | reduce --fold [] {|series_field, acc|
+      if ($json | get --optional $series_field | is-empty) {
+        return $acc
+      }
+      $acc | append (
+        {
+          name: ($json | get $series_field)
+        }
+      )
+    }
+  )
+
+  let publication_date = (
+    []
+    | append ($json | get --optional Year)
+    | append ($json | get --optional Month)
+    | append ($json | get --optional Day)
+    | str join "-"
+    | into datetime --timezone UTC
+  )
+
+  let narrative_fields = [Locations Characters Teams MainCharacterOrTeam]
+  let narrative = $narrative_fields | reduce --fold {narrative: {}} {|narrative_field, acc|
+    if ($json | get --optional $narrative_field | is-empty) {
+      return $acc
+    }
+    (
+      $acc
+      | update narrative (
+        $acc.narrative
+        | insert $narrative_field (
+          $json | get $narrative_field
+        )
+      )
+    )
+  }
+  # StoryArc and StoryArcNumber have to handled specially for the narrative field.
+
+  # todo
+  # Aditional Series Information:
+  #   Number
+  #   Volume
+  #   Count
+  #   Format
+  # Manga
+  # AgeRating (Normalize to Metron's / Kavita's supported ones)
+  # ids (GTIN + ids from Web)
+  # Publisher / Imprint
+  # Language
+  # AlternativeSeries
+  # AlternativeCount
+
+  let data = (
+    {}
+    | upsert_if_value "chapter_title" $chapter_title
+    | upsert_if_value "series" $series
+    | upsert_if_value "contributors" $contributors
+    | upsert_if_value "narrative" $narrative
+    | upsert_if_present "summary" $json "Summary"
+    | upsert_if_present "comment" $json "Notes"
+    | upsert_if_value "publication_date" $publication_date
+    | upsert_if_present "genres" $json "Genres"
+    | upsert_if_present "tags" $json "Tags"
+    | upsert_if_present "series_groups" $json "SeriesGroup"
+    | upsert_if_present "scan_information" $json "ScanInformation"
+    | upsert_if_present "page_count" $json "PageCount"
+    # | upsert_if_present "format" $json "Format"
+  )
+
+  $data
 }
 
 # Search for editions on Wikidata by ISBN-13.
