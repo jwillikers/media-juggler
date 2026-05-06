@@ -1376,7 +1376,7 @@ def main [
       # Kavita will assume that the issue number is a chapter for manga libraries.
       # Add the letter v before the issue number instead of a hashtag so that it understands it is the volume number.
       # Also, leave off the year and volume to avoid confusing Kavita.
-      '{series} v{issue}'
+      '{series} - Volume {issue}'
     }
   )
   let formats = $formats | (
@@ -1453,9 +1453,9 @@ def main [
             }
           )
           if $sanitized_title == null or $sanitized_title =~ 'Volume [0-9]+' or $sanitized_title =~ 'Vol. [0-9]+' {
-            $"($metadata.series), Vol. ($metadata.issue)"
+            $"($metadata.series), Volume ($metadata.issue)"
           } else {
-            $"($metadata.series), Vol. ($metadata.issue): ($sanitized_title)"
+            $"($metadata.series), Volume ($metadata.issue): ($sanitized_title)"
           }
         }
       )
@@ -1633,7 +1633,9 @@ def main [
       }
     )
     | upsert_comic_info {tag: "Manga", value: $manga}
-    | upsert_comic_info {tag: "Title", value: $title}
+    | upsert_comic_info {tag: "Series", value: ($comic_metadata.series | use_unicode_in_title)}
+    # Title is only used for chapter titles.
+    | drop_field_comic_info Title
     | upsert_comic_info {tag: "Format", value: "Digital"}
     | (
       let input = $in;
@@ -1738,6 +1740,7 @@ def main [
     }
     | inject_comic_info
   )
+
   log info "Updating the MetronInfo"
   # log debug $"metron_info:\n($formats.cbz | extract_metron_info_xml $temporary_directory)\n"
   (
@@ -1750,23 +1753,24 @@ def main [
         $i
         | get content
         | where tag != "Stories"
-        | append (
-          [
-            [tag attributes content];
-            [
-              Stories
-              {}
-              [
-                [tag attributes content];
-                [
-                  Story
-                  {}
-                  [[tag attributes content]; [null null $title]]
-                ]
-              ]
-            ]
-          ]
-        )
+        # Story is only used for the chapter title, not volume, so drop it.
+        # | append (
+        #   [
+        #     [tag attributes content];
+        #     [
+        #       Stories
+        #       {}
+        #       [
+        #         [tag attributes content];
+        #         [
+        #           Story
+        #           {}
+        #           [[tag attributes content]; [null null $title]]
+        #         ]
+        #       ]
+        #     ]
+        #   ]
+        # )
       )
     )
     # todo Set CollectionTitle to subtitle of an issue when a subtitle is present.
@@ -1792,7 +1796,26 @@ def main [
           | first
           | (
             let series_in = $in;
-            $series_in | upsert attributes ($series_in.attributes | upsert lang en)
+            $series_in
+            | upsert attributes (
+              $series_in.attributes
+              | upsert lang en
+            )
+            | upsert content (
+              $series_in.content
+              | where tag != Name
+              | prepend [
+                [tag attributes content];
+                [
+                  "Name"
+                  {}
+                  [
+                    [tag attributes content];
+                    [null null ($comic_metadata.series | use_unicode_in_title)]
+                  ]
+                ]
+              ]
+            )
           )
         )
       )
@@ -1825,13 +1848,14 @@ def main [
                     $series_in
                     | get content
                     | where tag != "Volume"
-                    | append (
-                      $series_in
-                      | get content
-                      | where tag == "Volume"
-                      | first
-                      | upsert content [[tag attributes content]; [null null ($comic_metadata.issue | into string)]]
-                    )
+                    # todo Don't drop this when it isn't manga / manhwa
+                    # | append (
+                    #   $series_in
+                    #   | get content
+                    #   | where tag == "Volume"
+                    #   | first
+                    #   | upsert content [[tag attributes content]; [null null ($comic_metadata.issue | into string)]]
+                    # )
                     | where tag != "IssueCount"
                     | where tag != "VolumeCount"
                     | append (
@@ -1973,13 +1997,13 @@ def main [
             let args = (
               []
               | append (
-                if $isbn != null {
+                if ($isbn | is-not-empty) {
                   $"--isbn=($isbn)"
                 }
               )
               | append (
                 if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-                  [$"--series=($comic_metadata.series)" $"--index=($comic_metadata.issue)"]
+                  [$"--series=($comic_metadata.series | use_unicode_in_title)" $"--index=($comic_metadata.issue)"]
                 }
               )
               | append (
@@ -2062,12 +2086,11 @@ def main [
                 }
               )
             );
-            log debug $"Running (ansi yellow)^ebook-meta ($input.book) ($args | str join ' ') --authors ($authors | str join "&") --title ($title) --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
+            log debug $"Running (ansi yellow)^ebook-meta ($input.book) ($args | str join ' ') --authors ($authors | str join "&") --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
             ^ebook-meta
               $input.book
               ...$args
               --authors ($authors | str join "&")
-              --title $title
               --identifier $"comicvine:($comic_vine_id)"
               --identifier $"comicvine-volume:($comic_metadata.series_id)"
           );
@@ -2101,13 +2124,13 @@ def main [
             let args = (
               []
               | append (
-                if $isbn != null {
+                if ($isbn | is-not-empty) {
                   $"--isbn=($isbn)"
                 }
               )
               | append (
                 if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-                  [$"--series=($comic_metadata.series)" $"--index=($comic_metadata.issue)"]
+                  [$"--series=($comic_metadata.series | use_unicode_in_title)" $"--index=($comic_metadata.issue)"]
                 }
               )
               | append (
@@ -2190,12 +2213,11 @@ def main [
                 }
               )
             );
-            log debug $"Running (ansi yellow)^ebook-meta ($input.book) ($args | str join ' ') --authors ($authors | str join "&") --title ($title) --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
+            log debug $"Running (ansi yellow)^ebook-meta ($input.book) ($args | str join ' ') --authors ($authors | str join "&") --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
             ^ebook-meta
               $input.book
               ...$args
               --authors ($authors | str join "&")
-              --title $title
               --identifier $"comicvine:($comic_vine_id)"
               --identifier $"comicvine-volume:($comic_metadata.series_id)"
           );
@@ -2412,10 +2434,21 @@ def main [
   let authors_subdirectory = $authors | str join ", " | use_unicode_in_title | sanitize_file_name
   # todo How to handle multiple series?
   let series_subdirectory = (
-    # Don't use a series subdirectory if the series is only one issue long.
-    # This may change if more issues are published in the future, fyi.
-    if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-      $comic_metadata.series | use_unicode_in_title | sanitize_file_name
+    # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
+    # Kavita dislikes multiple formats in the same directory.
+    # if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+    if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+      # Kavita doesn't like multiple formats being in the same directory.
+      (
+        $comic_metadata.series
+        | use_unicode_in_title
+        | sanitize_file_name
+        | path parse
+        | update stem {|p|
+          $p.stem + $" [($output_format)]"
+        }
+        | path join
+      )
     }
   )
   let target_directory = (
@@ -2428,7 +2461,9 @@ def main [
     let components = ($formats | get $output_format | path parse);
     {
       parent: $target_directory
-      stem: ($components.stem | use_unicode_in_title | sanitize_file_name)
+      stem: (
+        $components.stem | use_unicode_in_title | sanitize_file_name
+      )
       extension: $components.extension
     } | path join
   )
@@ -2472,26 +2507,26 @@ def main [
       $formats | get $output_format | scp $target_destination --mkdir
     }
     if $output_format == "pdf" {
-      log info $"Uploading (ansi yellow)($formats.comic_info)(ansi reset) to (ansi yellow)($comic_info_target_destination)(ansi reset)"
-      if $use_rsync {
-        $formats.comic_info | rsync $comic_info_target_destination "--mkpath"
-      } else {
-        $formats.comic_info | scp $comic_info_target_destination --mkdir
-      }
-      log info $"Uploading (ansi yellow)($formats.metron_info)(ansi reset) to (ansi yellow)($metron_info_target_destination)(ansi reset)"
-      if $use_rsync {
-        $formats.metron_info | rsync $metron_info_target_destination "--mkpath"
-      } else {
-        $formats.metron_info | scp $metron_info_target_destination --mkdir
-      }
-      if ($cover_target_destination | is-not-empty) {
-        log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
-        if $use_rsync {
-          $formats.cover | rsync $cover_target_destination "--mkpath"
-        } else {
-          $formats.cover | scp $cover_target_destination --mkdir
-        }
-      }
+    #   log info $"Uploading (ansi yellow)($formats.comic_info)(ansi reset) to (ansi yellow)($comic_info_target_destination)(ansi reset)"
+    #   if $use_rsync {
+    #     $formats.comic_info | rsync $comic_info_target_destination "--mkpath"
+    #   } else {
+    #     $formats.comic_info | scp $comic_info_target_destination --mkdir
+    #   }
+    #   log info $"Uploading (ansi yellow)($formats.metron_info)(ansi reset) to (ansi yellow)($metron_info_target_destination)(ansi reset)"
+    #   if $use_rsync {
+    #     $formats.metron_info | rsync $metron_info_target_destination "--mkpath"
+    #   } else {
+    #     $formats.metron_info | scp $metron_info_target_destination --mkdir
+    #   }
+    #   if ($cover_target_destination | is-not-empty) {
+    #     log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
+    #     if $use_rsync {
+    #       $formats.cover | rsync $cover_target_destination "--mkpath"
+    #     } else {
+    #       $formats.cover | scp $cover_target_destination --mkdir
+    #     }
+    #   }
     }
   } else {
     mkdir $destination
@@ -2509,13 +2544,6 @@ def main [
   let archival_target_directory = (
     [$archival_path $authors_subdirectory]
     | append $series_subdirectory
-    | append (
-      if $input_format == "pdf" and $archive_pdf {
-        $formats.pdf | path parse | get stem
-      } else {
-        null
-      }
-    )
     | path join
   )
   let epub_archival_destination = (

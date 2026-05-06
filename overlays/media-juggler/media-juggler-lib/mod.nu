@@ -227,7 +227,15 @@ export def sanitize_file_name []: string -> string {
 
 export def use_unicode_in_title []: string -> string {
   let title = $in
-  $title | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…"
+  # We don't want to replace the "-" before the volume part with an emdash or endash.
+  let components = $title | split row --number 2 " - Volume "
+  let title = (
+    if ($components | length) > 1 {
+      $components | update 0 ($components | first | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…") | str join " - Volume "
+    } else {
+      $title | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…"
+    }
+  )
   mut new_title = $title
   while '"' in $new_title {
     $new_title = $new_title | str replace '"' '“' | str replace '"' '”'
@@ -3518,40 +3526,39 @@ export def bookbrainz_get_edition_identifiers [
 # The title includes the issue number twice in the name, which is kind of ugly, so that is fixed.
 # All creators are tagged as authors which is incorrect.
 # To accommodate this, authors must be passed directly.
-#
 export def tag_epub_comic_vine [
-    comic_vine_issue_id: string # The unique Comic Vine id for the issue
-    authors: list<string> # A list of authors to use
-    title: string # The title to use
-    --working-directory: directory
+  comic_vine_issue_id: string # The unique Comic Vine id for the issue
+  authors: list<string> # A list of authors to use
+  --isbn: string # The ISBN with which to tag the EPUB
+  --working-directory: directory
 ]: path -> path {
-    let epub = $in
-    let opf_file = ({ parent: $working_directory, stem: $comic_vine_issue_id, extension: "opf" } | path join)
-    log debug $"Running (ansi yellow)^fetch-ebook-metadata --allowed-plugin Comicvine --identifier 'comicvine:($comic_vine_issue_id)' --opf(ansi reset)";
-    let opf = (
-      ^fetch-ebook-metadata
-        --allowed-plugin "Comicvine"
-        --identifier $"comicvine:($comic_vine_issue_id)"
-        --opf
-      | from xml
-    )
-    log debug $"The opf metadata for Comic Vine issue id (ansi purple_bold)($comic_vine_issue_id)(ansi reset) is:\n($opf)\n"
-    # todo edit XML directly?
-    (
-      $opf
-      | to xml
-      | save --force $opf_file
-    )
-    log debug $"Running (ansi yellow)^ebook-meta ($epub) --authors ($authors | str join '&') --from-opf '($working_directory)/($comic_vine_issue_id).opf' --title '($title)'(ansi reset)";
-    (
-      ^ebook-meta
-        $epub
-        --authors ($authors | str join "&")
-        --from-opf $"($working_directory)/($comic_vine_issue_id).opf"
-        --title $title
-    )
-    rm $opf_file
-    $epub
+  let epub = $in
+  let opf_file = ({ parent: $working_directory, stem: $comic_vine_issue_id, extension: "opf" } | path join)
+  log debug $"Running (ansi yellow)^fetch-ebook-metadata --allowed-plugin Comicvine --identifier 'comicvine:($comic_vine_issue_id)' --opf(ansi reset)";
+  let opf = (
+    ^fetch-ebook-metadata
+      --allowed-plugin "Comicvine"
+      --identifier $"comicvine:($comic_vine_issue_id)"
+      --opf
+    | from xml
+  )
+  log debug $"The opf metadata for Comic Vine issue id (ansi purple_bold)($comic_vine_issue_id)(ansi reset) is:\n($opf)\n"
+  # todo edit XML directly?
+  (
+    $opf
+    | to xml
+    | save --force $opf_file
+  )
+  log debug $"Running (ansi yellow)^ebook-meta ($epub) --authors ($authors | str join '&') --from-opf '($working_directory)/($comic_vine_issue_id).opf'(ansi reset)";
+  (
+    ^ebook-meta
+      $epub
+      --authors ($authors | str join "&")
+      --from-opf $"($working_directory)/($comic_vine_issue_id).opf"
+      --isbn $isbn
+  )
+  rm $opf_file
+  $epub
 }
 
 # Fetch metadata for an ebook
