@@ -5,6 +5,7 @@
   cbconvert,
   chromaprint,
   efficient-compression-tool,
+  exiftool,
   ffmpeg,
   file,
   image_optim,
@@ -113,6 +114,7 @@ else
             cbconvert
             # comictagger
             efficient-compression-tool
+            exiftool
             image_optim
             imagemagick
             # jpegli

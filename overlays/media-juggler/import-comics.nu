@@ -2217,9 +2217,14 @@ def main [
             ^ebook-meta
               $input.book
               ...$args
+              # Remove the title sort field.
+              --title-sort ""
               --authors ($authors | str join "&")
               --identifier $"comicvine:($comic_vine_id)"
-              --identifier $"comicvine-volume:($comic_metadata.series_id)"
+              --identifier $"comicvine-volume:($comic_metadata.series_id)";
+            # Now, delete the title so Kavita doesn't think it is a chapter title.
+            # ebook-meta isn't capable of deleting the title...
+            ^exiftool -Title="" $input.book
           );
           $input
         )
