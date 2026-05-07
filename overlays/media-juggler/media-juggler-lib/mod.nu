@@ -5055,9 +5055,16 @@ export def into_tone_format []: record -> record {
           if ($contributors_for_role | is-not-empty) {
             {$role: $contributors_for_role}
           }
-        } | reduce {|it, acc|
-          $acc | merge_or_input $it
-        };
+        }
+        let r = (
+          if ($r | is-empty) {
+            $r
+          } else {
+            $r | reduce {|it, acc|
+              $acc | merge_or_input $it
+            }
+          }
+        );
         $input | merge_or_input $r
       } else {
         $input
@@ -5447,6 +5454,10 @@ export def fetch_and_parse_musicbrainz_work [
     let work = (
       $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay
     )
+
+    # Avoid rate-limiting when called repeatedly from a loop.
+    sleep 0.1sec
+
     if ($work | is-not-empty) {
       $work | parse_musicbrainz_work
     }
