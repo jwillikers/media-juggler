@@ -1446,6 +1446,26 @@ def main [
           )
         }
       )
+      let ids = (
+        [
+          [type id];
+          [bookbrainz_edition_id $bookbrainz_edition_id]
+          [comic_vine_issue_id $comic_vine_issue_id]
+          [metron_issue_id $metron_issue_id]
+          [hardcover_book_slug $hardcover_book_slug]
+          [hardcover_edition_id $hardcover_edition_id]
+          [open_library_edition_id $open_library_edition_id]
+          [wikidata_edition_id $wikidata_edition_id]
+        ]
+        | where {|it| $it.id | is-not-empty }
+      )
+      let number_of_pages = (
+        if "cbz" in ($formats | columns) {
+          $formats.cbz | number_of_images_in_archive
+        } else {
+          null
+        }
+      )
       {
         result: {
           md: {
@@ -1456,8 +1476,12 @@ def main [
             description: $data.description
             volume: $volume_data.start_year
             issue_count: $volume_data.count_of_issues
+            ids: $ids
+            page_count: $number_of_pages
+            characters: ($data.character_credits | get --optional name)
             # Assume the language, I guess?
-            # language: "en"
+            language: "en"
+            manga: $manga
             genres: []
             year: ($publication_date | format date "%Y")
             month: ($publication_date | format date "%m")
@@ -1465,7 +1489,6 @@ def main [
             # $volume_data.description
             publisher: $volume_data.publisher.name
             # $data.store_date
-            # $data.description
             # $data.cover_date
             credits: $credits
             series_id: $data.volume.id
@@ -1631,17 +1654,6 @@ def main [
 
   let previous_title = ($comic_metadata | get title)
   log info $"Rewriting the title from (ansi yellow)'($previous_title)'(ansi reset) to (ansi yellow)'($title)'(ansi reset)"
-  # let sanitized_title = $title | str replace --all '"' '\"'
-  # todo Read from YAML file to ensure proper string escaping of single / double quotes?
-  # let metadata_yaml = $"manga: \"($manga)\", title: \"($sanitized_title)\""
-  # let metadata_yaml = (
-  #   if $isbn != null {
-  #     $metadata_yaml
-  #   } else {
-  #     $metadata_yaml + $", GTIN: \"($isbn)\""
-  #   }
-  # )
-  # $formats.cbz | comictagger_update_metadata $metadata_yaml --comictagger $comictagger
 
   # Attempt to get book metadata in order to obtain the ISBN
   # todo Interactively confirm this ISBN to ensure there are no hiccups, like a different issue from the same series
@@ -1686,66 +1698,6 @@ def main [
   )
 
   let comic_vine_id = (if $comic_vine_issue_id == null { $comic_metadata.issue_id } else { $comic_vine_issue_id })
-
-  # Obtain metadata using Calibre.
-  # This does get us
-  # let fetched_from_calibre = (
-  #   if $input_format in ["epub" "pdf"] {
-  #     $formats | get $input_format | (
-  #       let input = $in;
-  #       if $skip_optimization {
-  #         $input | (
-  #           fetch_book_metadata
-  #           # Use Comic Vine to ensure series information is correct.
-  #           --allowed-plugins ["Comicvine"]
-  #           # todo Get the EPUB metadata from sources besides Comic Vine as well?
-  #           # I think it probably isn't necessary at this point.
-  #           # This still doesn't actually use Comic Vine, but it does still end up working.
-  #           # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
-  #           --authors $authors
-  #           --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
-  #           --isbn $isbn
-  #           --skip-optimization
-  #           --title $title
-  #           $temporary_directory
-  #         )
-  #       } else {
-  #         $input | (
-  #           fetch_book_metadata
-  #           # Use Comic Vine to ensure series information is correct.
-  #           --allowed-plugins ["Comicvine"]
-  #           # todo Get the EPUB metadata from sources besides Comic Vine as well?
-  #           # I think it probably isn't necessary at this point.
-  #           # This still doesn't actually use Comic Vine, but it does still end up working.
-  #           # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
-  #           --authors $authors
-  #           --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
-  #           --isbn $isbn
-  #           --title $title
-  #           $temporary_directory
-  #         )
-  #       }
-  #     )
-  #   }
-  # )
-
-  # todo?
-  # Get the authors from Calibre if they are missing in the Comic Vine metadata.
-  # let authors = (
-  #   if ($authors | is-empty) {
-  #     $fetched_from_calibre.opf
-  #     | get content
-  #     | where tag == "metadata"
-  #     | first
-  #     | get content
-  #     | where tag == "creator"
-  #     | where attributes.role == "aut"
-  #     | par-each {|creator| $creator | get content | first | get content }
-  #     | sort
-  #   } else {
-  #     $authors
-  #   }
-  # )
 
   # Add the ISBN to the ComicInfo
   log info "Updating the ComicInfo"
@@ -2219,6 +2171,9 @@ def main [
           --authors ($authors | str join "&")
           # Keep the title in EPUBs for now, since I don't know how Kavita will react to not having a title in an EPUB.
           --title ($title | standardize_title)
+          # Remove tags which are frequently very cluttered.
+          # todo Allow specific tags, like Manga and Seinen
+          --tags ""
           --identifier $"comicvine:($comic_vine_id)"
           --identifier $"comicvine-volume:($comic_metadata.series_id)";
         $formats.epub
@@ -2331,6 +2286,7 @@ def main [
           ...$args
           # Keep the title in PDFs for now, since Kavita doesn't really change it's behavior whether one is included or not.
           --title ($title | standardize_title)
+          --tags ""
           # Remove the title sort field.
           # --title-sort ""
           --authors ($authors | str join "&")

@@ -857,6 +857,9 @@ export def upsert_comic_info [
   field: record<tag: string, value: string>
 ]: record -> record {
   let comic_info = $in
+  if ($field.tag | is-empty) or ($field.value | is-empty) {
+    return $comic_info
+  }
   (
     $comic_info
     | (
@@ -3207,6 +3210,160 @@ export def from_comic_info_xml []: [record -> record] {
   )
 
   $data
+}
+
+# Count the number of image files in a ZIP archive
+export def number_of_images_in_archive []: [path -> int] {
+  let archive = $in
+  $archive | list_files_in_archive_with_extensions $image_extensions | length
+}
+
+# Convert the internal data structure for a comic to a ComicInfo.xml
+#
+# https://anansi-project.github.io/docs/comicinfo/documentation
+# https://wiki.kavitareader.com/guides/metadata/comics/
+export def to_comic_info_xml []: [record -> record] {
+  let data = $in
+  if ($data | is-empty) {
+    error make {
+      msg: "empty comic data"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: $"pipe in the comic data"
+    }
+  }
+
+  let comic_vine_roles_map = [
+    [comic_vine_roles comic_info_roles];
+    [[Writer] [Writer]]
+    [[Penciller] [Penciller]]
+    [[Inker] [Inker]]
+    [[Colorist] [Colorist]]
+    [[Letterer] [Letterer]]
+    [[Artist] [Penciller Inker Colorist Letterer]]
+    # [[Designer] []]
+    # CoverArtist requires both the Cover and the Artist roles.
+    [[Cover Artist] [CoverArtist]]
+    [[Editor] [Editor]]
+    [[Translator] [Translator]]
+    # [[Production] []]
+  ]
+
+  let creators = (
+    $data | get --optional credits.person | uniq | reduce --fold [] {|creator creator_acc|
+      let creator_comic_vine_roles = $data.credits | where person == $creator | get role | uniq
+      # for each set of comic_vine_roles that is a subset of the creator's roles,
+      # add the creator with each of the target roles
+      $creator_acc | append (
+        $comic_vine_roles_map
+        | reduce --fold [] {|comic_vine_roles acc|
+          if ($comic_vine_roles.comic_vine_role | all {|role| $role in $creator_comic_vine_roles}) {
+            $acc | append (
+              $comic_vine_roles.comic_info_roles | each {|role|
+                {
+                  person: $creator
+                  role: $role
+                }
+              }
+            )
+          } else {
+            $acc
+          }
+        }
+        | uniq
+      )
+    }
+  ) | where {|creator| $creator.role | is-not-empty}
+  let creators = (
+    if ($creators | is-empty) {
+      null
+    } else {
+      $creators | group-by --to-table role | reduce --fold {} {|role acc|
+        $acc | insert $role.role $role.items.creator
+      }
+    }
+  )
+
+  let urls = $data.ids | each {|id|
+    if $id.type == "hardcover_book_slug" {
+      #
+    } else if $id.type == "hardcover_edition_id" {
+      if "hardcover_book_slug" in ($data | get --optional ids.type) {
+        $id.id | identifier_into_url $id.type --hardcover-book-slug ($data.ids | where type == "hardcover_book_slug" | get id | first)
+      } else {
+        # todo Add support for when the book slug is unknown which is now possible
+        $id.id | identifier_into_url $id.type
+      }
+    } else {
+      $id.id | identifier_into_url $id.type
+    }
+  } | where {|url| $url | is-not-empty } | str join " "
+
+  # todo
+  # AgeRating (Normalize to Metron's / Kavita's supported ones)
+  # AlternativeSeries
+  # AlternativeCount
+
+  # todo Teams?
+  # todo main character?
+  let comic_info_xml = (
+    {}
+    | upsert_comic_info {tag: "GTIN", value: ($data | get --optional isbn)}
+    | upsert_comic_info {tag: "Series", value: ($data | get --optional series)}
+    # | upsert_comic_info {tag: "Format", value: ($data | get --optional format)}
+    | upsert_comic_info {tag: "Count", value: ($data | get --optional issue_count)}
+    # todo PageCount
+    | upsert_comic_info {tag: "PageCount", value: ($data | get --optional page_count)}
+    | upsert_comic_info {tag: "Title", value: ($data | get --optional chapter_title)}
+    | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publisher)}
+    | upsert_comic_info {tag: "Imprint", value: ($data | get --optional imprint)}
+    | upsert_comic_info {tag: "Summary", value: ($data | get --optional description)}
+    | upsert_comic_info {
+      tag: "Characters"
+      value: (
+        if ($data | get --optional characters | is-empty) {
+          null
+        } else {
+          $data.characters | str join ","
+        }
+      )
+    }
+    | upsert_comic_info {tag: "Day", value: ($data | get --optional day)}
+    | upsert_comic_info {tag: "Month", value: ($data | get --optional month)}
+    | upsert_comic_info {tag: "Year", value: ($data | get --optional year)}
+    | upsert_comic_info {tag: "Manga", value: ($data | get --optional manga)}
+    | upsert_comic_info {
+      tag: "Number"
+      value: (
+        $data | get --optional (
+          if ($data | get --optional manga) != "No" {
+            ""
+          } else {
+            "issue"
+          }
+        )
+      )
+    }
+    | upsert_comic_info {
+      tag: "Volume"
+      value: (
+        $data | get --optional (
+          if ($data | get --optional manga) != "No" {
+            "issue"
+          } else {
+            "volume"
+          }
+        )
+      )
+    }
+    | upsert_comic_info {tag: "LanguageISO", value: ($data | get --optional language)}
+    | upsert_comic_info {tag: "Characters", value: ($data | get --optional characters | str join ",")}
+    | upsert_comic_info {tag: "Web", value: $urls}
+  )
+  $creators | reduce --fold $comic_info_xml {|role acc|
+    $acc | upsert_comic_info {tag: $role.role, value: ($role.creator | str join ",")}
+  }
 }
 
 # Search for editions on Wikidata by ISBN-13.
