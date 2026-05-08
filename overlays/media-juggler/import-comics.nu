@@ -1503,12 +1503,12 @@ def main [
       let new_file_name = (
         $previous_file_name | path parse | update stem (
           if $manga == "No" {
-            $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue) \(($comic_metadata.year)\)"
+            $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue | fill --alignment right --width 3 --character '0') \(($comic_metadata.year)\)"
           } else {
             # Kavita will assume that the issue number is a chapter for manga libraries.
             # Add the letter v before the issue number instead of a hashtag so that it understands it is the volume number.
             # Also, leave off the year and volume to avoid confusing Kavita.
-            $"($comic_metadata.series) - Volume ($comic_metadata.issue)"
+            $"($comic_metadata.series) - Volume ($comic_metadata.issue | fill --alignment right --width 3 --character '0')"
           }
         )
       ) | path join;
