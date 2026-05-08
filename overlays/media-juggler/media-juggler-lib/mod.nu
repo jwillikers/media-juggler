@@ -3572,6 +3572,96 @@ export def wikidata_search_editions_by_comic_vine_id [
   )
 }
 
+export def get_comic_vine_issue [
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> list<string>] {
+  let comic_vine_id = $in
+  let comic_vine_id = (
+    if ($comic_vine_id | str starts-with "4000-") {
+      $comic_vine_id
+    } else {
+      "4000-" + $comic_vine_id
+    }
+  )
+  for var in [COMIC_VINE_API_KEY] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      return null
+    }
+  }
+
+  let request = {
+    (
+      http get
+        --full
+        --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+        }
+        $"https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=($env.COMIC_VINE_API_KEY)&format=json"
+    )
+  }
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error getting Comic Vine data for issue ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($error.debug)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Comic Vine issue data with Comic Vine ID ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($response.body)"
+    return null
+  }
+  $response.body.results
+}
+
+export def get_comic_vine_volume [
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> list<string>] {
+  let comic_vine_id = $in
+  let comic_vine_id = (
+    if ($comic_vine_id | str starts-with "4050-") {
+      $comic_vine_id
+    } else {
+      "4050-" + $comic_vine_id
+    }
+  )
+  for var in [COMIC_VINE_API_KEY] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      return null
+    }
+  }
+
+  let request = {
+    (
+      http get
+        --full
+        --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+        }
+        $"https://comicvine.gamespot.com/api/volume/($comic_vine_id)/?api_key=($env.COMIC_VINE_API_KEY)&format=json"
+    )
+  }
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error getting Comic Vine data for volume ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/volume/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($error.debug)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Comic Vine volume data with Comic Vine ID ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/volume/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($response.body)"
+    return null
+  }
+  $response.body.results
+}
+
 # Get identifiers for an edition on Wikidata
 export def wikidata_get_edition_identifiers [
   --retries: int = 3 # The number of retries to perform when a request fails

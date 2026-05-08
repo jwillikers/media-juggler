@@ -116,52 +116,6 @@ export def tag_cbz [
   { cbz: $cbz, result: $result }
 }
 
-# Rename the comic according to the ComicInfo metadata
-export def comictagger_rename_cbz [
-  template: string # filename template, such as '{series} ({volume}) #{issue} ({year})'
-  --comictagger: path # ComicTagger executable
-]: path -> path {
-  let cbz = $in
-  log debug $"ComicTagger rename command: ^($comictagger) -$no-cr --no-gui --rename --tags-read 'CIX,METRONINFO' --template '{series} \({volume}\) #{issue} \({year}\)' ($cbz)";
-  (
-    do {
-      (
-        ^$comictagger
-        --no-cr
-        --no-gui
-        --rename
-        --tags-read "CIX,METRONINFO"
-        --template $template
-        $cbz
-      )
-    }
-    | complete
-    | get stdout
-    | lines --skip-empty
-    | last
-    | (
-      let output = $in;
-      log debug $"ComicTagger rename output: ($output)";
-      if $output == "Filename is already good!" {
-        $cbz
-      } else {
-        let new_name = (
-          $output
-          | parse --regex 'renamed \'(?P<original>.+\.(?:cbz|zip))\' -> \'(?P<renamed>.+\.cbz)\''
-          | get renamed
-          | first
-          | (
-            let filename = $in;
-            ($cbz | path parse | get parent) | path join $filename
-          )
-        )
-        log debug $"Renamed (ansi yellow)($cbz)(ansi reset) to (ansi yellow)($new_name)(ansi reset)"
-        $new_name
-      }
-    )
-  )
-}
-
 # Update ComicInfo metadata with ComicTagger
 export def comictagger_update_metadata [
   metadata: string # Key and values to update in the metadata in a YAML-like syntax
@@ -685,8 +639,11 @@ def main [
           let checksum = (
             if $checksum_type == "blake3" {
               $original_file | hash_blake3
-            } else if $checksum_type == "sh3-512" {
+            } else if $checksum_type == "sha3-512" {
               $original_file | hash_sha3_512
+            } else {
+              log error $"This should never happen."
+              exit 1
             }
           )
           let file_size = du $original_file | first | get physical
@@ -912,10 +869,9 @@ def main [
     }
   )
 
-
   # Generate a CBZ from the PDF format which may be used to extract the ISBN.
   let formats = (
-    if "pdf" in $formats {
+    if "pdf" in $formats and $archive_pdf {
       log debug "Generating a CBZ from the PDF"
       # Tweaking quality settings for large pdfs
       # For PDFs with massive image files, the quality needs to be knocked down or it will likely OOM.
@@ -959,6 +915,7 @@ def main [
   }
 
   # Determine the most likely ISBN from the metadata and pages
+  # todo Use isbntools to ensure that any discovered ISBNs are valid.
   let likely_isbn_from_pages_and_metadata = (
     if $metadata_isbn != null and $book_isbn_numbers != null {
       if ($book_isbn_numbers | is-empty) {
@@ -1400,18 +1357,22 @@ def main [
     }
   )
   let updated_optimized_file_hashes = (
-    $optimized_file_hashes | update sha256 (
-      $optimized_file_hashes.sha256 | append (
-        if "epub" in $formats {
-          # todo I might need to fix this to work with larger files
-          let hash = open --raw $formats.epub | hash sha256
-          if $hash not-in $optimized_file_hashes.sha256 {
-            log debug "Optimizing the EPUB"
-            open --raw ($formats.epub | polish_epub | optimize_images_in_zip) | hash sha256
+    if $skip_optimization {
+      $optimized_file_hashes
+    } else {
+      $optimized_file_hashes | update sha256 (
+        $optimized_file_hashes.sha256 | append (
+          if "epub" in $formats {
+            # todo I might need to fix this to work with larger files
+            let hash = open --raw $formats.epub | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              log debug "Optimizing the EPUB"
+              open --raw ($formats.epub | polish_epub | optimize_images_in_zip) | hash sha256
+            }
           }
-        }
-      ) | uniq | sort
-    )
+        ) | uniq | sort
+      )
+    }
   )
   if $updated_optimized_file_hashes != $optimized_file_hashes {
     $updated_optimized_file_hashes | save --force $optimized_files_cache_file
@@ -1425,7 +1386,7 @@ def main [
     if "epub" in $formats {
       log debug "Generating a CBZ from the EPUB"
       $formats | insert cbz ($formats.epub | zip_archive_to_cbz --working-directory $temporary_directory)
-    } else if "pdf" in $formats {
+    } else if "pdf" in $formats and $archive_pdf {
       log debug "Updating the CBZ for the PDF"
       let cbz = (
         $formats.cbz
@@ -1455,9 +1416,67 @@ def main [
     }
   )
 
-  log debug $"Fetching and writing metadata to (ansi yellow)($formats.cbz)(ansi reset) with ComicTagger"
+  log debug $"Fetching and writing metadata to (ansi yellow)($formats | get $output_format)(ansi reset) with ComicTagger"
   let tag_result = (
-    $formats.cbz | tag_cbz $comictagger --comic-vine-issue-id $comic_vine_issue_id
+    if $output_format == "pdf" {
+      # Get Comic Vine metadata through the ComicVine API directly.
+      let data = $comic_vine_issue_id | get_comic_vine_issue
+      # todo Cache things to avoid rate-limiting.
+      # Avoid rate-limiting
+      sleep 1sec
+      let volume_data = $data.volume.id | into string | get_comic_vine_volume
+      let publication_date = $data.store_date | into datetime
+      # Rewrite credits to match ComicTagger's format.
+      #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
+      let credits = (
+        $data.person_credits | reduce --fold [] {|person credits_acc|
+          $credits_acc | append (
+            $person.role
+            | split row ","
+            | str trim
+            | str capitalize
+            | each {|role|
+              {
+                person: $person.name
+                role: $role
+                primary: false
+                language: ""
+              }
+            }
+          )
+        }
+      )
+      {
+        result: {
+          md: {
+            issue_id: $data.id
+            issue: $data.issue_number
+            series: $data.volume.name
+            title: $data.name
+            description: $data.description
+            volume: $volume_data.start_year
+            issue_count: $volume_data.count_of_issues
+            # Assume the language, I guess?
+            # language: "en"
+            genres: []
+            year: ($publication_date | format date "%Y")
+            month: ($publication_date | format date "%m")
+            day: ($publication_date | format date "%d")
+            # $volume_data.description
+            publisher: $volume_data.publisher.name
+            # $data.store_date
+            # $data.description
+            # $data.cover_date
+            credits: $credits
+            series_id: $data.volume.id
+            _cover_image: [0, "", $data.image.original_url]
+          }
+          status: "good_match"
+        }
+      }
+    } else {
+      $formats.cbz | tag_cbz $comictagger --comic-vine-issue-id $comic_vine_issue_id
+    }
   )
   log debug $"The ComicTagger result is:\n(ansi green)($tag_result.result | to nuon)(ansi reset)\n"
 
@@ -1476,26 +1495,28 @@ def main [
   }
 
   log debug "Renaming the CBZ according to the updated metadata from ComicTagger"
-  let filename_template = (
-    if $manga == "No" {
-      '{series} ({volume}) #{issue} ({year})'
-    } else {
-      # Kavita will assume that the issue number is a chapter for manga libraries.
-      # Add the letter v before the issue number instead of a hashtag so that it understands it is the volume number.
-      # Also, leave off the year and volume to avoid confusing Kavita.
-      '{series} - Volume {issue}'
-    }
-  )
-  let formats = $formats | (
-    let format = $in;
-    $format | update cbz (
-      $format.cbz
-      | comictagger_rename_cbz $filename_template --comictagger $comictagger
+  let comic_metadata = ($tag_result.result | get md)
+
+  let formats = (
+    $formats | update $output_format (
+      let previous_file_name = $formats | get $output_format;
+      let new_file_name = (
+        $previous_file_name | path parse | update stem (
+          if $manga == "No" {
+            $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue) \(($comic_metadata.year)\)"
+          } else {
+            # Kavita will assume that the issue number is a chapter for manga libraries.
+            # Add the letter v before the issue number instead of a hashtag so that it understands it is the volume number.
+            # Also, leave off the year and volume to avoid confusing Kavita.
+            $"($comic_metadata.series) - Volume ($comic_metadata.issue)"
+          }
+        )
+      ) | path join;
+      mv --force $previous_file_name $new_file_name;
+      $new_file_name
     )
   )
-  log debug "Renamed the CBZ according to the updated metadata from ComicTagger"
-
-  let comic_metadata = ($tag_result.result | get md)
+  log debug "Renamed the file according to the metadata from Comic Vine"
 
   # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
   let authors = (
@@ -1625,7 +1646,7 @@ def main [
   # Attempt to get book metadata in order to obtain the ISBN
   # todo Interactively confirm this ISBN to ensure there are no hiccups, like a different issue from the same series
   let $isbn = (
-    if $isbn == null {
+    if ($isbn | is-empty) {
       log debug "Attempting to get the ISBN from the fetched metadata"
       log debug $"Fetching book metadata using title (ansi yellow)($title)(ansi reset) and authors (ansi yellow)($authors)(ansi reset)"
       # Kobo Metadata is not working well for getting the right issue number.
@@ -1664,47 +1685,49 @@ def main [
     }
   )
 
-  # Obtain metadata using Calibre
-  let comic_vine_id = (if $comic_vine_issue_id == null { $comic_metadata.issue_id } else { $comic_vine_issue_id });
-  let fetched_from_calibre = (
-    if $input_format in ["epub" "pdf"] {
-      $formats | get $input_format | (
-        let input = $in;
-        if $skip_optimization {
-          $input | (
-            fetch_book_metadata
-            # Use Comic Vine to ensure series information is correct.
-            --allowed-plugins ["Comicvine"]
-            # todo Get the EPUB metadata from sources besides Comic Vine as well?
-            # I think it probably isn't necessary at this point.
-            # This still doesn't actually use Comic Vine, but it does still end up working.
-            # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
-            --authors $authors
-            --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
-            --isbn $isbn
-            --skip-optimization
-            --title $title
-            $temporary_directory
-          )
-        } else {
-          $input | (
-            fetch_book_metadata
-            # Use Comic Vine to ensure series information is correct.
-            --allowed-plugins ["Comicvine"]
-            # todo Get the EPUB metadata from sources besides Comic Vine as well?
-            # I think it probably isn't necessary at this point.
-            # This still doesn't actually use Comic Vine, but it does still end up working.
-            # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
-            --authors $authors
-            --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
-            --isbn $isbn
-            --title $title
-            $temporary_directory
-          )
-        }
-      )
-    }
-  )
+  let comic_vine_id = (if $comic_vine_issue_id == null { $comic_metadata.issue_id } else { $comic_vine_issue_id })
+
+  # Obtain metadata using Calibre.
+  # This does get us
+  # let fetched_from_calibre = (
+  #   if $input_format in ["epub" "pdf"] {
+  #     $formats | get $input_format | (
+  #       let input = $in;
+  #       if $skip_optimization {
+  #         $input | (
+  #           fetch_book_metadata
+  #           # Use Comic Vine to ensure series information is correct.
+  #           --allowed-plugins ["Comicvine"]
+  #           # todo Get the EPUB metadata from sources besides Comic Vine as well?
+  #           # I think it probably isn't necessary at this point.
+  #           # This still doesn't actually use Comic Vine, but it does still end up working.
+  #           # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
+  #           --authors $authors
+  #           --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
+  #           --isbn $isbn
+  #           --skip-optimization
+  #           --title $title
+  #           $temporary_directory
+  #         )
+  #       } else {
+  #         $input | (
+  #           fetch_book_metadata
+  #           # Use Comic Vine to ensure series information is correct.
+  #           --allowed-plugins ["Comicvine"]
+  #           # todo Get the EPUB metadata from sources besides Comic Vine as well?
+  #           # I think it probably isn't necessary at this point.
+  #           # This still doesn't actually use Comic Vine, but it does still end up working.
+  #           # --allowed-plugins ["Comicvine" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"]
+  #           --authors $authors
+  #           --identifiers [$"comicvine:($comic_vine_id)" $"comicvine-volume:($comic_metadata.series_id)"]
+  #           --isbn $isbn
+  #           --title $title
+  #           $temporary_directory
+  #         )
+  #       }
+  #     )
+  #   }
+  # )
 
   # todo?
   # Get the authors from Calibre if they are missing in the Comic Vine metadata.
@@ -1726,346 +1749,348 @@ def main [
 
   # Add the ISBN to the ComicInfo
   log info "Updating the ComicInfo"
-  (
-    $formats.cbz
-    | extract_comic_info_xml $temporary_directory
-    # todo Determine BlackAndWhite automatically.
-    # | upsert_comic_info {BlackAndWhite: $}
-    | (
-      let info = $in;
-      if $isbn == null {
-        $info
-      } else {
-        $info | upsert_comic_info {tag: "GTIN", value: $isbn}
-      }
-    )
-    | upsert_comic_info {tag: "Manga", value: $manga}
-    | upsert_comic_info {tag: "Series", value: ($comic_metadata.series | use_unicode_in_title)}
-    # Title is only used for chapter titles.
-    | drop_field_comic_info Title
-    | upsert_comic_info {tag: "Format", value: "Digital"}
-    | (
-      let input = $in;
-      # For manga, Kavita seems to expect the Volume field to reflect the issue number and not the volume used by western comics.
-      # Update it here to be correct.
-      # Kavita uses the issue number as the chapter number, so that needs removed here as well.
-      if $manga == "No" {
-        $input
-      } else {
-        (
-          $input
-          | upsert_comic_info {tag: "Volume", value: $comic_metadata.issue}
-          | drop_field_comic_info "Number"
-        )
-      }
-    )
-    | (
-      let input = $in;
-      if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
-        if ($comic_metadata.language | str downcase) in ["eng" "english"] {
-          $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
+  if "cbz" in ($formats | columns) {
+    (
+      $formats.cbz
+      | extract_comic_info_xml $temporary_directory
+      # todo Determine BlackAndWhite automatically.
+      # | upsert_comic_info {BlackAndWhite: $}
+      | (
+        let info = $in;
+        if $isbn == null {
+          $info
         } else {
-          $input | upsert_comic_info {tag: "LanguageISO", value: $comic_metadata.language}
+          $info | upsert_comic_info {tag: "GTIN", value: $isbn}
         }
-      } else {
-        $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
-      }
-    )
-    | (
-      let input = $in;
-      if ($imprint | is-not-empty) {
-        $input | upsert_comic_info {tag: "Imprint", value: $imprint}
-      } else {
-        $input
-      }
-    )
-    | (
-      let input = $in;
-      if ($publisher | is-not-empty) {
-        $input | upsert_comic_info {tag: "Publisher", value: $publisher}
-      } else {
-        $input
-      }
-    )
-    | (
-      let input = $in;
-      let bookbrainz_url = (
-        if ($bookbrainz_edition_id | is-not-empty) {
-          $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"
-        } else {
-          ""
-        }
-      );
-      let comic_vine_url = (
-        if ($comic_vine_id | is-not-empty) {
-          $"https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
-        } else {
-          ""
-        }
-      );
-      let hardcover_url = (
-        # todo Since the book slug URL can change, figure out how to use this with just the edition id?
-        if ($hardcover_edition_id | is-not-empty) and ($hardcover_book_slug | is-not-empty) {
-          $"https://hardcover.app/books/($hardcover_book_slug)/editions/($hardcover_edition_id)"
-        } else {
-          ""
-        }
-      );
-      let wikidata_url = (
-        # To avoid ambiguity, only include one wikidata link, preferring the edition id if possible.
-        if ($wikidata_edition_id | is-not-empty) {
-          $"https://www.wikidata.org/wiki/($wikidata_edition_id)"
-        } else if ($wikidata_work_id | is-not-empty) {
-          $"https://www.wikidata.org/wiki/($wikidata_work_id)"
-        } else {
-          ""
-        }
-      );
-      let open_library_url = (
-        if ($open_library_edition_id | is-not-empty) {
-          $"https://openlibrary.org/books/($open_library_edition_id)"
-        } else {
-          ""
-        }
-      );
-      let urls = $"($bookbrainz_url) ($comic_vine_url) ($hardcover_url) ($wikidata_url) ($open_library_url)" | str trim | str replace --all --regex '[[:space:]]{2,}' ' ';
-      log debug $"urls: ($urls)";
-      if ($urls | is-empty) {
-        $input
-      } else {
-        $input | upsert_comic_info {
-          tag: "Web",
-          value: $urls,
-        }
-      }
-    )
-    # todo Incorporate Comic Vine issue id and series id in Notes section of ComicInfo.xml or sidecar metadata.opf
-    # This will allow easily updating the metadata in the future without having to redo all the lookup work.
-    | {
-      archive: $formats.cbz
-      comic_info: $in
-    }
-    | inject_comic_info
-  )
-
-  log info "Updating the MetronInfo"
-  # log debug $"metron_info:\n($formats.cbz | extract_metron_info_xml $temporary_directory)\n"
-  (
-    $formats.cbz
-    | extract_metron_info_xml $temporary_directory
-    | (
-      let i = $in;
-      $i
-      | update content (
-        $i
-        | get content
-        | where tag != "Stories"
-        # Story is only used for the chapter title, not volume, so drop it.
-        # | append (
-        #   [
-        #     [tag attributes content];
-        #     [
-        #       Stories
-        #       {}
-        #       [
-        #         [tag attributes content];
-        #         [
-        #           Story
-        #           {}
-        #           [[tag attributes content]; [null null $title]]
-        #         ]
-        #       ]
-        #     ]
-        #   ]
-        # )
       )
-    )
-    # todo Set CollectionTitle to subtitle of an issue when a subtitle is present.
-    | (
-      let info = $in;
-      if $isbn == null {
-        $info
-      } else {
-        $info | upsert_comic_info_content {tag: "GTIN", content: [[tag attributes content]; ["ISBN" null [[tag attributes content]; [null null $isbn]]]]}
+      | upsert_comic_info {tag: "Manga", value: $manga}
+      | upsert_comic_info {tag: "Series", value: ($comic_metadata.series | use_unicode_in_title)}
+      # Title is only used for chapter titles.
+      | drop_field_comic_info Title
+      | upsert_comic_info {tag: "Format", value: "Digital"}
+      | (
+        let input = $in;
+        # For manga, Kavita seems to expect the Volume field to reflect the issue number and not the volume used by western comics.
+        # Update it here to be correct.
+        # Kavita uses the issue number as the chapter number, so that needs removed here as well.
+        if $manga == "No" {
+          $input
+        } else {
+          (
+            $input
+            | upsert_comic_info {tag: "Volume", value: $comic_metadata.issue}
+            | drop_field_comic_info "Number"
+          )
+        }
+      )
+      | (
+        let input = $in;
+        if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
+          if ($comic_metadata.language | str downcase) in ["eng" "english"] {
+            $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
+          } else {
+            $input | upsert_comic_info {tag: "LanguageISO", value: $comic_metadata.language}
+          }
+        } else {
+          $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
+        }
+      )
+      | (
+        let input = $in;
+        if ($imprint | is-not-empty) {
+          $input | upsert_comic_info {tag: "Imprint", value: $imprint}
+        } else {
+          $input
+        }
+      )
+      | (
+        let input = $in;
+        if ($publisher | is-not-empty) {
+          $input | upsert_comic_info {tag: "Publisher", value: $publisher}
+        } else {
+          $input
+        }
+      )
+      | (
+        let input = $in;
+        let bookbrainz_url = (
+          if ($bookbrainz_edition_id | is-not-empty) {
+            $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"
+          } else {
+            ""
+          }
+        );
+        let comic_vine_url = (
+          if ($comic_vine_id | is-not-empty) {
+            $"https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
+          } else {
+            ""
+          }
+        );
+        let hardcover_url = (
+          # todo Since the book slug URL can change, figure out how to use this with just the edition id?
+          if ($hardcover_edition_id | is-not-empty) and ($hardcover_book_slug | is-not-empty) {
+            $"https://hardcover.app/books/($hardcover_book_slug)/editions/($hardcover_edition_id)"
+          } else {
+            ""
+          }
+        );
+        let wikidata_url = (
+          # To avoid ambiguity, only include one wikidata link, preferring the edition id if possible.
+          if ($wikidata_edition_id | is-not-empty) {
+            $"https://www.wikidata.org/wiki/($wikidata_edition_id)"
+          } else if ($wikidata_work_id | is-not-empty) {
+            $"https://www.wikidata.org/wiki/($wikidata_work_id)"
+          } else {
+            ""
+          }
+        );
+        let open_library_url = (
+          if ($open_library_edition_id | is-not-empty) {
+            $"https://openlibrary.org/books/($open_library_edition_id)"
+          } else {
+            ""
+          }
+        );
+        let urls = $"($bookbrainz_url) ($comic_vine_url) ($hardcover_url) ($wikidata_url) ($open_library_url)" | str trim | str replace --all --regex '[[:space:]]{2,}' ' ';
+        log debug $"urls: ($urls)";
+        if ($urls | is-empty) {
+          $input
+        } else {
+          $input | upsert_comic_info {
+            tag: "Web",
+            value: $urls,
+          }
+        }
+      )
+      # todo Incorporate Comic Vine issue id and series id in Notes section of ComicInfo.xml or sidecar metadata.opf
+      # This will allow easily updating the metadata in the future without having to redo all the lookup work.
+      | {
+        archive: $formats.cbz
+        comic_info: $in
       }
+      | inject_comic_info
     )
-    | (
-      let i = $in;
-      $i
-      | update content (
+
+    log info "Updating the MetronInfo"
+    # log debug $"metron_info:\n($formats.cbz | extract_metron_info_xml $temporary_directory)\n"
+    (
+      $formats.cbz
+      | extract_metron_info_xml $temporary_directory
+      | (
+        let i = $in;
         $i
-        | get content
-        | where tag != "Series"
-        | append (
+        | update content (
           $i
           | get content
-          | where tag == "Series"
-          | first
-          | (
-            let series_in = $in;
-            $series_in
-            | upsert attributes (
-              $series_in.attributes
-              | upsert lang en
-            )
-            | upsert content (
-              $series_in.content
-              | where tag != Name
-              | prepend [
-                [tag attributes content];
-                [
-                  "Name"
-                  {}
+          | where tag != "Stories"
+          # Story is only used for the chapter title, not volume, so drop it.
+          # | append (
+          #   [
+          #     [tag attributes content];
+          #     [
+          #       Stories
+          #       {}
+          #       [
+          #         [tag attributes content];
+          #         [
+          #           Story
+          #           {}
+          #           [[tag attributes content]; [null null $title]]
+          #         ]
+          #       ]
+          #     ]
+          #   ]
+          # )
+        )
+      )
+      # todo Set CollectionTitle to subtitle of an issue when a subtitle is present.
+      | (
+        let info = $in;
+        if $isbn == null {
+          $info
+        } else {
+          $info | upsert_comic_info_content {tag: "GTIN", content: [[tag attributes content]; ["ISBN" null [[tag attributes content]; [null null $isbn]]]]}
+        }
+      )
+      | (
+        let i = $in;
+        $i
+        | update content (
+          $i
+          | get content
+          | where tag != "Series"
+          | append (
+            $i
+            | get content
+            | where tag == "Series"
+            | first
+            | (
+              let series_in = $in;
+              $series_in
+              | upsert attributes (
+                $series_in.attributes
+                | upsert lang en
+              )
+              | upsert content (
+                $series_in.content
+                | where tag != Name
+                | prepend [
+                  [tag attributes content];
                   [
-                    [tag attributes content];
-                    [null null ($comic_metadata.series | use_unicode_in_title)]
+                    "Name"
+                    {}
+                    [
+                      [tag attributes content];
+                      [null null ($comic_metadata.series | use_unicode_in_title)]
+                    ]
                   ]
                 ]
-              ]
+              )
             )
           )
         )
       )
-    )
-    | (
-      let input = $in;
-      # Kavita uses the corresponding number field in ComicInfo.xml as the chapter number, so drop it here to be sure it doesn't interfere in the future.
-      if $manga == "No" {
-        $input
-      } else {
-        (
+      | (
+        let input = $in;
+        # Kavita uses the corresponding number field in ComicInfo.xml as the chapter number, so drop it here to be sure it doesn't interfere in the future.
+        if $manga == "No" {
           $input
-          | drop_field_comic_info "Number"
-          | (
-            let i = $in;
-            $i
-            | update content (
+        } else {
+          (
+            $input
+            | drop_field_comic_info "Number"
+            | (
+              let i = $in;
               $i
-              | get content
-              | where tag != "Series"
-              | append (
+              | update content (
                 $i
                 | get content
-                | where tag == "Series"
-                | first
-                | (
-                  let series_in = $in;
-                  $series_in
-                  | update content (
+                | where tag != "Series"
+                | append (
+                  $i
+                  | get content
+                  | where tag == "Series"
+                  | first
+                  | (
+                    let series_in = $in;
                     $series_in
-                    | get content
-                    | where tag != "Volume"
-                    # todo Don't drop this when it isn't manga / manhwa
-                    # | append (
-                    #   $series_in
-                    #   | get content
-                    #   | where tag == "Volume"
-                    #   | first
-                    #   | upsert content [[tag attributes content]; [null null ($comic_metadata.issue | into string)]]
-                    # )
-                    | where tag != "IssueCount"
-                    | where tag != "VolumeCount"
-                    | append (
-                      if "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+                    | update content (
+                      $series_in
+                      | get content
+                      | where tag != "Volume"
+                      # todo Don't drop this when it isn't manga / manhwa
+                      # | append (
+                      #   $series_in
+                      #   | get content
+                      #   | where tag == "Volume"
+                      #   | first
+                      #   | upsert content [[tag attributes content]; [null null ($comic_metadata.issue | into string)]]
+                      # )
+                      | where tag != "IssueCount"
+                      | where tag != "VolumeCount"
+                      | append (
+                        if "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+                          [
+                            [tag attributes content];
+                            [VolumeCount {} [[tag attributes content]; [null null ($comic_metadata.issue_count | into string)]]]
+                          ]
+                        }
+                      )
+                      | where tag != "Format"
+                      | append (
                         [
                           [tag attributes content];
-                          [VolumeCount {} [[tag attributes content]; [null null ($comic_metadata.issue_count | into string)]]]
+                          [Format {} [[tag attributes content]; [null null "Trade Paperback"]]]
                         ]
-                      }
-                    )
-                    | where tag != "Format"
-                    | append (
-                      [
-                        [tag attributes content];
-                        [Format {} [[tag attributes content]; [null null "Trade Paperback"]]]
-                      ]
+                      )
                     )
                   )
                 )
               )
             )
           )
-        )
-      }
-    )
-    | (
-      let input = $in;
-      # Add MangaVolume number if the manga is true and if this is more than just a one-shot series.
-      if ($manga | str starts-with "Yes") and "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-        $input | upsert_comic_info {tag: "MangaVolume", value: $comic_metadata.issue}
-      } else {
-        $input
-      }
-    )
-    | (
-      let input = $in;
-      if ($imprint | is-not-empty) {
-        $input | upsert_comic_info_content {tag: "Publisher", content: [[tag attributes content]; ["Imprint" null [[tag attributes content]; [null null $imprint]]]]}
-      } else {
-        $input
-      }
-    )
-    | (
-      let input = $in;
-      if ($publisher | is-not-empty) {
-        $input | upsert_comic_info_content {tag: "Publisher", content: [[tag attributes content]; ["Name" null [[tag attributes content]; [null null $publisher]]]]}
-      } else {
-        $input
-      }
-    )
-    | (
-      let input = $in;
-      let bookbrainz_url = (
-        if ($bookbrainz_edition_id | is-not-empty) {
-          $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"
         }
-      );
-      let comic_vine_url = (
-        if ($comic_vine_id | is-not-empty) {
-          $"https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
-        }
-      );
-      let hardcover_url = (
-        # todo Since the book slug URL can change, figure out how to use this with just the edition id?
-        if ($hardcover_edition_id | is-not-empty) and ($hardcover_book_slug | is-not-empty) {
-          $"https://hardcover.app/books/($hardcover_book_slug)/editions/($hardcover_edition_id)"
-        }
-      );
-      let open_library_url = (
-        if ($open_library_edition_id | is-not-empty) {
-          $"https://openlibrary.org/books/($open_library_edition_id)"
+      )
+      | (
+        let input = $in;
+        # Add MangaVolume number if the manga is true and if this is more than just a one-shot series.
+        if ($manga | str starts-with "Yes") and "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+          $input | upsert_comic_info {tag: "MangaVolume", value: $comic_metadata.issue}
         } else {
-          ""
+          $input
         }
-      );
-      let wikidata_url = (
-        # To avoid ambiguity, only include one wikidata link, preferring the edition id if possible.
-        if ($wikidata_edition_id | is-not-empty) {
-          $"https://www.wikidata.org/wiki/($wikidata_edition_id)"
-        } else if ($wikidata_work_id | is-not-empty) {
-          $"https://www.wikidata.org/wiki/($wikidata_work_id)"
+      )
+      | (
+        let input = $in;
+        if ($imprint | is-not-empty) {
+          $input | upsert_comic_info_content {tag: "Publisher", content: [[tag attributes content]; ["Imprint" null [[tag attributes content]; [null null $imprint]]]]}
+        } else {
+          $input
         }
-      );
-      let urls = [] | append $bookbrainz_url | append $comic_vine_url | append $hardcover_url | append $wikidata_url | append $open_library_url;
-      if ($urls | is-empty) {
-        $input
-      } else {
-        let content = $urls | each {|url|
-          {
-            tag: "URL",
-            attributes: null,
-            content: [[tag attributes content]; [null null $url]]
+      )
+      | (
+        let input = $in;
+        if ($publisher | is-not-empty) {
+          $input | upsert_comic_info_content {tag: "Publisher", content: [[tag attributes content]; ["Name" null [[tag attributes content]; [null null $publisher]]]]}
+        } else {
+          $input
+        }
+      )
+      | (
+        let input = $in;
+        let bookbrainz_url = (
+          if ($bookbrainz_edition_id | is-not-empty) {
+            $"https://bookbrainz.org/edition/($bookbrainz_edition_id)"
           }
+        );
+        let comic_vine_url = (
+          if ($comic_vine_id | is-not-empty) {
+            $"https://comicvine.gamespot.com/issue/4000-($comic_vine_id)"
+          }
+        );
+        let hardcover_url = (
+          # todo Since the book slug URL can change, figure out how to use this with just the edition id?
+          if ($hardcover_edition_id | is-not-empty) and ($hardcover_book_slug | is-not-empty) {
+            $"https://hardcover.app/books/($hardcover_book_slug)/editions/($hardcover_edition_id)"
+          }
+        );
+        let open_library_url = (
+          if ($open_library_edition_id | is-not-empty) {
+            $"https://openlibrary.org/books/($open_library_edition_id)"
+          } else {
+            ""
+          }
+        );
+        let wikidata_url = (
+          # To avoid ambiguity, only include one wikidata link, preferring the edition id if possible.
+          if ($wikidata_edition_id | is-not-empty) {
+            $"https://www.wikidata.org/wiki/($wikidata_edition_id)"
+          } else if ($wikidata_work_id | is-not-empty) {
+            $"https://www.wikidata.org/wiki/($wikidata_work_id)"
+          }
+        );
+        let urls = [] | append $bookbrainz_url | append $comic_vine_url | append $hardcover_url | append $wikidata_url | append $open_library_url;
+        if ($urls | is-empty) {
+          $input
+        } else {
+          let content = $urls | each {|url|
+            {
+              tag: "URL",
+              attributes: null,
+              content: [[tag attributes content]; [null null $url]]
+            }
+          }
+          $input | upsert_comic_info_content {tag: "URLs", content: $content}
         }
-        $input | upsert_comic_info_content {tag: "URLs", content: $content}
+      )
+      | {
+        archive: $formats.cbz
+        metron_info: $in
       }
+      | inject_metron_info
     )
-    | {
-      archive: $formats.cbz
-      metron_info: $in
-    }
-    | inject_metron_info
-  )
+  }
 
   # PDFs must be optimized before embedding metadata, as the embedded metadata will be scrubbed.
   let updated_optimized_file_hashes = (
@@ -2095,117 +2120,108 @@ def main [
     if "epub" in $formats {
       # Update the metadata in the EPUB file.
       let epub = (
-        $fetched_from_calibre
-        | export_book_to_directory ($formats | get "epub" | path dirname)
-        | embed_book_metadata
-        | (
-          let input = $in;
-          (
-            let args = (
-              []
-              | append (
-                if ($isbn | is-not-empty) {
-                  $"--isbn=($isbn)"
-                }
-              )
-              | append (
-                if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-                  [$"--series=($comic_metadata.series | use_unicode_in_title)" $"--index=($comic_metadata.issue)"]
-                }
-              )
-              | append (
-                if ($imprint | is-not-empty) {
-                  $"--publisher=($imprint)"
-                } else if ($publisher | is-not-empty) {
-                  $"--publisher=($publisher)"
-                } else if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
-                  $"--publisher=($comic_metadata.imprint)"
-                } else if "publisher" in $comic_metadata and ($comic_metadata.publisher | is-not-empty) {
-                  $"--publisher=($comic_metadata.publisher)"
-                }
-              )
-              | append (
-                if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
-                  if ($comic_metadata.language | str downcase) in ["eng" "english"] {
-                    "--language=en"
-                  } else {
-                    $"--language=($comic_metadata.language)"
-                  }
-                } else {
-                  "--language=en"
-                }
-              )
-              | append (
-                if "description" in $comic_metadata and ($comic_metadata.description | is-not-empty) {
-                  $"--comments=($comic_metadata.description)"
-                }
-              )
-              | append (
-                if "genres" in $comic_metadata and ($comic_metadata.genres | is-not-empty) {
-                  $"--tags=($comic_metadata.genres | str join ',')"
-                }
-              )
-              | append (
-                if ($bookbrainz_edition_id | is-not-empty) {
-                  $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
-                }
-              )
-              | append (
-                if ($hardcover_edition_id | is-not-empty) {
-                  $"--identifier=hardcover-edition:($hardcover_edition_id)"
-                }
-              )
-              | append (
-                if ($hardcover_book_slug | is-not-empty) {
-                  $"--identifier=hardcover:($hardcover_book_slug)"
-                }
-              )
-              | append (
-                if ($wikidata_edition_id | is-not-empty) {
-                  $"--identifier=wikidata-edition:($wikidata_edition_id)"
-                }
-              )
-              | append (
-                if ($wikidata_work_id | is-not-empty) {
-                  $"--identifier=wikidata-work:($wikidata_work_id)"
-                }
-              )
-              | append (
-                let year = (
-                  if "year" in $comic_metadata and ($comic_metadata.year | is-not-empty) {
-                    $comic_metadata.year
-                  }
-                );
-                let month = (
-                  if "month" in $comic_metadata and ($comic_metadata.month | is-not-empty) {
-                    $comic_metadata.month
-                  }
-                );
-                let day = (
-                  if "day" in $comic_metadata and ($comic_metadata.day | is-not-empty) {
-                    $comic_metadata.day
-                  }
-                );
-                if ($year | is-not-empty) and ($month | is-not-empty) and ($year | is-not-empty) {
-                  $"--date=($year)-($month)-($day)"
-                } else if ($year | is-not-empty) {
-                  $"--date=($year)"
-                }
-              )
+        let args = (
+          []
+          | append (
+            if ($isbn | is-not-empty) {
+              $"--isbn=($isbn)"
+            }
+          )
+          | append (
+            if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+              [$"--series=($comic_metadata.series | use_unicode_in_title)" $"--index=($comic_metadata.issue)"]
+            }
+          )
+          | append (
+            if ($imprint | is-not-empty) {
+              $"--publisher=($imprint)"
+            } else if ($publisher | is-not-empty) {
+              $"--publisher=($publisher)"
+            } else if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
+              $"--publisher=($comic_metadata.imprint)"
+            } else if "publisher" in $comic_metadata and ($comic_metadata.publisher | is-not-empty) {
+              $"--publisher=($comic_metadata.publisher)"
+            }
+          )
+          | append (
+            if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
+              if ($comic_metadata.language | str downcase) in ["eng" "english"] {
+                "--language=en"
+              } else {
+                $"--language=($comic_metadata.language)"
+              }
+            } else {
+              "--language=en"
+            }
+          )
+          | append (
+            if "description" in $comic_metadata and ($comic_metadata.description | is-not-empty) {
+              $"--comments=($comic_metadata.description)"
+            }
+          )
+          | append (
+            if "genres" in $comic_metadata and ($comic_metadata.genres | is-not-empty) {
+              $"--tags=($comic_metadata.genres | str join ',')"
+            }
+          )
+          | append (
+            if ($bookbrainz_edition_id | is-not-empty) {
+              $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
+            }
+          )
+          | append (
+            if ($hardcover_edition_id | is-not-empty) {
+              $"--identifier=hardcover-edition:($hardcover_edition_id)"
+            }
+          )
+          | append (
+            if ($hardcover_book_slug | is-not-empty) {
+              $"--identifier=hardcover:($hardcover_book_slug)"
+            }
+          )
+          | append (
+            if ($wikidata_edition_id | is-not-empty) {
+              $"--identifier=wikidata-edition:($wikidata_edition_id)"
+            }
+          )
+          | append (
+            if ($wikidata_work_id | is-not-empty) {
+              $"--identifier=wikidata-work:($wikidata_work_id)"
+            }
+          )
+          | append (
+            let year = (
+              if "year" in $comic_metadata and ($comic_metadata.year | is-not-empty) {
+                $comic_metadata.year
+              }
             );
-            log debug $"Running (ansi yellow)^ebook-meta ($input.book) ($args | str join ' ') --authors ($authors | str join "&") --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
-            ^ebook-meta
-              $input.book
-              ...$args
-              --authors ($authors | str join "&")
-              # Keep the title in EPUBs for now, since I don't know how Kavita will react to not having a title in an EPUB.
-              --title ($title | standardize_title)
-              --identifier $"comicvine:($comic_vine_id)"
-              --identifier $"comicvine-volume:($comic_metadata.series_id)"
-          );
-          $input
-        )
-        | get book
+            let month = (
+              if "month" in $comic_metadata and ($comic_metadata.month | is-not-empty) {
+                $comic_metadata.month
+              }
+            );
+            let day = (
+              if "day" in $comic_metadata and ($comic_metadata.day | is-not-empty) {
+                $comic_metadata.day
+              }
+            );
+            if ($year | is-not-empty) and ($month | is-not-empty) and ($year | is-not-empty) {
+              $"--date=($year)-($month)-($day)"
+            } else if ($year | is-not-empty) {
+              $"--date=($year)"
+            }
+          )
+        );
+        log debug $"Running (ansi yellow)^ebook-meta ($formats.epub) ($args | str join ' ') --authors ($authors | str join "&") --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
+        ^ebook-meta
+          $formats.epub
+          ...$args
+          --authors ($authors | str join "&")
+          # Keep the title in EPUBs for now, since I don't know how Kavita will react to not having a title in an EPUB.
+          --title ($title | standardize_title)
+          --identifier $"comicvine:($comic_vine_id)"
+          --identifier $"comicvine-volume:($comic_metadata.series_id)";
+        $formats.epub
       )
       let stem = ($formats.cbz | path parse | get stem)
       let renamed_epub = ({ parent: ($epub | path parse | get parent), stem: $stem, extension: "epub" } | path join)
@@ -2215,142 +2231,115 @@ def main [
       $formats | update epub $renamed_epub
     # Rename the PDF
     } else if "pdf" in $formats {
-      let stem = ($formats.cbz | path parse | get stem)
-      let renamed_pdf = ({ parent: ($formats.pdf | path parse | get parent), stem: $stem, extension: "pdf" } | path join)
-      if $formats.pdf != $renamed_pdf {
-        log debug $"Renaming the PDF from ($formats.pdf) to ($renamed_pdf)";
-        mv --force $formats.pdf $renamed_pdf
-      }
       # Update the metadata in the PDF file.
-      let updated_pdf = (
-        $fetched_from_calibre
-        | update book ($renamed_pdf)
-        | export_book_to_directory ($renamed_pdf | path dirname)
-        | embed_book_metadata
-        | (
-          let input = $in;
-          (
-            let args = (
-              []
-              | append (
-                if ($isbn | is-not-empty) {
-                  $"--isbn=($isbn)"
-                }
-              )
-              | append (
-                if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-                  [$"--series=($comic_metadata.series | use_unicode_in_title)" $"--index=($comic_metadata.issue)"]
-                }
-              )
-              | append (
-                if ($imprint | is-not-empty) {
-                  $"--publisher=($imprint)"
-                } else if ($publisher | is-not-empty) {
-                  $"--publisher=($publisher)"
-                } else if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
-                  $"--publisher=($comic_metadata.imprint)"
-                } else if "publisher" in $comic_metadata and ($comic_metadata.publisher | is-not-empty) {
-                  $"--publisher=($comic_metadata.publisher)"
-                }
-              )
-              | append (
-                if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
-                  if ($comic_metadata.language | str downcase) in ["eng" "english"] {
-                    "--language=en"
-                  } else {
-                    $"--language=($comic_metadata.language)"
-                  }
-                } else {
-                  "--language=en"
-                }
-              )
-              | append (
-                if "description" in $comic_metadata and ($comic_metadata.description | is-not-empty) {
-                  $"--comments=($comic_metadata.description)"
-                }
-              )
-              | append (
-                if "genres" in $comic_metadata and ($comic_metadata.genres | is-not-empty) {
-                  $"--tags=($comic_metadata.genres | str join ',')"
-                }
-              )
-              | append (
-                if ($bookbrainz_edition_id | is-not-empty) {
-                  $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
-                }
-              )
-              | append (
-                if ($hardcover_edition_id | is-not-empty) {
-                  $"--identifier=hardcover-edition:($hardcover_edition_id)"
-                }
-              )
-              | append (
-                if ($hardcover_book_slug | is-not-empty) {
-                  $"--identifier=hardcover:($hardcover_book_slug)"
-                }
-              )
-              | append (
-                if ($wikidata_edition_id | is-not-empty) {
-                  $"--identifier=wikidata-edition:($wikidata_edition_id)"
-                }
-              )
-              | append (
-                if ($wikidata_work_id | is-not-empty) {
-                  $"--identifier=wikidata-work:($wikidata_work_id)"
-                }
-              )
-              | append (
-                let year = (
-                  if "year" in $comic_metadata and ($comic_metadata.year | is-not-empty) {
-                    $comic_metadata.year
-                  }
-                );
-                let month = (
-                  if "month" in $comic_metadata and ($comic_metadata.month | is-not-empty) {
-                    $comic_metadata.month
-                  }
-                );
-                let day = (
-                  if "day" in $comic_metadata and ($comic_metadata.day | is-not-empty) {
-                    $comic_metadata.day
-                  }
-                );
-                if ($year | is-not-empty) and ($month | is-not-empty) and ($year | is-not-empty) {
-                  $"--date=($year)-($month)-($day)"
-                } else if ($year | is-not-empty) {
-                  $"--date=($year)"
-                }
-              )
-            );
-            log debug $"Running (ansi yellow)^ebook-meta ($input.book) ($args | str join ' ') --authors ($authors | str join "&") --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
-            ^ebook-meta
-              $input.book
-              ...$args
-              # Keep the title in PDFs for now, since Kavita doesn't really change it's behavior whether one is included or not.
-              --title ($title | standardize_title)
-              # Remove the title sort field.
-              # --title-sort ""
-              --authors ($authors | str join "&")
-              --identifier $"comicvine:($comic_vine_id)"
-              --identifier $"comicvine-volume:($comic_metadata.series_id)";
-            # Now, delete the title so Kavita doesn't think it is a chapter title.
-            # ebook-meta isn't capable of deleting the title...
-            # ^exiftool -Title="" $input.book
-          );
-          $input
+      let args = (
+        []
+        | append (
+          if ($isbn | is-not-empty) {
+            $"--isbn=($isbn)"
+          }
         )
-        | get book
-      )
-      # For some reason the PDF ends up with a different name when updating the metadata.
-      # todo Fix that.
-      if $updated_pdf != $renamed_pdf {
-        log debug $"Renaming the PDF from ($updated_pdf) to ($renamed_pdf)";
-        mv --force $updated_pdf $renamed_pdf
-      }
-      let comic_info = $formats.cbz | extract_comic_info $temporary_directory;
-      log debug "Extracted ComicInfo.xml";
-      let metron_info = $formats.cbz | extract_metron_info $temporary_directory;
-      log debug "Extracted MetronInfo.xml";
+        | append (
+          if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+            [$"--series=($comic_metadata.series | use_unicode_in_title)" $"--index=($comic_metadata.issue)"]
+          }
+        )
+        | append (
+          if ($imprint | is-not-empty) {
+            $"--publisher=($imprint)"
+          } else if ($publisher | is-not-empty) {
+            $"--publisher=($publisher)"
+          } else if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
+            $"--publisher=($comic_metadata.imprint)"
+          } else if "publisher" in $comic_metadata and ($comic_metadata.publisher | is-not-empty) {
+            $"--publisher=($comic_metadata.publisher)"
+          }
+        )
+        | append (
+          if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
+            if ($comic_metadata.language | str downcase) in ["eng" "english"] {
+              "--language=en"
+            } else {
+              $"--language=($comic_metadata.language)"
+            }
+          } else {
+            "--language=en"
+          }
+        )
+        | append (
+          if "description" in $comic_metadata and ($comic_metadata.description | is-not-empty) {
+            $"--comments=($comic_metadata.description)"
+          }
+        )
+        | append (
+          if "genres" in $comic_metadata and ($comic_metadata.genres | is-not-empty) {
+            $"--tags=($comic_metadata.genres | str join ',')"
+          }
+        )
+        | append (
+          if ($bookbrainz_edition_id | is-not-empty) {
+            $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
+          }
+        )
+        | append (
+          if ($hardcover_edition_id | is-not-empty) {
+            $"--identifier=hardcover-edition:($hardcover_edition_id)"
+          }
+        )
+        | append (
+          if ($hardcover_book_slug | is-not-empty) {
+            $"--identifier=hardcover:($hardcover_book_slug)"
+          }
+        )
+        | append (
+          if ($wikidata_edition_id | is-not-empty) {
+            $"--identifier=wikidata-edition:($wikidata_edition_id)"
+          }
+        )
+        | append (
+          if ($wikidata_work_id | is-not-empty) {
+            $"--identifier=wikidata-work:($wikidata_work_id)"
+          }
+        )
+        | append (
+          let year = (
+            if "year" in $comic_metadata and ($comic_metadata.year | is-not-empty) {
+              $comic_metadata.year
+            }
+          );
+          let month = (
+            if "month" in $comic_metadata and ($comic_metadata.month | is-not-empty) {
+              $comic_metadata.month
+            }
+          );
+          let day = (
+            if "day" in $comic_metadata and ($comic_metadata.day | is-not-empty) {
+              $comic_metadata.day
+            }
+          );
+          if ($year | is-not-empty) and ($month | is-not-empty) and ($year | is-not-empty) {
+            $"--date=($year)-($month)-($day)"
+          } else if ($year | is-not-empty) {
+            $"--date=($year)"
+          }
+        )
+      );
+      log debug $"Running (ansi yellow)^ebook-meta ($formats.pdf) ($args | str join ' ') --authors ($authors | str join "&") --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
+      (
+        ^ebook-meta
+          $formats.pdf
+          ...$args
+          # Keep the title in PDFs for now, since Kavita doesn't really change it's behavior whether one is included or not.
+          --title ($title | standardize_title)
+          # Remove the title sort field.
+          # --title-sort ""
+          --authors ($authors | str join "&")
+          --identifier $"comicvine:($comic_vine_id)"
+          --identifier $"comicvine-volume:($comic_metadata.series_id)"
+      );
+      # Now, delete the title so Kavita doesn't think it is a chapter title.
+      # ebook-meta isn't capable of deleting the title...
+      # ^exiftool -Title="" $input.book
       # Obtain a cover image which will be saved alongside the PDF
       # Since ComicVine has low limits on image file size, it's not the place to get high quality covers.
       # Prefer using the cover from the PDF and then fallback to using the one from ComicVine if that fails.
@@ -2363,7 +2352,7 @@ def main [
             stem: "cover"
           } | path join
         );
-        let result = (^ebook-meta --get-cover $cover $renamed_pdf | complete);
+        let result = (^ebook-meta --get-cover $cover $formats.pdf | complete);
         if $result.exit_code == 0 {
           $cover | rename_image_with_extension
         } else {
@@ -2411,9 +2400,9 @@ def main [
         $cover | optimize_image;
       }
       $formats
-      | update pdf $renamed_pdf
-      | insert comic_info $comic_info
-      | insert metron_info $metron_info
+      # | update pdf $formats.pdf
+      # | insert comic_info $comic_info
+      # | insert metron_info $metron_info
       | upsert_if_value cover $cover
       | (
         let input = $in;
@@ -2443,7 +2432,7 @@ def main [
           )
         } else {
           log debug "Dropping cbz from formats since the input format is a PDF";
-          $input | reject cbz
+          $input | reject --optional cbz
         }
       )
     } else {

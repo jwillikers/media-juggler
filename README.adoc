@@ -276,6 +276,13 @@ This will be used later to configure some of the tools.
 // comictagger --only-set-cv-key --cv-api-key <Comic Vine API key>
 // ----
 
+. Set the environment variable `COMIC_VINE_API_KEY` to your Comic Vine API key.
++
+[,sh]
+----
+set --export --universal COMIC_VINE_API_KEY <Comic Vine API key>
+----
+
 . Create the directory `~/.config/calibre/plugins/`.
 +
 [,sh]
