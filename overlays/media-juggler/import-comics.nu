@@ -676,6 +676,110 @@ def main [
     }
   )
 
+  # First, try to locate the release based on its hash if no Wikidata id is specified.
+  let wikidata_edition_id = (
+    if $original_input_format != "acsm" and ($wikidata_edition_id | is-empty) {
+      # BLAKE3 and SHA3-512 checksums are currently supported.
+      ["blake3" "sha3-512"] | reduce --fold "" {|checksum_type acc|
+        if ($acc | is-empty) {
+          let checksum = (
+            if $checksum_type == "blake3" {
+              $original_file | hash_blake3
+            } else if $checksum_type == "sh3-512" {
+              $original_file | hash_sha3_512
+            }
+          )
+          let file_size = du $original_file | first | get physical
+          let editions = $checksum | wikidata_search_editions_by_checksum $checksum_type $file_size
+          if ($editions | is-empty) {
+            # No editions found.
+            log debug $"No Wikidata editions found for the ($checksum_type | str upcase) (ansi purple)($checksum)(ansi reset)"
+            null
+          } else if ($editions | length) == 1 {
+            log info $"Found Wikidata edition (ansi green)($editions | first)(ansi reset) for the ($checksum_type | str upcase) checksum"
+            $editions | first
+          } else {
+            log warning $"Multiple Wikidata editions found for the ($checksum_type | str upcase) (ansi purple)($checksum)(ansi reset): ($editions)"
+            null
+          }
+        } else {
+          return $acc
+        }
+      }
+    } else {
+      $wikidata_edition_id
+    }
+  )
+  let wikidata_edition_identifiers = (
+    if ($wikidata_edition_id | is-not-empty) and (($isbn | is-empty) or ($bookbrainz_edition_id | is-empty) or ($open_library_edition_id | is-empty) or ($comic_vine_issue_id | is-empty)) {
+      $wikidata_edition_id | wikidata_get_edition_identifiers
+    }
+  )
+  let isbn = (
+    if ($isbn | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let isbns = $wikidata_edition_identifiers | get --optional "ISBN-13"
+      if ($isbns | is-empty) {
+        log warning $"No ISBN-13s found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($isbns | length) == 1 {
+        $isbns | first
+      } else {
+        log warning $"Multiple ISBN-13s found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($isbns)"
+        null
+      }
+    } else {
+      $isbn
+    }
+  )
+  let bookbrainz_edition_id = (
+    if ($bookbrainz_edition_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let bookbrainz_edition_ids = $wikidata_edition_identifiers | get --optional "BookBrainz edition ID"
+      if ($bookbrainz_edition_ids | is-empty) {
+        log warning $"No BookBrainz edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($bookbrainz_edition_ids | length) == 1 {
+        $bookbrainz_edition_ids | first
+      } else {
+        log warning $"Multiple BookBrainz edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($bookbrainz_edition_ids)"
+        null
+      }
+    } else {
+      $bookbrainz_edition_id
+    }
+  )
+  let open_library_edition_id = (
+    if ($open_library_edition_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let open_library_edition_ids = $wikidata_edition_identifiers | get --optional "Open Library ID"
+      if ($open_library_edition_ids | is-empty) {
+        log warning $"No OpenLibrary Book IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($open_library_edition_ids | length) == 1 {
+        $open_library_edition_ids | first
+      } else {
+        log warning $"Multiple OpenLibrary Book IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($open_library_edition_ids)"
+        null
+      }
+    } else {
+      $open_library_edition_id
+    }
+  )
+  let comic_vine_issue_id = (
+    if ($comic_vine_issue_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let comic_vine_issue_ids = $wikidata_edition_identifiers | get --optional "Comic Vine ID"
+      if ($comic_vine_issue_ids | is-empty) {
+        log warning $"No Comic Vine issue IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($comic_vine_issue_ids | length) == 1 {
+        $comic_vine_issue_ids | first
+      } else {
+        log warning $"Multiple Comic Vine issue IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($comic_vine_issue_ids)"
+        null
+      }
+    } else {
+      $comic_vine_issue_id
+    }
+  )
+
   # Get missing identifiers based on provided identifiers.
   # todo Search Open Library to.
 
@@ -735,9 +839,12 @@ def main [
   )
 
   # If Wikidata ID is provided and any identifiers are missing, attempt to get them from Wikidata.
+  # The Wikidata ID will be empty here if a wikidata ID wasn't found via a file checksum or BookBrainz.
   let wikidata_edition_identifiers = (
-    if ($wikidata_edition_id | is-not-empty) and (($isbn | is-empty) or ($bookbrainz_edition_id | is-empty) or ($open_library_edition_id | is-empty) or ($comic_vine_issue_id | is-empty)) {
+    if ($wikidata_edition_identifiers | is-empty) and ($wikidata_edition_id | is-not-empty) and (($isbn | is-empty) or ($bookbrainz_edition_id | is-empty) or ($open_library_edition_id | is-empty) or ($comic_vine_issue_id | is-empty)) {
       $wikidata_edition_id | wikidata_get_edition_identifiers
+    } else {
+      $wikidata_edition_identifiers
     }
   )
   let isbn = (

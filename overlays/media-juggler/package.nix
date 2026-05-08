@@ -1,5 +1,6 @@
 {
   advancecomp,
+  b3sum,
   beets,
   calibre,
   cbconvert,
@@ -20,6 +21,7 @@
   mupdf-headless,
   nushell,
   picard,
+  rhash,
   stdenvNoCC,
   tesseract,
   tone,
@@ -95,6 +97,7 @@ else
         --prefix PATH : ${
           lib.makeBinPath [
             chromaprint
+            b3sum
             efficient-compression-tool
             ffmpeg
             image_optim
@@ -102,6 +105,7 @@ else
             # jpegli
             minuimus
             m4b-tool
+            rhash
             tone
             zip
           ]
@@ -110,6 +114,7 @@ else
         --prefix PATH : ${
           lib.makeBinPath [
             advancecomp
+            b3sum
             calibre
             cbconvert
             # comictagger
@@ -121,6 +126,7 @@ else
             # kcc
             minuimus
             mupdf-headless
+            rhash
             tesseract
             udisks
             util-linux

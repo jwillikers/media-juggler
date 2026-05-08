@@ -3258,6 +3258,176 @@ export def wikidata_search_editions_by_isbn [
   )
 }
 
+# Calculate the SHA3-512 checksum for a file using rhash.
+export def hash_sha3_512 []: [string -> string] {
+  # File for which to generate the checksum.
+  let file = $in
+  if ($file | is-empty) {
+    error make {
+      msg: "no file provided"
+      labels: [
+        {text: "in" span: (metadata $in).span}
+      ]
+      help: "pipe in the path of the file to hash"
+    }
+  }
+  log debug $"Running command: (ansi yellow)^rhash --printf '%x{sha3-512}' '($file)'(ansi reset)"
+  let result = do { ^rhash --printf '%x{sha3-512}' $file } | complete
+  if ($result.exit_code != 0) {
+    error make {
+      msg: "non-zero exit code from rhash while calculating SHA3-512 checksum"
+      labels: [
+        {text: "result.exit_code" span: (metadata $result.exit_code).span}
+      ]
+      help: $"error calculating the SHA3-512 checksum for the file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+    }
+  }
+  if ($result.stdout | is-empty) {
+    error make {
+      msg: "missing SHA3-512 checksum in stdout"
+      labels: [
+        {text: "result.stdout" span: (metadata $result.stdout).span}
+      ]
+      help: $"no SHA3-512 checksum output by rhash for the file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+    }
+  }
+  $result.stdout | str trim
+}
+
+# Calculate the BLAKE3 checksum for a file using the b3sum utility.
+export def hash_blake3 []: [string -> string] {
+  # File for which to generate the checksum.
+  let file = $in
+  if ($file | is-empty) {
+    error make {
+      msg: "no file provided"
+      labels: [
+        {text: "in" span: (metadata $in).span}
+      ]
+      help: "pipe in the path of the file to hash"
+    }
+  }
+  log debug $"Running command: (ansi yellow)^b3sum --no-names '($file)'(ansi reset)"
+  let result = do { ^b3sum --no-names $file } | complete
+  if ($result.exit_code != 0) {
+    error make {
+      msg: "non-zero exit code from b3sum while calculating the BLAKE3 checksum"
+      labels: [
+        {text: "result.exit_code" span: (metadata $result.exit_code).span}
+      ]
+      help: $"error calculating the BLAKE3 checksum for the file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+    }
+  }
+  if ($result.stdout | is-empty) {
+    error make {
+      msg: "missing BLAKE3 checksum in stdout"
+      labels: [
+        {text: "result.stdout" span: (metadata $result.stdout).span}
+      ]
+      help: $"no BLAKE3 checksum output by b3sum for the file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+    }
+  }
+  $result.stdout | str trim
+}
+
+# Search for an edition on Wikidata by BLAKE3 or SHA3-512 checksum.
+#
+# Requires the environment variable MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN to set to a Wikidata access token.
+# The environment variable WIKIDATA_USERNAME must also be set to your Wikidata username.
+#
+# This will only work for unmodified release assets, of course.
+export def wikidata_search_editions_by_checksum [
+  type: string # The type of checksum, either "blake3" or "sha3-512"
+  file_size: filesize # The size of the file
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> list<string>] {
+  let checksum = $in
+  if ($checksum | is-empty) {
+    log error "No checksum provided!"
+    return null
+  }
+  if $type not-in [blake3 sha3-512] {
+    log error $"The type must be either (ansi yellow)blake3(ansi reset) or (ansi yellow)sha3-512(ansi reset)"
+    return null
+  }
+
+  for var in [WIKIDATA_USERNAME MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      return null
+    }
+  }
+
+  let checksum_type = (
+    if $type == "blake3" {
+      "Q81575705"
+    } else if $type == "sha3-512" {
+      "Q110651449"
+    }
+  )
+
+  # let data_size_bytes = $file_size | format filesize B
+  # let data_size_mebibytes = $file_size | format filesize MiB
+
+  # todo Use data size.
+  # Data size isn't normalizable on Wikidata.
+  # So, I need to do something special to normalize the data.
+  #
+  # ?statement pq:P3575 ?nodeDataSize.
+  # ?statement pqv:P3575 ?valueNodeDataSize.
+  # ?valueNodeDataSize wikibase:quantityAmount "+160.16015625"^^xsd:decimal.
+  # ?valueNodeDataSize wikibase:quantityUnit wd:Q79758.
+
+  let sparql_query = $"SELECT DISTINCT ?edition WHERE {
+    ?edition wdt:P31/wdt:P279* wd:Q3331189.
+    ?edition p:P4092 ?statement.
+    ?statement ps:P4092 '($checksum)'.
+    ?statement pq:P459 wd:($checksum_type).
+  }"
+
+  # log debug $"sparql_query: ($sparql_query)"
+
+  # https://query.wikidata.org/sparql?format=json&query=
+  let request = {
+    (
+      http get
+        --full
+        --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+          "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
+          "X-Authenticated-User": $env.WIKIDATA_USERNAME
+        }
+        $"($wikidata_sparql_api_url)($sparql_query | url encode)"
+    )
+  }
+
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error getting Wikidata edition by the ($type | str upcase) checksum ($checksum) from (ansi yellow)($wikidata_sparql_api_url)($sparql_query | url encode)(ansi reset): ($error.debug)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP error (ansi red)($response.status)(ansi reset) searching for Wikidata editions with the ($type | str upcase) checksum ($checksum) with SPARQL query ($sparql_query) at (ansi yellow)($wikidata_sparql_api_url)($sparql_query | url encode)(ansi reset): ($response.body)"
+    return null
+  }
+  let bindings = $response.body | from json | get results.bindings
+  if ($bindings | is-empty) {
+    return null
+  }
+  (
+    $bindings
+    | get edition
+    | where type == "uri"
+    | get value
+    | str replace "http://www.wikidata.org/entity/" ""
+  )
+}
+
 # Search for editions on Wikidata by Amazon ASIN.
 #
 # Requires the environment variable MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN to set to a Wikidata access token.
