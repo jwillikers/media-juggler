@@ -2198,6 +2198,8 @@ def main [
               $input.book
               ...$args
               --authors ($authors | str join "&")
+              # Keep the title in EPUBs for now, since I don't know how Kavita will react to not having a title in an EPUB.
+              --title ($title | standardize_title)
               --identifier $"comicvine:($comic_vine_id)"
               --identifier $"comicvine-volume:($comic_metadata.series_id)"
           );
@@ -2324,14 +2326,16 @@ def main [
             ^ebook-meta
               $input.book
               ...$args
+              # Keep the title in PDFs for now, since Kavita doesn't really change it's behavior whether one is included or not.
+              --title ($title | standardize_title)
               # Remove the title sort field.
-              --title-sort ""
+              # --title-sort ""
               --authors ($authors | str join "&")
               --identifier $"comicvine:($comic_vine_id)"
               --identifier $"comicvine-volume:($comic_metadata.series_id)";
             # Now, delete the title so Kavita doesn't think it is a chapter title.
             # ebook-meta isn't capable of deleting the title...
-            ^exiftool -Title="" $input.book
+            # ^exiftool -Title="" $input.book
           );
           $input
         )

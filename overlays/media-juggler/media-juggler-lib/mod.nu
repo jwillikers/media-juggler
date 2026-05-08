@@ -243,6 +243,25 @@ export def use_unicode_in_title []: string -> string {
   $new_title
 }
 
+# Make the title look nice when named for a volume, i.e. use a comma before the volume word when there isn't any other punctuation.
+#
+# This basically end up being consistent with the MusicBrainz style guidelines.
+export def standardize_title []: string -> string {
+  let title = $in
+  # We don't want to replace the "-" before the volume part with an emdash or endash.
+  let components = $title | split row --number 2 " - Volume "
+  if ($components | length) > 1 {
+    # If the title of the series ends with punctuation, don't add a comma.
+    if ($components | first | split chars | last) in ["!", "?", ".", ","] {
+      $components | str join " Volume "
+    } else {
+      $components | str join ", Volume "
+    }
+  } else {
+    $title
+  }
+}
+
 # Get the type of a path via SSH
 export def "ssh_path_type" []: path -> string {
   let input = $in
