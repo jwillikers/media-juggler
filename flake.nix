@@ -50,6 +50,7 @@
         cbconvert
         overlays.m4b-tool
         image_optim
+        isbnlib2
         media-juggler
       ];
     in
