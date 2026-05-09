@@ -868,12 +868,172 @@ def test_from_metron_info_xml [] {
   test_from_metron_info_xml_march_comes_in_like_a_lion_vol_1
 }
 
+def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
+  let $input = {
+    series: "March Comes in Like a Lion"
+    issue: "1"
+    description: "Summary of March Comes in Like a Lion.
+
+## Chapter Titles
+* Chapter 1
+* Chapter 2
+* Chapter 3
+* Chapter 10: Over the Cuckoo&apos;s Nest"
+    # publication_date: ("2023-05-01" | into datetime --timezone UTC)
+    year: "2023"
+    month: "05"
+    day: "01"
+    volume: "2023"
+    issue_count: "4"
+    credits: [
+      [person role primary language];
+      # ["Chica Umino" Inker false ""]
+      # ["Chica Umino" Penciller false ""]
+      ["Chica Umino" Artist false ""]
+      ["Chica Umino" Cover false ""]
+      ["Chica Umino" Writer false ""]
+      ["Jocelyne Allen" Translator false ""]
+    ]
+    # narrative: [
+    #   [locations];
+    #   [[Japan]]
+    # ]
+    genres: [coming-of-age romance "slice of life"]
+    tags: [seinen shogi]
+    ids: [
+      [type id];
+      ["bookbrainz_edition_id" "594a8ec2-6301-4c20-ae22-2c43840416b2"]
+      ["comic_vine_issue_id" "4000-987377"]
+      ["hardcover_book_slug" "march-comes-in-like-a-lion-vol-1"]
+      ["hardcover_edition_id" "32873036"]
+      ["wikidata_item_id" "Q139556252"]
+      ["open_library_edition_id" "OL61662902M"]
+    ]
+    page_count: 187
+    language: "american english"
+    isbn: "9781634428132"
+    # format: "digital"
+    manga: "YesAndRightToLeft"
+    publisher: "Denpa, LLC"
+    imprint: "Denpa"
+    # is_manga: true
+    # page_reading_order: "right_to_left"
+    # age_rating: "Everyone"
+    # publisher: {
+    #   name: "Denpa, LLC"
+    #   imprint: "Denpa"
+    # }
+    comment: "Tagged with ComicTagger 1.6.0b11.dev0 using info from Comic Vine on 2026-04-25 15:19:05. [Issue ID 987377]"
+    # series_groups: ["Example Series Group", "Another"]
+    # story_arc: {
+    #   name: "Example Story Arc"
+    #   number: 1
+    # }
+    # alternative_series: {
+    #   name: "Example Alternative Series"
+    #   count: 1
+    # }
+  }
+  let expected = open ([$test_data_dir "March Comes in Like a Lion v001_ComicInfo.xml"] | path join)
+  # log debug $"output: \n($input | into_comic_info_xml | to xml)\n"
+  # log debug $"output: \n($input | into_comic_info_xml | to nuon)\n"
+  assert equal ($input | into_comic_info_xml) $expected
+}
+
+def test_into_comic_info_xml [] {
+  test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1
+}
+
+def test_from_language_code_unsupported_code [] {
+  let input = "english"
+  assert error {|| $input | from_language_code $iso_language_codes_map}
+}
+
+def test_from_language_code_duplicate_languages [] {
+  let input = "engl"
+  let codes = [
+    [language iso_639_1 iso_639_3];
+    ["english" "en" "eng"]
+    ["english" "en" "eng"]
+  ]
+  assert error {|| $input | from_language_code $codes}
+}
+
+def test_from_language_code_en [] {
+  let input = "en"
+  let expected = "english"
+  assert equal ($input | from_language_code $iso_language_codes_map) $expected
+}
+
+def test_from_language_code_eng [] {
+  let input = "eng"
+  let expected = "english"
+  assert equal ($input | from_language_code $iso_language_codes_map) $expected
+}
+
+def test_from_language_code [] {
+  test_from_language_code_unsupported_code
+  test_from_language_code_duplicate_languages
+  test_from_language_code_en
+  test_from_language_code_eng
+}
+
+def test_into_language_code_unsupported_language [] {
+  let input = "spanglish"
+  let codes = [
+    [language iso_639_1 iso_639_3];
+    ["english" "en" "eng"]
+  ]
+  assert error {|| $input | into_language_code iso_639_1 $codes}
+}
+
+def test_into_language_code_unsupported_language_code [] {
+  let input = "english"
+  let codes = [
+    [language iso_639_1 iso_639_3];
+    ["english" "en" "eng"]
+  ]
+  assert error {|| $input | into_language_code ietf_null $codes}
+}
+
+def test_into_language_code_duplicate_languages [] {
+  let input = "en"
+  let codes = [
+    [language iso_639_1 iso_639_3];
+    ["english" "en" "eng"]
+    ["english" "en" "eng"]
+  ]
+  assert error {|| $input | into_language_code iso_639_1 $codes}
+}
+
+def test_into_language_code_en [] {
+  let input = "english"
+  let expected = "en"
+  assert equal ($input | into_language_code iso_639_1 $iso_language_codes_map) $expected
+}
+
+def test_into_language_code_eng [] {
+  let input = "english"
+  let expected = "eng"
+  assert equal ($input | into_language_code iso_639_3 $iso_language_codes_map) $expected
+}
+
+def test_into_language_code [] {
+  test_into_language_code_unsupported_language
+  test_into_language_code_unsupported_language_code
+  test_into_language_code_duplicate_languages
+  test_into_language_code_en
+  test_into_language_code_eng
+}
+
 def main [] {
   test_is_identifier_valid
   test_identifier_from_url
   test_identifier_into_url
-  test_from_comic_info_xml
-  # test_into_comic_info_xml
+  test_from_language_code
+  test_into_language_code
+  # test_from_comic_info_xml
+  test_into_comic_info_xml
   # test_from_metron_info_xml
   # test_into_metron_info_xml
   echo $"(ansi green)All tests passed!(ansi reset)"

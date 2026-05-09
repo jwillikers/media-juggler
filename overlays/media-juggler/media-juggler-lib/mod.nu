@@ -854,7 +854,7 @@ export def add_isbn_to_comic_info [
 }
 
 export def upsert_comic_info [
-  field: record<tag: string, value: string>
+  field: record<tag: string, value>
 ]: record -> record {
   let comic_info = $in
   if ($field.tag | is-empty) or ($field.value | is-empty) {
@@ -2879,7 +2879,7 @@ export def identifier_into_url [
       labels: [
           {text: "type" span: (metadata $type).span}
       ]
-      help: $"the value for the type field must be one of ($book_identifiers | columns)"
+      help: $"invalid value (ansi yellow)($type)(ansi reset) for the type field must be one of ($book_identifiers | columns)"
     }
   }
   if $type == "hardcover_edition_id" and ($hardcover_book_slug | is-empty) {
@@ -3218,11 +3218,138 @@ export def number_of_images_in_archive []: [path -> int] {
   $archive | list_files_in_archive_with_extensions $image_extensions | length
 }
 
+# export const comic_metadata_template = {
+# }
+
+# https://en.wikipedia.org/wiki/IETF_language_tag
+# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
+export const iso_language_codes_map = [
+  [language iso_639_1 iso_639_3 ietf_bcp_47 default_language];
+  ["english" "en" "eng" "en" true]
+  ["american english" "en" "eng" "en-US" false]
+  ["british english" "en" "eng" "en-GB" false]
+  ["chinese" "zh" "zho" "zh" true]
+  ["german" "de" "deu" "de" false]
+  ["japanese" "ja" "jpn" "ja" true]
+  ["japanese hiragana" "ja" "jpn" "ja-hira" false]
+  ["japanese katakana" "ja" "jpn" "ja-kana" false]
+  ["japanese kana" "ja" "jpn" "ja-hrkt" false]
+  ["japanese kanji" "ja" "jpn" "ja-hani" false]
+  ["japanese romanized" "ja" "jpn" "ja-Latn" false]
+  ["korean" "ko" "kor" "ko" true]
+  ["spanish" "es" "spa" "es" true]
+]
+
+# Convert a language to it's corresponding IETF BCP 47 or ISO 639-3 language code
+#
+# https://en.wikipedia.org/wiki/IETF_language_tag
+# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
+export def into_language_code [
+  type: string # 'ietf_bcp_47', 'iso_639_1', or 'iso_639_3'
+  language_codes_map: table = $iso_language_codes_map
+]: [string -> string] {
+  let language = $in
+  if $type not-in ($language_codes_map | reject --optional language default_language | columns) {
+    error make {
+      msg: "invalid language code type"
+      labels: [
+          {text: "type" span: (metadata $type).span}
+      ]
+      help: $"the language code type must be one of (ansi yellow)($language_codes_map | reject --optional language language_default | str join ' ')(ansi reset)"
+    }
+  }
+  let language_codes = $language_codes_map | where language == $language
+  if ($language_codes | is-empty) {
+    error make {
+      msg: "unsupported language"
+      labels: [
+          {text: "language_codes_map" span: (metadata $language_codes_map).span}
+      ]
+      help: $"add the language (ansi yellow)($language)(ansi reset) to the language_codes_map table"
+    }
+  }
+  let language_codes = (
+    if ($language_codes | length) > 1 {
+      let default_codes = $language_codes | where default_language == true
+      if ($default_codes | length) > 1 {
+        error make {
+          msg: "duplicate language in language_codes_map table default_language set to true"
+          labels: [
+              {text: "language_codes_map" span: (metadata $language_codes_map).span}
+          ]
+          help: $"remove the duplicate of the (ansi yellow)($language)(ansi reset) language from the table or set default_language to false for all but one of the entries which has the same language codes"
+        }
+      } else {
+        $default_codes
+      }
+    } else {
+      $language_codes
+    }
+  )
+  $language_codes | get $type | first
+}
+
+# Convert an IETF BCP 47 or ISO 639-3 language code into its corresponding language
+#
+# https://en.wikipedia.org/wiki/IETF_language_tag
+# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
+export def from_language_code [
+  # type: string # 'iso_639_1' 2-letter code or 'iso_639_3' 3-letter code
+  language_codes_map: table = $iso_language_codes_map
+]: [string -> string] {
+  let language_code = $in
+  let language_code_length = $language_code | str length
+  let type = (
+    if $language_code_length == 2 {
+      "iso_639_1"
+    } else if $language_code_length == 3 {
+      "iso_639_3"
+    } else {
+      error make {
+        msg: "unsupported language code type for the number of characters"
+        labels: [
+            {text: "language_code" span: (metadata $language_code).span}
+        ]
+        help: $"language codes must be 2-letters for (ansi yellow)iso_639_1(ansi reset) or 3-letters for (ansi yellow)iso_639_3(ansi reset)"
+      }
+    }
+  )
+  let languages = $language_codes_map | where {|it| ($it | get $type) == $language_code}
+  if ($languages | is-empty) {
+    error make {
+      msg: "invalid language code"
+      labels: [
+          {text: "language_code" span: (metadata $language_code).span}
+      ]
+      help: $"the language code (ansi yellow)($language_code)(ansi reset) of type (ansi yellow)($type)(ansi reset) does not exist in the language_codes_map table"
+    }
+  }
+  let languages = (
+    if ($languages | length) > 1 {
+      let default_languages = $languages | where default_language == true
+      if ($default_languages | length) > 1 {
+        error make {
+          msg: "duplicate language code in language_codes_map table where default_language is set to true"
+          labels: [
+              {text: "language_codes_map" span: (metadata $language_codes_map).span}
+          ]
+          help: $"remove the duplicate of the (ansi yellow)($language_code)(ansi reset) language from the table or set default_language to false for all but one of the entries which have the same language codes"
+        }
+      } else {
+        $default_languages
+      }
+    } else {
+      $languages
+    }
+  )
+  $languages.language | first
+}
+
 # Convert the internal data structure for a comic to a ComicInfo.xml
 #
 # https://anansi-project.github.io/docs/comicinfo/documentation
 # https://wiki.kavitareader.com/guides/metadata/comics/
-export def to_comic_info_xml []: [record -> record] {
+export def into_comic_info_xml []: [record -> record] {
   let data = $in
   if ($data | is-empty) {
     error make {
@@ -3241,7 +3368,10 @@ export def to_comic_info_xml []: [record -> record] {
     [[Inker] [Inker]]
     [[Colorist] [Colorist]]
     [[Letterer] [Letterer]]
-    [[Artist] [Penciller Inker Colorist Letterer]]
+    # [[Artist] [Penciller Inker Colorist]]
+    # I think ComicTagger does Penciller and Inker by default for Artist.
+    # I also include Colorist since usually, there's color of some sort in most comics and manga, even if it's only on the cover for manga.
+    [[Artist] [Penciller Inker Colorist]]
     # [[Designer] []]
     # CoverArtist requires both the Cover and the Artist roles.
     [[Cover Artist] [CoverArtist]]
@@ -3258,7 +3388,7 @@ export def to_comic_info_xml []: [record -> record] {
       $creator_acc | append (
         $comic_vine_roles_map
         | reduce --fold [] {|comic_vine_roles acc|
-          if ($comic_vine_roles.comic_vine_role | all {|role| $role in $creator_comic_vine_roles}) {
+          if ($comic_vine_roles.comic_vine_roles | all {|role| $role in $creator_comic_vine_roles}) {
             $acc | append (
               $comic_vine_roles.comic_info_roles | each {|role|
                 {
@@ -3279,15 +3409,17 @@ export def to_comic_info_xml []: [record -> record] {
     if ($creators | is-empty) {
       null
     } else {
+      # log debug $"Creators: ($creators)"
+      # log debug $"Creators grouped-by role: ($creators | group-by --to-table role)"
       $creators | group-by --to-table role | reduce --fold {} {|role acc|
-        $acc | insert $role.role $role.items.creator
+        $acc | insert $role.role $role.items.person
       }
     }
   )
 
   let urls = $data.ids | each {|id|
     if $id.type == "hardcover_book_slug" {
-      #
+      ""
     } else if $id.type == "hardcover_edition_id" {
       if "hardcover_book_slug" in ($data | get --optional ids.type) {
         $id.id | identifier_into_url $id.type --hardcover-book-slug ($data.ids | where type == "hardcover_book_slug" | get id | first)
@@ -3298,7 +3430,7 @@ export def to_comic_info_xml []: [record -> record] {
     } else {
       $id.id | identifier_into_url $id.type
     }
-  } | where {|url| $url | is-not-empty } | str join " "
+  } | where {|url| $url | is-not-empty } | sort | str join " "
 
   # todo
   # AgeRating (Normalize to Metron's / Kavita's supported ones)
@@ -3308,24 +3440,48 @@ export def to_comic_info_xml []: [record -> record] {
   # todo Teams?
   # todo main character?
   let comic_info_xml = (
-    {}
+    {
+      tag: "ComicInfo"
+      attributes: {}
+      content: []
+    }
     | upsert_comic_info {tag: "GTIN", value: ($data | get --optional isbn)}
     | upsert_comic_info {tag: "Series", value: ($data | get --optional series)}
     # | upsert_comic_info {tag: "Format", value: ($data | get --optional format)}
+    | upsert_comic_info {
+      tag: "Genre"
+      value: (
+        if ($data | get --optional genres | is-empty) {
+          null
+        } else {
+          $data.genres | sort | str join ","
+        }
+      )
+    }
+    | upsert_comic_info {
+      tag: "Tags"
+      value: (
+        if ($data | get --optional tags | is-empty) {
+          null
+        } else {
+          $data.tags | sort | str join ","
+        }
+      )
+    }
     | upsert_comic_info {tag: "Count", value: ($data | get --optional issue_count)}
-    # todo PageCount
-    | upsert_comic_info {tag: "PageCount", value: ($data | get --optional page_count)}
+    | upsert_comic_info {tag: "PageCount", value: ($data | get --optional page_count | into string)}
     | upsert_comic_info {tag: "Title", value: ($data | get --optional chapter_title)}
     | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publisher)}
     | upsert_comic_info {tag: "Imprint", value: ($data | get --optional imprint)}
     | upsert_comic_info {tag: "Summary", value: ($data | get --optional description)}
+    | upsert_comic_info {tag: "Notes", value: ($data | get --optional comment)}
     | upsert_comic_info {
       tag: "Characters"
       value: (
         if ($data | get --optional characters | is-empty) {
           null
         } else {
-          $data.characters | str join ","
+          $data.characters.name | sort | str join ","
         }
       )
     }
@@ -3357,12 +3513,13 @@ export def to_comic_info_xml []: [record -> record] {
         )
       )
     }
-    | upsert_comic_info {tag: "LanguageISO", value: ($data | get --optional language)}
-    | upsert_comic_info {tag: "Characters", value: ($data | get --optional characters | str join ",")}
+    | upsert_comic_info {tag: "LanguageISO", value: ($data | get --optional language | into_language_code ietf_bcp_47)}
     | upsert_comic_info {tag: "Web", value: $urls}
   )
-  $creators | reduce --fold $comic_info_xml {|role acc|
-    $acc | upsert_comic_info {tag: $role.role, value: ($role.creator | str join ",")}
+  # log debug $"creators: ($creators)"
+  # $comic_info_xml
+  $creators | columns | reduce --fold $comic_info_xml {|role acc|
+    $acc | upsert_comic_info {tag: $role, value: ($creators | get $role | sort | str join ",")}
   }
 }
 

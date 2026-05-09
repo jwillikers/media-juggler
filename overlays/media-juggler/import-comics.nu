@@ -156,6 +156,7 @@ def main [
   --cbconvert-pdf-image-quality: string = "90" # The image quality setting to pass to cbconvert when generating a CBZ from a PDF. Lower this as necessary for PDFs with extremely high quality images.
   --clear-comictagger-cache # Clear the ComicTagger cache to force it to pull in updated data
   --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
+  --default-language: string = "american english"
   --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library" "Kobo Metadata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
@@ -1438,6 +1439,7 @@ def main [
             | each {|role|
               {
                 person: $person.name
+                id: $person.id
                 role: $role
                 primary: false
                 language: ""
@@ -1478,11 +1480,11 @@ def main [
             issue_count: $volume_data.count_of_issues
             ids: $ids
             page_count: $number_of_pages
-            characters: ($data.character_credits | get --optional name)
-            # Assume the language, I guess?
-            language: "en"
+            characters: ($data.character_credits | select --optional name id)
+            language: $default_language
             manga: $manga
             genres: []
+            tags: []
             year: ($publication_date | format date "%Y")
             month: ($publication_date | format date "%m")
             day: ($publication_date | format date "%d")
@@ -1738,13 +1740,9 @@ def main [
       | (
         let input = $in;
         if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
-          if ($comic_metadata.language | str downcase) in ["eng" "english"] {
-            $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
-          } else {
-            $input | upsert_comic_info {tag: "LanguageISO", value: $comic_metadata.language}
-          }
+          $input | upsert_comic_info {tag: "LanguageISO", value: ($comic_metadata.language | into_language_code ietf_bcp_47)}
         } else {
-          $input | upsert_comic_info {tag: "LanguageISO", value: "en"}
+          $input | upsert_comic_info {tag: "LanguageISO", value: ($default_language | into_language_code ietf_bcp_47)}
         }
       )
       | (
@@ -2097,13 +2095,9 @@ def main [
           )
           | append (
             if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
-              if ($comic_metadata.language | str downcase) in ["eng" "english"] {
-                "--language=en"
-              } else {
-                $"--language=($comic_metadata.language)"
-              }
+              $"--language=($comic_metadata.language | into_language_code ietf_bcp_47)"
             } else {
-              "--language=en"
+              $"--language=($default_language | into_language_code ietf_bcp_47)"
             }
           )
           | append (
@@ -2212,13 +2206,9 @@ def main [
         )
         | append (
           if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
-            if ($comic_metadata.language | str downcase) in ["eng" "english"] {
-              "--language=en"
-            } else {
-              $"--language=($comic_metadata.language)"
-            }
+            $"--language=($comic_metadata.language | into_language_code ietf_bcp_47)"
           } else {
-            "--language=en"
+            $"--language=($default_language | into_language_code ietf_bcp_47)"
           }
         )
         | append (
