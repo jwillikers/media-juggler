@@ -464,8 +464,10 @@ export def pdf_page_count []: path -> int {
 # r'[- 0-9]{17}$)(?:97[89][- ]?)?[0-9]{1,5}'
 # r'[- ]?[0-9]+[- ]?[0-9]+[- ]?[0-9X]$',
 
-# todo Use a confidence rating for all ISBN results and use that to determine the most likely candidates?
 # Parse ISBN from text
+#
+# todo Use a confidence rating for all ISBN results and use that to determine the most likely candidates?
+# todo Add test cases for this function.
 export def parse_isbn [
 ]: list<string> -> list<string> {
   let text = $in
@@ -860,6 +862,7 @@ export def upsert_comic_info [
   if ($field.tag | is-empty) or ($field.value | is-empty) {
     return $comic_info
   }
+  # log debug $"upsert_comic_info: field: ($field)"
   (
     $comic_info
     | (
@@ -874,7 +877,7 @@ export def upsert_comic_info [
           attributes: {}
           content: [
             [tag attributes content];
-            [null null $field.value]
+            [null null ($field.value | into string)]
           ]
         }
       )
@@ -948,11 +951,18 @@ export def opf_from_epub [
   working_directory: directory
 ]: path -> record {
   let epub = $in
-  let opf_file = mktemp # ($epub | path parse | update  | update extension "opf" | path join)
-  log debug $"Running (ansi yellow)^ebook-meta --to-opf '($opf_file)' '($epub)'(ansi reset)";
-  ^ebook-meta --to-opf $opf_file $epub
-  let opf = open $opf_file | from xml
-  rm $opf_file
+  let opf_file = $epub | find_opf_in_epub
+  if ($opf_file | is-empty) {
+    log error $"No OPF file found in (ansi yellow)($epub)(ansi reset)"
+    return null
+  }
+  let metadata_file = $epub | extract_file_from_archive $opf_file $working_directory
+  let opf = (
+    if ($metadata_file | is-not-empty) {
+      open $metadata_file | from xml
+    }
+  )
+  rm $metadata_file
   $opf
 }
 
@@ -962,6 +972,7 @@ export def opf_from_epub [
 # Metadata embedded in an EPUB file or a ComicInfo.xml embedded in a CBZ or ZIP archive have the lowest precedence.
 # The sidecar metadata.opf and ComicInfo.xml files are assumed to reside in the same directory as the target file.
 #
+# todo Replace this with extract_ebook_metadata function.
 export def get_metadata [
   working_directory: directory # The scratch-space directory to use
 ]: path -> record {
@@ -1044,7 +1055,12 @@ export def isbn_from_opf []: record -> string {
     log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring metadata."
     return null
   }
-  let isbn = $metadata | first | where tag == "identifier" | where attributes.scheme == "ISBN"
+  let isbn = (
+    $metadata
+    | first
+    | where tag == "identifier"
+    | where {|it| ($it.attributes | get --optional scheme) == "ISBN"}
+  )
   if ($isbn | is-empty) {
     return null
   }
@@ -3194,22 +3210,266 @@ export def from_comic_info_xml []: [record -> record] {
 
   let data = (
     {}
-    | upsert_if_value "chapter_title" $chapter_title
-    | upsert_if_value "series" $series
-    | upsert_if_value "contributors" $contributors
-    | upsert_if_value "narrative" $narrative
-    | upsert_if_present "summary" $json "Summary"
+    # | upsert_if_value "chapter_title" $chapter_title
+    | upsert_if_present "chapter_title" $json "Title"
+    | upsert_if_present "series" $json "Series"
+    # Does Volume depend on Manga, then?
+    | upsert_if_present "issue" $json "Volume"
+    # | upsert_if_value "contributors" $contributors
+    # | upsert_if_value "narrative" $narrative
+    | upsert_if_present "description" $json "Summary"
     | upsert_if_present "comment" $json "Notes"
     | upsert_if_value "publication_date" $publication_date
     | upsert_if_present "genres" $json "Genres"
     | upsert_if_present "tags" $json "Tags"
     | upsert_if_present "series_groups" $json "SeriesGroup"
-    | upsert_if_present "scan_information" $json "ScanInformation"
+    # | upsert_if_present "scan_information" $json "ScanInformation"
     | upsert_if_present "page_count" $json "PageCount"
     # | upsert_if_present "format" $json "Format"
   )
 
   $data
+}
+
+# Parse metadata from exiftool's JSON output for a PDF file
+export def from_pdf_metadata []: [
+  record -> record
+] {
+  let metadata = $in
+
+  let publication_date = (
+    let date = $metadata | get --optional "Date";
+    if ($date | is-not-empty) {
+      $date | into datetime
+    }
+  )
+  let language = (
+    let language_code = $metadata | get --optional Language;
+    if ($language_code | is-not-empty) {
+      if ($language_code | str length) == 2 {
+        $language_code | from_language_code # iso_639_1
+      } else if ($language_code | str length) == 3 {
+        $language_code | from_language_code # iso_639_3
+      } else {
+        # todo Support type parameter in from_language_code
+        # $language_code | from_language_code ietf_bcp_47
+      }
+    }
+  )
+  # ISBN can come from Isbn, ISBN, or Identifier table
+  # Both Subject and Keywords fields should be parsed into allowed tags and genres
+  # exiftool doesn't parse IdentifierScheme correctly, so I can't parse the fields properly.
+  # Author or Creator field for writers and how are multiple split?
+  # Author is split with " & "
+  # Creator is a proper list
+  let credits = (
+    if ($metadata | get --optional Creator | is-not-empty) {
+      $metadata.Creator | each {|creator|
+        {
+          person: $creator
+          role: "Writer"
+          primary: true
+          language: ""
+        }
+      }
+    }
+  )
+  (
+    {}
+    | upsert_if_present "series" $metadata "Series"
+    | upsert_if_present "issue" $metadata "SeriesSeries_index"
+    | upsert_if_present "description" $metadata "Description"
+    | upsert_if_present "publication_date" $metadata "Date"
+    | upsert_if_present "page_count" $metadata "PageCount"
+    | upsert_if_present "publisher" $metadata "Publisher"
+    | upsert_if_present "isbn" $metadata "Isbn"
+    | upsert_if_present "isbn" $metadata "ISBN"
+    | upsert_if_value "language" $language
+    | upsert_if_value "credits" $credits
+    # todo Needs extra handling
+    # | upsert_if_present "language" $metadata "Language"
+  )
+}
+
+# Parse metadata from an EPUB's content.opf XML file
+export def from_opf_xml []: [
+  record -> record
+] {
+  let opf = $in
+  let opf = (
+    if $opf.tag == "package" {
+      $opf.content | where tag == "metadata" | first
+    } else {
+    # todo Verify metadata tag is here
+      $opf
+    }
+  )
+  let metadata_content = $opf | get content
+  let credits = (
+    let creators = $metadata_content | where tag == creator;
+    if ($creators | is-not-empty) {
+      let authors = $creators | where attributes.role == "aut"
+      if ($authors | is-not-empty) {
+        $authors | get content | first | get content | flatten | uniq | each {|author|
+          {
+            creator: $author
+            role: "Writer"
+            primary: true
+            language: ""
+          }
+        } | sort-by creator
+      } else {
+        # Fallback to using any creators as the author
+        $creators | get content | first | get content | flatten | uniq | each {|creator|
+          {
+            creator: $creator
+            role: "Writer"
+            primary: true
+            language: ""
+          }
+        }
+      }
+    }
+  )
+
+  let series = (
+    let meta = $metadata_content | where tag == meta;
+    if ($meta | is-not-empty) {
+      let series = $meta | where attributes.name == "calibre:series"
+      if ($series | is-not-empty) {
+        # todo Warn if there are multiple series
+        $series | first | get attributes.content
+      }
+    }
+  )
+
+  let issue = (
+    let meta = $metadata_content | where tag == meta;
+    if ($meta | is-not-empty) {
+      let series_indices = $meta | where attributes.name == "calibre:series_index"
+      if ($series_indices | is-not-empty) {
+        # todo Warn if there are multiple series indices
+        $series_indices | first | get attributes.content
+      }
+    }
+  )
+
+  # todo Handle multiple publishers?
+  let publisher = (
+    let publishers = $metadata_content | where tag == publisher;
+    if ($publishers | is-not-empty) {
+      $publishers | get content | first | get content | flatten | uniq | first
+    }
+  )
+
+  let language = (
+    let languages = $metadata_content | where tag == language;
+    if ($languages | is-not-empty) {
+      $languages | get content | first | get content | flatten | uniq | first
+    }
+  )
+  let language = (
+    let language_code = $language;
+    if ($language_code | is-not-empty) {
+      if ($language_code | str length) == 2 {
+        $language_code | from_language_code # iso_639_1
+      } else if ($language_code | str length) == 3 {
+        $language_code | from_language_code # iso_639_3
+      } else {
+        # todo Support type parameter in from_language_code
+        # $language_code | from_language_code ietf_bcp_47
+      }
+    }
+  )
+
+  let title = (
+    let titles = $metadata_content | where tag == title;
+    if ($titles | is-not-empty) {
+      $titles | get content | first | get content | flatten | uniq | first
+    }
+  )
+
+  let description = (
+    let descriptions = $metadata_content | where tag == description;
+    if ($descriptions | is-not-empty) {
+      $descriptions | get content | first | get content | flatten | uniq | first
+    }
+  )
+
+  let publication_date = (
+    let dates = $metadata_content | where tag == date;
+    if ($dates | is-not-empty) {
+      let date = $dates | get content | first | get content | flatten | uniq | first
+      if ($date | is-not-empty) {
+        $date | into datetime
+      }
+    }
+  )
+
+  let genres = (
+    let genres = $metadata_content | where tag == subject;
+    if ($genres | is-not-empty) {
+      $genres | get content | flatten | get content | uniq | sort
+    }
+  )
+
+  let identifier_schemes = [
+    [schemes type];
+    # [[GOODREADS] goodreads_version_id]
+    [[HARDCOVER HARDCOVER-SLUG] hardcover_book_slug]
+    # [[HARDCOVER-ID] hardcover_book_id]
+    [[HARDCOVER-EDITION] hardcover_edition_id]
+    [[COMICVINE] comic_vine_issue_id]
+    # [[COMICVINE-VOLUME] comic_vine_volume_id]
+    [[BOOKBRAINZ-EDITION] bookbrainz_edition_id]
+    [[WIKIDATA-EDITION] wikidata_item_id]
+    # [ISBN isbn]
+    # [STORYGRAPH storygraph_edition_id]
+    # [GOOGLE google_books_id]
+  ]
+
+  let ids = (
+    let ids = $metadata_content | where tag == identifier;
+    if ($ids | is-not-empty) {
+      $identifier_schemes | reduce --fold [] {|identifier_schemes_and_type acc|
+        let matching_ids = $ids | where {|it| ($it.attributes.scheme | str upcase) in $identifier_schemes_and_type.schemes }
+        if ($matching_ids | is-empty) {
+          $acc
+        } else {
+          # Ignore multiple ids of the same type.
+          # todo Warn if there are multiple, distinct IDs for the same scheme.
+          $acc | append {type: $identifier_schemes_and_type.type, id: ($matching_ids | get content | first | get content | first)}
+        }
+      }
+    }
+  )
+
+  # todo get title sort from meta calibre:title_sort?
+
+  let isbn = (
+    let ids = $metadata_content | where tag == identifier;
+    if ($ids | is-not-empty) {
+      let isbns = $ids | where attributes.scheme == "ISBN"
+      if ($isbns | is-not-empty) {
+        $isbns | get content | first | get content | flatten | uniq | first
+      }
+    }
+  )
+
+  (
+    {}
+    | upsert_if_value "credits" $credits
+    | upsert_if_value "publisher" $publisher
+    | upsert_if_value "genres" $genres
+    | upsert_if_value "language" $language
+    | upsert_if_value "title" $title
+    | upsert_if_value "description" $description
+    | upsert_if_value "publication_date" $publication_date
+    | upsert_if_value "ids" $ids
+    | upsert_if_value "series" $series
+    | upsert_if_value "issue" $issue
+    | upsert_if_value "isbn" $isbn
+  )
 }
 
 # Count the number of image files in a ZIP archive
@@ -3294,6 +3554,7 @@ export def into_language_code [
 # https://en.wikipedia.org/wiki/IETF_language_tag
 # https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
 export def from_language_code [
+  # todo: I should be using type here
   # type: string # 'iso_639_1' 2-letter code or 'iso_639_3' 3-letter code
   language_codes_map: table = $iso_language_codes_map
 ]: [string -> string] {
@@ -3343,6 +3604,83 @@ export def from_language_code [
     }
   )
   $languages.language | first
+}
+
+# Find the package OPF file in an EPUB.
+export def find_opf_in_epub []: [
+  path -> path
+] {
+  let epub = $in
+  let opf_directories = ["OPS" "OEBPS"]
+  let opf_files_in_epub = $epub | list_files_in_archive_with_extensions ["opf"]
+  let opf_files = $opf_files_in_epub | path parse | where parent in $opf_directories
+  if ($opf_files | is-empty) {
+    log warning $"No OPF file found in (ansi yellow)($epub)(ansi reset)"
+    return null
+  }
+  if ($opf_files | length) > 1 {
+    log warning $"Multiple OPF files found in (ansi yellow)($epub)(ansi reset): (ansi yellow)($opf_files | path join | str join ' ')(ansi reset). Using only the first."
+  }
+  $opf_files | path join | first
+}
+
+# Extract the metadata from an eBook.
+#
+# This uses ebook-meta for PDF and ePUB files.
+# I should probably use exiftool for PDFs and just parse the metadata.opf file out of EPUBs directly.
+export def extract_ebook_metadata [
+  working_directory: directory # The scratch-space directory to use
+]: [
+  path -> record
+] {
+  let file = $in
+  let file_type = $file | path parse | get extension | str downcase
+  # todo Eventually support MetronInfo.xml.
+  let metadata = (
+    if $file_type == "cbz" {
+      let metadata_file = $file | extract_file_from_archive "ComicInfo.xml" $working_directory
+      let metadata = (
+        if ($metadata_file | is-not-empty) {
+          open $metadata_file
+        }
+      )
+      rm $metadata_file
+      $metadata
+    } else if $file_type == "epub" {
+      let opf_file = $file | find_opf_in_epub
+      if ($opf_file | is-empty) {
+        log error $"No OPF file found in (ansi yellow)($file)(ansi reset)"
+        return null
+      }
+      let metadata_file = $file | extract_file_from_archive $opf_file $working_directory
+      let metadata = (
+        if ($metadata_file | is-not-empty) {
+          open $metadata_file | from xml
+        }
+      )
+      rm $metadata_file
+      $metadata
+    } else if $file_type == "pdf" {
+      # To get the identifiers from the PDF, we need to use ebook-meta instead of exiftool.
+      # ^exiftool -json $file | from json | first
+      let metadata_file = mktemp
+      log debug $"Running (ansi yellow)^ebook-meta --to-opf '($metadata_file)' ($file)(ansi reset)"
+      # todo Check command's exit code.
+      ^ebook-meta --to-opf $metadata_file $file
+      let metadata = (
+        open $metadata_file | from xml
+      )
+      rm $metadata_file
+      $metadata
+    }
+  )
+  if ($metadata | is-not-empty) {
+    if "comic_info" in $metadata {
+      $metadata | from_comic_info_xml
+    } else if "package" in $metadata {
+      $metadata | from_opf_xml
+    }
+  }
 }
 
 # Convert the internal data structure for a comic to a ComicInfo.xml
@@ -3437,6 +3775,17 @@ export def into_comic_info_xml []: [record -> record] {
   # AlternativeSeries
   # AlternativeCount
 
+  let publication_date = $data | get --optional publication_date
+  let publication_date_parts = (
+    if ($publication_date | is-not-empty) {
+      {
+        year: ($publication_date | format date "%Y")
+        month: ($publication_date | format date "%m")
+        day: ($publication_date | format date "%d")
+      }
+    }
+  )
+
   # todo Teams?
   # todo main character?
   let comic_info_xml = (
@@ -3485,9 +3834,9 @@ export def into_comic_info_xml []: [record -> record] {
         }
       )
     }
-    | upsert_comic_info {tag: "Day", value: ($data | get --optional day)}
-    | upsert_comic_info {tag: "Month", value: ($data | get --optional month)}
-    | upsert_comic_info {tag: "Year", value: ($data | get --optional year)}
+    | upsert_comic_info {tag: "Day", value: ($publication_date_parts | get --optional day)}
+    | upsert_comic_info {tag: "Month", value: ($publication_date_parts | get --optional month)}
+    | upsert_comic_info {tag: "Year", value: ($publication_date_parts | get --optional year)}
     | upsert_comic_info {tag: "Manga", value: ($data | get --optional manga)}
     | upsert_comic_info {
       tag: "Number"
@@ -3518,9 +3867,11 @@ export def into_comic_info_xml []: [record -> record] {
   )
   # log debug $"creators: ($creators)"
   # $comic_info_xml
-  $creators | columns | reduce --fold $comic_info_xml {|role acc|
+  let comic_info_xml = $creators | columns | reduce --fold $comic_info_xml {|role acc|
     $acc | upsert_comic_info {tag: $role, value: ($creators | get $role | sort | str join ",")}
   }
+  log debug $"Comic info: ($comic_info_xml | to nuon)"
+  $comic_info_xml
 }
 
 # Search for editions on Wikidata by ISBN-13.
@@ -4403,7 +4754,7 @@ export def fetch_book_metadata [
     if $isbn == null and ($all_opf_identifiers != null) {
       let all_opf_isbn = (
         $all_opf_identifiers
-        | where attributes.scheme == "ISBN"
+        | where {|it| ($it.attributes | get --optional scheme) == "ISBN"}
       )
       if ($all_opf_isbn | is-empty) {
         null
@@ -4427,7 +4778,7 @@ export def fetch_book_metadata [
     if $isbn == null and ($all_opf_identifiers != null) {
       let all_opf_non_isbn = (
         $all_opf_identifiers
-        | where attributes.scheme != "ISBN"
+        | where {|it| ($it.attributes | get --optional scheme) != "ISBN"}
       )
       if ($all_opf_non_isbn | is-empty) {
         null

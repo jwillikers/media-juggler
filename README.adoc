@@ -16,7 +16,6 @@ endif::[]
 :Calibre: https://calibre-ebook.com/[Calibre]
 :Comic-Vine: https://comicvine.gamespot.com/[Comic Vine]
 :ComicInfo: https://anansi-project.github.io/docs/category/comicinfo[ComicInfo]
-:ComicTagger: https://github.com/comictagger/comictagger[ComicTagger]
 :Fanatical: https://www.fanatical.com/en/[Fanatical]
 :just: https://github.com/casey/just[just]
 :Hardcover: https://hardcover.app[Hardcover]
@@ -138,10 +137,10 @@ Metadata is retrieved from various sources, as detailed in the <<metadata-source
 |{MusicBrainz}
 |===
 
-Several tools are used to facilitate the import process, which are documented in the <<import-tools>> table.
+Several tools are used to get metadata for different media, which are documented in the <<metadata-tools>> table.
 
-[#import-tools]
-.Import Tools
+[#metadata-tools]
+.Metadata Tools
 [cols="1,1"]
 |===
 |Media
@@ -154,7 +153,7 @@ Several tools are used to facilitate the import process, which are documented in
 |{Calibre}
 
 |Comics, Manga, Manhwa
-|{ComicTagger}, {Calibre}
+|{Calibre}
 
 |Music
 |{Beets}
@@ -268,14 +267,6 @@ Be sure to read the https://github.com/Leseratte10/acsm-calibre-plugin/tree/v0.0
 . Get your Comic Vine API token from https://comicvine.gamespot.com/api/[here].
 This will be used later to configure some of the tools.
 
-// todo
-// . Add your Comic Vine API token to ComicTagger.
-// +
-// [,sh]
-// ----
-// comictagger --only-set-cv-key --cv-api-key <Comic Vine API key>
-// ----
-
 . Set the environment variable `COMIC_VINE_API_KEY` to your Comic Vine API key.
 +
 [,sh]
@@ -332,28 +323,6 @@ After a new activation export the activation using menu:Preferences[Plugins > De
 
 . Hit btn:[Apply].
 . Hit btn:[Close].
-
-. Install the {ComicTagger} AppImage and make it executable.
-+
-[,sh]
-----
-curl --location --output-dir ~/Downloads --remote-name https://github.com/comictagger/comictagger/releases/download/1.6.0-beta.10/ComicTagger-x86_64.AppImage
-chmod +x ~/Downloads/ComicTagger-x86_64.AppImage
-----
-
-. Create the plugins directory for ComicTagger.
-+
-[,sh]
-----
-mkdir --parents ~/.config/ComicTagger/plugins
-----
-
-. Install the https://github.com/mizaki/metroninfo_ct[metroninfo_ct] plugin for ComicTagger.
-+
-[,sh]
-----
-curl --location --output-dir ~/.config/ComicTagger/plugins --remote-name https://github.com/mizaki/metroninfo_ct/releases/download/0.0.3/metroninfo_ct-plugin-0.0.3.zip
-----
 
 // todo Document getting and setting various api keys for Beets
 
@@ -430,15 +399,19 @@ import-audiobooks.nu --use-rsync file.m4b --musicbrainz-release-id 2cfe3579-56f3
 
 import-comics.nu::
 +
-The `import-comics.nu` requires the path to the {ComicTagger} AppImage as its first positional argument.
-Providing a Wikidata, BookBrainz, or ISBN-13 identifier with CLI flags is recommended.
+The `import-comics.nu` script requires a Comic Vine issue ID.
+It's possible to supply other IDs, such as a Wikidata, BookBrainz, or ISBN-13 with CLI flags.
+If the Comic Vine issue ID can be gleaned from Wikidata, then it isn't required on the CLI.
+If the comic matches a hash on Wikidata, no external identifiers are required.
+If identifiers already exist in the metadata of the file, then those IDs are not requires.
+The script also attempts to extract the ISBN from within the pages of the comic.
 The script defaults to preferences for Manga.
 Pass `--manga No` for comics and `--manga Yes` for manga read from left-to-right.
 The default value of `--manga` is `YesAndRightToLeft`.
 +
 [,sh]
 ----
-import-comics.nu --use-rsync ~/Downloads/ComicTagger-x86_64.AppImage file.epub --isbn 9781234561234
+import-comics.nu --use-rsync file.epub --isbn 9781234561234
 ----
 
 import-ebooks.nu::
@@ -468,7 +441,7 @@ It provides the Wikidata edition ID for each comic.
 
 [,nushell]
 ----
-ls | get name | sort --natural | zip [Q139382000 Q139398001 Q139398002] | each {|| overlays/media-juggler/import-comics.nu --use-rsync ~/Downloads/ComicTagger-x86_64.AppImage $in.0 --wikidata-edition-id $in.1}
+ls | get name | sort --natural | zip [Q139382000 Q139398001 Q139398002] | each {|| overlays/media-juggler/import-comics.nu --use-rsync $in.0 --wikidata-edition-id $in.1}
 ----
 
 == Develop
@@ -526,8 +499,7 @@ nix build .#calibre-plugins.acsm
 
 == Future Work
 
-Currently, the large task I'd like to complete is the migration from using {ComicTagger} and {Comic-Vine} metadata to using metadata from {BookBrainz}, {Wikidata}, and possibly {Hardcover} directly through their APIs.
-For this, I need to produce the {ComicInfo} and {MetronInfo} files from scratch, so it will take a fair amount of work.
+Currently, the large task I'd like to complete is adding support for other metadata sources besides {Comic-Vine} for metadata, such as {BookBrainz}, {Wikidata}, and possibly {Hardcover}.
 This migration will greatly reduce the complexity of the manga import process which is ridiculously convoluted right now.
 
 A similar change for eBooks, where I embed data directly in EPUBs without {Calibre}, may also be possible.
@@ -540,8 +512,9 @@ I'd also like to incorporate chapters from the Table of Contents section of edit
 
 .import-comics.nu Todo
 * [ ] Add a flag to embed cover from file.
-* [ ] Switch to using the BookBrainz API, Wikidata, and the Hardcover API, instead of Comic Vine and ComicTagger.
-This will require building the ComicInfo.xml and MetronInfo.xml files from scratch instead of relying on ComicTagger to produce them.
+* [x] Use the Comic Vine API directly instead of using ComicTagger.
+* [ ] Cache Comic Vine API responses.
+* [ ] Switch to using the BookBrainz API, Wikidata, and the Hardcover API, in addition to Comic Vine.
 Comic Vine's data is not open and it's a pain to contribute to.
 * [x] Automatically look up Hardcover, Wikidata, BookBrainz, and Open Library IDs by ISBN.
 * [x] Automatically fetch missing ids from Wikidata, BookBrainz, and Open Library.

@@ -883,6 +883,7 @@ def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
     year: "2023"
     month: "05"
     day: "01"
+    publication_date: ("2023-05-01" | into datetime)
     volume: "2023"
     issue_count: "4"
     credits: [
@@ -1026,14 +1027,71 @@ def test_into_language_code [] {
   test_into_language_code_eng
 }
 
+def test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
+  let input = open ([$test_data_dir "march-comes-in-like-a-lion-volume-1-pdf-metadata.opf"] | path join) | from xml
+  let expected = {
+    credits: [
+      [creator, role, primary, language];
+      ["Chica Umino", Writer, true, ""]
+    ]
+    publisher: "Denpa"
+    genres: [
+      "Character Driven"
+      "Comics"
+      "Loveable Characters"
+      "Not Diverse Characters"
+      "Strong Character Development"
+      "Weak Character Development"
+    ]
+    language: "english"
+    title: "March Comes in Like a Lion, Vol. 1",
+    description: "Rei Kiriyama is a child prodigy. Rei Kiriyama is also an orphan who lives alone in an empty apartment. Rei Kiriyama is a teen working in an adult's world.
+
+Life is complicated for Rei. He's an up-and-coming shogi (Japanese chess) player on the verge of turning pro but he has no homelife or much of a life period outside his board game but thankfully with the help of some life-long friends he has an opportunity start all over again.
+
+Note: This volume was released digitally (05/03/2023) before paperback (06/06/2023).
+
+## Chapter Titles
+* Chapter 1: Rei Kiriyama
+* Chapter 2: A Riverside Town
+* Chapter 3: Akari
+* Chapter 4: The Other Side of the Bridge
+* Chapter 5: Harunobu
+* Chapter 6: Beyond the Night Sky
+* Chapter 7: Hina
+* Chapter 8: VS.
+* Chapter 9: Contract
+* Chapter 10: Over the Cuckoo's Nest"
+    publication_date: (2023-05-01T05:00:00+00:00 | into datetime)
+    ids: [
+      [type, id];
+      [hardcover_book_slug, "march-comes-in-like-a-lion-volume-1"],
+      [hardcover_edition_id, "30930924"],
+      [comic_vine_issue_id, "987377"],
+      [bookbrainz_edition_id, "594a8ec2-6301-4c20-ae22-2c43840416b2"],
+      [wikidata_item_id, "Q139556252"]
+    ],
+    series: "March Comes in Like a Lion",
+    issue: "1",
+    isbn: "9781634428132"
+  }
+  # log debug $"\n($input | from_opf_xml | to nuon)\n"
+  assert equal ($input | from_opf_xml) $expected
+}
+
+def test_from_opf_xml [] {
+  test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf
+}
+
 def main [] {
   test_is_identifier_valid
   test_identifier_from_url
   test_identifier_into_url
   test_from_language_code
   test_into_language_code
-  # test_from_comic_info_xml
   test_into_comic_info_xml
+  test_from_opf_xml
+  # test_from_comic_info_xml
   # test_from_metron_info_xml
   # test_into_metron_info_xml
   echo $"(ansi green)All tests passed!(ansi reset)"
