@@ -938,7 +938,17 @@ def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
   let expected = open ([$test_data_dir "March Comes in Like a Lion v001_ComicInfo.xml"] | path join)
   # log debug $"output: \n($input | into_comic_info_xml | to xml)\n"
   # log debug $"output: \n($input | into_comic_info_xml | to nuon)\n"
-  assert equal ($input | into_comic_info_xml) $expected
+  let output = ($input | into_comic_info_xml)
+  # Notes field is based on date and time as well as version.
+  # Just make sure it contains the Comic Vine ID in the required format.
+  assert ("ComicVine [CVDB987377]" in ($output.content | where tag == "Notes" | first | get content | first | get content))
+  let output = (
+    $output
+    | update content (
+      $output.content | where tag != Notes
+    )
+  )
+  assert equal $output $expected
 }
 
 def test_into_comic_info_xml [] {

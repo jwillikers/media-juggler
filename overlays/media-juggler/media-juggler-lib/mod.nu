@@ -3786,6 +3786,30 @@ export def into_comic_info_xml []: [record -> record] {
     }
   )
 
+  # Kavita can parse Comic Vine and Metron IDs in a specific format from the Notes section.
+  # ComicVine [CVDB734524]
+  # MetronTagger- [issue_id:156409]
+  # todo support parsing these from the ComicInfo.xml as well.
+  let notes = (
+    let notes = $"Tagged with MediaJuggler import-comics.nu version ($media_juggler_version) at (date now | date to-timezone UTC | format date %+).";
+    let comic_vine_issue_ids = $data.ids | where type == "comic_vine_issue_id";
+    let notes = (
+      if ($comic_vine_issue_ids | is-not-empty) {
+        let comic_vine_issue_id = $comic_vine_issue_ids.id | first | str replace "4000-" ""
+        $"($notes) ComicVine [CVDB($comic_vine_issue_id)]."
+      } else {
+        $notes
+      }
+    );
+    let metron_issue_ids = $data.ids | where type == "metron_issue_id";
+    if ($metron_issue_ids | is-not-empty) {
+      let metron_issue_id = $metron_issue_ids.id | first
+      $"($notes) MetronTagger- [issue_id:($metron_issue_id)]."
+    } else {
+      $notes
+    }
+  )
+
   # todo Teams?
   # todo main character?
   let comic_info_xml = (
@@ -3823,7 +3847,7 @@ export def into_comic_info_xml []: [record -> record] {
     | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publisher)}
     | upsert_comic_info {tag: "Imprint", value: ($data | get --optional imprint)}
     | upsert_comic_info {tag: "Summary", value: ($data | get --optional description)}
-    | upsert_comic_info {tag: "Notes", value: ($data | get --optional comment)}
+    | upsert_comic_info {tag: "Notes", value: $notes}
     | upsert_comic_info {
       tag: "Characters"
       value: (
