@@ -502,9 +502,87 @@ def main [
 
   # Obtain IDs from existing EPUB, CBZ, or PDF metadata.
   # todo Need to determine preference for ComicInfo vs. MetronInfo.
-  # let existing_metadata = (
-  #   $formats | get $input_format | extract_ebook_metadata
-  # )
+  let existing_metadata = (
+    $formats | get $input_format | extract_ebook_metadata $temporary_directory
+  )
+
+  # If no primary ids, i.e. ISBN, BookBrainz edition ID, and Wikidata item ID, are provided, try using the primary ids available in the metadata.
+  # If an ISBN, BookBrainz edition ID, or Wikidata item ID are provided, we'll try to use those to look up the other IDs using the provided ones.
+  # However, for the Comic Vine ID, we'll use it from the existing metadata unless it is provided on the command-line.
+  # This is because Comic Vine IDs are only associated with other identifiers through Wikidata.
+  # todo Handle merging existing data and IDs.
+  let isbn = (
+    if ($isbn | is-empty) and ($bookbrainz_edition_id | is-empty) and ($wikidata_edition_id | is-empty) {
+      if ($isbn | is-empty) {
+        if ($existing_metadata | is-not-empty) {
+          let metadata_isbn = $existing_metadata | get --optional isbn
+          if ($existing_metadata.isbn | is-not-empty) {
+            $existing_metadata.isbn
+          }
+        }
+      } else {
+        $isbn
+      }
+    } else {
+      $isbn
+    }
+  )
+  let bookbrainz_edition_id = (
+    if ($isbn | is-empty) and ($bookbrainz_edition_id | is-empty) and ($bookbrainz_edition_id | is-empty) {
+      if ($bookbrainz_edition_id | is-empty) {
+        if ($existing_metadata | is-not-empty) {
+          let ids = $existing_metadata | get --optional ids
+          if ($ids | is-not-empty) {
+            let bookbrainz_edition_ids = $ids | where type == "bookbrainz_edition_id"
+            if ($bookbrainz_edition_ids | is-not-empty) {
+              # todo Warn if multiple
+              $bookbrainz_edition_ids | first
+            }
+          }
+        }
+      } else {
+        $bookbrainz_edition_id
+      }
+    } else {
+      $wikidata_edition_id
+    }
+  )
+  let wikidata_edition_id = (
+    if ($isbn | is-empty) and ($bookbrainz_edition_id | is-empty) and ($wikidata_edition_id | is-empty) {
+      if ($wikidata_edition_id | is-empty) {
+        if ($existing_metadata | is-not-empty) {
+          let ids = $existing_metadata | get --optional ids
+          if ($ids | is-not-empty) {
+            let wikidata_edition_ids = $ids | where type == "wikidata_edition_id"
+            if ($wikidata_edition_ids | is-not-empty) {
+              # todo Warn if multiple
+              $wikidata_edition_ids | first
+            }
+          }
+        }
+      } else {
+        $wikidata_edition_id
+      }
+    } else {
+      $wikidata_edition_id
+    }
+  )
+  let comic_vine_issue_id = (
+    if ($comic_vine_issue_id | is-empty) {
+      if ($existing_metadata | is-not-empty) {
+        let ids = $existing_metadata | get --optional ids
+        if ($ids | is-not-empty) {
+          let comic_vine_issue_ids = $ids | where type == "comic_vine_issue_id"
+          if ($comic_vine_issue_ids | is-not-empty) {
+            # todo Warn if multiple
+            $comic_vine_issue_ids | first
+          }
+        }
+      }
+    } else {
+      $comic_vine_issue_id
+    }
+  )
 
   # First, try to locate the release based on its hash if no Wikidata id is specified.
   let wikidata_edition_id = (
@@ -745,24 +823,8 @@ def main [
     }
   )
 
-  # Generate a CBZ from the PDF format which may be used to extract the ISBN.
-  let formats = (
-    if "pdf" in $formats and $archive_pdf {
-      log debug "Generating a CBZ from the PDF"
-      # Tweaking quality settings for large pdfs
-      # For PDFs with massive image files, the quality needs to be knocked down or it will likely OOM.
-      $formats | insert cbz ($formats.pdf | cbconvert --format "jpeg" --quality $cbconvert_pdf_image_quality)
-    } else {
-      $formats
-    }
-  )
-
-  log debug "Attempting to get the ISBN from existing metadata"
-  let metadata_isbn = (
-    $file | get_metadata $temporary_directory | isbn_from_metadata
-  )
-  if $metadata_isbn != null {
-    log debug $"Found the ISBN (ansi purple)($metadata_isbn)(ansi reset) in the book's metadata"
+  if ($existing_metadata | get --optional isbn) {
+    log debug $"Found the ISBN (ansi purple)($existing_metadata.isbn)(ansi reset) in the book's metadata"
   }
 
   log debug "Attempting to get the ISBN from the first ten and last ten pages of the book"
@@ -793,11 +855,11 @@ def main [
   # Determine the most likely ISBN from the metadata and pages
   # todo Use isbntools to ensure that any discovered ISBNs are valid.
   let likely_isbn_from_pages_and_metadata = (
-    if ($metadata_isbn | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
+    if ($existing_metadata | get --optional isbn | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
       if ($book_isbn_numbers | is-empty) {
-        log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
-        $metadata_isbn
-      } else if $metadata_isbn in $book_isbn_numbers {
+        log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($existing_metadata.isbn)(ansi reset)"
+        $existing_metadata.isbn
+      } else if $existing_metadata.isbn in $book_isbn_numbers {
         if ($book_isbn_numbers | length) == 1 {
           log debug "Found an exact match between the ISBN in the metadata and the ISBN in the pages of the book"
         } else if ($book_isbn_numbers | length) > 10 {
@@ -809,12 +871,12 @@ def main [
             error: $"Found more than 10 ISBN numbers in the pages of the book: (ansi purple)($book_isbn_numbers)(ansi reset)"
           }
         }
-        $metadata_isbn
+        $existing_metadata.isbn
       } else {
         # todo If only one number is available in the pages, should it be preferred?
-        log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+        log warning $"The ISBN from the book's metadata, (ansi purple)($existing_metadata.isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
         if ($book_isbn_numbers | length) == 1 {
-          log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+          log warning $"The ISBN from the book's metadata, (ansi purple)($existing_metadata.isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
           $book_isbn_numbers | first
         } else {
           if ($isbn | is-empty) {
@@ -823,16 +885,16 @@ def main [
             }
             return {
               file: $original_file
-              error: $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset). Use the `--isbn` flag to set the ISBN instead."
+              error: $"The ISBN from the book's metadata, (ansi purple)($existing_metadata.isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset). Use the `--isbn` flag to set the ISBN instead."
             }
           } else {
-            log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+            log warning $"The ISBN from the book's metadata, (ansi purple)($existing_metadata.isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
           }
         }
       }
-    } else if ($metadata_isbn | is-not-empty) {
-      log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
-      $metadata_isbn
+    } else if ($existing_metadata | get --optional isbn | is-not-empty) {
+      log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($existing_metadata.isbn)(ansi reset)"
+      $existing_metadata.isbn
     } else if ($book_isbn_numbers | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
       if ($book_isbn_numbers | length) == 1 {
         log debug $"Found a single ISBN in the pages of the book: (ansi purple)($book_isbn_numbers | first)(ansi reset)"
