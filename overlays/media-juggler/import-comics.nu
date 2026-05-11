@@ -27,15 +27,12 @@ use media-juggler-lib *
 #
 def main [
   ...files: string # The paths to ACSM, EPUB, and CBZ files to convert, tag, and upload. Supports SSH paths.
-  --archive-pdf # Archive input PDF files under the --archival-path instead of uploading them to the primary bucket. This will cause a high quality CBZ file to be generated and uploaded to the primary storage server.
   --cbconvert-pdf-image-quality: string = "90" # The image quality setting to pass to cbconvert when generating a CBZ from a PDF. Lower this as necessary for PDFs with extremely high quality images.
   --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
   --default-language: string = "american english"
   --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library" "Kobo Metadata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
-  --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
-  --ereader-subdirectory: string = "Books/Manga" # The subdirectory on the e-reader in-which to copy
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
   --isbn: string
   --jxl # Convert lossless PNG images to JXL
@@ -47,9 +44,6 @@ def main [
   --issue-year: string # The publication year of the issue
   --manga: string = "YesAndRightToLeft" # Whether the file is manga "Yes", right-to-left manga "YesAndRightToLeft", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
   --metron-issue-id: string # The issue id on Metron.
-  --archival-path: string = "" # The archival path where files will be archived. The file will be uploaded under a subdirectory named after the author and series.
-  # --archival-path: string = "meerkat:/var/media/archive/books/" # The archival path where files will be archived. The file will be uploaded under a subdirectory named after the author and series.
-  --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
   --destination: directory = "meerkat:/var/media/manga" # The directory under which to copy files. I have comics, manga, and manhwa subdirectories.
   # --series: string # The name of the series
   # --series-year: string # The initial publication year of the series, also referred to as the volume
@@ -57,7 +51,6 @@ def main [
   --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
   --title: string # The title of the comic or manga issue
-  --upload-ereader-cbz # Upload the E-Reader specific format to the server
   --use-rsync
   --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
   --hardcover-edition-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
@@ -172,24 +165,6 @@ def main [
   )
   if not ($destination | is_ssh_path) {
     mkdir $destination
-  }
-
-  let username = (^id --name --user)
-  let ereader_disk_label = (
-    if $ereader == null {
-      ""
-    } else {
-      $ereader_profiles | where model == $ereader | first | get disk_label
-    }
-  )
-  let ereader_mountpoint = (["/run/media" $username $ereader_disk_label] | path join)
-  let ereader_target_directory = ([$ereader_mountpoint $ereader_subdirectory] | path join)
-  if $ereader != null and not $no_copy_to_ereader {
-    if (^findmnt --target $ereader_target_directory | complete | get exit_code) != 0 {
-      ^udisksctl mount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
-      # todo Parse the mountpoint from the output of this command
-    }
-    mkdir $ereader_target_directory
   }
 
   let results = $files | each {|original_file|
@@ -461,7 +436,7 @@ def main [
   log debug $"The original files for the comic are (ansi yellow)($original_comic_files)(ansi reset)"
 
   let output_format = (
-    if $original_input_format == "pdf" and not $archive_pdf {
+    if $original_input_format == "pdf" {
       "pdf"
     } else {
       "cbz"
@@ -1333,28 +1308,6 @@ def main [
     if "epub" in $formats {
       log debug "Generating a CBZ from the EPUB"
       $formats | insert cbz ($formats.epub | zip_archive_to_cbz --working-directory $temporary_directory)
-    } else if "pdf" in $formats and $archive_pdf {
-      log debug "Updating the CBZ for the PDF"
-      let cbz = (
-        $formats.cbz
-        | (
-        let archive = $in;
-        if $comic_info != null {
-          {
-            archive: $archive,
-            comic_info: (open $comic_info),
-          }
-          | inject_comic_info
-          } else {
-            $archive
-          }
-        )
-      )
-      if $comic_info != null {
-        log debug $"Removing the sidecar ComicInfo file (ansi yellow)($comic_info)(ansi reset)"
-        rm $comic_info
-      }
-      $formats | update cbz $cbz
     } else if "cbz" in $formats {
       log debug "Standardizing the image file names of the CBZ"
       $formats | update cbz ($formats.cbz | zip_archive_to_cbz --working-directory $temporary_directory)
@@ -2121,37 +2074,6 @@ def main [
       # | insert comic_info $comic_info
       # | insert metron_info $metron_info
       | upsert_if_value cover $cover
-      | (
-        let input = $in;
-        log debug "Updating PDF in table";
-        log debug $"Input:\n($input)\n";
-        # todo untested
-        if $archive_pdf {
-          log debug "Creating JPEG-XL CBZ from PDF";
-          $input
-          | update cbz (
-            $formats.pdf
-            | convert_to_lossless_jxl
-            | (
-              let cbz = $in;
-              {
-                archive: $cbz
-                comic_info: (open $formats.comic_info)
-              }
-            ) | inject_comic_info
-            | (
-              let cbz = $in;
-              {
-                archive: $cbz
-                metron_info: (open $formats.metron_info)
-              }
-            ) | inject_metron_info
-          )
-        } else {
-          log debug "Dropping cbz from formats since the input format is a PDF";
-          $input | reject --optional cbz
-        }
-      )
     } else {
       $formats
     }
@@ -2233,25 +2155,6 @@ def main [
     $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
-
-  # Not sure if "webp" would really be any better than jpeg here or not...
-  # I'm assuming it might at least be a little bit smaller given cbconvert doesn't appear to use mozjpeg.
-  # Use PNG for lossless codecs and webp for lossy.
-  # CBconvert appears to always use lossy webp encoding.
-  let formats = (
-    if $ereader == null {
-      $formats
-    } else {
-      $formats
-      | insert ereader_cbz (
-        $formats
-        | get $input_format
-        | convert_for_ereader $ereader $temporary_directory
-      )
-    }
-  )
-
-  # todo Functions archive_epub, upload_cbz, and perhaps copy_cbz_to_ereader
 
   let authors_subdirectory = $authors | str join ", " | use_unicode_in_title | sanitize_file_name
   # todo How to handle multiple series?
@@ -2362,121 +2265,6 @@ def main [
     }
   }
 
-  # Keep the EPUB for archival purposes.
-  let archival_target_directory = (
-    [$archival_path $authors_subdirectory]
-    | append $series_subdirectory
-    | path join
-  )
-  let epub_archival_destination = (
-    if "epub" in $formats {
-      let components = ($formats.epub | path parse);
-      {
-        parent: $archival_target_directory
-        stem: $components.stem
-        extension: $components.extension
-      } | path join
-    }
-  )
-  let pdf_archival_destination = (
-    if "pdf" in $formats and $archive_pdf {
-      let components = ($formats.pdf | path parse);
-      {
-        parent: $archival_target_directory
-        stem: $components.stem
-        extension: $components.extension
-      }
-      | path join
-    }
-  )
-  let comic_info_archival_destination = (
-    if "pdf" in $formats and $archive_pdf {
-      let components = ($formats.comic_info | path parse);
-      {
-        parent: $archival_target_directory
-        stem: $components.stem
-        extension: $components.extension
-      } | path join
-    }
-  )
-  let metron_info_archival_destination = (
-    if "pdf" in $formats and $archive_pdf {
-      let components = ($formats.metron_info | path parse);
-      {
-        parent: $archival_target_directory
-        stem: $components.stem
-        extension: $components.extension
-      } | path join
-    }
-  )
-  let cover_archival_destination = (
-    if "pdf" in $formats and $archive_pdf and "cover" in $formats and ($formats.cover | is-not-empty) {
-      let components = ($formats.cover | path parse);
-      {
-        parent: $archival_target_directory
-        stem: $components.stem
-        extension: $components.extension
-      } | path join
-    }
-  )
-  if ($archival_path | is-not-empty) and not $skip_upload {
-    if "epub" in $formats {
-      log info $"Uploading (ansi yellow)($formats.epub)(ansi reset) to (ansi yellow)($epub_archival_destination)(ansi reset)"
-      if $use_rsync {
-        $formats.epub | rsync $epub_archival_destination "--mkpath"
-      } else {
-        $formats.epub | scp $epub_archival_destination --mkdir
-      }
-    } else if "pdf" in $formats and $archive_pdf  {
-      log info $"Uploading (ansi yellow)($formats.pdf)(ansi reset) to (ansi yellow)($pdf_archival_destination)(ansi reset)"
-      if $use_rsync {
-        $formats.pdf | rsync $pdf_archival_destination "--mkpath"
-      } else {
-        $formats.pdf | scp $pdf_archival_destination --mkdir
-      }
-      log info $"Uploading (ansi yellow)($formats.comic_info)(ansi reset) to (ansi yellow)($comic_info_archival_destination)(ansi reset)"
-      if $use_rsync {
-        $formats.comic_info | rsync $comic_info_archival_destination "--mkpath"
-      } else {
-        $formats.comic_info | scp $comic_info_archival_destination --mkdir
-      }
-      log info $"Uploading (ansi yellow)($formats.metron_info)(ansi reset) to (ansi yellow)($metron_info_archival_destination)(ansi reset)"
-      if $use_rsync {
-        $formats.metron_info | rsync $metron_info_archival_destination "--mkpath"
-      } else {
-        $formats.metron_info | scp $metron_info_archival_destination --mkdir
-      }
-      if ($cover_archival_destination | is-not-empty) {
-        log info $"Uploading (ansi yellow)($formats.cover)(ansi reset) to (ansi yellow)($cover_archival_destination)(ansi reset)"
-        if $use_rsync {
-          $formats.cover | rsync $cover_archival_destination "--mkpath"
-        } else {
-          $formats.cover | scp $cover_archival_destination --mkdir
-        }
-      }
-    }
-  }
-
-  if ereader_cbz in $formats {
-    if $no_copy_to_ereader {
-      let safe_basename = (($formats.ereader_cbz | path basename) | str replace --all ":" "_")
-      let target = ([$ereader_target_directory $safe_basename] | path join)
-      log info $"Copying (ansi yellow)($formats.ereader_cbz)(ansi reset) to (ansi yellow)($target)(ansi reset)"
-      cp $formats.ereader_cbz $target
-    }
-    if $upload_ereader_cbz {
-      log info $"Uploading (ansi yellow)($formats.ereader_cbz)(ansi reset) to (ansi yellow)($target_directory)/($formats.ereader_cbz | path basename)(ansi reset)"
-      if $use_rsync {
-        $formats.ereader_cbz | rsync $target_directory "--mkpath"
-      } else {
-        $formats.ereader_cbz | scp $target_directory --mkdir
-      }
-    }
-    if $no_copy_to_ereader and not $upload_ereader_cbz {
-      mv --force $formats.ereader_cbz $destination
-    }
-  }
-
   if not $keep {
     log debug "Deleting the original file"
     let uploaded_paths = (
@@ -2484,7 +2272,6 @@ def main [
       | append $comic_info_target_destination
       | append $metron_info_target_destination
       | append $cover_target_destination
-      | append (if ($archival_path | is-not-empty) { [$epub_archival_destination $pdf_archival_destination $cover_archival_destination $comic_info_archival_destination $metron_info_target_destination] })
     )
     log debug $"Uploaded paths: ($uploaded_paths)"
     if ($original_file | is_ssh_path) {
@@ -2527,12 +2314,6 @@ def main [
   #     error: $err.msg
   #   }
   # }
-  }
-
-  if $ereader != null and not $no_copy_to_ereader {
-    if (^findmnt --target $ereader_target_directory | complete | get exit_code) == 0 {
-      ^udisksctl unmount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
-    }
   }
 
   $results | to json | print
