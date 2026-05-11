@@ -2792,11 +2792,13 @@ export const book_identifiers = {
   bookbrainz_edition_id: {
     match_expression: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
     url: "https://bookbrainz.org/edition/{{ bookbrainz_edition_id }}"
+    # url_match_expression: "^http[s]{0,1}://bookbrainz.org/edition/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
     url_parse_expression: '^http[s]{0,1}://bookbrainz.org/edition/(?<bookbrainz_edition_id>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/{0,1}$'
   }
   bookbrainz_work_id: {
     match_expression: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
     url: "https://bookbrainz.org/work/{{ bookbrainz_work_id }}"
+    # url_match_expression: "^http[s]{0,1}://bookbrainz.org/work/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
     url_parse_expression: '^http[s]{0,1}://bookbrainz.org/work/(?<bookbrainz_work_id>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/{0,1}$'
   }
   comic_vine_issue_id: {
@@ -2942,6 +2944,72 @@ export def identifier_into_url [
   }
 }
 
+# Determine the identifier type of a given URL
+# export def identifier_from_url [
+#   type: string # Identifier type. See columns in book_identifiers for available types.
+# ]: [string -> record] {
+#   let url = $in
+#   if ($url | is-empty) {
+#     error make {
+#       msg: "empty url"
+#       labels: [
+#           {text: "url" span: (metadata $url).span}
+#       ]
+#       help: "pipe a url string into identifier_from_url"
+#     }
+#   }
+#   if ($type | is-empty) {
+#     error make {
+#       msg: "empty identifier type"
+#       labels: [
+#           {text: "type" span: (metadata $type).span}
+#       ]
+#       help: "pass a nonempty value for the type field"
+#     }
+#   }
+#   if $type not-in ($book_identifiers | columns) {
+#     error make {
+#       msg: "invalid identifier type"
+#       labels: [
+#           {text: "type" span: (metadata $type).span}
+#       ]
+#       help: $"the value for the type field must be one of ($book_identifiers | columns)"
+#     }
+#   }
+#   let ids = $url | parse --regex ($book_identifiers | get $type | get url_parse_expression)
+#   if ($ids | is-empty) {
+#     return {}
+#   }
+#   # This should never happen.
+#   if ($ids | length) > 1 {
+#     error make {
+#       msg: $"more than one ID of type (ansi purple)($type)(ansi reset) parsed from URL (ansi yellow)($url)(ansi reset): ($ids)"
+#       labels: [
+#           {text: "ids" span: (metadata $ids).span}
+#       ]
+#       help: "parsing multiple ids of the same type from a URL should not be possible"
+#     }
+#   }
+#   let ids = $ids | first
+#   # Double check that the identifier is valid.
+#   # The parse regex should only parse valid identifiers in the first place.
+#   # log debug $"ids: ($ids)"
+#   $ids | items {|type, id|
+#     # log debug $"type: ($type)"
+#     # log debug $"id: ($id)"
+#     if not ($id | is_identifier_valid $type) {
+#       error make {
+#         msg: $"the (ansi red)($id)(ansi reset) of type (ansi yellow)($type)(ansi reset) is invalid"
+#         labels: [
+#             {text: "ids" span: (metadata $ids).span}
+#         ]
+#         help: $"there is a problem with the url_parse_expression (ansi yellow)($book_identifiers | get $type | get url_parse_expression)(ansi reset) parsing invalid IDs of type (ansi yellow)($type)(ansi reset)"
+#       }
+#     }
+#   }
+#   $ids
+# }
+
 # Parse a book identifier from its URL
 #
 # When the identifier is hardcover_edition_id, the hardcover_book_slug will also be included in the result.
@@ -3055,6 +3123,24 @@ export const comic_info_fields = [
   [AgeRating null]
 ]
 
+export const comic_vine_roles_map = [
+  [comic_vine_roles comic_info_roles];
+  [[Writer] [Writer]]
+  [[Penciller] [Penciller]]
+  [[Inker] [Inker]]
+  [[Colorist] [Colorist]]
+  [[Letterer] [Letterer]]
+  # I think ComicTagger does Penciller and Inker by default for Artist.
+  # I also include Colorist since usually, there's color of some sort in most comics and manga, even if it's only on the cover for manga.
+  [[Artist] [Penciller Inker Colorist]]
+  # [[Designer] []]
+  # CoverArtist requires both the Cover and the Artist roles.
+  [[Cover Artist] [CoverArtist]]
+  [[Editor] [Editor]]
+  [[Translator] [Translator]]
+  # [[Production] []]
+]
+
 # Read a ComicInfo.xml file into the internal data structure
 #
 # https://anansi-project.github.io/docs/comicinfo/documentation
@@ -3068,6 +3154,15 @@ export def from_comic_info_xml []: [record -> record] {
           {text: "in" span: (metadata $in).span}
       ]
       help: $"pipe in the ComicInfo XML data"
+    }
+  }
+  if ($comic_info_xml | get --optional tag) != "ComicInfo" {
+    error make {
+      msg: "top-level tag of ComicInfo XML is not ComicInfo"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: $"use valid ComicInfo XML data where the top-level tag is ComicInfo"
     }
   }
   let comic_info_xml = ($comic_info_xml | get --optional content)
@@ -3108,48 +3203,275 @@ export def from_comic_info_xml []: [record -> record] {
       $acc | insert $comic_info_field.tag ($value | split row $comic_info_field.delimiter | str trim)
     }
   )
+  # log debug $"json: ($json | to nuon)"
 
-  let contributor_tags = [
-    [tag role];
-    [Writer writer]
-    [Penciller penciller]
-    [Inker inker]
-    [Colorist colorist]
-    [Letterer letterer]
-    [CoverArtist cover_artist]
-    [Editor editor]
-    [Translator translator]
-  ]
-  let contributors = $contributor_tags | reduce --fold [] {|tag, acc|
-    let contributors = $json | get --optional $tag.tag
-    if ($contributors | is-empty) {
+  # Include a mapping from the ComicInfo roles Penciller and Inker to the Artist Comic Vine role.
+  # The Colorist role is kind of optional for that mapping.
+  let comic_vine_roles_map = (
+    $comic_vine_roles_map
+    | append [[comic_vine_roles comic_info_roles]; [[Cover Artist] [Penciller Inker Colorist CoverArtist]]]
+    | append [[comic_vine_roles comic_info_roles]; [[Cover Artist] [Penciller Inker CoverArtist]]]
+    | append [[comic_vine_roles comic_info_roles]; [[Artist] [Penciller Inker]]]
+  )
+  let comic_info_contributors = $comic_vine_roles_map.comic_info_roles | flatten | uniq | reduce --fold [] {|comic_info_role acc|
+    let contributors_for_role = $json | get --optional $comic_info_role
+    if ($contributors_for_role | is-empty) {
       return $acc
     }
     $acc | append (
-      $contributors | each {|contributor|
+      $contributors_for_role | each {|contributor|
         {
-          contributor: $contributor
-          role: $tag.role
+          person: $contributor
+          role: $comic_info_role
         }
       }
     )
-  } | group-by --to-table contributor | each {|contributor|
-    {
-      contributor: $contributor.contributor
-      roles: $contributor.items.role
-    }
   }
+  # | group-by --to-table person
+  # log debug $"comic_info_contributors: ($comic_info_contributors)"
+
+  let contributors = (
+    if ($comic_info_contributors | is-empty) {
+    } else {
+      $comic_info_contributors.person | uniq | reduce --fold [] {|person acc|
+        # I need to remove the matched roles so that they aren't matched again.
+        # log debug $"person: ($person)"
+       let roles = (
+          $comic_vine_roles_map
+          # Sort by the number of ComicInfo roles first so that we find the best Comic Vine role based on the highest number of matching ComicInfo roles.
+          | sort-by --custom {|a b| ($a.comic_info_roles | length) >= ($b.comic_info_roles | length)}
+          | reduce --fold {} {|comic_vine_role_mapping comic_vine_roles_acc|
+            # If all roles have been matched, we're done.
+            if ($comic_vine_roles_acc | is-not-empty) and ($comic_vine_roles_acc.matched_comic_info_roles | length) >= ($comic_info_contributors | where person == $person | get role | uniq | length) {
+              return $comic_vine_roles_acc
+            }
+            let person_roles = $comic_info_contributors | where person == $person | get role
+            let unmatched_comic_info_roles = (
+              if ($comic_vine_roles_acc | is-empty) {
+                $person_roles
+              } else {
+                $person_roles | where {|role| $role not-in $comic_vine_roles_acc.matched_comic_info_roles}
+              }
+            )
+            # All required ComicInfo roles are in the person's roles.
+            if ($comic_vine_role_mapping.comic_info_roles | all {|comic_info_role| $comic_info_role in $unmatched_comic_info_roles }) {
+              {
+                matched_comic_info_roles: (
+                  if ($comic_vine_roles_acc | get --optional comic_info_roles | is-empty) {
+                    $comic_vine_role_mapping.comic_info_roles
+                  } else {
+                    $comic_vine_roles_acc.comic_info_roles | append $comic_vine_role_mapping.comic_info_roles
+                  }
+                )
+                comic_vine_roles: (
+                  if ($comic_vine_roles_acc | get --optional comic_vine_roles | is-empty) {
+                    $comic_vine_role_mapping.comic_vine_roles
+                  } else {
+                    $comic_vine_roles_acc.comic_vine_roles | append $comic_vine_role_mapping.comic_vine_roles
+                  }
+                )
+              }
+            } else {
+              $comic_vine_roles_acc
+            }
+          } | get comic_vine_roles
+        )
+        # log debug $"roles: ($roles)"
+        $roles | reduce --fold $acc {|role inner_acc|
+          # $inner_acc | append {
+          #   person: $person
+          #   role: $role
+          #   primary: false
+          #   language: ""
+          # }
+            $inner_acc | append [
+              [person role primary language];
+              [$person $role false ""]
+            ]
+        }
+          # $roles | each {|role|
+            # [
+            #   [person role primary language];
+            #   [$person $role false null]
+            # ]
+            # {
+            #   person: $person
+            #   role: $role
+            #   primary: false
+            #   language: ""
+            # }
+          # }
+        # )
+      }
+    }
+  )
+  # log debug $"contributors: ($contributors)"
+  let contributors = (
+    if ($contributors | is-not-empty) {
+      $contributors | sort-by --custom {|a b|
+        if $a.person == $b.person {
+          $a.role < $b.role
+        } else {
+          $a.person < $b.person
+        }
+      }
+    }
+  )
+
+  # let contributors = (
+  #   $comic_vine_roles_map.comic_info_roles
+  #   # Sort by the number of roles first.
+  #   | sort-by --custom {|a b| ($a | length) >= ($b | length)}
+  #   | reduce --fold [] {|mapping acc|
+  #     # Where each contributor
+  #     let contributors = $json | where {|it|  }
+  #     if ($contributors | is-empty) {
+  #       return $acc
+  #     }
+  #     $acc | append (
+  #       $contributors | each {|contributor|
+  #         {
+  #           person: $contributor
+  #           role: $tag.role
+  #         }
+  #       }
+  #     )
+  #   }
+  # )
 
   # Check for erroneous volume titles in this field.
   let chapter_title = (
     if ($json | get --optional "Title" | is-empty) {
 
     } else {
-      if $json.Title =~ ' (?:Vol\.)|(?:Volume) [0-9.]+$' {
+      if $json.Title =~ ' (?:(?:Vol\.)|(?:Volume)|(?:Book)) .+$' {
         # This is almost certainly a volume title and will be omitted.
       } else {
         $json.Title
       }
+    }
+  )
+
+  let issue = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+        $json | get --optional Number
+    } else {
+      # This is manga, so the Number field should be the chapter index.
+      # The issue number should come from the Volume field in this case.
+      let volume = $json | get --optional Volume
+      if ($volume | is-empty) {
+        # If the Volume is missing or if the title looks like it's for a volume, use the Number field as the issue.
+        # if ($json | get --optional "Title" | is-empty) {
+        #   $json | get --optional Number
+        # } else {
+        #   if $json.Title =~ ' (?:(?:Vol\.)|(?:Volume)|(?:Book)) .+$' {
+        #     $json | get --optional Number
+        #   } else {
+        #     # Nothing
+        #   }
+        # }
+      } else {
+        $volume
+      }
+    }
+  )
+
+  let volume = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+      $json | get --optional Volume
+    } else {
+      # This is manga, so the Volume is used as the volume number in the series.
+      # Ignore this field in that case.
+    }
+  )
+
+  let chapter_index = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+      # Chapter index is only for manga.
+    } else {
+      $json | get --optional Number
+    }
+  )
+
+  # Issue count can be the number of chapters or the number of volumes for manga.
+  let issue_count = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+      $json | get --optional Count
+    } else {
+      if ($chapter_index | is-empty) {
+        # Assume the Count field holds the number of chapters if the chapter_index exists.
+      } else {
+        $json | get --optional Count
+      }
+    }
+  )
+
+  let chapter_count = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+      # Only used for manga
+    } else {
+      if ($chapter_index | is-empty) {
+        # Assume the Count field holds the number of volumes if there is no chapter index.
+        $json | get --optional Count
+      } else {
+      }
+    }
+  )
+
+  let ids_and_urls = (
+    if ($json | get --optional Web | is-empty) {
+    } else {
+      $json.Web | reduce --fold [] {|url acc| |
+        $acc | append (
+          let id = (
+            # We always need to try the hardcover_edition_id before the hardcover_book_slug in order to get both.
+            $book_identifiers | reject hardcover_edition_id | columns | prepend hardcover_edition_id | reduce --fold {} {|identifier_type identifier_acc|
+              # Book identifier has been determined.
+              if ($identifier_acc | is-not-empty) {
+                return $identifier_acc
+              }
+              # log debug $"id ($url)"
+              # log debug $"id ($identifier_type)"
+              let id = $url | identifier_from_url $identifier_type
+              # log debug $"id ($id)"
+              if ($id | is-not-empty) {
+                if ("hardcover_book_slug" in ($id | columns) and "hardcover_edition_id" in ($id | columns)) {
+                  [
+                    [url type id];
+                    [$url hardcover_edition_id $id.hardcover_edition_id]
+                    [$url hardcover_book_slug $id.hardcover_book_slug]
+                  ]
+                } else {
+                  {
+                    url: $url
+                    type: $identifier_type
+                    id: ($id | get $identifier_type)
+                  }
+                }
+              }
+            }
+          );
+          if ($id | is-empty) {
+            {
+              url: $url
+              type: null
+              id: null
+            }
+          } else {
+            $id
+          }
+        )
+      }
+    }
+  )
+  let ids = (
+    if ($ids_and_urls | is-not-empty) {
+      $ids_and_urls | where {|it| ($it.id | is-not-empty)} | reject --optional url | sort-by type
+    }
+  )
+  let links = (
+    if ($ids_and_urls | is-not-empty) {
+      $ids_and_urls | where {|it| ($it.id | is-empty)} | get url | sort
     }
   )
 
@@ -3169,66 +3491,98 @@ export def from_comic_info_xml []: [record -> record] {
   )
 
   let publication_date = (
-    []
-    | append ($json | get --optional Year)
-    | append ($json | get --optional Month)
-    | append ($json | get --optional Day)
-    | str join "-"
-    | into datetime --timezone UTC
+    if ([Year Month Day] | all {|it| $it in ($json | columns)}) {
+      []
+      | append ($json | get --optional Year)
+      | append ($json | get --optional Month)
+      | append ($json | get --optional Day)
+      | str join "-"
+      | into datetime --timezone UTC
+    }
   )
 
-  let narrative_fields = [Locations Characters Teams MainCharacterOrTeam]
-  let narrative = $narrative_fields | reduce --fold {narrative: {}} {|narrative_field, acc|
-    if ($json | get --optional $narrative_field | is-empty) {
-      return $acc
-    }
-    (
-      $acc
-      | update narrative (
-        $acc.narrative
-        | insert $narrative_field (
-          $json | get $narrative_field
-        )
-      )
-    )
-  }
+  # let narrative_fields = [Locations Characters Teams MainCharacterOrTeam]
+  # let narrative = $narrative_fields | reduce --fold {narrative: {}} {|narrative_field, acc|
+  #   if ($json | get --optional $narrative_field | is-empty) {
+  #     return $acc
+  #   }
+  #   (
+  #     $acc
+  #     | update narrative (
+  #       $acc.narrative
+  #       | insert $narrative_field (
+  #         $json | get $narrative_field
+  #       )
+  #     )
+  #   )
+  # }
   # StoryArc and StoryArcNumber have to handled specially for the narrative field.
 
   # todo
-  # Aditional Series Information:
-  #   Number
-  #   Volume
-  #   Count
-  #   Format
-  # Manga
   # AgeRating (Normalize to Metron's / Kavita's supported ones)
-  # ids (GTIN + ids from Web)
-  # Publisher / Imprint
-  # Language
   # AlternativeSeries
   # AlternativeCount
 
-  let data = (
+  let issue_id = (
+    if ($ids | is-not-empty) {
+      $ids | where type == "comic_vine_issue_id" | get id | first
+    }
+  )
+
+  let language = (
+    let language = $json | get --optional LanguageISO;
+    if ($language | is-not-empty) {
+      try {
+        $language | from_language_code
+      } catch {|error|
+        log warning $"Unknown language code in ComicInfo: (ansi red)($language)(ansi reset)"
+        null
+      }
+    }
+  )
+
+  let genres = (
+    if ($json | get --optional Genre | is-not-empty) {
+      $json.Genre | sort
+    }
+  )
+
+  let tags = (
+    if ($json | get --optional Tags | is-not-empty) {
+      $json.Tags | sort
+    }
+  )
+
+  (
     {}
-    # | upsert_if_value "chapter_title" $chapter_title
-    | upsert_if_present "chapter_title" $json "Title"
+    | upsert_if_value "chapter_title" $chapter_title
+    | upsert_if_value "chapter_index" $chapter_index
+    | upsert_if_value "issue_count" $issue_count
+    | upsert_if_value "issue_id" $issue_id
     | upsert_if_present "series" $json "Series"
-    # Does Volume depend on Manga, then?
-    | upsert_if_present "issue" $json "Volume"
-    # | upsert_if_value "contributors" $contributors
-    # | upsert_if_value "narrative" $narrative
+    | upsert_if_value "issue" $issue
+    | upsert_if_value "volume" $volume
+    | upsert_if_value "credits" $contributors
+    | upsert_if_value "ids" $ids
+    | upsert_if_value "links" $links
+    | upsert_if_value "language" $language
+    | upsert_if_present "isbn" $json "GTIN"
+    | upsert_if_present "manga" $json "Manga"
     | upsert_if_present "description" $json "Summary"
     | upsert_if_present "comment" $json "Notes"
     | upsert_if_value "publication_date" $publication_date
-    | upsert_if_present "genres" $json "Genres"
-    | upsert_if_present "tags" $json "Tags"
+    | upsert_if_present publisher $json "Publisher"
+    | upsert_if_present imprint $json "Imprint"
+    | upsert_if_present year $json "Year"
+    | upsert_if_present month $json "Month"
+    | upsert_if_present day $json "Day"
+    | upsert_if_value "genres" $genres
+    | upsert_if_value "tags" $tags
     | upsert_if_present "series_groups" $json "SeriesGroup"
-    # | upsert_if_present "scan_information" $json "ScanInformation"
+    | upsert_if_present "scan_information" $json "ScanInformation"
     | upsert_if_present "page_count" $json "PageCount"
-    # | upsert_if_present "format" $json "Format"
+    | upsert_if_present "format" $json "Format"
   )
-
-  $data
 }
 
 # Parse metadata from exiftool's JSON output for a PDF file
@@ -3555,7 +3909,7 @@ export def into_language_code [
 # https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
 export def from_language_code [
   # todo: I should be using type here
-  # type: string # 'iso_639_1' 2-letter code or 'iso_639_3' 3-letter code
+  # type: string # 'iso_639_1' 2-letter code, 'iso_639_3' 3-letter code, or 'ietf_bcp_47' to try everything else
   language_codes_map: table = $iso_language_codes_map
 ]: [string -> string] {
   let language_code = $in
@@ -3566,13 +3920,14 @@ export def from_language_code [
     } else if $language_code_length == 3 {
       "iso_639_3"
     } else {
-      error make {
-        msg: "unsupported language code type for the number of characters"
-        labels: [
-            {text: "language_code" span: (metadata $language_code).span}
-        ]
-        help: $"language codes must be 2-letters for (ansi yellow)iso_639_1(ansi reset) or 3-letters for (ansi yellow)iso_639_3(ansi reset)"
-      }
+      "ietf_bcp_47"
+      # error make {
+      #   msg: "unsupported language code type for the number of characters"
+      #   labels: [
+      #       {text: "language_code" span: (metadata $language_code).span}
+      #   ]
+      #   help: $"language codes must be 2-letters for (ansi yellow)iso_639_1(ansi reset) or 3-letters for (ansi yellow)iso_639_3(ansi reset)"
+      # }
     }
   )
   let languages = $language_codes_map | where {|it| ($it | get $type) == $language_code}
@@ -3699,25 +4054,6 @@ export def into_comic_info_xml []: [record -> record] {
     }
   }
 
-  let comic_vine_roles_map = [
-    [comic_vine_roles comic_info_roles];
-    [[Writer] [Writer]]
-    [[Penciller] [Penciller]]
-    [[Inker] [Inker]]
-    [[Colorist] [Colorist]]
-    [[Letterer] [Letterer]]
-    # [[Artist] [Penciller Inker Colorist]]
-    # I think ComicTagger does Penciller and Inker by default for Artist.
-    # I also include Colorist since usually, there's color of some sort in most comics and manga, even if it's only on the cover for manga.
-    [[Artist] [Penciller Inker Colorist]]
-    # [[Designer] []]
-    # CoverArtist requires both the Cover and the Artist roles.
-    [[Cover Artist] [CoverArtist]]
-    [[Editor] [Editor]]
-    [[Translator] [Translator]]
-    # [[Production] []]
-  ]
-
   let creators = (
     $data | get --optional credits.person | uniq | reduce --fold [] {|creator creator_acc|
       let creator_comic_vine_roles = $data.credits | where person == $creator | get role | uniq
@@ -3768,7 +4104,7 @@ export def into_comic_info_xml []: [record -> record] {
     } else {
       $id.id | identifier_into_url $id.type
     }
-  } | where {|url| $url | is-not-empty } | sort | str join " "
+  } | where {|url| $url | is-not-empty } | append ($data | get --optional links) | sort | uniq | str join " "
 
   # todo
   # AgeRating (Normalize to Metron's / Kavita's supported ones)
@@ -3894,7 +4230,7 @@ export def into_comic_info_xml []: [record -> record] {
   let comic_info_xml = $creators | columns | reduce --fold $comic_info_xml {|role acc|
     $acc | upsert_comic_info {tag: $role, value: ($creators | get $role | sort | str join ",")}
   }
-  log debug $"Comic info: ($comic_info_xml | to nuon)"
+  # log debug $"Comic info: ($comic_info_xml | to nuon)"
   $comic_info_xml
 }
 
