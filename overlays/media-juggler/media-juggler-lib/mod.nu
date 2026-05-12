@@ -4489,7 +4489,7 @@ export def wikidata_search_editions_by_asin [
   }
 
   let sparql_query = $"SELECT DISTINCT ?edition WHERE {
-    ?edition wdt:P31/wdt:P279* wd:Q3331189/wd:Q122731938.
+    ?edition wdt:P31/wdt:P279* wd:Q3331189.
     ?edition wdt:P5749 '($asin)'.
   }"
 
@@ -4506,6 +4506,9 @@ export def wikidata_search_editions_by_asin [
         $"($wikidata_sparql_api_url)($sparql_query | url encode)"
     )
   }
+
+  # log debug $"sparql_query: ($sparql_query)"
+
   let response = (
     try {
       retry_http $request $retries $retry_delay
