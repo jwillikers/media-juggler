@@ -1704,8 +1704,8 @@ def main [
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
 
-  let authors_subdirectory = $authors | str join ", " | use_unicode_in_title | sanitize_file_name
-  # todo How to handle multiple series?
+  # Authors
+  # todo How to handle nested series and subseries?
   let series_subdirectory = (
     # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
     # Kavita dislikes multiple formats in the same directory.
@@ -1716,11 +1716,7 @@ def main [
         $comic_metadata.series
         | use_unicode_in_title
         | sanitize_file_name
-        | path parse
-        | update stem {|p|
-          $p.stem + $" [($output_format)]"
-        }
-        | path join
+        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
       )
     # Kavita needs series to be in their own directories.
     # So, if this is a oneshot, put it in its own directory.
@@ -1732,11 +1728,12 @@ def main [
         | get stem
         | use_unicode_in_title
         | sanitize_file_name
+        | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
       )
     }
   )
   let target_directory = (
-    [$destination $authors_subdirectory]
+    [$destination]
     | append $series_subdirectory
     | path join
   )
