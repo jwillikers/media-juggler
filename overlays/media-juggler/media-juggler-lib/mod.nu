@@ -1999,12 +1999,13 @@ export const book_identifiers = {
     # More characters than this are probably allowed.
     match_expression: '^[a-zA-Z0-9_-]+$'
     url: "https://hardcover.app/books/{{ hardcover_book_slug }}"
-    url_parse_expression: '^http[s]{0,1}://hardcover.app/books/(?<hardcover_book_slug>[a-zA-Z0-9_-]+)(?:(?:/.*)|(?:/{0,1}))$'
+    url_parse_expression: '^http[s]{0,1}://hardcover.app/books/(?<hardcover_book_slug>[a-zA-Z0-9_-]+)(?:(?:/editions/(?<hardcover_edition_id>[0-9]+)/{0,1})|(?:/.*)|(?:/{0,1}))$'
   }
   hardcover_edition_id: {
     match_expression: '^[0-9]+$'
     url: "https://hardcover.app/books/{{ hardcover_book_slug }}/editions/{{ hardcover_edition_id }}"
-    url_parse_expression: "http[s]{0,1}://hardcover.app/books/(?<hardcover_book_slug>[a-zA-Z0-9_-]+)/editions/(?<hardcover_edition_id>[0-9]+)/{0,1}$"
+    edition_url: "https://hardcover.app/edition/id/{{ hardcover_edition_id }}"
+    url_parse_expression: "^http[s]{0,1}://hardcover.app/(?:(?:books/(?<hardcover_book_slug>[a-zA-Z0-9_-]+)/editions)|(?:edition/id))/(?<hardcover_edition_id>[0-9]+)/{0,1}$"
   }
   metron_issue_id: {
     match_expression: '^[0-9]+$'
@@ -2089,20 +2090,11 @@ export def identifier_into_url [
       help: $"invalid value (ansi yellow)($type)(ansi reset) for the type field must be one of ($book_identifiers | columns)"
     }
   }
-  if $type == "hardcover_edition_id" and ($hardcover_book_slug | is-empty) {
-    error make {
-      msg: "missing hardcover_book_slug"
-      labels: [
-          {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
-      ]
-      help: "the Hardcover book slug must be passed with the --hardcover-book-slug flag when the type is hardcover_edition_id"
-    }
-  }
   if $type != "hardcover_edition_id" and ($hardcover_book_slug | is-not-empty) {
     error make {
       msg: "invalid use of --hardcover-book-slug"
       labels: [
-          {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
+        {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
       ]
       help: "the flag --hardcover-book-slug is only valid when the type is hardcover_edition_id"
     }
@@ -2111,93 +2103,31 @@ export def identifier_into_url [
     error make {
       msg: "invalid identifier"
       labels: [
-          {text: "in" span: (metadata $in).span}
+        {text: "in" span: (metadata $in).span}
       ]
       help: $"the (ansi red)($id)(ansi reset) of type (ansi yellow)($type)(ansi reset) is invalid"
     }
   }
-  if $type == "hardcover_edition_id" and not ($hardcover_book_slug | is_identifier_valid "hardcover_book_slug") {
+  if $type == "hardcover_edition_id" and ($hardcover_book_slug | is-not-empty) and not ($hardcover_book_slug | is_identifier_valid "hardcover_book_slug") {
     error make {
       msg: "invalid hardcover_book_slug identifier"
       labels: [
-          {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
+        {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
       ]
       help: $"the Hardcover book slug (ansi red)($hardcover_book_slug)(ansi reset) is invalid"
     }
   }
   let url = $book_identifiers | get $type | get url | str replace ("{{ " + $type + " }}") $id
   if $type == "hardcover_edition_id" {
-    $url | str replace ("{{ hardcover_book_slug }}") $hardcover_book_slug
+    if ($hardcover_book_slug | is-empty) {
+      $book_identifiers | get $type | get edition_url | str replace "{{ hardcover_edition_id }}" $id
+    } else {
+      $url | str replace "{{ hardcover_book_slug }}" $hardcover_book_slug
+    }
   } else {
     $url
   }
 }
-
-# Determine the identifier type of a given URL
-# export def identifier_from_url [
-#   type: string # Identifier type. See columns in book_identifiers for available types.
-# ]: [string -> record] {
-#   let url = $in
-#   if ($url | is-empty) {
-#     error make {
-#       msg: "empty url"
-#       labels: [
-#           {text: "url" span: (metadata $url).span}
-#       ]
-#       help: "pipe a url string into identifier_from_url"
-#     }
-#   }
-#   if ($type | is-empty) {
-#     error make {
-#       msg: "empty identifier type"
-#       labels: [
-#           {text: "type" span: (metadata $type).span}
-#       ]
-#       help: "pass a nonempty value for the type field"
-#     }
-#   }
-#   if $type not-in ($book_identifiers | columns) {
-#     error make {
-#       msg: "invalid identifier type"
-#       labels: [
-#           {text: "type" span: (metadata $type).span}
-#       ]
-#       help: $"the value for the type field must be one of ($book_identifiers | columns)"
-#     }
-#   }
-#   let ids = $url | parse --regex ($book_identifiers | get $type | get url_parse_expression)
-#   if ($ids | is-empty) {
-#     return {}
-#   }
-#   # This should never happen.
-#   if ($ids | length) > 1 {
-#     error make {
-#       msg: $"more than one ID of type (ansi purple)($type)(ansi reset) parsed from URL (ansi yellow)($url)(ansi reset): ($ids)"
-#       labels: [
-#           {text: "ids" span: (metadata $ids).span}
-#       ]
-#       help: "parsing multiple ids of the same type from a URL should not be possible"
-#     }
-#   }
-#   let ids = $ids | first
-#   # Double check that the identifier is valid.
-#   # The parse regex should only parse valid identifiers in the first place.
-#   # log debug $"ids: ($ids)"
-#   $ids | items {|type, id|
-#     # log debug $"type: ($type)"
-#     # log debug $"id: ($id)"
-#     if not ($id | is_identifier_valid $type) {
-#       error make {
-#         msg: $"the (ansi red)($id)(ansi reset) of type (ansi yellow)($type)(ansi reset) is invalid"
-#         labels: [
-#             {text: "ids" span: (metadata $ids).span}
-#         ]
-#         help: $"there is a problem with the url_parse_expression (ansi yellow)($book_identifiers | get $type | get url_parse_expression)(ansi reset) parsing invalid IDs of type (ansi yellow)($type)(ansi reset)"
-#       }
-#     }
-#   }
-#   $ids
-# }
 
 # Parse a book identifier from its URL
 #
@@ -2210,7 +2140,7 @@ export def identifier_from_url [
     error make {
       msg: "empty url"
       labels: [
-          {text: "url" span: (metadata $url).span}
+        {text: "url" span: (metadata $url).span}
       ]
       help: "pipe a url string into identifier_from_url"
     }
@@ -2219,7 +2149,7 @@ export def identifier_from_url [
     error make {
       msg: "empty identifier type"
       labels: [
-          {text: "type" span: (metadata $type).span}
+        {text: "type" span: (metadata $type).span}
       ]
       help: "pass a nonempty value for the type field"
     }
@@ -2228,7 +2158,7 @@ export def identifier_from_url [
     error make {
       msg: "invalid identifier type"
       labels: [
-          {text: "type" span: (metadata $type).span}
+        {text: "type" span: (metadata $type).span}
       ]
       help: $"the value for the type field must be one of ($book_identifiers | columns)"
     }
@@ -2242,29 +2172,34 @@ export def identifier_from_url [
     error make {
       msg: $"more than one ID of type (ansi purple)($type)(ansi reset) parsed from URL (ansi yellow)($url)(ansi reset): ($ids)"
       labels: [
-          {text: "ids" span: (metadata $ids).span}
+        {text: "ids" span: (metadata $ids).span}
       ]
       help: "parsing multiple ids of the same type from a URL should not be possible"
     }
   }
   let ids = $ids | first
-  # Double check that the identifier is valid.
+  # Filter out empty IDs and double check that the identifier is valid.
   # The parse regex should only parse valid identifiers in the first place.
   # log debug $"ids: ($ids)"
-  $ids | items {|type, id|
+  $ids | columns | reduce --fold {} {|type acc|
     # log debug $"type: ($type)"
     # log debug $"id: ($id)"
-    if not ($id | is_identifier_valid $type) {
-      error make {
-        msg: $"the (ansi red)($id)(ansi reset) of type (ansi yellow)($type)(ansi reset) is invalid"
-        labels: [
+    if ($ids | get --optional $type | is-empty) {
+      $acc
+    } else {
+      if not ($ids | get $type | is_identifier_valid $type) {
+        error make {
+          msg: $"the (ansi red)($ids | get $type)(ansi reset) of type (ansi yellow)($type)(ansi reset) is invalid"
+          labels: [
             {text: "ids" span: (metadata $ids).span}
-        ]
-        help: $"there is a problem with the url_parse_expression (ansi yellow)($book_identifiers | get $type | get url_parse_expression)(ansi reset) parsing invalid IDs of type (ansi yellow)($type)(ansi reset)"
+          ]
+          help: $"there is a problem with the url_parse_expression (ansi yellow)($book_identifiers | get $type | get url_parse_expression)(ansi reset) parsing invalid IDs of type (ansi yellow)($type)(ansi reset)"
+        }
+      } else {
+        $acc | insert $type ($ids | get $type)
       }
     }
   }
-  $ids
 }
 
 export const comic_info_fields = [
@@ -3329,7 +3264,6 @@ export def into_comic_info_xml []: [record -> record] {
       if "hardcover_book_slug" in ($data | get --optional ids.type) {
         $id.id | identifier_into_url $id.type --hardcover-book-slug ($data.ids | where type == "hardcover_book_slug" | get id | first)
       } else {
-        # todo Add support for when the book slug is unknown which is now possible
         $id.id | identifier_into_url $id.type
       }
     } else {

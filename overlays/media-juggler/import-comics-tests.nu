@@ -267,7 +267,7 @@ def test_identifier_from_url_comic_vine_issue_id_valid_issue_http [] {
 }
 
 def test_identifier_from_url_hardcover_book_slug_edition_url [] {
-  let input = "https://hardcover.app/books/march-comes-in-like-a-lion-vol-1/editions/32873036"
+  let input = "https://hardcover.app/books/march-comes-in-like-a-lion-vol-1/editions"
   let expected = {
     hardcover_book_slug: "march-comes-in-like-a-lion-vol-1"
   }
@@ -298,6 +298,15 @@ def test_identifier_from_url_hardcover_book_slug_valid_book_http [] {
   let input = "http://hardcover.app/books/march-comes-in-like-a-lion-vol-1"
   let expected = {
     hardcover_book_slug: "march-comes-in-like-a-lion-vol-1"
+  }
+  assert equal ($input | identifier_from_url "hardcover_book_slug") $expected
+}
+
+def test_identifier_from_url_hardcover_book_slug_valid_book_with_edition_id [] {
+  let input = "http://hardcover.app/books/march-comes-in-like-a-lion-vol-1/editions/123456"
+  let expected = {
+    hardcover_book_slug: "march-comes-in-like-a-lion-vol-1"
+    hardcover_edition_id: "123456"
   }
   assert equal ($input | identifier_from_url "hardcover_book_slug") $expected
 }
@@ -339,6 +348,22 @@ def test_identifier_from_url_hardcover_edition_id_valid_edition_http [] {
   let input = "http://hardcover.app/books/march-comes-in-like-a-lion-vol-1/editions/1234"
   let expected = {
     hardcover_book_slug: "march-comes-in-like-a-lion-vol-1"
+    hardcover_edition_id: "1234"
+  }
+  assert equal ($input | identifier_from_url "hardcover_edition_id") $expected
+}
+
+def test_identifier_from_url_hardcover_edition_id_id_only [] {
+  let input = "https://hardcover.app/edition/id/1234"
+  let expected = {
+    hardcover_edition_id: "1234"
+  }
+  assert equal ($input | identifier_from_url "hardcover_edition_id") $expected
+}
+
+def test_identifier_from_url_hardcover_edition_id_id_only_http [] {
+  let input = "http://hardcover.app/edition/id/1234"
+  let expected = {
     hardcover_edition_id: "1234"
   }
   assert equal ($input | identifier_from_url "hardcover_edition_id") $expected
@@ -545,6 +570,8 @@ def test_identifier_from_url [] {
   test_identifier_from_url_hardcover_edition_id_invalid_book_url
   test_identifier_from_url_hardcover_edition_id_invalid_edition_url
   test_identifier_from_url_hardcover_edition_id_valid_edition_http
+  test_identifier_from_url_hardcover_edition_id_id_only
+  test_identifier_from_url_hardcover_edition_id_id_only_http
 
   test_identifier_from_url_metron_issue_id_series_url
   test_identifier_from_url_metron_issue_id_valid_issue
@@ -640,13 +667,15 @@ def test_identifier_into_url_hardcover_edition_id_hardcover_book_slug_invalid []
 }
 
 def test_identifier_into_url_hardcover_edition_id_hardcover_book_slug_empty [] {
-  let input = "32873036"
-  assert error {|| ($input | identifier_into_url "hardcover_edition_id" --hardcover-book-slug "")}
+  let input = "32095555"
+  let expected = "https://hardcover.app/edition/id/32095555"
+  assert equal ($input | identifier_into_url "hardcover_edition_id" --hardcover-book-slug "") $expected
 }
 
 def test_identifier_into_url_hardcover_edition_id_hardcover_book_slug_missing [] {
-  let input = "32873036"
-  assert error {|| ($input | identifier_into_url "hardcover_edition_id")}
+  let input = "32095555"
+  let expected = "https://hardcover.app/edition/id/32095555"
+  assert equal ($input | identifier_into_url "hardcover_edition_id") $expected
 }
 
 def test_identifier_into_url_hardcover_book_slug_added_for_wrong_type [] {
