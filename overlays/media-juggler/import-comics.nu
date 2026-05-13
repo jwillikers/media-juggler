@@ -34,7 +34,7 @@ def main [
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
   --isbn: string
-  --jxl # Convert lossless PNG images to JXL
+  # --jxl # Convert lossless PNG images to JXL
   --interactive # Ask for input from the user
   --keep # Don't delete or modify the original input files
   --keep-tmp # Don't delete the temporary directory when there's an error
@@ -1638,6 +1638,8 @@ def main [
       $optimized_file_hashes | update sha256 (
         $optimized_file_hashes.sha256 | append (
           if "epub" in $formats {
+            # Since the EPUB isn't saved, there's no need to bother with optimizing it further.
+
             # At this point, the images in the EPUB should be optimized.
             # Just optimize the compression.
             # Since we already cached the hash of this file, if nothing else has changed, we'll accidentally skip this part.
@@ -1651,8 +1653,8 @@ def main [
               # Uncomment to optimize EPUB ZIP compression
               # log debug "Optimizing the EPUB ZIP compression"
               # open --raw ($formats.epub | optimize_zip_ect) | hash sha256
-              log debug "Skipping optimizing the EPUB ZIP compression since EPUBs aren't currently saved."
-              open --raw ($formats.epub) | hash sha256
+              # log debug "Skipping optimizing the EPUB ZIP compression since EPUBs aren't currently saved."
+              # open --raw ($formats.epub) | hash sha256
 
             # }
           }
