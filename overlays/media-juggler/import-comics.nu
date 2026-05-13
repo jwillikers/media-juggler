@@ -1667,7 +1667,7 @@ def main [
         ) | append (
           if "cbz" in $formats {
             let image_format = ($formats.cbz | get_image_extension)
-            if $image_format == null {
+            if ($image_format | is-empty) {
               if not $keep_tmp {
                 rm --force --recursive $temporary_directory
               }
@@ -1678,10 +1678,10 @@ def main [
             }
 
             # todo Detect if another lossless format, i.e. webp, is being used and if so, convert those to jxl as well.
-            if $image_format in ["png"] and $jxl {
-              $formats.cbz | convert_to_lossless_jxl | optimize_zip_ect
-            # todo Someday, will it be possible to further optimize JXL?
-            } else if $image_format != "jxl" {
+            # if $image_format in ["png"] and $jxl {
+            #   $formats.cbz | convert_to_lossless_jxl | optimize_zip_ect
+            # # todo Someday, will it be possible to further optimize JXL?
+            # } else if $image_format != "jxl" {
               if $images_optimized {
                 # Just optimize the ZIP compression in this case
                 let hash = open --raw $formats.cbz | hash sha256
@@ -1696,7 +1696,7 @@ def main [
                   open --raw ($formats.cbz | optimize_zip) | hash sha256
                 }
               }
-            }
+            # }
           }
         ) | uniq | sort
       )
@@ -1856,6 +1856,12 @@ def main [
           rm --force $original
         }
       }
+    }
+    # Delete the EPUB exported by Calibre.
+    if ($formats | get $input_format | is_ssh_path) or ($formats | get $input_format) == $original_file {
+      # No need to delete this file.
+    } else {
+      rm --force ($formats | get $input_format)
     }
   }
   log debug $"Removing the working directory (ansi yellow)($temporary_directory)(ansi reset)"
