@@ -12,8 +12,8 @@ export const wikidata_api_url = "https://www.wikidata.org/w/rest.php/wikibase/v1
 export const wikidata_sparql_api_url = "https://query.wikidata.org/sparql?format=json&query="
 
 export const ereader_profiles = [
-    [model height width disk_label];
-    ["Kobo Elipsa 2E" 1872 1404 "KOBOeReader"]
+  [model height width disk_label];
+  ["Kobo Elipsa 2E" 1872 1404 "KOBOeReader"]
 ]
 
 export const image_extensions = [
@@ -35,27 +35,13 @@ export const audiobook_accompanying_document_file_extensions = [
   pdf
 ]
 
-export const musicbrainz_non_genre_tags = [
-  "abridged"
-  "accompanying document"
-  "audiobook"
-  "book"
-  "chapters"
-  "explicit"
-  # "light novel"
-  "novel"
-  "novelette"
-  "novella"
-  "short story"
-  "short story collection"
-  "unabridged"
-]
-
 # Allowed tags
-export const tags_allowlist = [
-  [tag aliases];
+export const tag_allowlist = [
+  [name aliases];
   [abridged []]
+  ["accompanying document" []] # MusicBrainz
   [book []]
+  [chapters []] # MusicBrainz
   [explicit []]
   [josei []]
   ["light novel" []]
@@ -66,15 +52,17 @@ export const tags_allowlist = [
   [novella []]
   [omnibus []]
   [seinen []]
+  [shogi []] # Subject
   [shōjo [shojo]]
   [shōnen [shonen]]
   ["short story" []]
   ["short story collection" []]
+  ["unabridged" []]
 ]
 
 # Allowed genres
 export const genre_allowlist = [
-  [genre aliases];
+  [name aliases];
   [action []]
   [adventure []]
   [apocalyptic []]
@@ -125,8 +113,10 @@ export const genre_allowlist = [
   ["superhero" []]
   ["sword and sorcery" ["sword & sorcery" "S&S" "heroic fantasy"]]
   [thriller [suspense]]
+  ["vampire" []]
   ["villainess" []]
   ["western" []]
+  ["young adult" ["ya"]]
   ["yuri" []]
 ]
 
@@ -2340,6 +2330,46 @@ export const comic_vine_roles_map = [
   # [[Production] []]
 ]
 
+# Filter and rename genres or tags according to the allow list
+export def sanitize_genres_or_tags [
+  allowlist: table<name: string, aliases: list<string>> # The allow list
+]: [list<string> -> list<string>] {
+  let tags = $in
+  if ($allowlist | is-empty) {
+    error make {
+      msg: "empty allowlist"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: "pass a non-empty allowlist for the allowlist argument"
+    }
+  }
+  if ($tags | is-empty) {
+    return []
+  }
+
+  $tags | reduce --fold [] {|tag acc|
+    let lowercase_tag = $tag | str downcase
+    let matching_tags = $allowlist | where {|allowed_tag|
+      (($allowed_tag.name | str downcase) == $lowercase_tag) or ($allowed_tag.aliases | any {|alias| $lowercase_tag == ($alias | str downcase)})
+    }
+    if ($matching_tags | is-empty) {
+      log debug $"Ignoring tag/genre: (ansi purple)($tag)(ansi reset)"
+      $acc
+    } else if ($matching_tags | length) == 1 {
+      $acc | append ($matching_tags.name | first)
+    } else {
+      error make {
+        msg: "multiple matches in the allowlist"
+        labels: [
+          {text: "matching_tags" span: (metadata $matching_tags).span}
+        ]
+        help: $"found multiple matches for (ansi yellow)($tag)(ansi reset) in the allowlist ($allowlist): (ansi yellow)($matching_tags)(ansi reset)"
+      }
+    }
+  } | sort
+}
+
 # Read a ComicInfo.xml file into the internal data structure
 #
 # https://anansi-project.github.io/docs/comicinfo/documentation
@@ -2742,13 +2772,13 @@ export def from_comic_info_xml []: [record -> record] {
 
   let genres = (
     if ($json | get --optional Genre | is-not-empty) {
-      $json.Genre | sort
+      $json.Genre | sanitize_genres_or_tags $genre_allowlist
     }
   )
 
   let tags = (
     if ($json | get --optional Tags | is-not-empty) {
-      $json.Tags | sort
+      $json.Tags | sanitize_genres_or_tags $tag_allowlist
     }
   )
 
@@ -2839,8 +2869,6 @@ export def from_pdf_metadata []: [
     | upsert_if_present "isbn" $metadata "ISBN"
     | upsert_if_value "language" $language
     | upsert_if_value "credits" $credits
-    # todo Needs extra handling
-    # | upsert_if_present "language" $metadata "Language"
   )
 }
 
@@ -2962,7 +2990,7 @@ export def from_opf_xml []: [
   let genres = (
     let genres = $metadata_content | where tag == subject;
     if ($genres | is-not-empty) {
-      $genres | get content | flatten | get content | uniq | sort
+      $genres | get content | flatten | get content | uniq | sanitize_genres_or_tags $genre_allowlist
     }
   )
 
@@ -4269,7 +4297,7 @@ export def fetch_book_metadata [
     | where tag == "identifier"
   )
   let isbn = (
-    if $isbn == null and ($all_opf_identifiers != null) {
+    if ($isbn | is-empty) and ($all_opf_identifiers | is-not-empty) {
       let all_opf_isbn = (
         $all_opf_identifiers
         | where {|it| ($it.attributes | get --optional scheme) == "ISBN"}
@@ -4293,7 +4321,7 @@ export def fetch_book_metadata [
   # }
   let identifiers = (
     # todo Merge identifiers?
-    if $isbn == null and ($all_opf_identifiers != null) {
+    if ($isbn | is-empty) and ($all_opf_identifiers | is-not-empty) {
       let all_opf_non_isbn = (
         $all_opf_identifiers
         | where {|it| ($it.attributes | get --optional scheme) != "ISBN"}
@@ -8821,7 +8849,32 @@ export def parse_genres_and_tags []: record<genres: table<name: string, count: i
   if ($input | get --optional tags | is-empty) or "tags" not-in ($input | columns) {
     if "genres" in ($input | columns) and ($input | get --optional genres | is-not-empty) {
       return {
-        genres: ($input | get --optional genres | sort-by --custom $sort | uniq-by name)
+        genres: (
+          $input
+          | get --optional genres
+          | reduce --fold [] {|tag acc|
+            let lowercase_tag = $tag.name | str downcase
+            let matching_tags = $genre_allowlist | where {|allowed_tag|
+              ($allowed_tag.name | str downcase) == $lowercase_tag or ($allowed_tag.aliases | any {|alias| $lowercase_tag == ($alias | str downcase)})
+            }
+            if ($matching_tags | is-empty) {
+              log debug $"Ignoring genre: (ansi purple)($tag.name)(ansi reset)"
+              $acc
+            } else if ($matching_tags | length) == 1 {
+              $acc | append {name: ($matching_tags.name | first), count: $tag.count}
+            } else {
+              error make {
+                msg: "multiple matches in the allowlist"
+                labels: [
+                  {text: "matching_tags" span: (metadata $matching_tags).span}
+                ]
+                help: $"found multiple matches for (ansi yellow)($tag.name)(ansi reset) in the allowlist ($genre_allowlist): (ansi yellow)($matching_tags)(ansi reset)"
+              }
+            }
+          }
+          | sort-by --custom $sort
+          | uniq-by name
+        )
         tags: []
       }
     }
@@ -8834,16 +8887,50 @@ export def parse_genres_and_tags []: record<genres: table<name: string, count: i
   let genres = $input | get --optional genres | append (
     $input.tags
     # | select name count
-    | where {|tag|
-      $tag.name not-in $musicbrainz_non_genre_tags
+    | reduce --fold [] {|tag acc|
+      let lowercase_tag = $tag.name | str downcase
+      let matching_tags = $genre_allowlist | where {|allowed_tag|
+        (($allowed_tag.name | str downcase) == $lowercase_tag) or ($allowed_tag.aliases | any {|alias| $lowercase_tag == ($alias | str downcase)})
+      }
+      if ($matching_tags | is-empty) {
+        log debug $"Ignoring genre: (ansi purple)($tag.name)(ansi reset)"
+        $acc
+      } else if ($matching_tags | length) == 1 {
+        $acc | append {name: ($matching_tags.name | first), count: $tag.count}
+      } else {
+        error make {
+          msg: "multiple matches in the allowlist"
+          labels: [
+            {text: "matching_tags" span: (metadata $matching_tags).span}
+          ]
+          help: $"found multiple matches for (ansi yellow)($tag.name)(ansi reset) in the allowlist ($genre_allowlist): (ansi yellow)($matching_tags)(ansi reset)"
+        }
+      }
     }
   ) | sort-by --custom $sort | uniq-by name
 
   let tags = (
     $input.tags
     # | select name count
-    | where {|tag|
-      $tag.name not-in ($genres | get --optional name)
+    | reduce --fold [] {|tag acc|
+      let lowercase_tag = $tag.name | str downcase
+      let matching_tags = $tag_allowlist | where {|allowed_tag|
+        (($allowed_tag.name | str downcase) == $lowercase_tag) or ($allowed_tag.aliases | any {|alias| $lowercase_tag == ($alias | str downcase)})
+      }
+      if ($matching_tags | is-empty) {
+        log debug $"Ignoring tag: (ansi purple)($tag.name)(ansi reset)"
+        $acc
+      } else if ($matching_tags | length) == 1 {
+        $acc | append {name: ($matching_tags.name | first), count: $tag.count}
+      } else {
+        error make {
+          msg: "multiple matches in the allowlist"
+          labels: [
+            {text: "matching_tags" span: (metadata $matching_tags).span}
+          ]
+          help: $"found multiple matches for (ansi yellow)($tag.name)(ansi reset) in the allowlist ($tag_allowlist): (ansi yellow)($matching_tags)(ansi reset)"
+        }
+      }
     }
     # sort by the count, highest to lowest, and then name alphabetically
     | sort-by --custom $sort

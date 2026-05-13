@@ -160,21 +160,21 @@ def main [
   )
 
   let keep = (
-    if $keep != null {
+    if ($keep | is-not-empty) {
       $keep
     } else if ($config | get --optional keep | is-not-empty) {
       $config.keep
     }
   )
   let merge = (
-    if $merge != null {
+    if ($merge | is-not-empty) {
       $merge
     } else if ($config | get --optional merge | is-not-empty) {
       $config.merge
     }
   )
   let use_rsync = (
-    if $use_rsync != null {
+    if ($use_rsync | is-not-empty) {
       $use_rsync
     } else if ($config | get --optional use_rsync | is-not-empty) {
       $config.use_rsync

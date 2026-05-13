@@ -989,12 +989,9 @@ def test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
     ]
     publisher: "Denpa"
     genres: [
-      "Character Driven"
-      "Comics"
-      "Loveable Characters"
-      "Not Diverse Characters"
-      "Strong Character Development"
-      "Weak Character Development"
+      coming-of-age
+      romance
+      "slice of life"
     ]
     language: "english"
     title: "March Comes in Like a Lion, Vol. 1",
@@ -1036,12 +1033,66 @@ def test_from_opf_xml [] {
   test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf
 }
 
+def test_sanitize_genres_or_tags_empty_allowlist [] {
+  let input = [coming-of-age fantasy romantasy]
+  assert error {|| $input | sanitize_genres_or_tags []}
+}
+
+def test_sanitize_genres_or_tags_empty_input [] {
+  let input = []
+  assert equal ($input | sanitize_genres_or_tags $genre_allowlist) []
+}
+
+def test_sanitize_genres_or_tags_duplicate_tags [] {
+  let input = [coming-of-age fantasy romantasy]
+  let allowlist = [
+    [name aliases];
+    [coming-of-age ["coming of age"]]
+    [fantasy []]
+    ["romantic fantasy" [romantasy fantasy]]
+  ]
+  assert error {|| $input | sanitize_genres_or_tags $allowlist}
+}
+
+def test_sanitize_genres_or_tags_simple [] {
+  let input = [coming-of-age fantasy romantasy]
+  let allowlist = [
+    [name aliases];
+    [coming-of-age ["coming of age"]]
+    [fantasy []]
+    ["romantic fantasy" [romantasy]]
+  ]
+  let expected = ["coming-of-age" fantasy "romantic fantasy"]
+  assert equal ($input | sanitize_genres_or_tags $allowlist) $expected
+}
+
+def test_sanitize_genres_or_tags_case [] {
+  let input = ["Coming of Age" Fantasy Romantasy]
+  let allowlist = [
+    [name aliases];
+    [coming-of-age ["coming of age"]]
+    [fantasy []]
+    ["Romantic Fantasy" [romantasy]]
+  ]
+  let expected = ["Romantic Fantasy" coming-of-age fantasy]
+  assert equal ($input | sanitize_genres_or_tags $allowlist) $expected
+}
+
+def test_sanitize_genres_or_tags [] {
+  test_sanitize_genres_or_tags_empty_allowlist
+  test_sanitize_genres_or_tags_empty_input
+  test_sanitize_genres_or_tags_duplicate_tags
+  test_sanitize_genres_or_tags_simple
+  test_sanitize_genres_or_tags_case
+}
+
 def main [] {
   test_is_identifier_valid
   test_identifier_from_url
   test_identifier_into_url
   test_from_language_code
   test_into_language_code
+  test_sanitize_genres_or_tags
   test_into_comic_info_xml
   test_from_opf_xml
   test_from_comic_info_xml

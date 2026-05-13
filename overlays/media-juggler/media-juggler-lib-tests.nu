@@ -1639,14 +1639,12 @@ def test_chapters_into_tone_format [] {
 def test_parse_genres_and_tags_from_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = {
-    genres: [
-      [name count scope];
-      ["light novel" 1 "release group"]
-    ]
+    genres: []
     tags: [
       [name count scope];
-      [unabridged 1 "release group"]
-      [unabridged 1 "recording"]
+      ["light novel" 1 "release group"]
+      ["unabridged" 1 "release group"]
+      ["unabridged" 1 "recording"]
     ]
   }
   assert equal ($input | parse_genres_and_tags_from_musicbrainz_release) $expected
@@ -1655,13 +1653,11 @@ def test_parse_genres_and_tags_from_musicbrainz_release_baccano_vol_1 [] {
 def test_parse_genres_and_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = {
-    genres: [
-      [name count scope];
-      ["light novel" 1 "release group"]
-    ]
+    genres: []
     tags: [
       [name count scope];
       [chapters 1 "release"]
+      ["light novel" 1 "release group"]
       [unabridged 1 "release group"]
     ]
   }
@@ -1695,12 +1691,9 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
       musicbrainz_release_status: "official"
       amazon_asin: "B0CRSJ8RQV"
       audible_asin: "B0CRSPBW6X"
-      genres: [
-        [name count scope];
-        ["light novel" 1 "release group"]
-      ]
       tags: [
         [name count scope];
+        ["light novel" 1 "release group"]
         [unabridged 1 "release group"]
         [unabridged 1 recording]
       ]
@@ -1782,7 +1775,6 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
   assert equal ($actual | get book | get artist_credit) ($expected | get book | get artist_credit)
   assert equal ($actual | get book | get series) ($expected | get book | get series)
   assert equal ($actual | get book | get tags) ($expected | get book | get tags)
-  assert equal ($actual | get book | get genres) ($expected | get book | get genres)
   assert equal ($actual | get book | get contributors) ($expected | get book | get contributors)
   assert equal ($actual | get book) ($expected | get book)
   assert equal ($actual | get tracks | first | columns) ($expected | get tracks | first | columns)
@@ -1821,13 +1813,10 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
       isbn: "9781949980523"
       musicbrainz_release_country: "XW"
       musicbrainz_release_status: "official"
-      genres: [
-        [name count scope];
-        ["light novel" 1 "release group"]
-      ]
       tags: [
         [name count scope];
         [chapters 1 release]
+        ["light novel" 1 "release group"]
         [unabridged 1 "release group"]
       ]
       publication_date: ("2020-03-24T00:00:00" | into datetime)
@@ -1889,7 +1878,6 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
   let actual = ($input | parse_musicbrainz_release)
   assert equal ($actual | get book | columns) ($expected | get book | columns)
   assert equal ($actual | get book | get artist_credit) ($expected | get book | get artist_credit)
-  assert equal ($actual | get book | get genres) ($expected | get book | get genres)
   assert equal ($actual | get book | get tags) ($expected | get book | get tags)
   assert equal ($actual | get book | get chapters) ($expected | get book | get chapters)
   assert equal ($actual | get book | get series) ($expected | get book | get series)
@@ -3737,7 +3725,6 @@ def test_parse_musicbrainz_series_monogatari_work [] {
     genres: [
       [name, count];
       [fiction, 1],
-      ["light novel", 1],
       [mystery, 1],
       [paranormal, 1],
       [psychological, 1],
@@ -3746,7 +3733,10 @@ def test_parse_musicbrainz_series_monogatari_work [] {
       [supernatural, 1],
       [vampire, 1]
     ]
-    tags: []
+    tags: [
+      [name, count];
+      ["light novel", 1],
+    ]
   }
   assert equal ($input | parse_musicbrainz_series) $expected
 }
@@ -3767,7 +3757,6 @@ def test_parse_musicbrainz_series_monogatari_first_season_work [] {
     genres: [
       [name, count];
       [fiction, 1],
-      ["light novel", 1],
       [mystery, 1],
       [paranormal, 1],
       [psychological, 1],
@@ -3776,7 +3765,10 @@ def test_parse_musicbrainz_series_monogatari_first_season_work [] {
       [supernatural, 1],
       [vampire, 1]
     ]
-    tags: []
+    tags: [
+      [name, count];
+      ["light novel", 1],
+    ]
   }
   assert equal ($input | parse_musicbrainz_series) $expected
 }
@@ -3794,7 +3786,6 @@ def test_parse_musicbrainz_series_bakemonogatari_work [] {
     genres: [
       [name, count];
       [fiction, 1],
-      ["light novel", 1],
       [mystery, 1],
       [paranormal, 1],
       [psychological, 1],
@@ -3803,7 +3794,10 @@ def test_parse_musicbrainz_series_bakemonogatari_work [] {
       ["speculative fiction", 1],
       [vampire, 1]
     ]
-    tags: []
+    tags: [
+      [name, count];
+      ["light novel", 1],
+    ]
   }
   assert equal ($input | parse_musicbrainz_series) $expected
 }
@@ -4486,11 +4480,13 @@ def test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802 [] {
       [name, count];
       [action, 1],
       [fiction, 1],
-      ["light novel", 1],
       [mecha, 1],
       [military, 1]
     ]
-    tags: []
+    tags: [
+      [name, count];
+      ["light novel", 1],
+    ]
   }
   assert equal ($input | parse_musicbrainz_work) $expected
 }

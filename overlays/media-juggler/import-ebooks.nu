@@ -66,6 +66,20 @@ def main [
     }
   )
 
+  let keep = (
+    if ($keep | is-not-empty) {
+      $keep
+    } else if ($config | get --optional keep | is-not-empty) {
+      $config.keep
+    }
+  )
+  let use_rsync = (
+    if ($use_rsync | is-not-empty) {
+      $use_rsync
+    } else if ($config | get --optional use_rsync | is-not-empty) {
+      $config.use_rsync
+    }
+  )
   let destination = (
     if ($destination | is-not-empty) {
       $destination

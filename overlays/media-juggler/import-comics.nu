@@ -35,7 +35,7 @@ def main [
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
   --isbn: string
   # --jxl # Convert lossless PNG images to JXL
-  --interactive # Ask for input from the user
+  # --interactive # Ask for input from the user
   --keep # Don't delete or modify the original input files
   --keep-tmp # Don't delete the temporary directory when there's an error
   --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
@@ -50,7 +50,7 @@ def main [
   --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
   --title: string # The title of the comic or manga issue
-  --use-rsync
+  --use-rsync # Use rsync instead of scp to retrieve and copy files from a remote machine.
   --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
   --hardcover-edition-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
   --hardcover-book-slug: string # The Hardcover Book Slug (only embedded in the metadata right now)
@@ -139,6 +139,27 @@ def main [
     }
   )
 
+  let default_language = (
+    if ($default_language | is-not-empty) {
+      $default_language
+    } else if ($config | get --optional default_language | is-not-empty) {
+      $config.default_language
+    }
+  )
+  let keep = (
+    if ($keep | is-not-empty) {
+      $keep
+    } else if ($config | get --optional keep | is-not-empty) {
+      $config.keep
+    }
+  )
+  let use_rsync = (
+    if ($use_rsync | is-not-empty) {
+      $use_rsync
+    } else if ($config | get --optional use_rsync | is-not-empty) {
+      $config.use_rsync
+    }
+  )
   let destination = (
     if ($destination | is-not-empty) {
       $destination
