@@ -1772,51 +1772,6 @@ export def get_zip_image_dimensions []: path -> string {
   )
 }
 
-# Replace low resolution image files in a CBZ with the corresponding page from the EPUB formatted for the primary resolution.
-#
-# Sometime icons or decorations will be saved in low resolution image files in an EPUB.
-# The EPUB will place the image at a reasonable scale somewhere on the page.
-# Extracting this directly to a CBZ will cause the low resolution image to be blown up, which looks heavily pixelated.
-# To mitigate this, this function uses the original EPUB to produce an image of the page at the proper resolution.
-# This ensures the page appears correctly in the CBZ.
-#
-# The original images are preserved in a hidden folder in the CBZ.
-# todo I need to be sure that CBZ viewers on KOReader and Kavita don't try to show the hidden files.
-#
-# Actually, this appears to have been an issue with KOReader, so this functionality probably isn't necessary.
-#
-export def replace_low_res_images_in_cbz_with_formatted_from_epub []: [
-  record<cbz: path, epub: path> -> path
-] {
-  let input = $in
-  let dimensions = $input.cbz | get_zip_image_dimensions
-  log debug $"Image dimensions in archive (ansi yellow)($input.cbz)(ansi reset) are ($dimensions)"
-  let format = $input.cbz | get_image_extension
-  let format = (
-    if ($format == "jpg") {
-      "jpeg"
-    } else {
-      $format
-    }
-  )
-
-  # -no-convert
-  (
-    ^cbconvert
-    convert
-    --filter 7
-    --no-cover
-    --no-convert
-    --quality 100
-    --width $dimensions.width
-    --height $dimensions.height
-    $input.cbz
-  )
-
-  # Convert
-  $input.cbz
-}
-
 # Search for an edition on Hardcover by id such as ASIN, ISBN, or hardcover edition id.
 #
 # Requires the environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN be set to a Hardcover API key.
@@ -3482,6 +3437,14 @@ export def into_comic_info_xml []: [record -> record] {
   $comic_info_xml
 }
 
+# Convert metadata into the metadata object of the OPF XML format used by EPUBs
+#
+# This format can then be used to update the content.opf or package.opf file in an EPUB.
+export def into_metadata_opf_xml []: [record -> record] {
+  let opf = $in
+  # todo
+}
+
 # Search for editions on Wikidata by ISBN-13.
 #
 # Requires the environment variable MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN to set to a Wikidata access token.
@@ -3867,6 +3830,7 @@ export def get_comic_vine_issue [
     }
   }
 
+  log debug $"Getting Comic Vine data for issue ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset)"
   let request = {
     (
       http get
@@ -3890,6 +3854,7 @@ export def get_comic_vine_issue [
     log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Comic Vine issue data with Comic Vine ID ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($response.body)"
     return null
   }
+  # log debug $"response.body: ($response.body)"
   $response.body.results
 }
 
@@ -4576,123 +4541,6 @@ export def embed_book_metadata []: [
   $input
 }
 
-# export def tag_epub [
-#     # --allowed-plugins: list<string> # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
-#     # --authors: list<string> # A list of authors to use
-#     # --cover: path # Path to which to download the cover
-#     # --identifiers: list<string> # A list of identifiers
-#     # --isbn: string # The unique ComicVine id for the issue
-#     # --title: string # The title to use
-#     --working-directory: directory
-# ]: record<epub: path, opf: record, cover: path> -> path {
-#     let epub = $in
-#     # let opf_file = ({ parent: $working_directory, stem: ($epub | path parse | get stem), extension: "opf" } | path join)
-#     # let cover = ({ parent: $working_directory, stem: ($epub | path parse | get stem), extension: "opf" } | path join)
-#     let result = fetch-ebook-metadata
-#     log debug $"The fetched metadata for the book (ansi purple_bold)($epub)(ansi reset) is:\n($result.opf)\n"
-#     (
-#         $result.opf
-#         | to xml
-#         | save --force $opf_file
-#     )
-#     (
-#         ^ebook-meta
-#             $epub
-#             # --authors ($authors | str join "&")
-#             # --cover
-#             --from-opf $"($working_directory)/($comic_vine_issue_id).opf"
-#             # --title $title
-#     )
-#     rm $opf_file
-#     # rm $cover
-#     $epub
-# }
-
-# Convert images in a CBZ to lossless JXL.
-# JXL should be a great archival format going forward and is a significant reduction in size over JPEG, even using lossless compression.
-# AVIF is an alternative format which could be used for archival purposes.
-# I decided to go with JXL, but haven't looked into both formats exhaustively.
-#
-# CBconvert uses lossless encoding when the quality is set to 100.
-# The intent is for this to be archival quality.
-# The EPUB is saved to ensure that the original source material remains intact, just in case I messed something up in the conversion process.
-#
-# Unfortunately, the JXL format isn't supported by KOReader yet.
-#
-# Okay, so, updating CBConvert to 1.1.0 results in proper JXL lossless compression I'm pretty sure.
-# However, it results in significantly larger files than the source JPEGs.
-# I'll probably only want to use JXL when the source files are PNGs.
-export def convert_to_lossless_jxl []: path -> path {
-    let input_file = $in
-    let components = ($input_file | path parse)
-    let original_size = (ls $input_file | first | get size)
-    let file = (
-        $input_file | cbconvert
-            --format "jxl"
-            --quality 100 # lossless
-
-    )
-    let current_size = (ls $file | first | get size)
-    let average = (($original_size + $current_size) / 2)
-    let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    let size_table = [[original current "% difference"]; [$original_size $current_size $percent_difference]]
-    log info $"Converted (ansi yellow)($input_file)(ansi reset) to (ansi yellow)($file)(ansi reset) to JPEG-XL: ($size_table)"
-    if $current_size > $original_size {
-      log warning "JPEG-XL comic archive increased in size compared to the original input file!"
-    }
-    $file
-}
-
-# Convert a copy for my primary e-reader:
-# Kobo Elipsa 2E: 1404x1872 (Gamma 1.8).
-# todo I'm not sure this is even really necessary
-# Using the correct resolution does seem to result in much faster page loads.
-# Although, maybe that's due to using webp?
-# I should verify.
-export def cbconvert [
-    suffix: string = "" # Suffix to add to the CBZ filename
-    --format: string # The image format to convert to
-    --height: string # The height of the converted images
-    --quality: string # The quality setting to use for the encoder
-    --width: string # The width of the converted images
-]: path -> path {
-  let file = $in
-  let components = ($file | path parse)
-  # todo Use some sort of wrapper to print out command-line of command being run?
-  # todo This doesn't work right with jpegs.
-  # Create a temporary directory on the filesystem to avoid running out of RAM.
-  let tmpdir = mktemp --directory cbconvert.tmp.XXXXXXX --tmpdir-path (pwd)
-  $env.TMPDIR = $tmpdir
-  if $height == null and $width == null {
-    log debug $"Running command: cbconvert --filter 7 --format ($format) --height ($height) --outdir ($components.parent) --quality ($quality) --suffix ($suffix) --width ($width) ($file)"
-    (
-      ^cbconvert convert
-        --filter 7 # Use the highest quality resampling filter.
-        --format $format
-        --outdir $components.parent
-        --quality $quality
-        --suffix $suffix
-        $file
-    )
-  } else {
-    log debug $"Running command: cbconvert --filter 7 --format ($format) --height ($height) --outdir ($components.parent) --quality ($quality) --suffix ($suffix) --width ($width) ($file)"
-    (
-      ^cbconvert convert
-        --filter 7 # Use the highest quality resampling filter.
-        --fit
-        --format $format
-        --height $height
-        --outdir $components.parent
-        --quality $quality
-        --suffix $suffix
-        --width $width
-        $file
-    )
-  }
-  rm --force --recursive $tmpdir
-  $components | { parent: $components.parent, stem: ($components.stem + $suffix), extension: "cbz" } | path join
-}
-
 # Convert a copy for my primary e-reader:
 # Kobo Elipsa 2E: 1404x1872 (Gamma 1.8).
 # todo I'm not sure this is even really necessary
@@ -4709,67 +4557,51 @@ export def convert_for_ereader [
     let input_format = $components.extension
 
     let image_format = (
-        if $input_format in ["cbz" "epub" "zip"] {
-            let image_extension = ($file | get_image_extension);
-            if ($image_extension == null) {
-                log error "Failed to determine the image file format"
-                exit 1
-            }
-            $image_extension
-        } else {
-            null
+      if $input_format in ["cbz" "epub" "zip"] {
+        let image_extension = ($file | get_image_extension);
+        if ($image_extension == null) {
+          log error "Failed to determine the image file format"
+          exit 1
         }
+        $image_extension
+      } else {
+        null
+      }
     )
 
-    # todo Use KCC for PDFs too?
-
     # Use KCC because it won't look right when converting jpegs with cbconvert 1.1.0.
-    if $image_format in ["jpeg" "jpg"] {
-        (
-            let components = ($file | path parse);
-            let temp = (
-                {
-                    parent: $working_directory,
-                    stem: $components.stem,
-                    extension: $components.extension
-                }
-                | path join
-            );
-            cp $file $temp;
-            let components = ($temp | path parse);
-            let kcc_output = (
-                {
-                    parent: $components.parent,
-                    stem: ($components.stem + "_kcc0"),
-                    extension: $components.extension
-                }
-                | path join
-            );
-            let output = (
-                {
-                    parent: $components.parent,
-                    stem: ($components.stem + $suffix),
-                    extension: $components.extension
-                }
-                | path join
-            );
-            log debug $"Running command: flatpak run --command=kcc-c2e io.github.ciromattia.kcc --profile KoE --manga-style --forcecolor --format CBZ --output '($temp)' --targetsize 10000 --upscale '($temp)'";
-            (^flatpak run --command=kcc-c2e io.github.ciromattia.kcc --profile KoE --manga-style --forcecolor --format CBZ --output $temp --targetsize 10000 --upscale $temp);
-            mv $kcc_output $output;
-            rm $temp;
-            $output
-        )
-    } else {
-        (
-            $file
-            | cbconvert $suffix
-                # Alternatively, PNG could also be used for PDFs i.e. when image_format is null.
-                --format (if $image_format in [ "avif" "jxl" "png", ] { "png" } else { "jpeg" })
-                --height ($ereader_profiles | where model == $ereader | first | get height)
-                --quality 100
-                --width ($ereader_profiles | where model == $ereader | first | get width)
-        )
-    }
+    let components = ($file | path parse);
+    let temp = (
+        {
+            parent: $working_directory,
+            stem: $components.stem,
+            extension: $components.extension
+        }
+        | path join
+    )
+    cp $file $temp
+    let components = ($temp | path parse);
+    let kcc_output = (
+        {
+            parent: $components.parent,
+            stem: ($components.stem + "_kcc0"),
+            extension: $components.extension
+        }
+        | path join
+    )
+    let output = (
+        {
+            parent: $components.parent,
+            stem: ($components.stem + $suffix),
+            extension: $components.extension
+        }
+        | path join
+    )
+    log debug $"Running command: flatpak run --command=kcc-c2e io.github.ciromattia.kcc --profile KoE --manga-style --forcecolor --format CBZ --output '($temp)' --targetsize 10000 --upscale '($temp)'"
+    (^flatpak run --command=kcc-c2e io.github.ciromattia.kcc --profile KoE --manga-style --forcecolor --format CBZ --output $temp --targetsize 10000 --upscale $temp)
+    mv $kcc_output $output
+    rm $temp
+    $output
     # The output is always a CBZ file.
     $components | update stem ($components.stem + $suffix) | update extension "cbz" | path join
 }

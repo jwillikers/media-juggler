@@ -3,7 +3,6 @@
   b3sum,
   beets,
   calibre,
-  cbconvert,
   chromaprint,
   efficient-compression-tool,
   exiftool,
@@ -12,7 +11,6 @@
   image_optim,
   imagemagick,
   isbntools,
-  # jpegli,
   keyfinder-cli,
   lib,
   m4b-tool,
@@ -46,8 +44,6 @@ else
       beets
       advancecomp
       calibre
-      cbconvert
-      # todo comictagger
       efficient-compression-tool
       ffmpeg
       file
@@ -82,12 +78,9 @@ else
           lib.makeBinPath [
             advancecomp
             calibre
-            cbconvert
             efficient-compression-tool
             image_optim
-            # jpegli
             minuimus
-            # kcc
             udisks
             util-linux
             zip
@@ -102,7 +95,6 @@ else
             ffmpeg
             image_optim
             isbntools
-            # jpegli
             minuimus
             m4b-tool
             rhash
@@ -116,13 +108,10 @@ else
             advancecomp
             b3sum
             calibre
-            cbconvert
-            # comictagger
             efficient-compression-tool
             exiftool
             image_optim
             imagemagick
-            # jpegli
             # kcc
             minuimus
             mupdf-headless
@@ -142,7 +131,6 @@ else
             file
             image_optim
             isbntools
-            # jpegli
             minuimus
             mupdf-headless
             tesseract

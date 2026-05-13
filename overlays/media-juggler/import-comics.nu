@@ -27,7 +27,6 @@ use media-juggler-lib *
 #
 def main [
   ...files: string # The paths to ACSM, EPUB, and CBZ files to convert, tag, and upload. Supports SSH paths.
-  --cbconvert-pdf-image-quality: string = "90" # The image quality setting to pass to cbconvert when generating a CBZ from a PDF. Lower this as necessary for PDFs with extremely high quality images.
   --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
   --default-language: string = "american english"
   --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
@@ -243,12 +242,12 @@ def main [
     }
   )
 
-  if $original_comic_info != null {
+  if ($original_comic_info | is-not-empty) {
     log debug $"Found Comic Info file (ansi yellow)($original_comic_info)(ansi reset)"
   }
 
   let comic_info = (
-    if $original_comic_info != null {
+    if ($original_comic_info | is-not-empty) {
       let target = [$temporary_directory ($original_comic_info | path basename)] | path join
       if ($original_file | is_ssh_path) {
         log debug $"Downloading the file (ansi yellow)($original_comic_info)(ansi reset) to (ansi yellow)($target)(ansi reset)"
@@ -341,12 +340,12 @@ def main [
     }
   )
 
-  if $original_opf != null {
+  if ($original_opf | is-not-empty) {
     log debug $"Found OPF metadata file (ansi yellow)($original_opf)(ansi reset)"
   }
 
   let opf = (
-    if $original_opf != null {
+    if ($original_opf | is-not-empty) {
       # todo Is this right?
       let opf_file = ($original_file | split_ssh_path | get path | path dirname | path join "metadata.opf")
       if ($original_file | is_ssh_path) {
@@ -1302,7 +1301,11 @@ def main [
           issue_id: $data.id
           issue: $data.issue_number
           series: ($data.volume.name | use_unicode_in_title)
-          title: ($data.name | use_unicode_in_title)
+          title: (
+            if ($data | get --optional name | is-not-empty) {
+              $data.name | use_unicode_in_title
+            }
+          )
           description: $data.description
           volume: $volume_data.start_year
           issue_count: $volume_data.count_of_issues
@@ -1840,7 +1843,7 @@ def main [
         }
       }
     } else {
-      if $destination != null {
+      if ($destination | is-not-empty) {
         for original in $original_comic_files {
           let output = [$destination ($original | path basename)] | path join
           if $original != $output {
