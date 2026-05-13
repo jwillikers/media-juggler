@@ -40,7 +40,7 @@ def main [
   --keep-tmp # Don't delete the temporary directory when there's an error
   --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
   # --issue: string # The issue number
-  --issue-year: string # The publication year of the issue
+  # --issue-year: string # The publication year of the issue
   --manga: string = "YesAndRightToLeft" # Whether the file is manga "Yes", right-to-left manga "YesAndRightToLeft", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
   --metron-issue-id: string # The issue id on Metron.
   --destination: directory = "meerkat:/var/media/manga" # The directory under which to copy files. I have comics, manga, and manhwa subdirectories.
@@ -1461,10 +1461,12 @@ def main [
         | append (
           if ($isbn | is-not-empty) {
             $"--isbn=($isbn)"
+          } else if ($comic_metadata | get --optional isbn | is-not-empty) {
+            $"--isbn=($comic_metadata.isbn)"
           }
         )
         | append (
-          if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+          if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
             [$"--series=($comic_metadata.series | use_unicode_in_title)" $"--index=($comic_metadata.issue)"]
           }
         )
@@ -1473,26 +1475,26 @@ def main [
             $"--publisher=($imprint)"
           } else if ($publisher | is-not-empty) {
             $"--publisher=($publisher)"
-          } else if "imprint" in $comic_metadata and ($comic_metadata.imprint | is-not-empty) {
+          } else if ($comic_metadata | get --optional imprint | is-not-empty) {
             $"--publisher=($comic_metadata.imprint)"
-          } else if "publisher" in $comic_metadata and ($comic_metadata.publisher | is-not-empty) {
+          } else if ($comic_metadata | get --optional publisher | is-not-empty) {
             $"--publisher=($comic_metadata.publisher)"
           }
         )
         | append (
-          if "language" in $comic_metadata and ($comic_metadata.language | is-not-empty) {
+          if ($comic_metadata | get --optional language | is-not-empty) {
             $"--language=($comic_metadata.language | into_language_code ietf_bcp_47)"
           } else {
             $"--language=($default_language | into_language_code ietf_bcp_47)"
           }
         )
         | append (
-          if "description" in $comic_metadata and ($comic_metadata.description | is-not-empty) {
+          if ($comic_metadata | get --optional description | is-not-empty) {
             $"--comments=($comic_metadata.description)"
           }
         )
         | append (
-          if "genres" in $comic_metadata and ($comic_metadata.genres | is-not-empty) {
+          if ($comic_metadata | get --optional genres | is-not-empty) {
             $"--tags=($comic_metadata.genres | str join ',')"
           }
         )
@@ -1523,21 +1525,21 @@ def main [
         )
         | append (
           let year = (
-            if "year" in $comic_metadata and ($comic_metadata.year | is-not-empty) {
+            if ($comic_metadata | get --optional year | is-not-empty) {
               $comic_metadata.year
             }
           );
           let month = (
-            if "month" in $comic_metadata and ($comic_metadata.month | is-not-empty) {
+            if ($comic_metadata | get --optional month | is-not-empty) {
               $comic_metadata.month
             }
           );
           let day = (
-            if "day" in $comic_metadata and ($comic_metadata.day | is-not-empty) {
+            if ($comic_metadata | get --optional day | is-not-empty) {
               $comic_metadata.day
             }
           );
-          if ($year | is-not-empty) and ($month | is-not-empty) and ($year | is-not-empty) {
+          if ($year | is-not-empty) and ($month | is-not-empty) and ($day | is-not-empty) {
             $"--date=($year)-($month)-($day)"
           } else if ($year | is-not-empty) {
             $"--date=($year)"
