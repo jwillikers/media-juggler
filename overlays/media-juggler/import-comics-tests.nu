@@ -1122,6 +1122,7 @@ export def test_parse_wikidata_edition_and_works_metadata_one_piece_volume_1 [] 
   }
   # log debug $"\n($input | parse_wikidata_edition_and_works_metadata | to nuon)\n"
   let expected = {
+    comic_info_age_rating: "PG"
     forms_of_creative_work: ["manga" "manga volume"]
     genres: [adventure "comedy drama" "science fantasy"]
     intended_publics: [shōnen]

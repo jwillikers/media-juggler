@@ -163,6 +163,18 @@ export const age_rating_map = [
   ["X18+" "Explicit" 18]
 ]
 
+export const intended_public_to_age_rating_comic_info_map = [
+  [intended_publics comic_info_age_rating metron_info_age_rating];
+  [[shōjo shōnen] "PG" "Everyone"]
+  [[jose seinen] "Teen" "Teen"]
+]
+
+export const genre_to_age_rating_comic_info_map = [
+  [genres comic_info_age_rating metron_info_age_rating];
+  [[erotic] "M" "Mature"]
+  [[hentai] "X18+" "Adult"]
+]
+
 # Surround special characters in a string with square brackets
 #
 # Use this on strings before adding glob characters.
@@ -2752,7 +2764,6 @@ export def from_comic_info_xml []: [record -> record] {
   # StoryArc and StoryArcNumber have to handled specially for the narrative field.
 
   # todo
-  # AgeRating (Normalize to Metron's / Kavita's supported ones)
   # AlternativeSeries
   # AlternativeCount
 
@@ -2789,8 +2800,15 @@ export def from_comic_info_xml []: [record -> record] {
     }
   )
 
+  let comic_info_age_rating = (
+    if ($json | get --optional AgeRating | is-not-empty) and $json.AgeRating in ($age_rating_map.comic_info | uniq) {
+      $json.AgeRating
+    }
+  )
+
   (
     {}
+    | upsert_if_value "comic_info_age_rating" $comic_info_age_rating
     | upsert_if_value "chapter_title" $chapter_title
     | upsert_if_value "chapter_index" $chapter_index
     | upsert_if_value "issue_count" $issue_count
@@ -3415,6 +3433,7 @@ export def into_comic_info_xml []: [record -> record] {
         }
       )
     }
+    | upsert_comic_info {tag: "AgeRating", value: ($data | get --optional comic_info_age_rating)}
     | upsert_comic_info {tag: "Count", value: ($data | get --optional issue_count)}
     | upsert_comic_info {tag: "PageCount", value: ($data | get --optional page_count | into string)}
     | upsert_comic_info {tag: "Title", value: ($data | get --optional chapter_title)}
@@ -3660,7 +3679,9 @@ export def fetch_wikidata_edition_and_works_metadata [
 export def parse_wikidata_edition_and_works_metadata [
   form_of_creative_work_map: table<name: string, wikidata_id: string> = $form_of_creative_work_wikidata
   genre_list: table<name: string, aliases: list<string>, wikidata_ids: list<string>> = $genre_allowlist # The table of mappings from Wikidata ID to genre
+  genres_to_age_rating_map: table<genres: list<string>, comic_info_age_rating: string, metron_info_age_rating: string> = $genre_to_age_rating_comic_info_map
   intended_public_map: table<name: string, wikidata_id: string> = $intended_public_wikidata
+  intended_publics_to_age_rating_map: table<intended_publics: list<string>, comic_info_age_rating: string, metron_info_age_rating: string> = $intended_public_to_age_rating_comic_info_map
   language_codes_map: table = $iso_language_codes_map
 ]: [record -> record] {
   let edition_and_works = $in
@@ -4029,12 +4050,31 @@ export def parse_wikidata_edition_and_works_metadata [
     | uniq
   )
 
+  let comic_info_age_rating = (
+    let genre_age_rating = $genres_to_age_rating_map | where {|genre_to_age_rating|
+      $genre_to_age_rating.genres | any {|genre| $genre in $genres}
+    };
+    let intended_public_age_rating = $intended_publics_to_age_rating_map | where {|intended_public_to_age_rating|
+      $intended_public_to_age_rating.intended_publics | any {|intended_public| $intended_public in $intended_publics}
+    };
+    let age_ratings = $genre_age_rating | append $intended_public_age_rating;
+    let age_ratings = $age_ratings | each {|age_rating|
+      let age_range_begin = $age_rating_map | where {|comic_info_age_rating|
+        $comic_info_age_rating.comic_info == $age_rating.comic_info_age_rating
+      } | get --optional age_range_begin | first
+      $age_rating | insert age_range_begin $age_range_begin
+    };
+    if ($age_ratings | is-not-empty) {
+      $age_ratings | sort-by --reverse age_range_begin | first | get comic_info_age_rating
+    }
+  )
+
   # tags:
-  # intended public -> AgeRating
   # omnibus edition -> format?
 
   (
     {}
+    | upsert_if_value comic_info_age_rating $comic_info_age_rating
     | upsert_if_value forms_of_creative_work $forms_of_creative_work
     | upsert_if_value genres $genres
     | upsert_if_value intended_publics $intended_publics

@@ -1363,6 +1363,8 @@ def main [
           isbn: $isbn
           characters: ($data.character_credits | select --optional name id)
           language: $default_language
+          # Default the age rating to PG.
+          comic_info_age_rating: "PG"
           manga: $manga
           genres: []
           tags: []
@@ -1426,7 +1428,8 @@ def main [
             let hash = open --raw $formats.epub | hash sha256
             if $hash not-in $optimized_file_hashes.sha256 {
               log debug "Optimizing the EPUB"
-              open --raw ($formats.epub | polish_epub | optimize_images_in_zip) | hash sha256
+              # | polish_epub
+              open --raw ($formats.epub | optimize_images_in_zip) | hash sha256
             }
           }
         ) | uniq | sort
