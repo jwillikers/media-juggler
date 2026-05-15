@@ -799,8 +799,8 @@ def test_from_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
 * Chapter 3
 * Chapter 10: Over the Cuckoo&apos;s Nest"
     publication_date: ("2023-05-01T00:00:00" | into datetime --timezone UTC)
-    publisher: "Denpa, LLC"
-    imprint: "Denpa"
+    publishers: ["Denpa, LLC"]
+    imprints: ["Denpa"]
     year: "2023"
     month: "05"
     day: "01"
@@ -887,8 +887,8 @@ def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
     isbn: "9781634428132"
     # format: "digital"
     manga: "YesAndRightToLeft"
-    publisher: "Denpa, LLC"
-    imprint: "Denpa"
+    publishers: ["Denpa, LLC"]
+    imprints: ["Denpa"]
     # is_manga: true
     # page_reading_order: "right_to_left"
     # age_rating: "Everyone"
@@ -1016,7 +1016,7 @@ def test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
       [creator, role, primary, language];
       ["Chica Umino", Writer, true, ""]
     ]
-    publisher: "Denpa"
+    publishers: ["Denpa"]
     genres: [
       coming-of-age
       romance
@@ -1127,6 +1127,7 @@ export def test_parse_wikidata_edition_and_works_metadata_one_piece_volume_1 [] 
     intended_publics: [shōnen]
     language: "english"
     manga: "YesAndRightToLeft"
+    publication_date: ("2010-11-02T00:00:00Z" | into datetime --timezone UTC)
     publishers: [
       [wikidata_id, object_named_as];
       ["Q133698002" []]

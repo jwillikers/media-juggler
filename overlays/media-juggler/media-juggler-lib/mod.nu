@@ -2527,6 +2527,51 @@ export def from_comic_info_xml []: [record -> record] {
   #   }
   # )
 
+  let imprints = (
+    if ($json | get --optional Imprint | is-empty) {
+    } else {
+      $json.Imprint | split row "," | reduce --fold [] {|imprint acc|
+        if ($imprint | str starts-with " ") {
+          if ($acc | is-empty) {
+            $acc | append ($imprint | str trim)
+          } else {
+            if ($imprint | str trim | str downcase) in ["llc" "inc" "inc." "ltd", "co", "company", "corporation", "corp", "limited"] {
+              # This is probably a suffix for the previous imprint, so it should be included with the previous imprint rather than as its own imprint.
+              let last_index  = ($acc | length) - 1
+              $acc | update $last_index (($acc | last) + ", " + ($imprint | str trim))
+            } else {
+              $acc | append ($imprint | str trim)
+            }
+          }
+        } else {
+          $acc | append ($imprint | str trim)
+        }
+      }
+    }
+  )
+  let publishers = (
+    if ($json | get --optional Publisher | is-empty) {
+    } else {
+      $json.Publisher | split row "," | reduce --fold [] {|publisher acc|
+        if ($publisher | str starts-with " ") {
+          if ($acc | is-empty) {
+            $acc | append ($publisher | str trim)
+          } else {
+            if ($publisher | str trim | str downcase) in ["llc" "inc" "inc." "ltd", "co", "company", "corporation", "corp", "limited"] {
+              # This is probably a suffix for the previous imprint, so it should be included with the previous imprint rather than as its own imprint.
+              let last_index  = ($acc | length) - 1
+              $acc | update $last_index (($acc | last) + ", " + ($publisher | str trim))
+            } else {
+              $acc | append ($publisher | str trim)
+            }
+          }
+        } else {
+          $acc | append ($publisher | str trim)
+        }
+      }
+    }
+  )
+
   # Check for erroneous volume titles in this field.
   let chapter_title = (
     if ($json | get --optional "Title" | is-empty) {
@@ -2762,8 +2807,8 @@ export def from_comic_info_xml []: [record -> record] {
     | upsert_if_present "description" $json "Summary"
     | upsert_if_present "comment" $json "Notes"
     | upsert_if_value "publication_date" $publication_date
-    | upsert_if_present publisher $json "Publisher"
-    | upsert_if_present imprint $json "Imprint"
+    | upsert_if_value publishers $publishers
+    | upsert_if_value imprints $imprints
     | upsert_if_present year $json "Year"
     | upsert_if_present month $json "Month"
     | upsert_if_present day $json "Day"
@@ -3002,7 +3047,8 @@ export def from_opf_xml []: [
   (
     {}
     | upsert_if_value "credits" $credits
-    | upsert_if_value "publisher" $publisher
+    # todo Should we attempt to parse multiple publishers from PDF metadata?
+    | upsert_if_value "publishers" [$publisher]
     | upsert_if_value "genres" $genres
     | upsert_if_value "language" $language
     | upsert_if_value "title" $title
@@ -3372,8 +3418,8 @@ export def into_comic_info_xml []: [record -> record] {
     | upsert_comic_info {tag: "Count", value: ($data | get --optional issue_count)}
     | upsert_comic_info {tag: "PageCount", value: ($data | get --optional page_count | into string)}
     | upsert_comic_info {tag: "Title", value: ($data | get --optional chapter_title)}
-    | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publisher)}
-    | upsert_comic_info {tag: "Imprint", value: ($data | get --optional imprint)}
+    | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publishers | str join ",")}
+    | upsert_comic_info {tag: "Imprint", value: ($data | get --optional imprints | str join ",")}
     | upsert_comic_info {tag: "Summary", value: ($data | get --optional description)}
     | upsert_comic_info {tag: "Notes", value: $notes}
     | upsert_comic_info {
@@ -3677,6 +3723,53 @@ export def parse_wikidata_edition_and_works_metadata [
     }
   )
 
+  # P577: publication date
+  let publication_date = (
+    let wikidata_publication_dates = $edition | get --optional statements.P577;
+    if ($wikidata_publication_dates | is-empty) {
+      error make {
+        msg: "missing publication date for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add the publication date to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P407(ansi reset)"
+      }
+    };
+    let wikidata_publication_dates = $wikidata_publication_dates | where rank != "deprecated";
+    if ($wikidata_publication_dates | is-empty) {
+      error make {
+        msg: "missing non-deprecated publication date for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add a publication date to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P407(ansi reset) which isn't deprecated"
+      }
+    };
+    let wikidata_publication_dates = (
+      $wikidata_publication_dates
+      | sort-by --custom $sort_by_rank
+      | get --optional value.content
+    );
+    if ($wikidata_publication_dates | is-empty) {
+      null
+    } else {
+      if ($wikidata_publication_dates | length) > 1 {
+        log warning $"Multiple publication dates found for Wikidata edition (ansi yellow)($edition.id)(ansi reset): ($wikidata_publication_dates). Using only the first."
+      }
+      let wikidata_publication_date = $wikidata_publication_dates | first
+      if ($wikidata_publication_date.calendarmodel != "http://www.wikidata.org/entity/Q1985727") {
+        error make {
+          msg: "unsupported calendar model for publication date"
+          labels: [
+            {text: "wikidata_publication_date.calendarmodel" span: (metadata wikidata_publication_date.calendarmodel).span}
+          ]
+          help: $"the publication date on the Wikidata edition (ansi yellow)($edition.id)(ansi reset) has a calendar model of (ansi yellow)($wikidata_publication_date.calendarmodel)(ansi reset) which is not supported. Only (ansi yellow)(http://www.wikidata.org/entity/Q1985727)(ansi reset) is supported."
+        }
+      }
+      $wikidata_publication_date.time | str trim --left --char "+" | into datetime --timezone UTC
+    }
+  )
+
   let sort_by_rank_then_wikidata_id = {|a b|
     let ranks = [preferred normal deprecated] | enumerate
     if ($a.rank == $b.rank) {
@@ -3948,6 +4041,7 @@ export def parse_wikidata_edition_and_works_metadata [
     | upsert_if_value language $language
     | upsert_if_value main_subjects $main_subjects
     | upsert_if_value manga $manga
+    | upsert_if_value publication_date $publication_date
     | upsert_if_value publishers $publishers
     | upsert_if_value tags $tags
   )
@@ -4107,7 +4201,7 @@ export def process_wikidata_edition_and_works_metadata [
       # This will probably be complicated.
       # P31: instance of
       let is_imprint = $item | get --optional statements.P31.value.content | any {|item| $item in $imprint_wikidata_ids}
-      log debug $"is_imprint: ($is_imprint)"
+      # log debug $"is_imprint: ($is_imprint)"
       {
         name: $name
         is_imprint: $is_imprint
@@ -4128,29 +4222,11 @@ export def process_wikidata_edition_and_works_metadata [
     } | append $main_subjects | sort
   )
 
-  # ComicInfo only supports a single publisher
-  let publisher = (
-    if ($publishers | where not is_imprint | is-empty) {
-    } else {
-      $publishers | where not is_imprint | get --optional name | first
-    }
-  )
-
-  # ComicInfo only supports a single imprint
-  let imprint = (
-    if ($publishers | where is_imprint | is-empty) {
-    } else {
-      $publishers | where is_imprint | get --optional name | first
-    }
-  )
-
   (
     $metadata
     | upsert tags $tags
-    | upsert_if_value imprint $imprint
     | upsert_if_value imprints ($publishers | where is_imprint | get --optional name)
     | upsert_if_value main_subjects $main_subjects
-    | upsert_if_value publisher $publisher
     | upsert_if_value publishers ($publishers | where not is_imprint | get --optional name)
   )
 }

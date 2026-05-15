@@ -58,8 +58,8 @@ def main [
   # --open-library-work-id: string # The Open Library edition ID (only embedded in the metadata right now)
   --wikidata-work-id: string # The Wikidata work ID (only embedded in the metadata right now)
   --wikidata-edition-id: string # The Wikidata edition ID (only embedded in the metadata right now)
-  --imprint: string # Set the publisher/imprint. This is embedded in the ComicInfo.xml file and used for the publisher in EPUB and PDF metadata.
-  --publisher: string # Set the publisher in the metadata. Note that the imprint is preferred over this for EPUB and PDF metadata.
+  --imprints: list<string> # Set the publisher/imprint. This is embedded in the ComicInfo.xml file and used for the publisher in EPUB and PDF metadata.
+  --publishers: list<string> # Set the publisher in the metadata. Note that the imprint is preferred over this for EPUB and PDF metadata.
 ] {
   if ($files | is-empty) {
     log error "No files provided"
@@ -1281,7 +1281,30 @@ def main [
     # Avoid rate-limiting
     sleep 1sec;
     let volume_data = $data.volume.id | into string | get_comic_vine_volume $cache_function;;
-    let publication_date = $data.store_date | into datetime;
+    let publication_date = (
+      if ($data | get --optional store_date | is-empty) {
+      } else {
+        $data.store_date | into datetime
+      }
+    );
+    let year = (
+      if ($publication_date | is-empty) {
+      } else {
+        $publication_date | format date "%Y"
+      }
+    );
+    let month = (
+      if ($publication_date | is-empty) {
+      } else {
+        $publication_date | format date "%m"
+      }
+    );
+    let day = (
+      if ($publication_date | is-empty) {
+      } else {
+        $publication_date | format date "%d"
+      }
+    );
     # Rewrite credits to match ComicTagger's format.
     #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
     let credits = (
@@ -1344,11 +1367,11 @@ def main [
           genres: []
           tags: []
           publication_date: $publication_date
-          year: ($publication_date | format date "%Y")
-          month: ($publication_date | format date "%m")
-          day: ($publication_date | format date "%d")
+          year: $year
+          month: $month
+          day: $day
           # $volume_data.description
-          publisher: $volume_data.publisher.name
+          publishers: [$volume_data.publisher.name]
           # $data.store_date
           # $data.cover_date
           credits: $credits
@@ -1373,12 +1396,13 @@ def main [
   )
   log debug $"The Wikidata metadata is:\n(ansi green)($wikidata_metadata | to nuon)(ansi reset)\n"
 
-  let comic_metadata = ($tag_result.result.md)
+  let comic_metadata = $tag_result.result.md
   let comic_metadata = (
     $comic_metadata
     | merge $wikidata_metadata
-    # Prefer publisher from Comic Vine
-    | upsert publisher $comic_metadata.publisher
+    # Prefer publishers from Comic Vine over Wikidata.
+    # This is for consistency and to avoid comma's in the Publisher names causing problems, like Kodansha USA Publishing, LLC.
+    | upsert publishers $comic_metadata.publishers
   )
   log debug $"The merged metadata is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
 
@@ -1454,7 +1478,7 @@ def main [
       let new_file_name = (
         $previous_file_name | path parse | update stem (
           if $manga == "No" {
-            $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue | fill --alignment right --width 3 --character '0') \(($comic_metadata.year)\)"
+            $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue | fill --alignment right --width 3 --character '0') \(($comic_metadata.publication_date | date format '%Y')\)"
           } else {
             # Kavita will assume that the issue number is a chapter for manga libraries.
             # Add the letter v before the issue number instead of a hashtag so that it understands it is the volume number.
@@ -1573,14 +1597,16 @@ def main [
           }
         )
         | append (
-          if ($imprint | is-not-empty) {
-            $"--publisher=($imprint)"
-          } else if ($publisher | is-not-empty) {
-            $"--publisher=($publisher)"
-          } else if ($comic_metadata | get --optional imprint | is-not-empty) {
-            $"--publisher=($comic_metadata.imprint)"
-          } else if ($comic_metadata | get --optional publisher | is-not-empty) {
-            $"--publisher=($comic_metadata.publisher)"
+          # Prefer publisher over imprint
+          # todo Not sure if Kavita supports multiple publishers in the PDF metadata.
+          if ($publishers | is-not-empty) {
+            $"--publisher=($publishers | str join ',')"
+          } else if ($comic_metadata | get --optional publishers | is-not-empty) {
+            $"--publisher=($comic_metadata.publishers | str join ',')"
+          } else if ($imprints | is-not-empty) {
+            $"--publisher=($imprints | str join ',')"
+          } else if ($comic_metadata | get --optional imprints | is-not-empty) {
+            $"--publisher=($comic_metadata.imprints | str join ',')"
           }
         )
         | append (
@@ -1641,7 +1667,9 @@ def main [
               $comic_metadata.day
             }
           );
-          if ($year | is-not-empty) and ($month | is-not-empty) and ($day | is-not-empty) {
+          if ($comic_metadata | get --optional publication_date | is-not-empty) {
+            $"--date=($comic_metadata.publication_date | date format "%Y-%m-%d")"
+          } else if ($year | is-not-empty) and ($month | is-not-empty) and ($day | is-not-empty) {
             $"--date=($year)-($month)-($day)"
           } else if ($year | is-not-empty) {
             $"--date=($year)"
