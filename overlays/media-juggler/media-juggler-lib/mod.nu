@@ -62,62 +62,86 @@ export const tag_allowlist = [
 
 # Allowed genres
 export const genre_allowlist = [
-  [name aliases];
-  [action []]
-  [adventure []]
-  [apocalyptic []]
-  [comedy []]
-  ["comedy drama" [dramedy]]
-  ["coming-of-age" ["coming of age" "coming of age story"]]
-  [cooking []]
-  ["dark fantasy" ["fantasy horror"]]
-  ["drama" []]
-  ["ecchi" []]
-  ["epic" []]
-  ["erotic" [erotica]]
-  [fiction []]
-  [grimdark []]
-  ["harem" []]
-  ["high fantasy" ["epic fantasy"]]
-  ["historical" []]
-  ["historical fantasy" []]
-  ["isekai" []]
-  ["fantasy" []]
-  ["fantasy comedy" ["comic fantasy"]]
-  [horror []]
-  ["iyashikei" []]
-  [LitRPG ["literary role-playing game" "literary RPG"]]
-  ["magical girl" []]
-  [mecha []]
-  [military []]
-  [mystery [""]]
-  [neo-noir []]
-  [non-fiction [nonfiction]]
-  ["paranormal" []]
-  [post-apocalyptic []]
-  ["psychological" []]
-  ["psychological horror" []]
-  ["psychological thriller" []]
-  ["romance" [romantic]]
-  ["romantic comedy" [romcom rom-com]]
-  ["romantic fantasy" [romantasy]]
-  ["science fantasy" []]
-  ["science fiction" [sci-fi]]
-  ["school life" []]
-  ["sexual comedy" ["sex comedy" "erotic comedy"]]
-  ["slice of life" []]
-  ["speculative fiction" [""]]
-  ["sports" [spokon]]
-  ["steampunk" []]
-  ["supernatural" ["supernaturalist"]]
-  ["superhero" []]
-  ["sword and sorcery" ["sword & sorcery" "S&S" "heroic fantasy"]]
-  [thriller [suspense]]
-  ["vampire" []]
-  ["villainess" []]
-  ["western" []]
-  ["young adult" ["ya"]]
-  ["yuri" []]
+  [name aliases wikidata_ids];
+  [action ["action fiction"] [Q1762165 Q15637293 Q104537024 Q20087918]]
+  [adventure ["adventure fiction"] [Q21802675 Q15712918 Q104536877]]
+  [apocalyptic ["apocalyptic fiction"] [Q3919251]]
+  [comedy [] [Q40831 Q15286013 Q11298158]]
+  ["comedy drama" [dramedy] [Q859369 Q15712927 Q104536976]]
+  ["coming-of-age" ["coming of age" "coming of age story"] [Q2975633 Q135684998]]
+  [cooking [] [Q139412567 Q139412557 Q11080558]]
+  ["dark fantasy" ["fantasy horror"] [Q794912 Q111254005]]
+  ["drama" [] [Q21010853 Q15637299 Q104536999]]
+  ["ecchi" [] [Q219559]]
+  ["epic" [] [Q121368788 Q136913634]]
+  ["erotic" [erotica] [Q181001 Q110293051 Q14831027]]
+  [fantasy [] [Q132311 Q15637301 Q104536908]]
+  ["fantasy comedy" ["comic fantasy"] [Q1637212 Q136842300]]
+  [fiction [] [Q8253]]
+  [grimdark [] [Q25338354]]
+  ["harem" [] [Q690342 Q111253933]]
+  ["hentai" [] [Q172067 Q21997246]]
+  ["high fantasy" ["epic fantasy"] [Q326439 Q138948720]]
+  ["historical" [] [Q1196408 Q101240934 Q11125143]]
+  ["historical fantasy" [] [Q603291]]
+  [horror [] [Q16575965 Q12767035]]
+  ["isekai" [] [Q53911753]]
+  ["iyashikei" [] [Q97358333]]
+  [LitRPG ["literary role-playing game" "literary RPG"] [Q25493967]]
+  ["magical girl" [] [Q752321]]
+  [mecha [] [Q4292083]]
+  [military [] [Q21803247 Q136913640]]
+  [mystery [] [Q6585139 Q15637305]]
+  [neo-noir [] [Q2421031]]
+  [non-fiction [nonfiction] [Q213051]]
+  ["paranormal" [] [Q7135551]]
+  [post-apocalyptic [] [Q197949 Q103016666 Q103111961]]
+  ["psychological" [] [Q101240581 Q101240583]]
+  ["psychological horror" [] [Q604725 Q139041604]]
+  ["psychological thriller" [] [Q590103 Q139041618]]
+  ["romance" [romantic "romantic fiction"] [Q19765983 Q15637310 Q104536775]]
+  ["romantic comedy" [romcom rom-com] [Q860626 Q15712145]]
+  ["romantic fantasy" [romantasy] [Q930383]]
+  ["science fantasy" [] [Q930383 Q137198951]]
+  ["science fiction" [sci-fi] [Q24925 Q5366020 Q103925653]]
+  ["school life" [] [Q10670466]]
+  ["sexual comedy" ["sex comedy" "erotic comedy"] [Q2991560 Q138807680]]
+  ["slice of life" [] [Q2561438 Q15428604]]
+  ["speculative fiction" [] [Q9326077]]
+  ["sports" [spokon] [Q139794801 Q2281511]]
+  ["steampunk" [] [Q223685 Q139558719]]
+  ["supernatural" ["supernaturalist"] [Q7644030 Q61942616]]
+  ["superhero" [] [Q7643432 Q139794817]]
+  ["sword and sorcery" ["sword & sorcery" "S&S" "heroic fantasy"] [Q1999690 Q139071253]]
+  [thriller [suspense] [Q182015 Q101240755]]
+  ["vampire" [] [Q111019576 Q111019582]]
+  ["villainess" [] []]
+  ["western" [] [Q367591 Q139270219]]
+  ["young adult" ["ya"] [Q111984153]]
+  ["yuri" [] [Q320568]]
+]
+
+export const intended_public_wikidata = [
+  [name aliases wikidata_id age_range gender];
+  [shōnen [shonen] Q231302 {begin: 10 end: 21} male]
+  [seinen [] Q237338 {begin: 18 end: 40} male]
+  [shōjo [shojo] Q242492 {begin: 10 end: 21} female]
+  [josei [shojo] Q503106 {begin: 18 end: 40} female]
+]
+
+export const form_of_creative_work_wikidata = [
+  [name wikidata_id];
+  ["light novel" Q747381]
+  [manhwa Q562214]
+  ["manhwa volume" Q137923899]
+  [manga Q8274]
+  ["manga chapter" Q53460949]
+  ["manga volume" Q125632018]
+  [novel Q8261]
+  # todo [novellette ]
+  [novella Q149537]
+  ["short story" Q49084]
+  ["short story collection" Q1279564]
 ]
 
 # Age rating map between the ComicInfo and MetronInfo schemas
@@ -2713,7 +2737,10 @@ export def from_comic_info_xml []: [record -> record] {
 
   let tags = (
     if ($json | get --optional Tags | is-not-empty) {
-      $json.Tags | sanitize_genres_or_tags $tag_allowlist
+      # Tags have such a broad range that sanitizing them might prove difficult.
+      # I need a way to ensure I don't lose any tags on accident.
+      # $json.Tags | sanitize_genres_or_tags $tag_allowlist
+      $json.Tags
     }
   )
 
@@ -3000,20 +3027,20 @@ export def number_of_images_in_archive []: [path -> int] {
 # https://en.wikipedia.org/wiki/IETF_language_tag
 # https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
 export const iso_language_codes_map = [
-  [language iso_639_1 iso_639_3 ietf_bcp_47 default_language];
-  ["english" "en" "eng" "en" true]
-  ["american english" "en" "eng" "en-US" false]
-  ["british english" "en" "eng" "en-GB" false]
-  ["chinese" "zh" "zho" "zh" true]
-  ["german" "de" "deu" "de" false]
-  ["japanese" "ja" "jpn" "ja" true]
-  ["japanese hiragana" "ja" "jpn" "ja-hira" false]
-  ["japanese katakana" "ja" "jpn" "ja-kana" false]
-  ["japanese kana" "ja" "jpn" "ja-hrkt" false]
-  ["japanese kanji" "ja" "jpn" "ja-hani" false]
-  ["japanese romanized" "ja" "jpn" "ja-Latn" false]
-  ["korean" "ko" "kor" "ko" true]
-  ["spanish" "es" "spa" "es" true]
+  [language iso_639_1 iso_639_3 ietf_bcp_47 default_language wikidata_id];
+  ["english" "en" "eng" "en" true Q1860]
+  ["american english" "en" "eng" "en-US" false Q7976]
+  ["british english" "en" "eng" "en-GB" false Q7979]
+  ["chinese" "zh" "zho" "zh" true Q7850]
+  ["german" "de" "deu" "de" false Q188]
+  ["japanese" "ja" "jpn" "ja" true Q5287]
+  ["japanese hiragana" "ja" "jpn" "ja-hira" false Q53979341]
+  ["japanese katakana" "ja" "jpn" "ja-kana" false Q53979342]
+  ["japanese kana" "ja" "jpn" "ja-hrkt" false Q53979345]
+  ["japanese kanji" "ja" "jpn" "ja-hani" false Q53979504]
+  ["japanese romanized" "ja" "jpn" "ja-Latn" false Q53979348]
+  ["korean" "ko" "kor" "ko" true Q9176]
+  ["spanish" "es" "spa" "es" true Q1321]
 ]
 
 # Convert a language to it's corresponding IETF BCP 47 or ISO 639-3 language code
@@ -3475,6 +3502,660 @@ export def wikidata_search_editions_by_isbn [
   )
 }
 
+# Obtain the metadata for a Wikidata edition ID
+export def fetch_wikidata_edition_and_works_metadata [
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> record] {
+  let wikidata_edition_id = $in
+
+  if ($wikidata_edition_id | is-empty) {
+    error make {
+      msg: "missing wikidata edition id"
+      labels: [
+        {text: "wikidata_edition_id" span: (metadata $wikidata_edition_id).span}
+      ]
+      help: "pipe in a Wikidata edition ID"
+    }
+  }
+
+  for var in [WIKIDATA_USERNAME MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      error make {
+        msg: "missing required Wikidata environment variable"
+        labels: [
+          {text: "env" span: (metadata $env).span}
+        ]
+        help: $"set the environment variable (ansi yellow)($var)(ansi reset)"
+      }
+    }
+  }
+
+  let update_function = {|type id|
+    let request = {
+      (
+        http get --full --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "X-Authenticated-User": $env.WIKIDATA_USERNAME
+        }
+        $"($wikidata_api_url)/entities/items/($id)"
+      )
+    }
+
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Wikidata edition ($id) from (ansi yellow)($wikidata_api_url)(ansi reset): ($error.debug)"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Wikidata item ($id) from (ansi yellow)($wikidata_api_url)/entities/items/($id)(ansi reset): ($response.body)"
+      return null
+    }
+    $response.body
+  }
+
+  let edition = (do $cache "wikidata-item" $wikidata_edition_id $update_function null)
+  let wikidata_work_ids = (
+    if ($edition | get --optional statements.P629 | is-not-empty) {
+      $edition.statements.P629 | where rank != "deprecated" | get --optional value.content
+    }
+  )
+  let works = (
+    $wikidata_work_ids | each {|wikidata_work_id|
+      let update_function = {|type id|
+        let request = {
+          (
+            http get --full --headers {
+              "User-Agent": $user_agent
+              "Accept": "application/json"
+              "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+              "X-Authenticated-User": $env.WIKIDATA_USERNAME
+            }
+            $"($wikidata_api_url)/entities/items/($id)"
+          )
+        }
+
+        let response = (
+          try {
+            retry_http $request $retries $retry_delay
+          } catch {|error|
+            log error $"Error getting Wikidata work at (ansi yellow)($wikidata_api_url)(ansi reset): ($error.debug)"
+            return null
+          }
+        )
+        if ($response.status != 200) {
+          log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Wikidata item ($id) from (ansi yellow)($wikidata_api_url)/entities/items/($id)(ansi reset): ($response.body)"
+          return null
+        }
+        # Avoid rate-limiting
+        sleep 0.1sec
+        $response.body
+      }
+      (do $cache "wikidata-item" $wikidata_work_id $update_function null)
+    }
+  )
+  {
+    edition: $edition
+    works: $works
+  }
+}
+
+# Parse the data from the Wikidata API for a Wikidata edition and its associated works
+#
+# Processing is limited to what information can be gleaned that doesn't require additional lookups.
+# Call process_wikidata_edition_and_works_metadata on the result to retrieve additional information that requires further lookups.
+export def parse_wikidata_edition_and_works_metadata [
+  form_of_creative_work_map: table<name: string, wikidata_id: string> = $form_of_creative_work_wikidata
+  genre_list: table<name: string, aliases: list<string>, wikidata_ids: list<string>> = $genre_allowlist # The table of mappings from Wikidata ID to genre
+  intended_public_map: table<name: string, wikidata_id: string> = $intended_public_wikidata
+  language_codes_map: table = $iso_language_codes_map
+]: [record -> record] {
+  let edition_and_works = $in
+  let edition = $edition_and_works.edition
+  let works = $edition_and_works | get --optional works
+
+  let sort_by_rank = {|a b|
+    let ranks = [preferred normal deprecated] | enumerate
+    ($ranks | where item == $a.rank | first) < ($ranks | where item == $b.rank | first)
+  }
+
+  # Edition-related properties
+
+  # P407
+  let language = (
+    let wikidata_languages = $edition | get --optional statements.P407;
+    if ($wikidata_languages | is-empty) {
+      error make {
+        msg: "missing language for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add the language to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P407(ansi reset)"
+      }
+    };
+    let wikidata_languages = $wikidata_languages | where rank != "deprecated";
+    if ($wikidata_languages | is-empty) {
+      error make {
+        msg: "missing non-deprecated language for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add a language to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P407(ansi reset) which isn't deprecated"
+      }
+    };
+    let wikidata_languages = (
+      $wikidata_languages
+      | sort-by --custom $sort_by_rank
+      | get --optional value.content
+    );
+    if ($wikidata_languages | is-empty) {
+      null
+    } else {
+      if ($wikidata_languages | length) > 1 {
+        log warning $"Multiple languages found for Wikidata edition (ansi yellow)($edition.id)(ansi reset): ($wikidata_languages). Using only the first."
+      }
+      let wikidata_language = $wikidata_languages | first
+      let languages = $language_codes_map | where wikidata_id == $wikidata_language
+      if ($languages | is-empty) {
+        error make {
+          msg: "missing language mapping for Wikidata item ID"
+          labels: [
+            {text: "wikidata_language" span: (metadata wikidata_language).span}
+          ]
+          help: $"add a mapping for the Wikidata language ID (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_language) | ansi link --text $wikidata_language)(ansi reset) to the language_codes_map table"
+        }
+      } else {
+        $languages.language | first
+      }
+    }
+  )
+
+  let sort_by_rank_then_wikidata_id = {|a b|
+    let ranks = [preferred normal deprecated] | enumerate
+    if ($a.rank == $b.rank) {
+      $a.wikidata_id < $b.wikidata_id
+    } else {
+      ($ranks | where item == $a.rank | first) < ($ranks | where item == $b.rank | first)
+    }
+  }
+
+  # On Wikidata, typically the publisher is actually the imprint.
+  # This can be further verified by checking that the publisher is an instance of an imprint or one of its subclasses.
+  # The publishers require further processing.
+  # Uses object_named_as for the name if present
+  let publishers = (
+    # P123: publisher
+    # P1932: object named as
+    let wikidata_publishers = $edition | get --optional statements.P123 | where {|item| $item | is-not-empty};
+    if ($wikidata_publishers | is-empty) {
+      error make {
+        msg: "missing publisher for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add the publisher to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P123(ansi reset)"
+      }
+    };
+    let wikidata_publishers = $wikidata_publishers | where rank != "deprecated";
+    if ($wikidata_publishers | is-empty) {
+      error make {
+        msg: "missing non-deprecated publisher for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add a publisher to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P123(ansi reset) which isn't deprecated"
+      }
+    };
+    let wikidata_publishers = $wikidata_publishers | sort-by --custom $sort_by_rank_then_wikidata_id;
+    let wikidata_publishers = $wikidata_publishers | each {|wikidata_publisher|
+      let object_named_as = $wikidata_publisher | get qualifiers | where property.id == "P1932" | get --optional value.content
+      {
+        wikidata_id: $wikidata_publisher.value.content
+        object_named_as: $object_named_as
+      }
+    };
+    if ($wikidata_publishers | is-empty) {
+      []
+    } else {
+      $wikidata_publishers
+    }
+  )
+
+  let omnibus = (
+    # P31: instance of
+    "Q13137339" in $edition.statements.P31.value
+  )
+
+  # Work-related properties
+
+  let genres = (
+    let wikidata_genres = $works.statements | get --optional P136 | where {|item| $item | is-not-empty};
+    let wikidata_genres = (
+      if ($wikidata_genres | is-empty) {
+        []
+      } else {
+        let wikidata_genres = $wikidata_genres | flatten | where rank != "deprecated"
+        if ($wikidata_genres | is-empty) {
+          error make {
+            msg: "missing non-deprecated genres for Wikidata works"
+            labels: [
+              {text: "works" span: (metadata $works).span}
+            ]
+            help: $"add non-deprecated genres, property (ansi yellow)P136(ansi reset), to the Wikidata works"
+          }
+        } else {
+          # log debug $"Wikidata genres: ($wikidata_genres | to nuon)"
+          $wikidata_genres | get --optional value.content | uniq
+        }
+      }
+    );
+    $wikidata_genres | each {|wikidata_genre|
+      let $matching_genres = $genre_list | where {|g| $wikidata_genre in $g.wikidata_ids}
+      if ($matching_genres | is-empty) {
+        error make {
+          msg: "missing wikidata id for genre"
+          labels: [
+            {text: "wikidata_genre" span: (metadata $wikidata_genre).span}
+          ]
+          help: $"add the wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_genre) | ansi link --text $wikidata_genre)(ansi reset) to the genre table"
+        }
+      } else if ($matching_genres | length) > 1 {
+        error make {
+          msg: "duplicate wikidata id for genre"
+          labels: [
+            {text: "wikidata_genre" span: (metadata $wikidata_genre).span}
+          ]
+          help: $"remove the duplicate wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_genre) | ansi link --text $wikidata_genre)(ansi reset) from the genre table"
+        }
+      } else {
+        $matching_genres.name | first
+      }
+    } | sort
+  )
+
+  let forms_of_creative_work = (
+    # P7937: form of creative work
+    let wikidata_forms = $works.statements | get --optional P7937 | where {|item| $item | is-not-empty};
+    let wikidata_forms = (
+      if ($wikidata_forms | is-empty) {
+        []
+      } else {
+        let wikidata_forms = $wikidata_forms | flatten | where rank != "deprecated"
+        if ($wikidata_forms | is-empty) {
+          error make {
+            msg: "missing non-deprecated forms for Wikidata works"
+            labels: [
+              {text: "works" span: (metadata $works).span}
+            ]
+            help: $"add non-deprecated forms, property (ansi yellow)P7937(ansi reset), to the Wikidata works"
+          }
+        } else {
+          $wikidata_forms | get --optional value.content | uniq
+        }
+      }
+    );
+    # log debug $"Wikidata forms of creative work: ($wikidata_forms | to nuon)";
+    $wikidata_forms | each {|wikidata_form|
+      let $matching_forms = $form_of_creative_work_map | where wikidata_id == $wikidata_form
+      if ($matching_forms | is-empty) {
+        error make {
+          msg: "missing wikidata id for form of creative work"
+          labels: [
+            {text: "wikidata_form" span: (metadata $wikidata_form).span}
+          ]
+          help: $"add the wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_form) | ansi link --text $wikidata_form)(ansi reset) to the form of creative works table"
+        }
+      } else if ($matching_forms | length) > 1 {
+        error make {
+          msg: "duplicate wikidata id for form of creative work"
+          labels: [
+            {text: "wikidata_form" span: (metadata $wikidata_form).span}
+          ]
+          help: $"remove the duplicate wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_form) | ansi link --text $wikidata_form)(ansi reset) from the form of creative works table"
+        }
+      } else {
+        $matching_forms.name | first
+      }
+    } | sort
+  )
+
+  # todo age rating
+  let intended_publics = (
+    # P2360: intended public
+    let wikidata_intended_publics = $works.statements | get --optional P2360 | where {|item| $item | is-not-empty};
+    let wikidata_intended_publics = (
+      if ($wikidata_intended_publics | is-empty) {
+        []
+      } else {
+        let wikidata_intended_publics = $wikidata_intended_publics | flatten | where rank != "deprecated"
+        if ($wikidata_intended_publics | is-empty) {
+          error make {
+            msg: "missing non-deprecated intended public for Wikidata works"
+            labels: [
+              {text: "works" span: (metadata $works).span}
+            ]
+            help: $"add non-deprecated intended public, property (ansi yellow)P2360(ansi reset), to the Wikidata works"
+          }
+        } else {
+          $wikidata_intended_publics | get --optional value.content | uniq
+        }
+      }
+    );
+    $wikidata_intended_publics | each {|wikidata_intended_public|
+      let $matching_intended_publics = $intended_public_map | where wikidata_id == $wikidata_intended_public
+      if ($matching_intended_publics | is-empty) {
+        # todo This should probably be loosened to just ignore unknown intended publics.
+        error make {
+          msg: "missing wikidata id mapping for intended public"
+          labels: [
+            {text: "wikidata_intended_public" span: (metadata $wikidata_intended_public).span}
+          ]
+          help: $"add the wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_intended_public) | ansi link --text $wikidata_intended_public)(ansi reset) to the intended publics table"
+        }
+      } else if ($matching_intended_publics | length) > 1 {
+        error make {
+          msg: "duplicate wikidata id mapping for intended public"
+          labels: [
+            {text: "wikidata_intended_public" span: (metadata $wikidata_intended_public).span}
+          ]
+          help: $"remove the duplicate wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_intended_public) | ansi link --text $wikidata_intended_public)(ansi reset) from the intended publics table"
+        }
+      } else {
+        $matching_intended_publics.name | first
+      }
+    } | sort
+  )
+
+  let manga = (
+    if ($forms_of_creative_work | any {|form| $form in ["manga" "manga volume" "manga chapter"]}) {
+      "YesAndRightToLeft"
+    } else if  ($forms_of_creative_work | any {|form| $form in ["manhwa" "manhwa volume"]}) {
+      # Not technically true, but this implies that the volume should be treated in the same manner as it is for manga in the ComicInfo.xml.
+      "Yes"
+    } else {
+      "No"
+    }
+  )
+
+  # Requires subsequent processing to get the label language.
+  let main_subjects = (
+    # P921: main subject
+    let wikidata_main_subjects = $works.statements | get --optional P921 | where {|item| $item | is-not-empty};
+    if ($wikidata_main_subjects | is-empty) {
+      []
+    } else {
+      # log debug $"Wikidata main subjects: ($wikidata_main_subjects | to nuon)"
+      let wikidata_main_subjects = $wikidata_main_subjects | flatten | where rank != "deprecated"
+      if ($wikidata_main_subjects | is-empty) {
+        error make {
+          msg: "missing non-deprecated main subject for Wikidata works"
+          labels: [
+            {text: "works" span: (metadata $works).span}
+          ]
+          help: $"add non-deprecated main subject, property (ansi yellow)P921(ansi reset), to the Wikidata works"
+        }
+      } else {
+        $wikidata_main_subjects | sort-by --custom $sort_by_rank | get --optional value.content | sort | uniq
+      }
+    }
+  )
+
+  let tags = (
+    []
+    | append (
+      if $omnibus {
+        "omnibus"
+      }
+    )
+    | append (
+      if ($forms_of_creative_work | is-not-empty) {
+        # Don't include manga/manhwa volume/chapter tags for brevity.
+        if "manga volume" in $forms_of_creative_work or "manga chapter" in $forms_of_creative_work {
+          "manga"
+        } else if "manhwa volume" in $forms_of_creative_work or "manhwa chapter" in $forms_of_creative_work {
+          "manhwa"
+        } else {
+          $forms_of_creative_work
+        }
+      }
+    )
+    | append (
+      if ($intended_publics | is-not-empty) {
+        # Only use certain intended publics as tags, at least for now.
+        $intended_publics | where {|intended_public| $intended_public in [shōnen seinen shōjo josei]}
+      }
+    )
+    | sort
+    | uniq
+  )
+
+  # tags:
+  # intended public -> AgeRating
+  # omnibus edition -> format?
+
+  (
+    {}
+    | upsert_if_value forms_of_creative_work $forms_of_creative_work
+    | upsert_if_value genres $genres
+    | upsert_if_value intended_publics $intended_publics
+    | upsert_if_value language $language
+    | upsert_if_value main_subjects $main_subjects
+    | upsert_if_value manga $manga
+    | upsert_if_value publishers $publishers
+    | upsert_if_value tags $tags
+  )
+}
+
+# Process the metadata for a Wikidata edition and its associated works for items requiring additional lookups to the Wikidata API
+#
+# Should be called on the result of parse_wikidata_edition_and_works_metadata.
+# The fields that are processed further are:
+#   main_subjects: Labels are looked up and added to tags
+#   publishers: Labels are looked up for publishers and they are divided between publishers and imprints
+export def process_wikidata_edition_and_works_metadata [
+  wikidata_language_code: string # The language code to use when looking up labels
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [record -> record] {
+  let metadata = $in
+
+  if ($wikidata_language_code | str length) != 2 {
+    error make {
+      msg: "invalid Wikidata language code"
+      labels: [
+        {text: "wikidata_language_code" span: (metadata $wikidata_language_code).span}
+      ]
+      help: "the wikidata_language_code argument must be a 2-letter language code"
+    }
+  }
+
+  if ($metadata | is-empty) {
+    return $metadata
+    # error make {
+    #   msg: "empty edition and works data"
+    #   labels: [
+    #     {text: "edition_and_works" span: (metadata $edition_and_works).span}
+    #   ]
+    #   help: $"pipe in the edition and works data"
+    # }
+  }
+
+  for var in [WIKIDATA_USERNAME MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      error make {
+        msg: "missing required Wikidata environment variable"
+        labels: [
+          {text: "env" span: (metadata $env).span}
+        ]
+        help: $"set the environment variable (ansi yellow)($var)(ansi reset)"
+      }
+    }
+  }
+
+  let label_update_function = {|type id|
+    let request = {
+      (
+        http get --full --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "X-Authenticated-User": $env.WIKIDATA_USERNAME
+        }
+        $"($wikidata_api_url)/entities/items/($id)/labels/($wikidata_language_code)"
+      )
+    }
+
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting the (ansi yellow)($wikidata_language_code)(ansi reset) label of Wikidata item (ansi yellow)($id)(ansi reset) from (ansi yellow)($wikidata_api_url)/entities/items/($id)/labels/($wikidata_language_code)(ansi reset): ($error.debug)"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting the (ansi yellow)($wikidata_language_code)(ansi reset) label of Wikidata item ($id) from (ansi yellow)($wikidata_api_url)/entities/items/($id)/labels/($wikidata_language_code)(ansi reset): ($response.body)"
+      return null
+    }
+    # Avoid rate-limiting
+    sleep 0.1sec
+    { label: $response.body }
+  }
+
+  # main_subject
+  let main_subjects = (
+    let wikidata_main_subjects = $metadata | get --optional main_subjects | each {|wikidata_main_subject|
+      let label = (do $cache "wikidata-label" $wikidata_main_subject $label_update_function $wikidata_language_code) | get --optional label
+      if ($label | is-empty) {
+        log warning $"Missing (ansi yellow)($wikidata_language_code)(ansi reset) label for main subject Wikidata item (ansi yellow)($wikidata_main_subject)(ansi reset). Ignoring main subject."
+        null
+      } else {
+        $label
+      }
+    };
+    if ($wikidata_main_subjects | is-empty) {
+      []
+    } else {
+      $wikidata_main_subjects | where {|label| $label | is-not-empty} | sort | uniq
+    }
+  )
+
+  let item_update_function = {|type id|
+    let request = {
+      (
+        http get --full --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "X-Authenticated-User": $env.WIKIDATA_USERNAME
+        }
+        $"($wikidata_api_url)/entities/items/($id)"
+      )
+    }
+
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Wikidata item (ansi yellow)($id)(ansi reset) from (ansi yellow)($wikidata_api_url)/entities/items/($id)(ansi reset): ($error.debug)"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Wikidata item ($id) from (ansi yellow)($wikidata_api_url)/entities/items/($id)(ansi reset): ($response.body)"
+      return null
+    }
+    # Avoid rate-limiting
+    sleep 0.1sec
+    $response.body
+  }
+
+  let imprint_wikidata_ids = [
+    Q2608849 # imprint
+    Q115693088 # manga imprint
+    Q115693146 # comic book imprint
+    Q139545998 # light novel imprint
+  ]
+
+  let publishers = (
+    let wikidata_publishers = $metadata | get --optional publishers | each {|wikidata_publisher|
+      let item = (do $cache "wikidata-item" $wikidata_publisher.wikidata_id $item_update_function null)
+      let name = (
+        # For consistency, ignore object named as for now
+        # if ($wikidata_publisher | get --optional object_named_as | is-empty) {
+          if ($item | get --optional labels | get --optional $wikidata_language_code | is-empty) {
+            log error $"Missing (ansi yellow)($wikidata_language_code)(ansi reset) label for publisher Wikidata item (ansi yellow)($wikidata_publisher.wikidata_id)(ansi reset)."
+            null
+          } else {
+            $item.labels | get $wikidata_language_code
+          }
+        # } else {
+        #   $wikidata_publisher.object_named_as
+        # }
+      )
+      # Is the item an imprint of some kind?
+      # todo Get the actual publisher name when the item is an imprint.
+      # This will probably be complicated.
+      # P31: instance of
+      let is_imprint = $item | get --optional statements.P31.value.content | any {|item| $item in $imprint_wikidata_ids}
+      log debug $"is_imprint: ($is_imprint)"
+      {
+        name: $name
+        is_imprint: $is_imprint
+      }
+    };
+    if ($wikidata_publishers | is-empty) {
+      []
+    } else {
+      $wikidata_publishers | where {|item| $item.name | is-not-empty} | uniq
+    }
+  )
+
+  let tags = (
+    if ($metadata | get --optional tags | is-empty) {
+      []
+    } else {
+      $metadata.tags
+    } | append $main_subjects | sort
+  )
+
+  # ComicInfo only supports a single publisher
+  let publisher = (
+    if ($publishers | where not is_imprint | is-empty) {
+    } else {
+      $publishers | where not is_imprint | get --optional name | first
+    }
+  )
+
+  # ComicInfo only supports a single imprint
+  let imprint = (
+    if ($publishers | where is_imprint | is-empty) {
+    } else {
+      $publishers | where is_imprint | get --optional name | first
+    }
+  )
+
+  (
+    $metadata
+    | upsert tags $tags
+    | upsert_if_value imprint $imprint
+    | upsert_if_value imprints ($publishers | where is_imprint | get --optional name)
+    | upsert_if_value main_subjects $main_subjects
+    | upsert_if_value publisher $publisher
+    | upsert_if_value publishers ($publishers | where not is_imprint | get --optional name)
+  )
+}
+
+
 # Calculate the SHA3-512 checksum for a file using rhash.
 export def hash_sha3_512 []: [string -> string] {
   # File for which to generate the checksum.
@@ -3774,6 +4455,7 @@ export def wikidata_search_editions_by_comic_vine_id [
 }
 
 export def get_comic_vine_issue [
+  cache: closure
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
 ]: [string -> list<string>] {
@@ -3792,35 +4474,39 @@ export def get_comic_vine_issue [
     }
   }
 
-  log debug $"Getting Comic Vine data for issue ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset)"
-  let request = {
-    (
-      http get
-        --full
-        --headers {
-          "User-Agent": $user_agent
-          "Accept": "application/json"
-        }
-        $"https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=($env.COMIC_VINE_API_KEY)&format=json"
+  let update_cache = {|type id|
+    log debug $"Getting Comic Vine data for issue ($id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset)"
+    let request = {
+      (
+        http get
+          --full
+          --headers {
+            "User-Agent": $user_agent
+            "Accept": "application/json"
+          }
+          $"https://comicvine.gamespot.com/api/issue/($id)/?api_key=($env.COMIC_VINE_API_KEY)&format=json"
+      )
+    }
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Comic Vine data for issue ($id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($id)/?api_key=<api-key>&format=json(ansi reset): ($error.debug)"
+        return null
+      }
     )
-  }
-  let response = (
-    try {
-      retry_http $request $retries $retry_delay
-    } catch {|error|
-      log error $"Error getting Comic Vine data for issue ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($error.debug)"
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Comic Vine issue data with Comic Vine ID ($id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($id)/?api_key=<api-key>&format=json(ansi reset): ($response.body)"
       return null
     }
-  )
-  if ($response.status != 200) {
-    log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Comic Vine issue data with Comic Vine ID ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($response.body)"
-    return null
+    # log debug $"response.body: ($response.body)"
+    $response.body.results
   }
-  # log debug $"response.body: ($response.body)"
-  $response.body.results
+  do $cache "comic-vine-issue" $comic_vine_id $update_cache ""
 }
 
 export def get_comic_vine_volume [
+  cache: closure
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
 ]: [string -> list<string>] {
@@ -3839,30 +4525,33 @@ export def get_comic_vine_volume [
     }
   }
 
-  let request = {
-    (
-      http get
-        --full
-        --headers {
-          "User-Agent": $user_agent
-          "Accept": "application/json"
-        }
-        $"https://comicvine.gamespot.com/api/volume/($comic_vine_id)/?api_key=($env.COMIC_VINE_API_KEY)&format=json"
+  let update_cache = {|type id|
+    let request = {
+      (
+        http get
+          --full
+          --headers {
+            "User-Agent": $user_agent
+            "Accept": "application/json"
+          }
+          $"https://comicvine.gamespot.com/api/volume/($id)/?api_key=($env.COMIC_VINE_API_KEY)&format=json"
+      )
+    }
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Comic Vine data for volume ($id) from (ansi yellow)https://comicvine.gamespot.com/api/volume/($id)/?api_key=<api-key>&format=json(ansi reset): ($error.debug)"
+        return null
+      }
     )
-  }
-  let response = (
-    try {
-      retry_http $request $retries $retry_delay
-    } catch {|error|
-      log error $"Error getting Comic Vine data for volume ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/volume/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($error.debug)"
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Comic Vine volume data with Comic Vine ID ($id) from (ansi yellow)https://comicvine.gamespot.com/api/volume/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($response.body)"
       return null
     }
-  )
-  if ($response.status != 200) {
-    log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Comic Vine volume data with Comic Vine ID ($comic_vine_id) from (ansi yellow)https://comicvine.gamespot.com/api/volume/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($response.body)"
-    return null
+    $response.body.results
   }
-  $response.body.results
+  do $cache "comic-vine-issue" $comic_vine_id $update_cache ""
 }
 
 # Get identifiers for an edition on Wikidata

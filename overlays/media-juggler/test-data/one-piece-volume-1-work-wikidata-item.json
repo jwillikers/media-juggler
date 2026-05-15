@@ -1,0 +1,639 @@
+{
+  "type": "item",
+  "labels": {
+    "en": "One Piece, Volume 1: Romance Dawn",
+    "ja": "ONE PIECE 1 ROMANCE DAWN〜冒険の夜明け〜",
+    "ca": "Romance Dawn: L'albor de l'aventura"
+  },
+  "descriptions": {
+    "en": "1997 manga volume by Eiichiro Oda"
+  },
+  "aliases": {
+    "en": [
+      "One Piece, Volume 1",
+      "One Piece, Vol. 1",
+      "One Piece, Vol. 1: Romance Dawn",
+      "Romance Dawn"
+    ],
+    "ja": [
+      "ONE PIECE 巻一 ROMANCE DAWN〜冒険の夜明け〜"
+    ]
+  },
+  "statements": {
+    "P31": [
+      {
+        "id": "Q136611298$26a38b4c-4cfa-da42-b3df-5b7ae7801e6e",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P31",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q7725634"
+        }
+      }
+    ],
+    "P179": [
+      {
+        "id": "Q136611298$0844eb85-4f89-2ecb-d9c9-839a715f5b3e",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P478",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "1"
+            }
+          },
+          {
+            "property": {
+              "id": "P155",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "novalue"
+            }
+          },
+          {
+            "property": {
+              "id": "P156",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q138786478"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P179",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q28667972"
+        }
+      }
+    ],
+    "P50": [
+      {
+        "id": "Q136611298$2f998254-4539-144b-2b88-6e62d700168c",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P50",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q2010"
+        }
+      }
+    ],
+    "P577": [
+      {
+        "id": "Q136611298$e1b29b20-4e04-880b-1285-e046d05c1ffd",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P577",
+          "data_type": "time"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "time": "+1997-12-24T00:00:00Z",
+            "precision": 11,
+            "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+          }
+        }
+      }
+    ],
+    "P1476": [
+      {
+        "id": "Q136611298$fe9f802a-41fa-9a18-b9d2-4cd054e9f5ac",
+        "rank": "preferred",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P7452",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q71548220"
+            }
+          },
+          {
+            "property": {
+              "id": "P1814",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "ワンピース 1"
+            }
+          },
+          {
+            "property": {
+              "id": "P2125",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Wan Pīsu 1"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P1476",
+          "data_type": "monolingualtext"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "text": "ONE PIECE 1",
+            "language": "ja"
+          }
+        }
+      },
+      {
+        "id": "Q136611298$45ed833e-4976-f1db-fc58-f3a0b44774c7",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P1476",
+          "data_type": "monolingualtext"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "text": "One Piece, Volume 1",
+            "language": "en"
+          }
+        }
+      }
+    ],
+    "P1680": [
+      {
+        "id": "Q136611298$03ab5e7c-4635-e5bc-1b73-a08ae2a5e576",
+        "rank": "preferred",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P7452",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q71548220"
+            }
+          },
+          {
+            "property": {
+              "id": "P2125",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Romance Dawn: Bōken no Yoake"
+            }
+          },
+          {
+            "property": {
+              "id": "P1814",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "ROMANCE DAWN〜ぼうけん の よあけ〜"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P1680",
+          "data_type": "monolingualtext"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "text": "ROMANCE DAWN〜冒険の夜明け〜",
+            "language": "ja"
+          }
+        }
+      },
+      {
+        "id": "Q136611298$1045b466-4de4-1726-a02e-17a6ebf78448",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P1680",
+          "data_type": "monolingualtext"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "text": "Romance Dawn",
+            "language": "en"
+          }
+        }
+      }
+    ],
+    "P407": [
+      {
+        "id": "Q136611298$d8266620-4865-9415-357d-0c1ff70452cb",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P407",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q5287"
+        }
+      }
+    ],
+    "P495": [
+      {
+        "id": "Q136611298$9be9386b-4ba9-479f-52c4-a4743fe5d9c6",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P495",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q17"
+        }
+      }
+    ],
+    "P747": [
+      {
+        "id": "Q136611298$ce396261-4374-9a6d-d541-5533af18b561",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P407",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q1860"
+            }
+          },
+          {
+            "property": {
+              "id": "P437",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q128093"
+            }
+          },
+          {
+            "property": {
+              "id": "P577",
+              "data_type": "time"
+            },
+            "value": {
+              "type": "value",
+              "content": {
+                "time": "+2010-11-02T00:00:00Z",
+                "precision": 11,
+                "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+              }
+            }
+          },
+          {
+            "property": {
+              "id": "P123",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q133698002"
+            }
+          },
+          {
+            "property": {
+              "id": "P212",
+              "data_type": "external-id"
+            },
+            "value": {
+              "type": "value",
+              "content": "978-1-4215-4525-7"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P747",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q136611676"
+        }
+      }
+    ],
+    "P648": [
+      {
+        "id": "Q136611298$0db47e91-42c5-bb90-5037-909a08cc43a5",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P648",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "OL8215661W"
+        }
+      }
+    ],
+    "P1085": [
+      {
+        "id": "Q136611298$5b96195d-4ad5-a605-6e19-13284104e5fa",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P1085",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "457438"
+        }
+      }
+    ],
+    "P8383": [
+      {
+        "id": "Q136611298$ebef2fae-4dbb-732a-ebbd-6d56b52ec9c8",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P8383",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "361124"
+        }
+      }
+    ],
+    "P527": [
+      {
+        "id": "Q136611298$4e4119df-470d-6118-e4cf-57be01a3f3e6",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1545",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "1"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P527",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q136612840"
+        }
+      }
+    ],
+    "P2635": [
+      {
+        "id": "Q136611298$1df2608a-4c23-ea0f-74c0-a878841d5454",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P2635",
+          "data_type": "quantity"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "amount": "+8",
+            "unit": "http://www.wikidata.org/entity/Q53460949"
+          }
+        }
+      }
+    ],
+    "P110": [
+      {
+        "id": "Q136611298$824dd96d-4679-aeba-30a3-48f87efef665",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P110",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q2010"
+        }
+      }
+    ],
+    "P7937": [
+      {
+        "id": "Q136611298$2739fba9-411b-9c53-578b-feee912c2a62",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P7937",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q125632018"
+        }
+      },
+      {
+        "id": "Q136611298$01060e04-4def-4c4e-232f-a563d4727d31",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P7937",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q8274"
+        }
+      }
+    ],
+    "P136": [
+      {
+        "id": "Q136611298$11fd47e0-4f0b-9e8c-c4e8-3ce195a759a3",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P136",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q15712918"
+        }
+      },
+      {
+        "id": "Q136611298$3b65913f-4bc2-f3c7-5bca-75012b8de2b3",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P136",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q15712927"
+        }
+      },
+      {
+        "id": "Q136611298$d4136a4e-45c0-10c5-f2ba-2eede69a6b4a",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P136",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q137198951"
+        }
+      }
+    ],
+    "P478": [
+      {
+        "id": "Q136611298$dda2ee31-4a80-cb46-c071-44b997a69043",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P478",
+          "data_type": "string"
+        },
+        "value": {
+          "type": "value",
+          "content": "1"
+        }
+      }
+    ],
+    "P8345": [
+      {
+        "id": "Q136611298$6ee2c608-41fc-bfc0-0d0a-14257c7b61f2",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P8345",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q673"
+        }
+      }
+    ],
+    "P1434": [
+      {
+        "id": "Q136611298$40035c23-4abf-e889-a502-8c6cff20c460",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P1434",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q16682047"
+        }
+      }
+    ],
+    "P6262": [
+      {
+        "id": "Q136611298$5daeb4e0-4027-c60d-ba87-1c8fe59d9a41",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P6262",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "onepiece:Volume_1"
+        }
+      }
+    ],
+    "P2360": [
+      {
+        "id": "Q136611298$34ce8e86-4fc3-2347-4589-ff473d6642d9",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P2360",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q231302"
+        }
+      },
+      {
+        "id": "Q136611298$34ce8e86-4fc3-2347-4589-ff473d6642e9",
+        "rank": "deprecated",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P2360",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q237338"
+        }
+      }
+    ]
+  },
+  "sitelinks": {},
+  "id": "Q136611298"
+}

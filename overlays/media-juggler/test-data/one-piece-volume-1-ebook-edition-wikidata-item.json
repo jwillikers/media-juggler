@@ -1,0 +1,1114 @@
+{
+  "type": "item",
+  "labels": {
+    "en": "One Piece, Vol. 1: Romance Dawn",
+    "ca": "One Piece, Volume 1: Romance Dawn"
+  },
+  "descriptions": {
+    "en": "2010 ebook edition, en, Shonen Jump"
+  },
+  "aliases": {
+    "en": [
+      "One Piece, Volume 1",
+      "One Piece, Vol. 1",
+      "One Piece, Volume 1: Romance Dawn"
+    ]
+  },
+  "statements": {
+    "P31": [
+      {
+        "id": "Q136611676$f9395619-46e6-5424-c76a-0a405c882e5c",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P31",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q3331189"
+        }
+      }
+    ],
+    "P407": [
+      {
+        "id": "Q136611676$6b506834-4f20-397f-2018-73f6018fa55b",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [
+          {
+            "hash": "cd4893684cc06b24a118c083ebdc936aa421d4b4",
+            "parts": [
+              {
+                "property": {
+                  "id": "P248",
+                  "data_type": "wikibase-item"
+                },
+                "value": {
+                  "type": "value",
+                  "content": "Q1201876"
+                }
+              },
+              {
+                "property": {
+                  "id": "P648",
+                  "data_type": "external-id"
+                },
+                "value": {
+                  "type": "value",
+                  "content": "OL60495965M"
+                }
+              },
+              {
+                "property": {
+                  "id": "P813",
+                  "data_type": "time"
+                },
+                "value": {
+                  "type": "value",
+                  "content": {
+                    "time": "+2025-10-28T00:00:00Z",
+                    "precision": 11,
+                    "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "property": {
+          "id": "P407",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q1860"
+        }
+      }
+    ],
+    "P629": [
+      {
+        "id": "Q136611676$0bfab37f-48da-5ad7-d074-317da006042b",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P629",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q136611298"
+        }
+      }
+    ],
+    "P1476": [
+      {
+        "id": "Q136611676$335c6b2d-42ee-0187-2820-401183b404cd",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P1476",
+          "data_type": "monolingualtext"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "text": "One Piece, Vol. 1",
+            "language": "en"
+          }
+        }
+      }
+    ],
+    "P1680": [
+      {
+        "id": "Q136611676$070a188e-424e-3aca-dfcc-6c419e7994d6",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P1680",
+          "data_type": "monolingualtext"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "text": "Romance Dawn",
+            "language": "en"
+          }
+        }
+      }
+    ],
+    "P291": [
+      {
+        "id": "Q136611676$0a2424a3-4ce0-5071-54cb-8d9687fb8d3e",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P291",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q62"
+        }
+      }
+    ],
+    "P577": [
+      {
+        "id": "Q136611676$e89a42ee-4cdb-638f-3f19-4cfeed097de6",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [
+          {
+            "hash": "cd4893684cc06b24a118c083ebdc936aa421d4b4",
+            "parts": [
+              {
+                "property": {
+                  "id": "P248",
+                  "data_type": "wikibase-item"
+                },
+                "value": {
+                  "type": "value",
+                  "content": "Q1201876"
+                }
+              },
+              {
+                "property": {
+                  "id": "P648",
+                  "data_type": "external-id"
+                },
+                "value": {
+                  "type": "value",
+                  "content": "OL60495965M"
+                }
+              },
+              {
+                "property": {
+                  "id": "P813",
+                  "data_type": "time"
+                },
+                "value": {
+                  "type": "value",
+                  "content": {
+                    "time": "+2025-10-28T00:00:00Z",
+                    "precision": 11,
+                    "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "property": {
+          "id": "P577",
+          "data_type": "time"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "time": "+2010-11-02T00:00:00Z",
+            "precision": 11,
+            "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+          }
+        }
+      }
+    ],
+    "P50": [
+      {
+        "id": "Q136611676$d0024604-43f4-386b-d8ee-e5b83d3a5cf6",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Eiichiro Oda"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P50",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q2010"
+        }
+      }
+    ],
+    "P9191": [
+      {
+        "id": "Q136611676$0fb34c91-4706-9463-8352-c5ab2a0abb81",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Bill Schuch"
+            }
+          },
+          {
+            "property": {
+              "id": "P13187",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "touch-up art & lettering"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P9191",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q135033288"
+        }
+      }
+    ],
+    "P123": [
+      {
+        "id": "Q136611676$d2246025-4d5b-1be3-ec52-d490fc6dc8a3",
+        "rank": "preferred",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P7452",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q71536040"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P123",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q133698002"
+        }
+      },
+      {
+        "id": "Q136611676$f5e46bad-4730-db8b-3d6b-966492578150",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P123",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q139571225"
+        }
+      }
+    ],
+    "P212": [
+      {
+        "id": "Q136611676$25a612b0-431f-ec1a-be68-ab73e67dc12e",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P212",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "978-1-4215-4525-7"
+        }
+      }
+    ],
+    "P957": [
+      {
+        "id": "Q136611676$69d4b7f1-4796-903c-4d3e-6c61fe6a8017",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P957",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "1-4215-4525-X"
+        }
+      }
+    ],
+    "P5749": [
+      {
+        "id": "Q136611676$33fc1b6e-4d0c-c98c-c781-d5961921c924",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [
+          {
+            "hash": "cd4893684cc06b24a118c083ebdc936aa421d4b4",
+            "parts": [
+              {
+                "property": {
+                  "id": "P248",
+                  "data_type": "wikibase-item"
+                },
+                "value": {
+                  "type": "value",
+                  "content": "Q1201876"
+                }
+              },
+              {
+                "property": {
+                  "id": "P648",
+                  "data_type": "external-id"
+                },
+                "value": {
+                  "type": "value",
+                  "content": "OL60495965M"
+                }
+              },
+              {
+                "property": {
+                  "id": "P813",
+                  "data_type": "time"
+                },
+                "value": {
+                  "type": "value",
+                  "content": {
+                    "time": "+2025-10-28T00:00:00Z",
+                    "precision": 11,
+                    "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "property": {
+          "id": "P5749",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "B00F3HG7ES"
+        }
+      }
+    ],
+    "P648": [
+      {
+        "id": "Q136611676$4d97b35c-4f81-bed2-91b2-5fddd79b3448",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P648",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "OL60495965M"
+        }
+      }
+    ],
+    "P12351": [
+      {
+        "id": "Q136611676$c77c7052-41a4-591d-14cf-a0108111929a",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P12351",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "e9f8abaf-15ef-4453-885d-037a31ff80e1"
+        }
+      }
+    ],
+    "P243": [
+      {
+        "id": "Q136611676$e776a67b-43f3-4ca2-5032-40d61ddfe0dc",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P243",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "966447660"
+        }
+      },
+      {
+        "id": "Q136611676$156aa2b1-4651-438d-eebc-fbd26005d83b",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P243",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "1312289745"
+        }
+      }
+    ],
+    "P2969": [
+      {
+        "id": "Q136611676$4fbae055-4273-3b60-093e-e1afb359f267",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P2969",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "19007070"
+        }
+      }
+    ],
+    "P655": [
+      {
+        "id": "Q136611676$01356e15-4474-e2fe-e8c9-12c0e1bcd21b",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Andy Nakatani"
+            }
+          },
+          {
+            "property": {
+              "id": "P13187",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "translation"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P655",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q135032908"
+        }
+      }
+    ],
+    "P5202": [
+      {
+        "id": "Q136611676$1843998e-49df-e0e5-efe7-3a7737e9b779",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Lance Caselman"
+            }
+          },
+          {
+            "property": {
+              "id": "P13187",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "English adaptation"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P5202",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q135032477"
+        }
+      }
+    ],
+    "P98": [
+      {
+        "id": "Q136611676$0082ef93-481e-9dc1-23a8-38675ed8ffce",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Jason Thompson"
+            }
+          },
+          {
+            "property": {
+              "id": "P13187",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "senior editor"
+            }
+          },
+          {
+            "property": {
+              "id": "P3831",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q26206833"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P98",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q4460327"
+        }
+      }
+    ],
+    "P287": [
+      {
+        "id": "Q136611676$600bc510-4faa-264a-6c6b-30206df4d97a",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Sean Lee"
+            }
+          },
+          {
+            "property": {
+              "id": "P3831",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q627325"
+            }
+          },
+          {
+            "property": {
+              "id": "P13187",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "cover & graphic design"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P287",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q135033527"
+        }
+      }
+    ],
+    "P675": [
+      {
+        "id": "Q136611676$663e52b9-4a3e-9431-07ed-2377be4b2514",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P675",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "fV_wAQAAQBAJ"
+        }
+      }
+    ],
+    "P437": [
+      {
+        "id": "Q136611676$763c3aa2-49f8-a256-ead9-0557b8536b60",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P437",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q139660346"
+        }
+      },
+      {
+        "id": "Q136611676$68049fa6-4093-342e-cc54-ceb180bfb7b5",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P437",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q139660326"
+        }
+      }
+    ],
+    "P750": [
+      {
+        "id": "Q136611676$f367a2f3-4055-4d23-8621-610e841f0a14",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P2699",
+              "data_type": "url"
+            },
+            "value": {
+              "type": "value",
+              "content": "https://www.kobo.com/us/en/ebook/one-piece-vol-1"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P750",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q139545632"
+        }
+      },
+      {
+        "id": "Q136611676$29ac1626-4b20-b364-9be0-028d3c694888",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P2699",
+              "data_type": "url"
+            },
+            "value": {
+              "type": "value",
+              "content": "https://www.overdrive.com/search?q=28AA1833-F9F1-4553-8575-BB4C1B934D13"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P750",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q139545673"
+        }
+      },
+      {
+        "id": "Q136611676$8beda99e-481a-70b4-8670-bd3727080249",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P2699",
+              "data_type": "url"
+            },
+            "value": {
+              "type": "value",
+              "content": "https://www.viz.com/manga-books/manga/wd/product/139/digital"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P750",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q139660720"
+        }
+      }
+    ],
+    "P110": [
+      {
+        "id": "Q136611676$27a9ae52-4f3e-3c66-2084-611ba9544c5e",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Eiichiro Oda"
+            }
+          },
+          {
+            "property": {
+              "id": "P13187",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "story and art by"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P110",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q2010"
+        }
+      }
+    ],
+    "P736": [
+      {
+        "id": "Q136611676$a7021b62-4012-88fe-19fb-ba29e0507f29",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Eiichiro Oda"
+            }
+          },
+          {
+            "property": {
+              "id": "P3831",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q644687"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P736",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q2010"
+        }
+      },
+      {
+        "id": "Q136611676$81a463bc-411a-aa66-57a3-e3648b00c4b9",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Sean Lee"
+            }
+          },
+          {
+            "property": {
+              "id": "P3831",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q5322166"
+            }
+          },
+          {
+            "property": {
+              "id": "P13187",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "cover & graphic design"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P736",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q135033527"
+        }
+      }
+    ],
+    "P5905": [
+      {
+        "id": "Q136611676$3e9785e0-4801-42ec-cd46-eaa593546a0d",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P5905",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "4000-192239"
+        }
+      }
+    ],
+    "P1032": [
+      {
+        "id": "Q136611676$4ca76ee8-4f3b-d27b-6b39-c5ff1be74d8d",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P750",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q139545632"
+            }
+          }
+        ],
+        "references": [
+          {
+            "hash": "665eb00cd46bb14f230b08625b725319df91abd2",
+            "parts": [
+              {
+                "property": {
+                  "id": "P854",
+                  "data_type": "url"
+                },
+                "value": {
+                  "type": "value",
+                  "content": "https://www.kobo.com/us/en/ebook/one-piece-vol-1"
+                }
+              }
+            ]
+          }
+        ],
+        "property": {
+          "id": "P1032",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q139545548"
+        }
+      }
+    ],
+    "P10225": [
+      {
+        "id": "Q136611676$c4373b87-4c1e-fd97-1af8-89a0cb30701f",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P407",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q1860"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P10225",
+          "data_type": "url"
+        },
+        "value": {
+          "type": "value",
+          "content": "https://www.viz.com/manga-books/manga/wd/product/139/digital"
+        }
+      }
+    ],
+    "P6216": [
+      {
+        "id": "Q136611676$9383b253-46db-ccd7-0688-3a0d95278cce",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P275",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q1752207"
+            }
+          },
+          {
+            "property": {
+              "id": "P9905",
+              "data_type": "time"
+            },
+            "value": {
+              "type": "value",
+              "content": {
+                "time": "+1997-00-00T00:00:00Z",
+                "precision": 9,
+                "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+              }
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P6216",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q50423863"
+        }
+      }
+    ],
+    "P3575": [
+      {
+        "id": "Q136611676$aba3e45f-49e8-63d2-aa66-ec02d10649d2",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P750",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q139545632"
+            }
+          },
+          {
+            "property": {
+              "id": "P2701",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q27196933"
+            }
+          }
+        ],
+        "references": [
+          {
+            "hash": "665eb00cd46bb14f230b08625b725319df91abd2",
+            "parts": [
+              {
+                "property": {
+                  "id": "P854",
+                  "data_type": "url"
+                },
+                "value": {
+                  "type": "value",
+                  "content": "https://www.kobo.com/us/en/ebook/one-piece-vol-1"
+                }
+              }
+            ]
+          }
+        ],
+        "property": {
+          "id": "P3575",
+          "data_type": "quantity"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "amount": "+146",
+            "unit": "http://www.wikidata.org/entity/Q79758"
+          }
+        }
+      }
+    ],
+    "P3931": [
+      {
+        "id": "Q136611676$8c9e2e25-4db7-d137-e9f1-797f30ac04b3",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1932",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Eiichiro Oda"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P3931",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q2010"
+        }
+      }
+    ]
+  },
+  "sitelinks": {},
+  "id": "Q136611676"
+}

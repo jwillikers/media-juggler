@@ -1115,6 +1115,34 @@ def test_sanitize_genres_or_tags [] {
   test_sanitize_genres_or_tags_case
 }
 
+export def test_parse_wikidata_edition_and_works_metadata_one_piece_volume_1 [] {
+  let input = {
+    edition: (open ([$test_data_dir "one-piece-volume-1-ebook-edition-wikidata-item.json"] | path join))
+    works: [(open ([$test_data_dir "one-piece-volume-1-work-wikidata-item.json"] | path join))]
+  }
+  # log debug $"\n($input | parse_wikidata_edition_and_works_metadata | to nuon)\n"
+  let expected = {
+    forms_of_creative_work: ["manga" "manga volume"]
+    genres: [adventure "comedy drama" "science fantasy"]
+    intended_publics: [shōnen]
+    language: "english"
+    manga: "YesAndRightToLeft"
+    publishers: [
+      [wikidata_id, object_named_as];
+      ["Q133698002" []]
+      ["Q139571225" []]
+    ],
+    tags: [manga shōnen]
+  }
+  assert equal ($input | parse_wikidata_edition_and_works_metadata) $expected
+}
+
+# todo Should write more tests for parse_wikidata_edition_and_works_metadata
+# todo Test main_subject functionality.
+def test_parse_wikidata_edition_and_works_metadata [] {
+  test_parse_wikidata_edition_and_works_metadata_one_piece_volume_1
+}
+
 def main [] {
   test_is_identifier_valid
   test_identifier_from_url
@@ -1125,6 +1153,7 @@ def main [] {
   test_into_comic_info_xml
   test_from_opf_xml
   test_from_comic_info_xml
+  test_parse_wikidata_edition_and_works_metadata
   # test_from_metron_info_xml
   # test_into_metron_info_xml
   echo $"(ansi green)All tests passed!(ansi reset)"

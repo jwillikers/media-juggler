@@ -1213,6 +1213,175 @@ def main [
     log warning $"Missing (ansi red)Hardcover edition ID(ansi reset)"
   }
 
+  let cache_function = {|type, id, update_function, filename_suffix|
+    let filename = (
+      if ($filename_suffix | is-not-empty) {
+        $"($id)_($filename_suffix).json"
+      } else {
+        $"($id).json"
+      }
+    )
+    let cached_file = [$cache_directory $type $filename] | path join
+    try {
+      let data = open $cached_file
+      if ($data | is-empty) {
+        rm $cached_file
+        error make {
+          msg: "empty cached file"
+          labels: [
+              {text: "cached_file" span: (metadata $cached_file).span}
+          ]
+          help: $"the empty ($cached_file) has been deleted. Try re-running."
+        }
+      }
+      # The integer duration must be converted to a Nushell duration when loading a release from a JSON file.
+      # if $type == "release" {
+      #   $data | update tracks (
+      #     $data.tracks | each {|track|
+      #       $track | update duration ($track.duration | into duration)
+      #     }
+      #   ) | (
+      #     let input = $in;
+      #     if "chapters" in $input.book {
+      #       $input | update book.chapters (
+      #         $input.book.chapters | each {|chapter|
+      #           $chapter | update start ($chapter.start | into duration) | update length ($chapter.length | into duration)
+      #         }
+      #       )
+      #     } else {
+      #       $input
+      #     }
+      #   )
+      # } else {
+        $data
+      # }
+    } catch {
+      let result = do $update_function $type $id
+      mkdir ($cached_file | path dirname)
+      if ($result | is-not-empty) {
+        $result | save --force $cached_file
+      } else {
+        error make {
+          msg: "empty or null result"
+          labels: [
+              {text: "result" span: (metadata $result).span}
+          ]
+          help: "try re-running when the service is available"
+        }
+      }
+      $result
+    }
+  }
+
+  log debug "Fetching metadata"
+  let tag_result = (
+    # Get Comic Vine metadata through the ComicVine API directly.
+    let data = $comic_vine_issue_id | get_comic_vine_issue $cache_function;
+    # todo Cache things to avoid rate-limiting.
+    # Avoid rate-limiting
+    sleep 1sec;
+    let volume_data = $data.volume.id | into string | get_comic_vine_volume $cache_function;;
+    let publication_date = $data.store_date | into datetime;
+    # Rewrite credits to match ComicTagger's format.
+    #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
+    let credits = (
+      $data.person_credits | reduce --fold [] {|person credits_acc|
+        $credits_acc | append (
+          $person.role
+          | split row ","
+          | str trim
+          | str capitalize
+          | each {|role|
+            {
+              person: $person.name
+              id: $person.id
+              role: $role
+              primary: false
+              language: ""
+            }
+          }
+        )
+      }
+    );
+    let ids = (
+      [
+        [type id];
+        [bookbrainz_edition_id $bookbrainz_edition_id]
+        [comic_vine_issue_id (
+          if ($comic_vine_issue_id | str starts-with "4000-") {
+            $comic_vine_issue_id
+          } else {
+            "4000-" + $comic_vine_issue_id
+          }
+        )]
+        [metron_issue_id $metron_issue_id]
+        [hardcover_book_slug $hardcover_book_slug]
+        [hardcover_edition_id $hardcover_edition_id]
+        [open_library_edition_id $open_library_edition_id]
+        [wikidata_item_id $wikidata_edition_id]
+      ]
+      | where {|it| $it.id | is-not-empty }
+    );
+    {
+      result: {
+        md: {
+          issue_id: $data.id
+          issue: $data.issue_number
+          series: ($data.volume.name | use_unicode_in_title)
+          title: (
+            if ($data | get --optional name | is-not-empty) {
+              $data.name | use_unicode_in_title
+            }
+          )
+          description: $data.description
+          volume: $volume_data.start_year
+          issue_count: $volume_data.count_of_issues
+          ids: $ids
+          isbn: $isbn
+          characters: ($data.character_credits | select --optional name id)
+          language: $default_language
+          manga: $manga
+          genres: []
+          tags: []
+          publication_date: $publication_date
+          year: ($publication_date | format date "%Y")
+          month: ($publication_date | format date "%m")
+          day: ($publication_date | format date "%d")
+          # $volume_data.description
+          publisher: $volume_data.publisher.name
+          # $data.store_date
+          # $data.cover_date
+          credits: $credits
+          series_id: $data.volume.id
+          _cover_image: [0, "", $data.image.original_url]
+        }
+        status: "good_match"
+      }
+    }
+  )
+  log debug $"The Comic Vine API result is:\n(ansi green)($tag_result.result | to nuon)(ansi reset)\n"
+
+  let wikidata_metadata = (
+    if ($wikidata_edition_id | is-not-empty) {
+      (
+        $wikidata_edition_id
+        | fetch_wikidata_edition_and_works_metadata $cache_function
+        | parse_wikidata_edition_and_works_metadata
+        | process_wikidata_edition_and_works_metadata "en" $cache_function
+      )
+    }
+  )
+  log debug $"The Wikidata metadata is:\n(ansi green)($wikidata_metadata | to nuon)(ansi reset)\n"
+
+  let comic_metadata = ($tag_result.result.md)
+  let comic_metadata = (
+    $comic_metadata
+    | merge $wikidata_metadata
+    # Prefer publisher from Comic Vine
+    | upsert publisher $comic_metadata.publisher
+  )
+  log debug $"The merged metadata is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
+
   # If the input format is EPUB, optimize the images before generating the CBZ.
   # This avoids optimizing the same images twice.
   let optimized_file_hashes = (
@@ -1260,111 +1429,23 @@ def main [
     }
   )
 
-  log debug $"Fetching and writing metadata to (ansi yellow)($formats | get $output_format)(ansi reset)"
-  let tag_result = (
-    # Get Comic Vine metadata through the ComicVine API directly.
-    let data = $comic_vine_issue_id | get_comic_vine_issue;
-    # todo Cache things to avoid rate-limiting.
-    # Avoid rate-limiting
-    sleep 1sec;
-    let volume_data = $data.volume.id | into string | get_comic_vine_volume;
-    let publication_date = $data.store_date | into datetime;
-    # Rewrite credits to match ComicTagger's format.
-    #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
-    let credits = (
-      $data.person_credits | reduce --fold [] {|person credits_acc|
-        $credits_acc | append (
-          $person.role
-          | split row ","
-          | str trim
-          | str capitalize
-          | each {|role|
-            {
-              person: $person.name
-              id: $person.id
-              role: $role
-              primary: false
-              language: ""
-            }
-          }
-        )
-      }
-    );
-    let ids = (
-      [
-        [type id];
-        [bookbrainz_edition_id $bookbrainz_edition_id]
-        [comic_vine_issue_id (
-          if ($comic_vine_issue_id | str starts-with "4000-") {
-            $comic_vine_issue_id
-          } else {
-            "4000-" + $comic_vine_issue_id
-          }
-        )]
-        [metron_issue_id $metron_issue_id]
-        [hardcover_book_slug $hardcover_book_slug]
-        [hardcover_edition_id $hardcover_edition_id]
-        [open_library_edition_id $open_library_edition_id]
-        [wikidata_item_id $wikidata_edition_id]
-      ]
-      | where {|it| $it.id | is-not-empty }
-    );
-    let number_of_pages = (
-      if "cbz" in ($formats | columns) {
-        $formats.cbz | number_of_images_in_archive
-      } else {
-        null
-      }
-    );
-    {
-      result: {
-        md: {
-          issue_id: $data.id
-          issue: $data.issue_number
-          series: ($data.volume.name | use_unicode_in_title)
-          title: (
-            if ($data | get --optional name | is-not-empty) {
-              $data.name | use_unicode_in_title
-            }
-          )
-          description: $data.description
-          volume: $volume_data.start_year
-          issue_count: $volume_data.count_of_issues
-          ids: $ids
-          isbn: $isbn
-          page_count: $number_of_pages
-          characters: ($data.character_credits | select --optional name id)
-          language: $default_language
-          manga: $manga
-          genres: []
-          tags: []
-          publication_date: $publication_date
-          year: ($publication_date | format date "%Y")
-          month: ($publication_date | format date "%m")
-          day: ($publication_date | format date "%d")
-          # $volume_data.description
-          publisher: $volume_data.publisher.name
-          # $data.store_date
-          # $data.cover_date
-          credits: $credits
-          series_id: $data.volume.id
-          _cover_image: [0, "", $data.image.original_url]
-        }
-        status: "good_match"
-      }
+  # Only calculate the pages after the CBZ has been generated and cleaned up.
+  let comic_metadata = (
+    if "cbz" in $formats {
+      let number_of_pages = $formats.cbz | number_of_images_in_archive
+      $comic_metadata | insert page_count $number_of_pages
+    } else {
+      $comic_metadata
     }
   )
-  log debug $"The Comic Vine API result is:\n(ansi green)($tag_result.result | to nuon)(ansi reset)\n"
 
   # Embed the ComicInfo.xml file in the CBZ.
   if "cbz" in ($formats | columns) {
     {
       archive: $formats.cbz
-      comic_info: ($tag_result.result.md | into_comic_info_xml)
+      comic_info: ($comic_metadata | into_comic_info_xml)
     } | inject_comic_info
   }
-
-  let comic_metadata = ($tag_result.result | get md)
 
   log debug "Renaming the CBZ according to the updated metadata from ComicTagger"
   let formats = (
