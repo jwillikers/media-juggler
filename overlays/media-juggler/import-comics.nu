@@ -1532,6 +1532,7 @@ def main [
   let title = (
     if ($title | is-not-empty) {
       if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: " {
+        # Volume followed by subtitle
         let subtitle = $comic_metadata.title | parse --regex "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: (?<subtitle>.*)"
         if ($subtitle | is-not-empty) {
           # todo What if we get multiple regex matches?
@@ -1540,9 +1541,11 @@ def main [
           $"($comic_metadata.series), Volume ($comic_metadata.issue)"
         }
       } else if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) " {
+        # No subtitle
         $"($comic_metadata.series), Volume ($comic_metadata.issue)"
       } else {
-        $"($comic_metadata.series), Volume ($comic_metadata.issue)"
+        # Subtitle is the tile
+        $"($comic_metadata.series), Volume ($comic_metadata.issue): ($comic_metadata.title)"
       }
     } else {
       $title | use_unicode_in_title
