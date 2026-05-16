@@ -9148,6 +9148,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   cover_art_directory: directory
   cache: closure
   combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
+  # todo Expose duration threshold as a command-line option for situations where it needs to be increased.
   duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
   chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
   --retries: int = 3
