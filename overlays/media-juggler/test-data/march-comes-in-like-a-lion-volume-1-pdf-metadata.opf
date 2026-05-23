@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="calibre_id" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:title>March Comes in Like a Lion, Vol. 1</dc:title>
+    <dc:creator opf:role="aut" opf:file-as="Umino, Chica">Chica Umino</dc:creator>
+    <dc:contributor opf:role="bkp" opf:file-as="calibre">calibre (8.14.0) [https://calibre-ebook.com]</dc:contributor>
+    <dc:identifier id="calibre_id" opf:scheme="calibre">2494c4ca-6fb6-459f-baca-26de4d2df70e</dc:identifier>
+    <dc:date>2023-05-01T05:00:00+00:00</dc:date>
+    <dc:language>eng</dc:language>
+    <dc:description>Rei Kiriyama is a child prodigy. Rei Kiriyama is also an orphan who lives alone in an empty apartment. Rei Kiriyama is a teen working in an adult's world.
+
+Life is complicated for Rei. He's an up-and-coming shogi (Japanese chess) player on the verge of turning pro but he has no homelife or much of a life period outside his board game but thankfully with the help of some life-long friends he has an opportunity start all over again.
+
+Note: This volume was released digitally (05/03/2023) before paperback (06/06/2023).
+
+## Chapter Titles
+* Chapter 1: Rei Kiriyama
+* Chapter 2: A Riverside Town
+* Chapter 3: Akari
+* Chapter 4: The Other Side of the Bridge
+* Chapter 5: Harunobu
+* Chapter 6: Beyond the Night Sky
+* Chapter 7: Hina
+* Chapter 8: VS.
+* Chapter 9: Contract
+* Chapter 10: Over the Cuckoo's Nest</dc:description>
+    <dc:publisher>Denpa</dc:publisher>
+    <dc:identifier opf:scheme="HARDCOVER">march-comes-in-like-a-lion-volume-1</dc:identifier>
+    <dc:identifier opf:scheme="HARDCOVER-SLUG">march-comes-in-like-a-lion-volume-1</dc:identifier>
+    <dc:identifier opf:scheme="HARDCOVER-ID">908381</dc:identifier>
+    <dc:identifier opf:scheme="HARDCOVER-EDITION">30930924</dc:identifier>
+    <dc:identifier opf:scheme="COMICVINE">987377</dc:identifier>
+    <dc:identifier opf:scheme="COMICVINE-VOLUME">150064</dc:identifier>
+    <dc:identifier opf:scheme="ISBN">9781634428132</dc:identifier>
+    <dc:identifier opf:scheme="BOOKBRAINZ-EDITION">594a8ec2-6301-4c20-ae22-2c43840416b2</dc:identifier>
+    <dc:identifier opf:scheme="WIKIDATA-EDITION">Q139556252</dc:identifier>
+    <dc:subject>Strong Character Development</dc:subject>
+    <dc:subject>Loveable Characters</dc:subject>
+    <dc:subject>Character Driven</dc:subject>
+    <dc:subject>Weak Character Development</dc:subject>
+    <dc:subject>Not Diverse Characters</dc:subject>
+    <dc:subject>Comics</dc:subject>
+    <dc:subject>Coming-of-age</dc:subject>
+    <dc:subject>Romance</dc:subject>
+    <dc:subject>Slice of Life</dc:subject>
+    <meta name="calibre:series" content="March Comes in Like a Lion"/>
+    <meta name="calibre:series_index" content="1"/>
+    <meta name="calibre:title_sort" content="March Comes in Like a Lion, Vol. 1"/>
+  </metadata>
+  <manifest/>
+  <spine/>
+  <guide/>
+</package>

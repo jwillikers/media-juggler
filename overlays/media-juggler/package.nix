@@ -1,16 +1,16 @@
 {
   advancecomp,
+  b3sum,
   beets,
   calibre,
-  cbconvert,
   chromaprint,
   efficient-compression-tool,
+  exiftool,
   ffmpeg,
   file,
   image_optim,
   imagemagick,
   isbntools,
-  # jpegli,
   keyfinder-cli,
   lib,
   m4b-tool,
@@ -19,6 +19,7 @@
   mupdf-headless,
   nushell,
   picard,
+  rhash,
   stdenvNoCC,
   tesseract,
   tone,
@@ -43,8 +44,6 @@ else
       beets
       advancecomp
       calibre
-      cbconvert
-      # todo comictagger
       efficient-compression-tool
       ffmpeg
       file
@@ -65,6 +64,7 @@ else
     checkPhase = ''
       runHook preCheck
       nu media-juggler-lib-tests.nu
+      nu import-comics-tests.nu
       nu import-music-tests.nu
       runHook postCheck
     '';
@@ -78,12 +78,9 @@ else
           lib.makeBinPath [
             advancecomp
             calibre
-            cbconvert
             efficient-compression-tool
             image_optim
-            # jpegli
             minuimus
-            # kcc
             udisks
             util-linux
             zip
@@ -93,13 +90,14 @@ else
         --prefix PATH : ${
           lib.makeBinPath [
             chromaprint
+            b3sum
             efficient-compression-tool
             ffmpeg
             image_optim
             isbntools
-            # jpegli
             minuimus
             m4b-tool
+            rhash
             tone
             zip
           ]
@@ -108,16 +106,16 @@ else
         --prefix PATH : ${
           lib.makeBinPath [
             advancecomp
+            b3sum
             calibre
-            cbconvert
-            # comictagger
             efficient-compression-tool
+            exiftool
             image_optim
             imagemagick
-            # jpegli
             # kcc
             minuimus
             mupdf-headless
+            rhash
             tesseract
             udisks
             util-linux
@@ -133,7 +131,6 @@ else
             file
             image_optim
             isbntools
-            # jpegli
             minuimus
             mupdf-headless
             tesseract

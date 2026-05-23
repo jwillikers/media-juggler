@@ -12,8 +12,8 @@ export const wikidata_api_url = "https://www.wikidata.org/w/rest.php/wikibase/v1
 export const wikidata_sparql_api_url = "https://query.wikidata.org/sparql?format=json&query="
 
 export const ereader_profiles = [
-    [model height width disk_label];
-    ["Kobo Elipsa 2E" 1872 1404 "KOBOeReader"]
+  [model height width disk_label];
+  ["Kobo Elipsa 2E" 1872 1404 "KOBOeReader"]
 ]
 
 export const image_extensions = [
@@ -35,19 +35,144 @@ export const audiobook_accompanying_document_file_extensions = [
   pdf
 ]
 
-export const musicbrainz_non_genre_tags = [
-  "abridged"
-  "accompanying document"
-  "audiobook"
-  "chapters"
-  "explicit"
-  # "light novel"
-  "novel"
-  "novelette"
-  "novella"
-  "short story"
-  "short story collection"
-  "unabridged"
+# Allowed tags
+export const tag_allowlist = [
+  [name aliases];
+  [abridged []]
+  ["accompanying document" []] # MusicBrainz
+  [book []]
+  [chapters []] # MusicBrainz
+  [explicit []]
+  [josei []]
+  ["light novel" []]
+  [manga []]
+  [manhwa [manhua]]
+  [novel []]
+  [novelette []]
+  [novella []]
+  [omnibus []]
+  [seinen []]
+  [shogi []] # Subject
+  [shōjo [shojo]]
+  [shōnen [shonen]]
+  ["short story" []]
+  ["short story collection" []]
+  ["unabridged" []]
+]
+
+# Allowed genres
+export const genre_allowlist = [
+  [name aliases wikidata_ids];
+  [action ["action fiction"] [Q1762165 Q15637293 Q104537024 Q20087918]]
+  [adventure ["adventure fiction"] [Q21802675 Q15712918 Q104536877]]
+  [apocalyptic ["apocalyptic fiction"] [Q3919251]]
+  [comedy [] [Q40831 Q15286013 Q11298158]]
+  ["comedy drama" [dramedy] [Q859369 Q15712927 Q104536976]]
+  ["coming-of-age" ["coming of age" "coming of age story"] [Q2975633 Q135684998]]
+  [cooking [] [Q139412567 Q139412557 Q11080558]]
+  ["dark fantasy" ["fantasy horror"] [Q794912 Q111254005]]
+  ["drama" [] [Q21010853 Q15637299 Q104536999]]
+  ["ecchi" [] [Q219559]]
+  ["epic" [] [Q121368788 Q136913634]]
+  ["erotic" [erotica] [Q181001 Q110293051 Q14831027]]
+  [fantasy [] [Q132311 Q15637301 Q104536908]]
+  ["fantasy comedy" ["comic fantasy"] [Q1637212 Q136842300]]
+  [fiction [] [Q8253]]
+  [grimdark [] [Q25338354]]
+  ["harem" [] [Q690342 Q111253933]]
+  ["hentai" [] [Q172067 Q21997246]]
+  ["high fantasy" ["epic fantasy"] [Q326439 Q138948720]]
+  ["historical" [] [Q1196408 Q101240934 Q11125143]]
+  ["historical fantasy" [] [Q603291]]
+  [horror [] [Q16575965 Q12767035]]
+  ["isekai" [] [Q53911753]]
+  ["iyashikei" [] [Q97358333]]
+  [LitRPG ["literary role-playing game" "literary RPG"] [Q25493967]]
+  ["magical girl" [] [Q752321]]
+  [mecha [] [Q4292083]]
+  [military [] [Q21803247 Q136913640]]
+  [mystery [] [Q6585139 Q15637305]]
+  [neo-noir [] [Q2421031]]
+  [non-fiction [nonfiction] [Q213051]]
+  ["paranormal" [] [Q7135551]]
+  [post-apocalyptic [] [Q197949 Q103016666 Q103111961]]
+  ["psychological" [] [Q101240581 Q101240583]]
+  ["psychological horror" [] [Q604725 Q139041604]]
+  ["psychological thriller" [] [Q590103 Q139041618]]
+  ["romance" [romantic "romantic fiction"] [Q19765983 Q15637310 Q104536775]]
+  ["romantic comedy" [romcom rom-com] [Q860626 Q15712145]]
+  ["romantic fantasy" [romantasy] [Q930383]]
+  ["science fantasy" [] [Q930383 Q137198951]]
+  ["science fiction" [sci-fi] [Q24925 Q5366020 Q103925653]]
+  ["school life" [] [Q10670466]]
+  ["sexual comedy" ["sex comedy" "erotic comedy"] [Q2991560 Q138807680]]
+  ["slice of life" [] [Q2561438 Q15428604]]
+  ["speculative fiction" [] [Q9326077]]
+  ["sports" [spokon] [Q139794801 Q2281511]]
+  ["steampunk" [] [Q223685 Q139558719]]
+  ["supernatural" ["supernaturalist"] [Q7644030 Q61942616]]
+  ["superhero" [] [Q7643432 Q139794817]]
+  ["sword and sorcery" ["sword & sorcery" "S&S" "heroic fantasy"] [Q1999690 Q139071253]]
+  [thriller [suspense] [Q182015 Q101240755]]
+  ["vampire" [] [Q111019576 Q111019582]]
+  ["villainess" [] []]
+  ["western" [] [Q367591 Q139270219]]
+  ["young adult" ["ya"] [Q111984153]]
+  ["yuri" [] [Q320568]]
+]
+
+export const intended_public_wikidata = [
+  [name aliases wikidata_id age_range gender];
+  [shōnen [shonen] Q231302 {begin: 10 end: 21} male]
+  [seinen [] Q237338 {begin: 18 end: 40} male]
+  [shōjo [shojo] Q242492 {begin: 10 end: 21} female]
+  [josei [shojo] Q503106 {begin: 18 end: 40} female]
+]
+
+export const form_of_creative_work_wikidata = [
+  [name wikidata_id];
+  ["light novel" Q747381]
+  [manhwa Q562214]
+  ["manhwa volume" Q137923899]
+  [manga Q8274]
+  ["manga chapter" Q53460949]
+  ["manga volume" Q125632018]
+  [novel Q8261]
+  # todo [novellette ]
+  [novella Q149537]
+  ["short story" Q49084]
+  ["short story collection" Q1279564]
+]
+
+# Age rating map between the ComicInfo and MetronInfo schemas
+export const age_rating_map = [
+  [comic_info metron_info age_range_begin];
+  [Unknown Everyone 0]
+  ["Rating Pending" null null]
+  ["Early Childhood" Everyone 0]
+  ["G" Everyone 0]
+  ["Everyone 10+" Everyone 10]
+  ["PG" Everyone 10]
+  ["Kids to Adults" Everyone 0]
+  ["Teen" Teen 13]
+  ["MA15+" "Teen Plus" 15]
+  ["Mature 17+" "Mature" 17]
+  ["M" "Mature" 17]
+  ["R18+" "Adult" 18]
+  ["Adults Only 18+" "Adult" 18]
+  ["X18+" "Explicit" 18]
+]
+
+export const intended_public_to_age_rating_comic_info_map = [
+  [intended_publics comic_info_age_rating metron_info_age_rating];
+  [[shōjo shōnen] "PG" "Everyone"]
+  [[jose seinen] "Teen" "Teen"]
+]
+
+export const genre_to_age_rating_comic_info_map = [
+  [genres comic_info_age_rating metron_info_age_rating];
+  [[erotic] "M" "Mature"]
+  [[hentai] "X18+" "Adult"]
 ]
 
 # Surround special characters in a string with square brackets
@@ -226,12 +351,39 @@ export def sanitize_file_name []: string -> string {
 
 export def use_unicode_in_title []: string -> string {
   let title = $in
-  $title | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…"
+  # We don't want to replace the "-" before the volume part with an emdash or endash.
+  let components = $title | split row --number 2 " - Volume "
+  let title = (
+    if ($components | length) > 1 {
+      $components | update 0 ($components | first | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…") | str join " - Volume "
+    } else {
+      $title | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…"
+    }
+  )
   mut new_title = $title
   while '"' in $new_title {
     $new_title = $new_title | str replace '"' '“' | str replace '"' '”'
   }
   $new_title
+}
+
+# Make the title look nice when named for a volume, i.e. use a comma before the volume word when there isn't any other punctuation.
+#
+# This basically end up being consistent with the MusicBrainz style guidelines.
+export def standardize_title []: string -> string {
+  let title = $in
+  # We don't want to replace the "-" before the volume part with an emdash or endash.
+  let components = $title | split row --number 2 " - Volume "
+  if ($components | length) > 1 {
+    # If the title of the series ends with punctuation, don't add a comma.
+    if ($components | first | split chars | last) in ["!", "?", ".", ","] {
+      $components | str join " Volume "
+    } else {
+      $components | str join ", Volume "
+    }
+  } else {
+    $title
+  }
 }
 
 # Get the type of a path via SSH
@@ -385,26 +537,6 @@ export def "ssh_path_exists" []: path -> bool {
   ($exit_code == 0)
 }
 
-# List files over SSH
-# export def "ssh_list_files_in_archive_with_extensions" [
-#   ...args: string
-# ]: path -> nothing {
-#   let input = $in
-#   let ssh_path = $input | split_ssh_path
-#   (
-#     ^unzip -l $archive
-#     | lines
-#     | drop nth 0 1
-#     | drop 2
-#     | str trim
-#     | parse "{length}  {date} {time}   {name}"
-#     | get name
-#     | uniq
-#     | sort
-#   )
-#   ^ssh $ssh_path.server nu --commands $"\'ls (...$args) ($ssh_path.path) | to json\'" | from json
-# }
-
 # Get the number of pages in a PDF
 export def pdf_page_count []: path -> int {
   let pdf = $in
@@ -436,8 +568,10 @@ export def pdf_page_count []: path -> int {
 # r'[- 0-9]{17}$)(?:97[89][- ]?)?[0-9]{1,5}'
 # r'[- ]?[0-9]+[- ]?[0-9]+[- ]?[0-9X]$',
 
-# todo Use a confidence rating for all ISBN results and use that to determine the most likely candidates?
 # Parse ISBN from text
+#
+# todo Use a confidence rating for all ISBN results and use that to determine the most likely candidates?
+# todo Add test cases for this function.
 export def parse_isbn [
 ]: list<string> -> list<string> {
   let text = $in
@@ -614,11 +748,6 @@ export def image_to_text []: path -> string {
   $result.stdout
 }
 
-# todo
-# export def isbn_10_to_isbn_13 []: string -> string {
-#   str substring 0 11
-# }
-
 # export def extract_isbn_from_image []: path -> list<string> {
 #   let image = $in
 #   $image | image_to_text | lines --skip-empty | parse_isbn
@@ -655,180 +784,14 @@ export def parse_comic_vine_issue_metadata []: record -> table {
   let metadata = $in | get md
 }
 
-# Extract the issue from ComicInfo.xml metadata
-#
-# todo Add tests
-export def issue_from_comic_info []: record -> string {
-  let comic_info = $in
-  let number = $comic_info | get content | where tag == "Number" | get content
-  if ($number | is-empty) {
-    return null
-  }
-  if ($number | length) > 1 {
-    log warning $"Somehow found multiple Number fields in the ComicInfo.xml metadata: ($number). Ignoring Number fields."
-    return null
-  }
-  let values = $number | first | get content
-  if ($values | is-empty) {
-    return null
-  }
-  if ($values | length) > 1 {
-    log warning $"Somehow found multiple values in the Number field of the ComicInfo.xml metadata: ($values). Ignoring Number field."
-    return null
-  }
-  $values | first
-}
-
-# Extract the issue year from ComicInfo.xml metadata
-#
-# todo Add tests
-export def issue_year_from_comic_info []: record -> string {
-  let comic_info = $in
-  let year = $comic_info | get content | where tag == "Year" | get content
-  if ($year | is-empty) {
-    return null
-  }
-  if ($year | length) > 1 {
-    log warning $"Somehow found multiple Year fields in the ComicInfo.xml metadata: ($year). Ignoring Year fields."
-    return null
-  }
-  let values = $year | first | get content
-  if ($values | is-empty) {
-    return null
-  }
-  if ($values | length) > 1 {
-    log warning $"Somehow found multiple years in the Year field of the ComicInfo.xml metadata: ($values). Ignoring Year field."
-    return null
-  }
-  $values | first
-}
-
-# Extract the series year from ComicInfo.xml metadata
-#
-# todo Add tests
-export def series_year_from_comic_info []: record -> string {
-  let comic_info = $in
-  let volume = $comic_info | get content | where tag == "Volume" | get content
-  if ($volume | is-empty) {
-    return null
-  }
-  if ($volume | length) > 1 {
-    log warning $"Somehow found multiple Volume fields in the ComicInfo.xml metadata: ($volume). Ignoring Volume fields."
-    return null
-  }
-  let values = $volume | first | get content
-  if ($values | is-empty) {
-    return null
-  }
-  if ($values | length) > 1 {
-    log warning $"Somehow found multiple volumes in the Volume field of the ComicInfo.xml metadata: ($values). Ignoring Volume field."
-    return null
-  }
-  $values | first
-}
-
-# Extract the series from ComicInfo.xml metadata
-#
-# todo Add tests
-export def series_from_comic_info []: record -> string {
-  let comic_info = $in
-  let series = $comic_info | get content | where tag == "Series" | get content
-  if ($series | is-empty) {
-    return null
-  }
-  if ($series | length) > 1 {
-    log warning $"Somehow found multiple Series fields in the ComicInfo.xml metadata: ($series). Ignoring Series fields."
-    return null
-  }
-  let values = $series | first | get content
-  if ($values | is-empty) {
-    return null
-  }
-  if ($values | length) > 1 {
-    log warning $"Somehow found multiple series in the Series field of the ComicInfo.xml metadata: ($values). Ignoring Series field."
-    return null
-  }
-  $values | first
-}
-
-# Extract the ISBN from ComicInfo.xml metadata
-#
-# The GTIN field stores a value that can be an ISBN.
-# todo Add tests
-export def isbn_from_comic_info []: record -> string {
-  let comic_info = $in
-  let gtin = $comic_info | get content | where tag == GTIN
-  if ($gtin | is-empty) {
-    return null
-  }
-  let isbn_numbers = ($gtin | first | get content | first | get content) | lines --skip-empty | reverse | parse_isbn
-  if ($isbn_numbers | is-empty) {
-    return null
-  }
-  if ($isbn_numbers | length) > 1 {
-    log warning $"Somehow found multiple ISBN numbers in the GTIN field of the ComicInfo.xml metadata: ($isbn_numbers). Ignoring GTIN field."
-    return null
-  }
-  $isbn_numbers | first
-}
-
-# Inject the ISBN in ComicInfo.xml metadata
-#
-# The GTIN field stores a value that can be an ISBN.
-# todo Add tests
-export def add_isbn_to_comic_info [
-  isbn: string
-]: record -> record {
-  let comic_info = $in
-  # let gtin = $comic_info | get content | where tag == GTIN
-  # if ($gtin | is-empty) {
-  #   (
-  #     $comic_info
-  #     | (
-  #       let i = $in;
-  #       $i
-  #       | update content (
-  #         $i
-  #         | get content
-  #         | append {
-  #           tag: GTIN
-  #           attributes: {}
-  #           content: [
-  #             [tag attributes content];
-  #             [null null $isbn]
-  #           ]
-  #         }
-  #       )
-  #     )
-  #   )
-  # } else {
-    (
-      $comic_info
-      | (
-        let i = $in;
-        $i
-        | update content (
-          $i
-          | get content
-          | where tag != "GTIN"
-          | append {
-            tag: "GTIN"
-            attributes: {}
-            content: [
-              [tag attributes content];
-              [null null $isbn]
-            ]
-          }
-        )
-      )
-    )
-  # }
-}
-
 export def upsert_comic_info [
-  field: record<tag: string, value: string>
+  field: record<tag: string, value>
 ]: record -> record {
   let comic_info = $in
+  if ($field.tag | is-empty) or ($field.value | is-empty) {
+    return $comic_info
+  }
+  # log debug $"upsert_comic_info: field: ($field)"
   (
     $comic_info
     | (
@@ -843,7 +806,7 @@ export def upsert_comic_info [
           attributes: {}
           content: [
             [tag attributes content];
-            [null null $field.value]
+            [null null ($field.value | into string)]
           ]
         }
       )
@@ -890,484 +853,6 @@ export def upsert_comic_info_content [
       )
     )
   )
-}
-
-# Extract the title from ComicInfo.xml metadata
-#
-# todo Add tests
-export def title_from_comic_info []: record -> string {
-  let comic_info = $in
-  let tags = $comic_info | get content | where tag == "Title"
-  if ($tags | is-empty) {
-    return null
-  }
-  let titles = $tags | first | get content | get content
-  if ($titles | is-empty) {
-    return null
-  }
-  if ($titles | length) > 1 {
-    log warning $"Somehow found multiple titles in the Title field of the ComicInfo.xml metadata: ($titles). Ignoring Title field."
-    return null
-  }
-  $titles | first
-}
-
-# Extract the metadata from an EPUB file in the OPF format
-export def opf_from_epub [
-  working_directory: directory
-]: path -> record {
-  let epub = $in
-  let opf_file = mktemp # ($epub | path parse | update  | update extension "opf" | path join)
-  log debug $"Running (ansi yellow)^ebook-meta --to-opf '($opf_file)' '($epub)'(ansi reset)";
-  ^ebook-meta --to-opf $opf_file $epub
-  let opf = open $opf_file | from xml
-  rm $opf_file
-  $opf
-}
-
-# Extract the metadata from an EPUB, CBZ, or sidecar OPF or ComicInfo.xml file
-#
-# The ISBN from a side-car ComicInfo.xml has the highest precedence, followed by a sidecar metadata.opf file.
-# Metadata embedded in an EPUB file or a ComicInfo.xml embedded in a CBZ or ZIP archive have the lowest precedence.
-# The sidecar metadata.opf and ComicInfo.xml files are assumed to reside in the same directory as the target file.
-#
-export def get_metadata [
-  working_directory: directory # The scratch-space directory to use
-]: path -> record {
-  let file = $in
-  let metadata = {}
-  let metadata = (
-    let comic_info_file = [($file | path dirname) "ComicInfo.xml"] | path join;
-    if ($comic_info_file | path exists) {
-      let comic_info = open $comic_info_file
-      if $comic_info == null {
-        $metadata
-      } else {
-        $metadata | insert comic_info $comic_info
-      }
-    } else {
-      $metadata
-    }
-  )
-
-  let metadata = (
-    let metadata_opf_file = [($file | path dirname) "metadata.opf"] | path join;
-    if ($metadata_opf_file | path exists) {
-      let opf = open $metadata_opf_file | from xml
-      if $opf == null {
-        $metadata
-      } else {
-        $metadata | insert opf $opf
-      }
-    } else {
-      $metadata
-    }
-  )
-
-  let input_format = $file | path parse | get extension
-  let metadata = (
-    if $input_format == "epub" {
-      let opf = $file | opf_from_epub $working_directory
-      if ($opf | is-empty) {
-        $metadata
-      } else {
-        $metadata | upsert opf (
-          if "opf" in $metadata {
-            $metadata | get opf | merge $opf
-          } else {
-            $opf
-          }
-        )
-      }
-    } else if $input_format in ["cbz" "zip"] {
-      let comic_info = $file | extract_comic_info_xml $working_directory
-      if $comic_info == null {
-        $metadata
-      } else {
-        $metadata | upsert comic_info (
-          if "comic_info" in $metadata {
-            $metadata | get comic_info | merge $comic_info
-          } else {
-            $comic_info
-          }
-        )
-      }
-    } else {
-      $metadata
-    }
-  )
-
-  $metadata
-}
-
-# Extract the ISBN from OPF metadata
-#
-# todo Add tests
-export def isbn_from_opf []: record -> string {
-  let opf = $in
-  let metadata = $opf | get content | where tag == "metadata" | get content
-  if ($metadata | is-empty) {
-    return null
-  }
-  if ($metadata | length) > 1 {
-    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring metadata."
-    return null
-  }
-  let isbn = $metadata | first | where tag == "identifier" | where attributes.scheme == "ISBN"
-  if ($isbn | is-empty) {
-    return null
-  }
-  if ($isbn | length) > 1 {
-    log warning $"Somehow found multiple ISBN numbers in the OPF metadata: ($metadata). Ignoring ISBN numbers."
-    return null
-  }
-  let isbn_values = $isbn | first | get content | get content
-  if ($isbn_values | is-empty) {
-    return null
-  }
-  if ($isbn_values | length) > 1 {
-    log warning $"Somehow found multiple ISBN values in the OPF metadata: ($metadata). Ignoring ISBN numbers."
-    return null
-  }
-  let isbn_numbers = ($isbn_values | first) | lines --skip-empty | reverse | parse_isbn
-  if ($isbn_numbers | is-empty) {
-    return null
-  }
-  if ($isbn_numbers | length) > 1 {
-    log warning $"Somehow parsed multiple ISBN numbers from the ISBN field of the OPF metadata: ($isbn_numbers). Ignoring ISBN numbers."
-    return null
-  }
-  $isbn_numbers | first
-}
-
-# Extract the issue from OPF metadata
-#
-# todo Add tests
-export def issue_from_opf []: record -> string {
-  let opf = $in
-  let metadata = $opf | get content | where tag == "metadata"
-  if ($metadata | is-empty) {
-    return null
-  }
-  if ($metadata | length) > 1 {
-    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring."
-    return null
-  }
-  let series_index = $metadata | first | get content | where tag == "meta" | where attributes.name == "calibre:series_index" | get attributes | get content
-  if ($series_index | is-empty) {
-    return null
-  }
-  if ($series_index | length) > 1 {
-    log warning $"Somehow found multiple calibre:series_index field of the OPF metadata: ($series_index). Ignoring."
-    return null
-  }
-  $series_index | first
-}
-
-# Extract the issue year from OPF metadata
-#
-# todo Add tests
-export def issue_year_from_opf []: record -> string {
-  let opf = $in
-  let metadata = $opf | get content | where tag == "metadata"
-  if ($metadata | is-empty) {
-    return null
-  }
-  if ($metadata | length) > 1 {
-    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring metadata."
-    return null
-  }
-  let date = $metadata | first | get content | where tag == "date"
-  if ($date | is-empty) {
-    return null
-  }
-  if ($date | length) > 1 {
-    log warning $"Somehow found multiple date fields in the OPF metadata: ($date). Ignoring."
-    return null
-  }
-  let values = $date | first | get content | get content
-  if ($values | is-empty) {
-    return null
-  }
-  if ($values | length) > 1 {
-    log warning $"Somehow found multiple values for the date field of the OPF metadata: ($values). Ignoring title field."
-    return null
-  }
-  $values | first | into datetime | format date "%Y"
-}
-
-# Extract the issue datetime from OPF metadata
-#
-# todo Add tests
-export def issue_datetime_from_opf []: record -> string {
-  let opf = $in
-  let metadata = $opf | get content | where tag == "metadata"
-  if ($metadata | is-empty) {
-    return null
-  }
-  if ($metadata | length) > 1 {
-    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring metadata."
-    return null
-  }
-  let date = $metadata | first | get content | where tag == "date"
-  if ($date | is-empty) {
-    return null
-  }
-  if ($date | length) > 1 {
-    log warning $"Somehow found multiple date fields in the OPF metadata: ($date). Ignoring."
-    return null
-  }
-  let values = $date | first | get content | get content
-  if ($values | is-empty) {
-    return null
-  }
-  if ($values | length) > 1 {
-    log warning $"Somehow found multiple values for the date field of the OPF metadata: ($values). Ignoring title field."
-    return null
-  }
-  $values | first | into datetime
-}
-
-# Extract the series from OPF metadata
-#
-# todo Add tests
-export def series_from_opf []: record -> string {
-  let opf = $in
-  let metadata = $opf | get content | where tag == "metadata"
-  if ($metadata | is-empty) {
-    return null
-  }
-  if ($metadata | length) > 1 {
-    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring."
-    return null
-  }
-  let series = $metadata | first | get content | where tag == "meta" | where attributes.name == "calibre:series" | get attributes | get content
-  if ($series | is-empty) {
-    return null
-  }
-  if ($series | length) > 1 {
-    log warning $"Somehow found multiple calibre:series fields of the OPF metadata: ($series). Ignoring."
-    return null
-  }
-  $series | first
-}
-
-# Extract the series year from OPF metadata
-#
-# I don't know how this is actually stored in OPF metadata if it is at all.
-# todo Add tests
-#
-# export def series_year_from_opf []: record -> string {
-#   ""
-# }
-
-# Extract the title from OPF metadata
-#
-# todo Add tests
-export def title_from_opf []: record -> string {
-  let opf = $in
-  let metadata = $opf | get content | where tag == "metadata"
-  if ($metadata | is-empty) {
-    return null
-  }
-  if ($metadata | length) > 1 {
-    log warning $"Somehow found multiple metadata fields of the OPF metadata: ($metadata). Ignoring metadata."
-    return null
-  }
-  let title = $metadata | first | get content | where tag == "title"
-  if ($title | is-empty) {
-    return null
-  }
-  if ($metadata | length) > 1 {
-    log warning $"Somehow found multiple title fields of the OPF metadata: ($title). Ignoring metadata."
-    return null
-  }
-  let titles = $title | first | get content | get content
-  if ($titles | is-empty) {
-    return null
-  }
-  if ($titles | length) > 1 {
-    log warning $"Somehow found multiple Titles field of the OPF metadata: ($titles). Ignoring title field."
-    return null
-  }
-  $titles | first
-}
-
-# Extract the ISBN from Comic Info and/or OPF metadata
-#
-# todo Add tests.
-#
-export def isbn_from_metadata [
-]: record -> string {
-  let metadata = $in
-  if $metadata == null or ($metadata | is-empty) {
-    return null
-  }
-
-  # Prefer the Comic Info metadata
-  let isbn = (
-    if "comic_info" in $metadata {
-      $metadata.comic_info | isbn_from_comic_info
-    } else {
-      null
-    }
-  )
-
-  if $isbn == null {
-    if "opf" in $metadata {
-      $metadata.opf | isbn_from_opf
-    } else {
-      null
-    }
-  } else {
-    $isbn
-  }
-}
-
-# Extract the issue from Comic Info and/or OPF metadata
-#
-# todo Add tests.
-#
-export def issue_from_metadata []: record -> string {
-  let metadata = $in
-  if $metadata == null or ($metadata | is-empty) {
-    return null
-  }
-
-  # Prefer the Comic Info metadata
-  let issue = (
-    if "comic_info" in $metadata {
-      $metadata.comic_info | issue_from_comic_info
-    } else {
-      null
-    }
-  )
-
-  if $issue == null {
-    if "opf" in $metadata {
-      $metadata.opf | issue_from_opf
-    } else {
-      null
-    }
-  } else {
-    $issue
-  }
-}
-
-# Extract the issue year from Comic Info and/or OPF metadata
-#
-# todo Add tests.
-#
-export def issue_year_from_metadata []: record -> string {
-  let metadata = $in
-  if $metadata == null or ($metadata | is-empty) {
-    return null
-  }
-
-  # Prefer the Comic Info metadata
-  let issue_year = (
-    if "comic_info" in $metadata {
-      $metadata.comic_info | issue_year_from_comic_info
-    } else {
-      null
-    }
-  )
-
-  if $issue_year == null {
-    if "opf" in $metadata {
-      let exact = $metadata.opf | issue_datetime_from_opf
-      # For some reason, this appears to be a placeholder and should be ignored
-      if $exact == ("2013-03-04T11:00:00+00:00" | into datetime) {
-        null
-      } else {
-        $exact | format date "%Y"
-      }
-    } else {
-      null
-    }
-  } else {
-    $issue_year
-  }
-}
-
-# Extract the series from Comic Info and/or OPF metadata
-#
-# todo Add tests.
-#
-export def series_from_metadata []: record -> string {
-  let metadata = $in
-  if $metadata == null or ($metadata | is-empty) {
-    return null
-  }
-
-  # Prefer the Comic Info metadata
-  let series = (
-    if "comic_info" in $metadata {
-      $metadata.comic_info | series_from_comic_info
-    } else {
-      null
-    }
-  )
-
-  if $series == null {
-    if "opf" in $metadata {
-      $metadata.opf | series_from_opf
-    } else {
-      null
-    }
-  } else {
-    $series
-  }
-}
-
-# Extract the series year from Comic Info and/or OPF metadata
-#
-# Don't know how to get the series year from OPF metadata, so the year can only be retrieved from Comic Info.
-#
-# todo Add tests.
-#
-export def series_year_from_metadata []: record -> string {
-  let metadata = $in
-  if $metadata == null or ($metadata | is-empty) {
-    return null
-  }
-  let series_year = (
-    if "comic_info" in $metadata {
-      $metadata.comic_info | series_year_from_comic_info
-    } else {
-      null
-    }
-  )
-}
-
-# Extract the title from Comic Info and/or OPF metadata
-#
-# todo Add tests.
-#
-export def title_from_metadata []: record -> string {
-  let metadata = $in
-  if $metadata == null or ($metadata | is-empty) {
-    return null
-  }
-
-  # Prefer the Comic Info metadata
-  let title = (
-    if "comic_info" in $metadata {
-      $metadata.comic_info | title_from_comic_info
-    } else {
-      null
-    }
-  )
-
-  if $title == null {
-    if "opf" in $metadata {
-      $metadata.opf | title_from_opf
-    } else {
-      null
-    }
-  } else {
-    $title
-  }
 }
 
 # Escape special characters like the opening bracket for the unzip command.
@@ -2188,174 +1673,6 @@ export def pdf_to_cbz [
   $cbz
 }
 
-# Parse metadata from a comic file name
-#
-# <series> (<series_year>) #<issue> (<issue_year>)
-export def metadata_from_comic_filename []: path -> record {
-  let file = $in
-  let stem = $file | path parse | get stem
-  let metadata = (
-    $stem
-    | parse --regex '(?P<series>.+?)\s+(?:\((?P<series_year>[0-9]+)\)\s+){0,1}#(?P<issue>[0-9]+)(?:\s+\((?P<issue_year>[0-9]+)\)){0,1}'
-  )
-  if ($metadata | is-empty) {
-    null
-  } else {
-    $metadata | first
-  }
-}
-
-# Incorporate metadata for ComicTagger in the filename.
-export def comic_file_name_from_metadata [
-  working_directory: directory
-  --issue: string
-  --issue-year: string
-  --series: string
-  --series-year: string
-]: path -> path {
-  let file = $in
-  let metadata = $file | get_metadata $working_directory
-  let title = $metadata | title_from_metadata
-  if $title != null {
-    log debug $"Title from metadata: ($title)"
-  }
-  let series = (
-    if $series == null {
-      $metadata | series_from_metadata
-    } else {
-      $series
-    }
-  )
-  let series_year = (
-    if $series_year == null {
-      $metadata | series_year_from_metadata
-    } else {
-      $series_year
-    }
-  )
-  let issue = (
-    if $issue == null {
-      $metadata | issue_from_metadata
-    } else {
-      $issue
-    }
-  )
-  let issue_year = (
-    if $issue_year == null {
-      $metadata | issue_year_from_metadata
-    } else {
-      $issue_year
-    }
-  )
-
-  let filename_metadata = $file | metadata_from_comic_filename
-  let series = (
-    if $series == null {
-      if $filename_metadata == null {
-        null
-      } else {
-        $filename_metadata | get series
-      }
-    } else {
-      $series
-    }
-  )
-  let series_year = (
-    if $series_year == null {
-      if $filename_metadata == null {
-        null
-      } else {
-        $filename_metadata | get series_year
-      }
-    } else {
-      $series_year
-    }
-  )
-  let issue = (
-    if $issue == null {
-      if $filename_metadata == null {
-        null
-      } else {
-        $filename_metadata | get issue
-      }
-    } else {
-      $issue
-    }
-  )
-  let issue_year = (
-    if $issue_year == null {
-      if $filename_metadata == null {
-        null
-      } else {
-        $filename_metadata | get issue_year
-      }
-    } else {
-      $issue_year
-    }
-  )
-
-  let parsed_title = (
-    if $title == null {
-      null
-    } else {
-      if ($title | str contains "Volume") {
-          (
-              $title
-              | parse --regex '(?P<series>.+) Volume (?P<issue>[0-9]+)'
-              | first
-          )
-      } else if ($title =~ '.*[\s,_]+[vV][oO][lL]\.*\s*[0-9]+') {
-          (
-              $title
-              | parse --regex '(?P<series>.+?)[\s,_]+[vV][oO][lL]\.*\s*(?P<issue>[0-9]+)'
-              | first
-          )
-      } else if $title =~ ".+ [0-9]+" {
-        $title
-        | parse --regex '(?P<series>.+) (?P<issue>[0-9]+)'
-        | first
-      } else {
-        { series: $title, issue: 1 }
-      }
-    }
-  )
-  if $parsed_title != null {
-    log debug $"Parsed the title as (ansi purple)($parsed_title)(ansi reset)"
-  }
-
-  let series = (
-    if $series == null {
-      if $parsed_title == null {
-        null
-      } else {
-        log debug $"Parsed the series as (ansi purple)'($parsed_title.series)'(ansi reset) from the title"
-        $parsed_title.series
-      }
-    } else {
-      $series
-    }
-  )
-  let issue = (
-    if $issue == null {
-      if $parsed_title == null {
-        null
-      } else {
-        log debug $"Parsed the issue as (ansi purple)'($parsed_title.issue)'(ansi reset) from the title"
-        $parsed_title.issue
-      }
-    } else {
-      $issue
-    }
-  )
-
-  if $series == null and $issue == null {
-    log error $"Unable to determine the series and issue from the metadata title '($title)'. Pass the Comic Vine issue id with the (ansi green)--comic-vine-issue-id(ansi reset) flag."
-    $file
-  } else {
-    $file | path parse | update stem $"($series) \(($series_year)\) #($issue) \(($issue_year)\)" | path join
-  }
-}
-
 # Convert a FLAC to an OGA
 #
 # ffmpeg drops embedded cover art.
@@ -2479,51 +1796,6 @@ export def get_zip_image_dimensions []: path -> string {
     | sort-by --reverse count
     | first
   )
-}
-
-# Replace low resolution image files in a CBZ with the corresponding page from the EPUB formatted for the primary resolution.
-#
-# Sometime icons or decorations will be saved in low resolution image files in an EPUB.
-# The EPUB will place the image at a reasonable scale somewhere on the page.
-# Extracting this directly to a CBZ will cause the low resolution image to be blown up, which looks heavily pixelated.
-# To mitigate this, this function uses the original EPUB to produce an image of the page at the proper resolution.
-# This ensures the page appears correctly in the CBZ.
-#
-# The original images are preserved in a hidden folder in the CBZ.
-# todo I need to be sure that CBZ viewers on KOReader and Kavita don't try to show the hidden files.
-#
-# Actually, this appears to have been an issue with KOReader, so this functionality probably isn't necessary.
-#
-export def replace_low_res_images_in_cbz_with_formatted_from_epub []: [
-  record<cbz: path, epub: path> -> path
-] {
-  let input = $in
-  let dimensions = $input.cbz | get_zip_image_dimensions
-  log debug $"Image dimensions in archive (ansi yellow)($input.cbz)(ansi reset) are ($dimensions)"
-  let format = $input.cbz | get_image_extension
-  let format = (
-    if ($format == "jpg") {
-      "jpeg"
-    } else {
-      $format
-    }
-  )
-
-  # -no-convert
-  (
-    ^cbconvert
-    convert
-    --filter 7
-    --no-cover
-    --no-convert
-    --quality 100
-    --width $dimensions.width
-    --height $dimensions.height
-    $input.cbz
-  )
-
-  # Convert
-  $input.cbz
 }
 
 # Search for an edition on Hardcover by id such as ASIN, ISBN, or hardcover edition id.
@@ -2730,6 +2002,1503 @@ export def hyphenate_isbn []: [string -> string] {
   $result.stdout | str trim
 }
 
+# Validate an ISBN with the isbn_validate program from isbntools
+export def validate_isbn []: [string -> bool] {
+  let isbn = $in
+  let result = do { ^isbn_validate $isbn } | complete
+  if ($result.exit_code != 0) {
+    log error $"Error validating ISBN (ansi yellow)($isbn)(ansi reset): ($result.stderr)"
+    return null
+  }
+  $result.stdout | is-not-empty
+}
+
+export const book_identifiers = {
+  bookbrainz_edition_id: {
+    match_expression: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    url: "https://bookbrainz.org/edition/{{ bookbrainz_edition_id }}"
+    # url_match_expression: "^http[s]{0,1}://bookbrainz.org/edition/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    url_parse_expression: '^http[s]{0,1}://bookbrainz.org/edition/(?<bookbrainz_edition_id>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/{0,1}$'
+  }
+  bookbrainz_work_id: {
+    match_expression: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    url: "https://bookbrainz.org/work/{{ bookbrainz_work_id }}"
+    # url_match_expression: "^http[s]{0,1}://bookbrainz.org/work/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    url_parse_expression: '^http[s]{0,1}://bookbrainz.org/work/(?<bookbrainz_work_id>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/{0,1}$'
+  }
+  comic_vine_issue_id: {
+    match_expression: '^4000-[0-9]+$'
+    url: "https://comicvine.gamespot.com/issue/{{ comic_vine_issue_id }}"
+    url_parse_expression: '^http[s]{0,1}://comicvine.gamespot.com/[a-zA-Z0-9_-]+/(?<comic_vine_issue_id>4000-[0-9]+)/{0,1}$'
+  }
+  hardcover_book_slug: {
+    # More characters than this are probably allowed.
+    match_expression: '^[a-zA-Z0-9_-]+$'
+    url: "https://hardcover.app/books/{{ hardcover_book_slug }}"
+    url_parse_expression: '^http[s]{0,1}://hardcover.app/books/(?<hardcover_book_slug>[a-zA-Z0-9_-]+)(?:(?:/editions/(?<hardcover_edition_id>[0-9]+)/{0,1})|(?:/.*)|(?:/{0,1}))$'
+  }
+  hardcover_edition_id: {
+    match_expression: '^[0-9]+$'
+    url: "https://hardcover.app/books/{{ hardcover_book_slug }}/editions/{{ hardcover_edition_id }}"
+    edition_url: "https://hardcover.app/edition/id/{{ hardcover_edition_id }}"
+    url_parse_expression: "^http[s]{0,1}://hardcover.app/(?:(?:books/(?<hardcover_book_slug>[a-zA-Z0-9_-]+)/editions)|(?:edition/id))/(?<hardcover_edition_id>[0-9]+)/{0,1}$"
+  }
+  metron_issue_id: {
+    match_expression: '^[0-9]+$'
+    url: "https://metron.cloud/issue/{{ metron_issue_id }}"
+    url_parse_expression: '^http[s]{0,1}://metron.cloud/issue/(?<metron_issue_id>[0-9]+)/{0,1}$'
+  }
+  open_library_edition_id: {
+    match_expression: '^OL[0-9]+M$'
+    url: "https://openlibrary.org/books/{{ open_library_edition_id }}"
+    url_parse_expression: '^http[s]{0,1}://openlibrary.org/books/(?<open_library_edition_id>OL[0-9]+M)(?:(?:/.+)|(?:/{0,1}))$'
+  }
+  open_library_work_id: {
+    match_expression: '^OL[0-9]+W$'
+    url: "https://openlibrary.org/works/{{ open_library_work_id }}"
+    url_parse_expression: '^http[s]{0,1}://openlibrary.org/(?:books|works)/(?<open_library_work_id>OL[0-9]+W)(?:(?:/.+)|(?:/{0,1}))$'
+  }
+  wikidata_item_id: {
+    match_expression: '^Q[0-9]+$'
+    url: "https://www.wikidata.org/wiki/{{ wikidata_item_id }}"
+    url_parse_expression: '^http[s]{0,1}://www.wikidata.org/wiki/(?<wikidata_item_id>Q[0-9]+)/{0,1}$'
+  }
+}
+
+# Check if an identifier of the specified type is valid by checking it against a regular expression
+export def is_identifier_valid [
+  type: string # Identifier type. See columns in book_identifiers for available types.
+]: [string -> bool] {
+  let id = $in
+  if ($type | is-empty) {
+    error make {
+      msg: "empty identifier type"
+      labels: [
+          {text: "type" span: (metadata $type).span}
+      ]
+      help: "pass a nonempty value for the type field"
+    }
+  }
+  if $type not-in ($book_identifiers | columns) {
+    error make {
+      msg: "invalid identifier type"
+      labels: [
+          {text: "type" span: (metadata $type).span}
+      ]
+      help: $"the value for the type field must be one of ($book_identifiers | columns)"
+    }
+  }
+  if ($id | is-empty) {
+    return false
+  }
+  $id =~ ($book_identifiers | get $type | get match_expression)
+}
+
+export def identifier_into_url [
+  type: string # Identifier type. See columns in book_identifiers for available types.
+  --hardcover-book-slug: string # Required when the type is hardcover_edition_id
+]: [string -> string] {
+  let id = $in
+  if ($id | is-empty) {
+    error make {
+      msg: "empty id"
+      labels: [
+          {text: "id" span: (metadata $id).span}
+      ]
+      help: "pipe the value of an id into identifier_into_url"
+    }
+  }
+  if ($type | is-empty) {
+    error make {
+      msg: "empty identifier type"
+      labels: [
+          {text: "type" span: (metadata $type).span}
+      ]
+      help: "pass a nonempty value for the type field"
+    }
+  }
+  if $type not-in ($book_identifiers | columns) {
+    error make {
+      msg: "invalid identifier type"
+      labels: [
+          {text: "type" span: (metadata $type).span}
+      ]
+      help: $"invalid value (ansi yellow)($type)(ansi reset) for the type field must be one of ($book_identifiers | columns)"
+    }
+  }
+  if $type != "hardcover_edition_id" and ($hardcover_book_slug | is-not-empty) {
+    error make {
+      msg: "invalid use of --hardcover-book-slug"
+      labels: [
+        {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
+      ]
+      help: "the flag --hardcover-book-slug is only valid when the type is hardcover_edition_id"
+    }
+  }
+  if not ($id | is_identifier_valid $type) {
+    error make {
+      msg: "invalid identifier"
+      labels: [
+        {text: "in" span: (metadata $in).span}
+      ]
+      help: $"the (ansi red)($id)(ansi reset) of type (ansi yellow)($type)(ansi reset) is invalid"
+    }
+  }
+  if $type == "hardcover_edition_id" and ($hardcover_book_slug | is-not-empty) and not ($hardcover_book_slug | is_identifier_valid "hardcover_book_slug") {
+    error make {
+      msg: "invalid hardcover_book_slug identifier"
+      labels: [
+        {text: "hardcover_book_slug" span: (metadata $hardcover_book_slug).span}
+      ]
+      help: $"the Hardcover book slug (ansi red)($hardcover_book_slug)(ansi reset) is invalid"
+    }
+  }
+  let url = $book_identifiers | get $type | get url | str replace ("{{ " + $type + " }}") $id
+  if $type == "hardcover_edition_id" {
+    if ($hardcover_book_slug | is-empty) {
+      $book_identifiers | get $type | get edition_url | str replace "{{ hardcover_edition_id }}" $id
+    } else {
+      $url | str replace "{{ hardcover_book_slug }}" $hardcover_book_slug
+    }
+  } else {
+    $url
+  }
+}
+
+# Parse a book identifier from its URL
+#
+# When the identifier is hardcover_edition_id, the hardcover_book_slug will also be included in the result.
+export def identifier_from_url [
+  type: string # Identifier type. See columns in book_identifiers for available types.
+]: [string -> record] {
+  let url = $in
+  if ($url | is-empty) {
+    error make {
+      msg: "empty url"
+      labels: [
+        {text: "url" span: (metadata $url).span}
+      ]
+      help: "pipe a url string into identifier_from_url"
+    }
+  }
+  if ($type | is-empty) {
+    error make {
+      msg: "empty identifier type"
+      labels: [
+        {text: "type" span: (metadata $type).span}
+      ]
+      help: "pass a nonempty value for the type field"
+    }
+  }
+  if $type not-in ($book_identifiers | columns) {
+    error make {
+      msg: "invalid identifier type"
+      labels: [
+        {text: "type" span: (metadata $type).span}
+      ]
+      help: $"the value for the type field must be one of ($book_identifiers | columns)"
+    }
+  }
+  let ids = $url | parse --regex ($book_identifiers | get $type | get url_parse_expression)
+  if ($ids | is-empty) {
+    return {}
+  }
+  # This should never happen.
+  if ($ids | length) > 1 {
+    error make {
+      msg: $"more than one ID of type (ansi purple)($type)(ansi reset) parsed from URL (ansi yellow)($url)(ansi reset): ($ids)"
+      labels: [
+        {text: "ids" span: (metadata $ids).span}
+      ]
+      help: "parsing multiple ids of the same type from a URL should not be possible"
+    }
+  }
+  let ids = $ids | first
+  # Filter out empty IDs and double check that the identifier is valid.
+  # The parse regex should only parse valid identifiers in the first place.
+  # log debug $"ids: ($ids)"
+  $ids | columns | reduce --fold {} {|type acc|
+    # log debug $"type: ($type)"
+    # log debug $"id: ($id)"
+    if ($ids | get --optional $type | is-empty) {
+      $acc
+    } else {
+      if not ($ids | get $type | is_identifier_valid $type) {
+        error make {
+          msg: $"the (ansi red)($ids | get $type)(ansi reset) of type (ansi yellow)($type)(ansi reset) is invalid"
+          labels: [
+            {text: "ids" span: (metadata $ids).span}
+          ]
+          help: $"there is a problem with the url_parse_expression (ansi yellow)($book_identifiers | get $type | get url_parse_expression)(ansi reset) parsing invalid IDs of type (ansi yellow)($type)(ansi reset)"
+        }
+      } else {
+        $acc | insert $type ($ids | get $type)
+      }
+    }
+  }
+}
+
+export const comic_info_fields = [
+  [tag delimiter];
+  [Title null]
+  [LocalizedSeries null]
+  [Series null]
+  [SeriesGroup ","]
+  [StoryArc ","]
+  [StoryArcNumber ","]
+  [AlternativeSeries null]
+  [AlternativeCount null]
+  [SeriesSort null]
+  [Count null]
+  [Number null]
+  [Volume null]
+  [Summary null]
+  [Notes null]
+  [Year null]
+  [Month null]
+  [Day null]
+  [Locations ","]
+  [Characters ","]
+  [Teams ","]
+  [MainCharacterOrTeam null]
+  [ScanInformation null]
+  [Writer ","]
+  [Penciller ","]
+  [Inker ","]
+  [Colorist ","]
+  [Letterer ","]
+  [CoverArtist ","]
+  [Editor ","]
+  [Translator ","]
+  [Publisher null]
+  [Imprint null]
+  [Genre ","]
+  [Tags ","]
+  [Web " "]
+  [PageCount null]
+  [LanguageISO null]
+  [GTIN null]
+  [Format null]
+  [Manga null]
+  [AgeRating null]
+]
+
+export const comic_vine_roles_map = [
+  [comic_vine_roles comic_info_roles];
+  [[Writer] [Writer]]
+  [[Penciller] [Penciller]]
+  [[Inker] [Inker]]
+  [[Colorist] [Colorist]]
+  [[Letterer] [Letterer]]
+  # I think ComicTagger does Penciller and Inker by default for Artist.
+  # I also include Colorist since usually, there's color of some sort in most comics and manga, even if it's only on the cover for manga.
+  [[Artist] [Penciller Inker Colorist]]
+  # [[Designer] []]
+  # CoverArtist requires both the Cover and the Artist roles.
+  [[Cover Artist] [CoverArtist]]
+  [[Editor] [Editor]]
+  [[Translator] [Translator]]
+  # [[Production] []]
+]
+
+# Filter and rename genres or tags according to the allow list
+export def sanitize_genres_or_tags [
+  allowlist: table<name: string, aliases: list<string>> # The allow list
+]: [list<string> -> list<string>] {
+  let tags = $in
+  if ($allowlist | is-empty) {
+    error make {
+      msg: "empty allowlist"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: "pass a non-empty allowlist for the allowlist argument"
+    }
+  }
+  if ($tags | is-empty) {
+    return []
+  }
+
+  $tags | reduce --fold [] {|tag acc|
+    let lowercase_tag = $tag | str downcase
+    let matching_tags = $allowlist | where {|allowed_tag|
+      (($allowed_tag.name | str downcase) == $lowercase_tag) or ($allowed_tag.aliases | any {|alias| $lowercase_tag == ($alias | str downcase)})
+    }
+    if ($matching_tags | is-empty) {
+      log debug $"Ignoring tag/genre: (ansi purple)($tag)(ansi reset)"
+      $acc
+    } else if ($matching_tags | length) == 1 {
+      $acc | append ($matching_tags.name | first)
+    } else {
+      error make {
+        msg: "multiple matches in the allowlist"
+        labels: [
+          {text: "matching_tags" span: (metadata $matching_tags).span}
+        ]
+        help: $"found multiple matches for (ansi yellow)($tag)(ansi reset) in the allowlist ($allowlist): (ansi yellow)($matching_tags)(ansi reset)"
+      }
+    }
+  } | sort
+}
+
+# Read a ComicInfo.xml file into the internal data structure
+#
+# https://anansi-project.github.io/docs/comicinfo/documentation
+# https://wiki.kavitareader.com/guides/metadata/comics/
+export def from_comic_info_xml []: [record -> record] {
+  let comic_info_xml = $in
+  if ($comic_info_xml | is-empty) {
+    error make {
+      msg: "empty ComicInfo XML data"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: $"pipe in the ComicInfo XML data"
+    }
+  }
+  if ($comic_info_xml | get --optional tag) != "ComicInfo" {
+    error make {
+      msg: "top-level tag of ComicInfo XML is not ComicInfo"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: $"use valid ComicInfo XML data where the top-level tag is ComicInfo"
+    }
+  }
+  let comic_info_xml = ($comic_info_xml | get --optional content)
+  if ($comic_info_xml | is-empty) {
+    error make {
+      msg: "missing content for ComicInfo XML data"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: $"use valid ComicInfo XML data"
+    }
+  }
+
+  # Parse the ComicInfo.xml data into a more usable JSON format.
+  let json = (
+    $comic_info_fields
+    | reduce --fold {} {|comic_info_field, acc|
+      let tags = ($comic_info_xml | where tag == $comic_info_field.tag)
+      if ($tags | is-empty) {
+        return $acc
+      }
+      if ($tags | length) > 1 {
+        error make {
+          msg: "duplicate tag in ComicInfo XML data"
+          labels: [
+              {text: "comic_info_xml" span: (metadata $comic_info_xml).span}
+          ]
+          help: $"duplicate tag in ComicInfo.xml: (ansi red)($comic_info_field.tag)(ansi reset)"
+        }
+      }
+      let value = $tags | first | get content | first | get content
+      if ($value | is-empty) {
+        return $acc
+      }
+      if ($comic_info_field.delimiter | is-empty) {
+        return ($acc | insert $comic_info_field.tag $value)
+      }
+      $acc | insert $comic_info_field.tag ($value | split row $comic_info_field.delimiter | str trim)
+    }
+  )
+  # log debug $"json: ($json | to nuon)"
+
+  # Include a mapping from the ComicInfo roles Penciller and Inker to the Artist Comic Vine role.
+  # The Colorist role is kind of optional for that mapping.
+  let comic_vine_roles_map = (
+    $comic_vine_roles_map
+    | append [[comic_vine_roles comic_info_roles]; [[Cover Artist] [Penciller Inker Colorist CoverArtist]]]
+    | append [[comic_vine_roles comic_info_roles]; [[Cover Artist] [Penciller Inker CoverArtist]]]
+    | append [[comic_vine_roles comic_info_roles]; [[Artist] [Penciller Inker]]]
+  )
+  let comic_info_contributors = $comic_vine_roles_map.comic_info_roles | flatten | uniq | reduce --fold [] {|comic_info_role acc|
+    let contributors_for_role = $json | get --optional $comic_info_role
+    if ($contributors_for_role | is-empty) {
+      return $acc
+    }
+    $acc | append (
+      $contributors_for_role | each {|contributor|
+        {
+          person: $contributor
+          role: $comic_info_role
+        }
+      }
+    )
+  }
+  # | group-by --to-table person
+  # log debug $"comic_info_contributors: ($comic_info_contributors)"
+
+  let contributors = (
+    if ($comic_info_contributors | is-empty) {
+    } else {
+      $comic_info_contributors.person | uniq | reduce --fold [] {|person acc|
+        # I need to remove the matched roles so that they aren't matched again.
+        # log debug $"person: ($person)"
+       let roles = (
+          $comic_vine_roles_map
+          # Sort by the number of ComicInfo roles first so that we find the best Comic Vine role based on the highest number of matching ComicInfo roles.
+          | sort-by --custom {|a b| ($a.comic_info_roles | length) >= ($b.comic_info_roles | length)}
+          | reduce --fold {} {|comic_vine_role_mapping comic_vine_roles_acc|
+            # If all roles have been matched, we're done.
+            if ($comic_vine_roles_acc | is-not-empty) and ($comic_vine_roles_acc.matched_comic_info_roles | length) >= ($comic_info_contributors | where person == $person | get role | uniq | length) {
+              return $comic_vine_roles_acc
+            }
+            let person_roles = $comic_info_contributors | where person == $person | get role
+            let unmatched_comic_info_roles = (
+              if ($comic_vine_roles_acc | is-empty) {
+                $person_roles
+              } else {
+                $person_roles | where {|role| $role not-in $comic_vine_roles_acc.matched_comic_info_roles}
+              }
+            )
+            # All required ComicInfo roles are in the person's roles.
+            if ($comic_vine_role_mapping.comic_info_roles | all {|comic_info_role| $comic_info_role in $unmatched_comic_info_roles }) {
+              {
+                matched_comic_info_roles: (
+                  if ($comic_vine_roles_acc | get --optional comic_info_roles | is-empty) {
+                    $comic_vine_role_mapping.comic_info_roles
+                  } else {
+                    $comic_vine_roles_acc.comic_info_roles | append $comic_vine_role_mapping.comic_info_roles
+                  }
+                )
+                comic_vine_roles: (
+                  if ($comic_vine_roles_acc | get --optional comic_vine_roles | is-empty) {
+                    $comic_vine_role_mapping.comic_vine_roles
+                  } else {
+                    $comic_vine_roles_acc.comic_vine_roles | append $comic_vine_role_mapping.comic_vine_roles
+                  }
+                )
+              }
+            } else {
+              $comic_vine_roles_acc
+            }
+          } | get comic_vine_roles
+        )
+        # log debug $"roles: ($roles)"
+        $roles | reduce --fold $acc {|role inner_acc|
+          # $inner_acc | append {
+          #   person: $person
+          #   role: $role
+          #   primary: false
+          #   language: ""
+          # }
+            $inner_acc | append [
+              [person role primary language];
+              [$person $role false ""]
+            ]
+        }
+          # $roles | each {|role|
+            # [
+            #   [person role primary language];
+            #   [$person $role false null]
+            # ]
+            # {
+            #   person: $person
+            #   role: $role
+            #   primary: false
+            #   language: ""
+            # }
+          # }
+        # )
+      }
+    }
+  )
+  # log debug $"contributors: ($contributors)"
+  let contributors = (
+    if ($contributors | is-not-empty) {
+      $contributors | sort-by --custom {|a b|
+        if $a.person == $b.person {
+          $a.role < $b.role
+        } else {
+          $a.person < $b.person
+        }
+      }
+    }
+  )
+
+  # let contributors = (
+  #   $comic_vine_roles_map.comic_info_roles
+  #   # Sort by the number of roles first.
+  #   | sort-by --custom {|a b| ($a | length) >= ($b | length)}
+  #   | reduce --fold [] {|mapping acc|
+  #     # Where each contributor
+  #     let contributors = $json | where {|it|  }
+  #     if ($contributors | is-empty) {
+  #       return $acc
+  #     }
+  #     $acc | append (
+  #       $contributors | each {|contributor|
+  #         {
+  #           person: $contributor
+  #           role: $tag.role
+  #         }
+  #       }
+  #     )
+  #   }
+  # )
+
+  let imprints = (
+    if ($json | get --optional Imprint | is-empty) {
+    } else {
+      $json.Imprint | split row "," | reduce --fold [] {|imprint acc|
+        if ($imprint | str starts-with " ") {
+          if ($acc | is-empty) {
+            $acc | append ($imprint | str trim)
+          } else {
+            if ($imprint | str trim | str downcase) in ["llc" "inc" "inc." "ltd", "co", "company", "corporation", "corp", "limited"] {
+              # This is probably a suffix for the previous imprint, so it should be included with the previous imprint rather than as its own imprint.
+              let last_index  = ($acc | length) - 1
+              $acc | update $last_index (($acc | last) + ", " + ($imprint | str trim))
+            } else {
+              $acc | append ($imprint | str trim)
+            }
+          }
+        } else {
+          $acc | append ($imprint | str trim)
+        }
+      }
+    }
+  )
+  let publishers = (
+    if ($json | get --optional Publisher | is-empty) {
+    } else {
+      $json.Publisher | split row "," | reduce --fold [] {|publisher acc|
+        if ($publisher | str starts-with " ") {
+          if ($acc | is-empty) {
+            $acc | append ($publisher | str trim)
+          } else {
+            if ($publisher | str trim | str downcase) in ["llc" "inc" "inc." "ltd", "co", "company", "corporation", "corp", "limited"] {
+              # This is probably a suffix for the previous imprint, so it should be included with the previous imprint rather than as its own imprint.
+              let last_index  = ($acc | length) - 1
+              $acc | update $last_index (($acc | last) + ", " + ($publisher | str trim))
+            } else {
+              $acc | append ($publisher | str trim)
+            }
+          }
+        } else {
+          $acc | append ($publisher | str trim)
+        }
+      }
+    }
+  )
+
+  # Check for erroneous volume titles in this field.
+  let chapter_title = (
+    if ($json | get --optional "Title" | is-empty) {
+
+    } else {
+      if $json.Title =~ ' (?:(?:Vol\.)|(?:Volume)|(?:Book)) .+$' {
+        # This is almost certainly a volume title and will be omitted.
+      } else {
+        $json.Title
+      }
+    }
+  )
+
+  let issue = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+        $json | get --optional Number
+    } else {
+      # This is manga, so the Number field should be the chapter index.
+      # The issue number should come from the Volume field in this case.
+      let volume = $json | get --optional Volume
+      if ($volume | is-empty) {
+        # If the Volume is missing or if the title looks like it's for a volume, use the Number field as the issue.
+        # if ($json | get --optional "Title" | is-empty) {
+        #   $json | get --optional Number
+        # } else {
+        #   if $json.Title =~ ' (?:(?:Vol\.)|(?:Volume)|(?:Book)) .+$' {
+        #     $json | get --optional Number
+        #   } else {
+        #     # Nothing
+        #   }
+        # }
+      } else {
+        $volume
+      }
+    }
+  )
+
+  let volume = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+      $json | get --optional Volume
+    } else {
+      # This is manga, so the Volume is used as the volume number in the series.
+      # Ignore this field in that case.
+    }
+  )
+
+  let chapter_index = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+      # Chapter index is only for manga.
+    } else {
+      $json | get --optional Number
+    }
+  )
+
+  # Issue count can be the number of chapters or the number of volumes for manga.
+  let issue_count = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+      $json | get --optional Count
+    } else {
+      if ($chapter_index | is-empty) {
+        # Assume the Count field holds the number of chapters if the chapter_index exists.
+      } else {
+        $json | get --optional Count
+      }
+    }
+  )
+
+  let chapter_count = (
+    if ($json | get --optional Manga | is-empty) or (($json | get --optional Manga | is-not-empty) and $json.Manga == "No") {
+      # Only used for manga
+    } else {
+      if ($chapter_index | is-empty) {
+        # Assume the Count field holds the number of volumes if there is no chapter index.
+        $json | get --optional Count
+      } else {
+      }
+    }
+  )
+
+  let ids_and_urls = (
+    if ($json | get --optional Web | is-empty) {
+    } else {
+      $json.Web | reduce --fold [] {|url acc| |
+        $acc | append (
+          let id = (
+            # We always need to try the hardcover_edition_id before the hardcover_book_slug in order to get both.
+            $book_identifiers | reject hardcover_edition_id | columns | prepend hardcover_edition_id | reduce --fold {} {|identifier_type identifier_acc|
+              # Book identifier has been determined.
+              if ($identifier_acc | is-not-empty) {
+                return $identifier_acc
+              }
+              # log debug $"id ($url)"
+              # log debug $"id ($identifier_type)"
+              let id = $url | identifier_from_url $identifier_type
+              # log debug $"id ($id)"
+              if ($id | is-not-empty) {
+                if ("hardcover_book_slug" in ($id | columns) and "hardcover_edition_id" in ($id | columns)) {
+                  [
+                    [url type id];
+                    [$url hardcover_edition_id $id.hardcover_edition_id]
+                    [$url hardcover_book_slug $id.hardcover_book_slug]
+                  ]
+                } else {
+                  {
+                    url: $url
+                    type: $identifier_type
+                    id: ($id | get $identifier_type)
+                  }
+                }
+              }
+            }
+          );
+          if ($id | is-empty) {
+            {
+              url: $url
+              type: null
+              id: null
+            }
+          } else {
+            $id
+          }
+        )
+      }
+    }
+  )
+  let ids = (
+    if ($ids_and_urls | is-not-empty) {
+      $ids_and_urls | where {|it| ($it.id | is-not-empty)} | reject --optional url | sort-by type
+    }
+  )
+  let links = (
+    if ($ids_and_urls | is-not-empty) {
+      $ids_and_urls | where {|it| ($it.id | is-empty)} | get url | sort
+    }
+  )
+
+  # Series fields in priority order: SeriesSort, LocalizedSeries, Series
+  let series_fields = [SeriesSort LocalizedSeries Series]
+  let series = (
+    $series_fields | reduce --fold [] {|series_field, acc|
+      if ($json | get --optional $series_field | is-empty) {
+        return $acc
+      }
+      $acc | append (
+        {
+          name: ($json | get $series_field)
+        }
+      )
+    }
+  )
+
+  let publication_date = (
+    if ([Year Month Day] | all {|it| $it in ($json | columns)}) {
+      []
+      | append ($json | get --optional Year)
+      | append ($json | get --optional Month)
+      | append ($json | get --optional Day)
+      | str join "-"
+      | into datetime --timezone UTC
+    }
+  )
+
+  # let narrative_fields = [Locations Characters Teams MainCharacterOrTeam]
+  # let narrative = $narrative_fields | reduce --fold {narrative: {}} {|narrative_field, acc|
+  #   if ($json | get --optional $narrative_field | is-empty) {
+  #     return $acc
+  #   }
+  #   (
+  #     $acc
+  #     | update narrative (
+  #       $acc.narrative
+  #       | insert $narrative_field (
+  #         $json | get $narrative_field
+  #       )
+  #     )
+  #   )
+  # }
+  # StoryArc and StoryArcNumber have to handled specially for the narrative field.
+
+  # todo
+  # AlternativeSeries
+  # AlternativeCount
+
+  let issue_id = (
+    if ($ids | is-not-empty) {
+      $ids | where type == "comic_vine_issue_id" | get id | first
+    }
+  )
+
+  let language = (
+    let language = $json | get --optional LanguageISO;
+    if ($language | is-not-empty) {
+      try {
+        $language | from_language_code
+      } catch {|error|
+        log warning $"Unknown language code in ComicInfo: (ansi red)($language)(ansi reset)"
+        null
+      }
+    }
+  )
+
+  let genres = (
+    if ($json | get --optional Genre | is-not-empty) {
+      $json.Genre | sanitize_genres_or_tags $genre_allowlist
+    }
+  )
+
+  let tags = (
+    if ($json | get --optional Tags | is-not-empty) {
+      # Tags have such a broad range that sanitizing them might prove difficult.
+      # I need a way to ensure I don't lose any tags on accident.
+      # $json.Tags | sanitize_genres_or_tags $tag_allowlist
+      $json.Tags
+    }
+  )
+
+  let comic_info_age_rating = (
+    if ($json | get --optional AgeRating | is-not-empty) and $json.AgeRating in ($age_rating_map.comic_info | uniq) {
+      $json.AgeRating
+    }
+  )
+
+  (
+    {}
+    | upsert_if_value "comic_info_age_rating" $comic_info_age_rating
+    | upsert_if_value "chapter_title" $chapter_title
+    | upsert_if_value "chapter_index" $chapter_index
+    | upsert_if_value "issue_count" $issue_count
+    | upsert_if_value "issue_id" $issue_id
+    | upsert_if_present "series" $json "Series"
+    | upsert_if_value "issue" $issue
+    | upsert_if_value "volume" $volume
+    | upsert_if_value "credits" $contributors
+    | upsert_if_value "ids" $ids
+    | upsert_if_value "links" $links
+    | upsert_if_value "language" $language
+    | upsert_if_present "isbn" $json "GTIN"
+    | upsert_if_present "manga" $json "Manga"
+    | upsert_if_present "description" $json "Summary"
+    | upsert_if_present "comment" $json "Notes"
+    | upsert_if_value "publication_date" $publication_date
+    | upsert_if_value publishers $publishers
+    | upsert_if_value imprints $imprints
+    | upsert_if_present year $json "Year"
+    | upsert_if_present month $json "Month"
+    | upsert_if_present day $json "Day"
+    | upsert_if_value "genres" $genres
+    | upsert_if_value "tags" $tags
+    | upsert_if_present "series_groups" $json "SeriesGroup"
+    | upsert_if_present "scan_information" $json "ScanInformation"
+    | upsert_if_present "page_count" $json "PageCount"
+    | upsert_if_present "format" $json "Format"
+  )
+}
+
+# Parse metadata from exiftool's JSON output for a PDF file
+export def from_pdf_metadata []: [
+  record -> record
+] {
+  let metadata = $in
+
+  let publication_date = (
+    let date = $metadata | get --optional "Date";
+    if ($date | is-not-empty) {
+      $date | into datetime
+    }
+  )
+  let language = (
+    let language_code = $metadata | get --optional Language;
+    if ($language_code | is-not-empty) {
+      if ($language_code | str length) == 2 {
+        $language_code | from_language_code # iso_639_1
+      } else if ($language_code | str length) == 3 {
+        $language_code | from_language_code # iso_639_3
+      } else {
+        # todo Support type parameter in from_language_code
+        # $language_code | from_language_code ietf_bcp_47
+      }
+    }
+  )
+  # ISBN can come from Isbn, ISBN, or Identifier table
+  # Both Subject and Keywords fields should be parsed into allowed tags and genres
+  # exiftool doesn't parse IdentifierScheme correctly, so I can't parse the fields properly.
+  # Author or Creator field for writers and how are multiple split?
+  # Author is split with " & "
+  # Creator is a proper list
+  let credits = (
+    if ($metadata | get --optional Creator | is-not-empty) {
+      $metadata.Creator | each {|creator|
+        {
+          person: $creator
+          role: "Writer"
+          primary: true
+          language: ""
+        }
+      }
+    }
+  )
+  (
+    {}
+    | upsert_if_present "series" $metadata "Series"
+    | upsert_if_present "issue" $metadata "SeriesSeries_index"
+    | upsert_if_present "description" $metadata "Description"
+    | upsert_if_present "publication_date" $metadata "Date"
+    | upsert_if_present "page_count" $metadata "PageCount"
+    | upsert_if_present "publisher" $metadata "Publisher"
+    | upsert_if_present "isbn" $metadata "Isbn"
+    | upsert_if_present "isbn" $metadata "ISBN"
+    | upsert_if_value "language" $language
+    | upsert_if_value "credits" $credits
+  )
+}
+
+# Parse metadata from an EPUB's content.opf XML file
+export def from_opf_xml []: [
+  record -> record
+] {
+  let opf = $in
+  let opf = (
+    if $opf.tag == "package" {
+      $opf.content | where tag == "metadata" | first
+    } else {
+    # todo Verify metadata tag is here
+      $opf
+    }
+  )
+  let metadata_content = $opf | get content
+  let credits = (
+    let creators = $metadata_content | where tag == creator;
+    if ($creators | is-not-empty) {
+      let authors = $creators | where attributes.role == "aut"
+      if ($authors | is-not-empty) {
+        $authors | get content | first | get content | flatten | uniq | each {|author|
+          {
+            creator: $author
+            role: "Writer"
+            primary: true
+            language: ""
+          }
+        } | sort-by creator
+      } else {
+        # Fallback to using any creators as the author
+        $creators | get content | first | get content | flatten | uniq | each {|creator|
+          {
+            creator: $creator
+            role: "Writer"
+            primary: true
+            language: ""
+          }
+        }
+      }
+    }
+  )
+
+  let series = (
+    let meta = $metadata_content | where tag == meta;
+    if ($meta | is-not-empty) {
+      let series = $meta | where attributes.name == "calibre:series"
+      if ($series | is-not-empty) {
+        # todo Warn if there are multiple series
+        $series | first | get attributes.content
+      }
+    }
+  )
+
+  let issue = (
+    let meta = $metadata_content | where tag == meta;
+    if ($meta | is-not-empty) {
+      let series_indices = $meta | where attributes.name == "calibre:series_index"
+      if ($series_indices | is-not-empty) {
+        # todo Warn if there are multiple series indices
+        $series_indices | first | get attributes.content
+      }
+    }
+  )
+
+  # todo Handle multiple publishers?
+  let publisher = (
+    let publishers = $metadata_content | where tag == publisher;
+    if ($publishers | is-not-empty) {
+      $publishers | get content | first | get content | flatten | uniq | first
+    }
+  )
+
+  let language = (
+    let languages = $metadata_content | where tag == language;
+    if ($languages | is-not-empty) {
+      $languages | get content | first | get content | flatten | uniq | first
+    }
+  )
+  let language = (
+    let language_code = $language;
+    if ($language_code | is-not-empty) {
+      if ($language_code | str length) == 2 {
+        $language_code | from_language_code # iso_639_1
+      } else if ($language_code | str length) == 3 {
+        $language_code | from_language_code # iso_639_3
+      } else {
+        # todo Support type parameter in from_language_code
+        # $language_code | from_language_code ietf_bcp_47
+      }
+    }
+  )
+
+  let title = (
+    let titles = $metadata_content | where tag == title;
+    if ($titles | is-not-empty) {
+      $titles | get content | first | get content | flatten | uniq | first
+    }
+  )
+
+  let description = (
+    let descriptions = $metadata_content | where tag == description;
+    if ($descriptions | is-not-empty) {
+      $descriptions | get content | first | get content | flatten | uniq | first
+    }
+  )
+
+  let publication_date = (
+    let dates = $metadata_content | where tag == date;
+    if ($dates | is-not-empty) {
+      let date = $dates | get content | first | get content | flatten | uniq | first
+      if ($date | is-not-empty) {
+        $date | into datetime
+      }
+    }
+  )
+
+  let genres = (
+    let genres = $metadata_content | where tag == subject;
+    if ($genres | is-not-empty) {
+      $genres | get content | flatten | get content | uniq | sanitize_genres_or_tags $genre_allowlist
+    }
+  )
+
+  let identifier_schemes = [
+    [schemes type];
+    # [[GOODREADS] goodreads_version_id]
+    [[HARDCOVER HARDCOVER-SLUG] hardcover_book_slug]
+    # [[HARDCOVER-ID] hardcover_book_id]
+    [[HARDCOVER-EDITION] hardcover_edition_id]
+    [[COMICVINE] comic_vine_issue_id]
+    # [[COMICVINE-VOLUME] comic_vine_volume_id]
+    [[BOOKBRAINZ-EDITION] bookbrainz_edition_id]
+    [[WIKIDATA-EDITION] wikidata_item_id]
+    # [ISBN isbn]
+    # [STORYGRAPH storygraph_edition_id]
+    # [GOOGLE google_books_id]
+  ]
+
+  let ids = (
+    let ids = $metadata_content | where tag == identifier;
+    if ($ids | is-not-empty) {
+      $identifier_schemes | reduce --fold [] {|identifier_schemes_and_type acc|
+        let matching_ids = $ids | where {|it| ($it.attributes.scheme | str upcase) in $identifier_schemes_and_type.schemes }
+        if ($matching_ids | is-empty) {
+          $acc
+        } else {
+          # Ignore multiple ids of the same type.
+          # todo Warn if there are multiple, distinct IDs for the same scheme.
+          $acc | append {type: $identifier_schemes_and_type.type, id: ($matching_ids | get content | first | get content | first)}
+        }
+      }
+    }
+  )
+
+  # todo get title sort from meta calibre:title_sort?
+
+  let isbn = (
+    let ids = $metadata_content | where tag == identifier;
+    if ($ids | is-not-empty) {
+      let isbns = $ids | where attributes.scheme == "ISBN"
+      if ($isbns | is-not-empty) {
+        $isbns | get content | first | get content | flatten | uniq | first
+      }
+    }
+  )
+
+  (
+    {}
+    | upsert_if_value "credits" $credits
+    # todo Should we attempt to parse multiple publishers from PDF metadata?
+    | upsert_if_value "publishers" [$publisher]
+    | upsert_if_value "genres" $genres
+    | upsert_if_value "language" $language
+    | upsert_if_value "title" $title
+    | upsert_if_value "description" $description
+    | upsert_if_value "publication_date" $publication_date
+    | upsert_if_value "ids" $ids
+    | upsert_if_value "series" $series
+    | upsert_if_value "issue" $issue
+    | upsert_if_value "isbn" $isbn
+  )
+}
+
+# Count the number of image files in a ZIP archive
+export def number_of_images_in_archive []: [path -> int] {
+  let archive = $in
+  $archive | list_files_in_archive_with_extensions $image_extensions | length
+}
+
+# export const comic_metadata_template = {
+# }
+
+# https://en.wikipedia.org/wiki/IETF_language_tag
+# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
+export const iso_language_codes_map = [
+  [language iso_639_1 iso_639_3 ietf_bcp_47 default_language wikidata_id];
+  ["english" "en" "eng" "en" true Q1860]
+  ["american english" "en" "eng" "en-US" false Q7976]
+  ["british english" "en" "eng" "en-GB" false Q7979]
+  ["chinese" "zh" "zho" "zh" true Q7850]
+  ["german" "de" "deu" "de" false Q188]
+  ["japanese" "ja" "jpn" "ja" true Q5287]
+  ["japanese hiragana" "ja" "jpn" "ja-hira" false Q53979341]
+  ["japanese katakana" "ja" "jpn" "ja-kana" false Q53979342]
+  ["japanese kana" "ja" "jpn" "ja-hrkt" false Q53979345]
+  ["japanese kanji" "ja" "jpn" "ja-hani" false Q53979504]
+  ["japanese romanized" "ja" "jpn" "ja-Latn" false Q53979348]
+  ["korean" "ko" "kor" "ko" true Q9176]
+  ["spanish" "es" "spa" "es" true Q1321]
+]
+
+# Convert a language to it's corresponding IETF BCP 47 or ISO 639-3 language code
+#
+# https://en.wikipedia.org/wiki/IETF_language_tag
+# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
+export def into_language_code [
+  type: string # 'ietf_bcp_47', 'iso_639_1', or 'iso_639_3'
+  language_codes_map: table = $iso_language_codes_map
+]: [string -> string] {
+  let language = $in
+  if $type not-in ($language_codes_map | reject --optional language default_language | columns) {
+    error make {
+      msg: "invalid language code type"
+      labels: [
+          {text: "type" span: (metadata $type).span}
+      ]
+      help: $"the language code type must be one of (ansi yellow)($language_codes_map | reject --optional language language_default | str join ' ')(ansi reset)"
+    }
+  }
+  let language_codes = $language_codes_map | where language == $language
+  if ($language_codes | is-empty) {
+    error make {
+      msg: "unsupported language"
+      labels: [
+          {text: "language_codes_map" span: (metadata $language_codes_map).span}
+      ]
+      help: $"add the language (ansi yellow)($language)(ansi reset) to the language_codes_map table"
+    }
+  }
+  let language_codes = (
+    if ($language_codes | length) > 1 {
+      let default_codes = $language_codes | where default_language == true
+      if ($default_codes | length) > 1 {
+        error make {
+          msg: "duplicate language in language_codes_map table default_language set to true"
+          labels: [
+              {text: "language_codes_map" span: (metadata $language_codes_map).span}
+          ]
+          help: $"remove the duplicate of the (ansi yellow)($language)(ansi reset) language from the table or set default_language to false for all but one of the entries which has the same language codes"
+        }
+      } else {
+        $default_codes
+      }
+    } else {
+      $language_codes
+    }
+  )
+  $language_codes | get $type | first
+}
+
+# Convert an IETF BCP 47 or ISO 639-3 language code into its corresponding language
+#
+# https://en.wikipedia.org/wiki/IETF_language_tag
+# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
+export def from_language_code [
+  # todo: I should be using type here
+  # type: string # 'iso_639_1' 2-letter code, 'iso_639_3' 3-letter code, or 'ietf_bcp_47' to try everything else
+  language_codes_map: table = $iso_language_codes_map
+]: [string -> string] {
+  let language_code = $in
+  let language_code_length = $language_code | str length
+  let type = (
+    if $language_code_length == 2 {
+      "iso_639_1"
+    } else if $language_code_length == 3 {
+      "iso_639_3"
+    } else {
+      "ietf_bcp_47"
+      # error make {
+      #   msg: "unsupported language code type for the number of characters"
+      #   labels: [
+      #       {text: "language_code" span: (metadata $language_code).span}
+      #   ]
+      #   help: $"language codes must be 2-letters for (ansi yellow)iso_639_1(ansi reset) or 3-letters for (ansi yellow)iso_639_3(ansi reset)"
+      # }
+    }
+  )
+  let languages = $language_codes_map | where {|it| ($it | get $type) == $language_code}
+  if ($languages | is-empty) {
+    error make {
+      msg: "invalid language code"
+      labels: [
+          {text: "language_code" span: (metadata $language_code).span}
+      ]
+      help: $"the language code (ansi yellow)($language_code)(ansi reset) of type (ansi yellow)($type)(ansi reset) does not exist in the language_codes_map table"
+    }
+  }
+  let languages = (
+    if ($languages | length) > 1 {
+      let default_languages = $languages | where default_language == true
+      if ($default_languages | length) > 1 {
+        error make {
+          msg: "duplicate language code in language_codes_map table where default_language is set to true"
+          labels: [
+              {text: "language_codes_map" span: (metadata $language_codes_map).span}
+          ]
+          help: $"remove the duplicate of the (ansi yellow)($language_code)(ansi reset) language from the table or set default_language to false for all but one of the entries which have the same language codes"
+        }
+      } else {
+        $default_languages
+      }
+    } else {
+      $languages
+    }
+  )
+  $languages.language | first
+}
+
+# Find the package OPF file in an EPUB.
+export def find_opf_in_epub []: [
+  path -> path
+] {
+  let epub = $in
+  let opf_directories = ["OPS" "OEBPS"]
+  let opf_files_in_epub = $epub | list_files_in_archive_with_extensions ["opf"]
+  if ($opf_files_in_epub | is-empty) {
+    log error $"No OPF files found in (ansi yellow)($epub)(ansi reset)"
+    return null
+  }
+  let opf_files = $opf_files_in_epub | path parse | where parent in $opf_directories
+  if ($opf_files | is-empty) {
+    log warning $"No OPF file found in (ansi yellow)($epub)(ansi reset)"
+    return null
+  }
+  if ($opf_files | length) > 1 {
+    log warning $"Multiple OPF files found in (ansi yellow)($epub)(ansi reset): (ansi yellow)($opf_files | path join | str join ' ')(ansi reset). Using only the first."
+  }
+  $opf_files | path join | first
+}
+
+# Extract the metadata from an eBook.
+#
+# This uses ebook-meta for PDF and ePUB files.
+# I should probably use exiftool for PDFs and just parse the metadata.opf file out of EPUBs directly.
+export def extract_ebook_metadata [
+  working_directory: directory # The scratch-space directory to use
+]: [
+  path -> record
+] {
+  let file = $in
+  let file_type = $file | path parse | get extension | str downcase
+  # todo Eventually support MetronInfo.xml.
+  let metadata = (
+    if $file_type == "cbz" {
+      let metadata_file = $file | extract_file_from_archive "ComicInfo.xml" $working_directory
+      let metadata = (
+        if ($metadata_file | is-not-empty) {
+          open $metadata_file
+        }
+      )
+      rm $metadata_file
+      $metadata
+    } else if $file_type == "epub" {
+      let opf_file = $file | find_opf_in_epub
+      if ($opf_file | is-empty) {
+        log error $"No OPF file found in (ansi yellow)($file)(ansi reset)"
+        return null
+      }
+      let metadata_file = $file | extract_file_from_archive $opf_file $working_directory
+      let metadata = (
+        if ($metadata_file | is-not-empty) {
+          open $metadata_file | from xml
+        }
+      )
+      rm $metadata_file
+      $metadata
+    } else if $file_type == "pdf" {
+      # To get the identifiers from the PDF, we need to use ebook-meta instead of exiftool.
+      # ^exiftool -json $file | from json | first
+      let metadata_file = mktemp
+      log debug $"Running (ansi yellow)^ebook-meta --to-opf '($metadata_file)' ($file)(ansi reset)"
+      # todo Check command's exit code.
+      ^ebook-meta --to-opf $metadata_file $file
+      let metadata = (
+        open $metadata_file | from xml
+      )
+      rm $metadata_file
+      $metadata
+    }
+  )
+  if ($metadata | is-not-empty) {
+    if "comic_info" in $metadata {
+      $metadata | from_comic_info_xml
+    } else if "package" in $metadata {
+      $metadata | from_opf_xml
+    }
+  }
+}
+
+# Convert the internal data structure for a comic to a ComicInfo.xml
+#
+# https://anansi-project.github.io/docs/comicinfo/documentation
+# https://wiki.kavitareader.com/guides/metadata/comics/
+export def into_comic_info_xml []: [record -> record] {
+  let data = $in
+  if ($data | is-empty) {
+    error make {
+      msg: "empty comic data"
+      labels: [
+          {text: "in" span: (metadata $in).span}
+      ]
+      help: $"pipe in the comic data"
+    }
+  }
+
+  let creators = (
+    $data | get --optional credits.person | uniq | reduce --fold [] {|creator creator_acc|
+      let creator_comic_vine_roles = $data.credits | where person == $creator | get role | uniq
+      # for each set of comic_vine_roles that is a subset of the creator's roles,
+      # add the creator with each of the target roles
+      $creator_acc | append (
+        $comic_vine_roles_map
+        | reduce --fold [] {|comic_vine_roles acc|
+          if ($comic_vine_roles.comic_vine_roles | all {|role| $role in $creator_comic_vine_roles}) {
+            $acc | append (
+              $comic_vine_roles.comic_info_roles | each {|role|
+                {
+                  person: $creator
+                  role: $role
+                }
+              }
+            )
+          } else {
+            $acc
+          }
+        }
+        | uniq
+      )
+    }
+  ) | where {|creator| $creator.role | is-not-empty}
+  let creators = (
+    if ($creators | is-empty) {
+      null
+    } else {
+      # log debug $"Creators: ($creators)"
+      # log debug $"Creators grouped-by role: ($creators | group-by --to-table role)"
+      $creators | group-by --to-table role | reduce --fold {} {|role acc|
+        $acc | insert $role.role $role.items.person
+      }
+    }
+  )
+
+  let urls = $data.ids | each {|id|
+    if $id.type == "hardcover_book_slug" {
+      ""
+    } else if $id.type == "hardcover_edition_id" {
+      if "hardcover_book_slug" in ($data | get --optional ids.type) {
+        $id.id | identifier_into_url $id.type --hardcover-book-slug ($data.ids | where type == "hardcover_book_slug" | get id | first)
+      } else {
+        $id.id | identifier_into_url $id.type
+      }
+    } else {
+      $id.id | identifier_into_url $id.type
+    }
+  } | where {|url| $url | is-not-empty } | append ($data | get --optional links) | sort | uniq | str join " "
+
+  # todo
+  # AgeRating (Normalize to Metron's / Kavita's supported ones)
+  # AlternativeSeries
+  # AlternativeCount
+
+  let publication_date = $data | get --optional publication_date
+  let publication_date_parts = (
+    if ($publication_date | is-not-empty) {
+      {
+        year: ($publication_date | format date "%Y")
+        month: ($publication_date | format date "%m")
+        day: ($publication_date | format date "%d")
+      }
+    }
+  )
+
+  # Kavita can parse Comic Vine and Metron IDs in a specific format from the Notes section.
+  # ComicVine [CVDB734524]
+  # MetronTagger- [issue_id:156409]
+  # todo support parsing these from the ComicInfo.xml as well.
+  let notes = (
+    let notes = $"Tagged with MediaJuggler import-comics.nu version ($media_juggler_version) at (date now | date to-timezone UTC | format date %+).";
+    let comic_vine_issue_ids = $data.ids | where type == "comic_vine_issue_id";
+    let notes = (
+      if ($comic_vine_issue_ids | is-not-empty) {
+        let comic_vine_issue_id = $comic_vine_issue_ids.id | first | str replace "4000-" ""
+        $"($notes) ComicVine [CVDB($comic_vine_issue_id)]."
+      } else {
+        $notes
+      }
+    );
+    let metron_issue_ids = $data.ids | where type == "metron_issue_id";
+    if ($metron_issue_ids | is-not-empty) {
+      let metron_issue_id = $metron_issue_ids.id | first
+      $"($notes) MetronTagger- [issue_id:($metron_issue_id)]."
+    } else {
+      $notes
+    }
+  )
+
+  # todo Teams?
+  # todo main character?
+  let comic_info_xml = (
+    {
+      tag: "ComicInfo"
+      attributes: {}
+      content: []
+    }
+    | upsert_comic_info {tag: "GTIN", value: ($data | get --optional isbn)}
+    | upsert_comic_info {tag: "Series", value: ($data | get --optional series)}
+    # | upsert_comic_info {tag: "Format", value: ($data | get --optional format)}
+    | upsert_comic_info {
+      tag: "Genre"
+      value: (
+        if ($data | get --optional genres | is-empty) {
+          null
+        } else {
+          $data.genres | sort | str join ","
+        }
+      )
+    }
+    | upsert_comic_info {
+      tag: "Tags"
+      value: (
+        if ($data | get --optional tags | is-empty) {
+          null
+        } else {
+          $data.tags | sort | str join ","
+        }
+      )
+    }
+    | upsert_comic_info {tag: "AgeRating", value: ($data | get --optional comic_info_age_rating)}
+    | upsert_comic_info {tag: "Count", value: ($data | get --optional issue_count)}
+    | upsert_comic_info {tag: "PageCount", value: ($data | get --optional page_count | into string)}
+    | upsert_comic_info {tag: "Title", value: ($data | get --optional chapter_title)}
+    | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publishers | str join ",")}
+    | upsert_comic_info {tag: "Imprint", value: ($data | get --optional imprints | str join ",")}
+    | upsert_comic_info {tag: "Summary", value: ($data | get --optional description)}
+    | upsert_comic_info {tag: "Notes", value: $notes}
+    | upsert_comic_info {
+      tag: "Characters"
+      value: (
+        if ($data | get --optional characters | is-empty) {
+          null
+        } else {
+          $data.characters.name | sort | str join ","
+        }
+      )
+    }
+    | upsert_comic_info {tag: "Day", value: ($publication_date_parts | get --optional day)}
+    | upsert_comic_info {tag: "Month", value: ($publication_date_parts | get --optional month)}
+    | upsert_comic_info {tag: "Year", value: ($publication_date_parts | get --optional year)}
+    | upsert_comic_info {tag: "Manga", value: ($data | get --optional manga)}
+    | upsert_comic_info {
+      tag: "Number"
+      value: (
+        $data | get --optional (
+          if ($data | get --optional manga) != "No" {
+            ""
+          } else {
+            "issue"
+          }
+        )
+      )
+    }
+    | upsert_comic_info {
+      tag: "Volume"
+      value: (
+        $data | get --optional (
+          if ($data | get --optional manga) != "No" {
+            "issue"
+          } else {
+            "volume"
+          }
+        )
+      )
+    }
+    | upsert_comic_info {tag: "LanguageISO", value: ($data | get --optional language | into_language_code ietf_bcp_47)}
+    | upsert_comic_info {tag: "Web", value: $urls}
+  )
+  # log debug $"creators: ($creators)"
+  # $comic_info_xml
+  let comic_info_xml = $creators | columns | reduce --fold $comic_info_xml {|role acc|
+    $acc | upsert_comic_info {tag: $role, value: ($creators | get $role | sort | str join ",")}
+  }
+  # log debug $"Comic info: ($comic_info_xml | to nuon)"
+  $comic_info_xml
+}
+
+# Convert metadata into the metadata object of the OPF XML format used by EPUBs
+#
+# This format can then be used to update the content.opf or package.opf file in an EPUB.
+export def into_metadata_opf_xml []: [record -> record] {
+  let opf = $in
+  # todo
+}
+
 # Search for editions on Wikidata by ISBN-13.
 #
 # Requires the environment variable MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN to set to a Wikidata access token.
@@ -2798,6 +3567,881 @@ export def wikidata_search_editions_by_isbn [
   )
 }
 
+# Obtain the metadata for a Wikidata edition ID
+export def fetch_wikidata_edition_and_works_metadata [
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> record] {
+  let wikidata_edition_id = $in
+
+  if ($wikidata_edition_id | is-empty) {
+    error make {
+      msg: "missing wikidata edition id"
+      labels: [
+        {text: "wikidata_edition_id" span: (metadata $wikidata_edition_id).span}
+      ]
+      help: "pipe in a Wikidata edition ID"
+    }
+  }
+
+  for var in [WIKIDATA_USERNAME MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      error make {
+        msg: "missing required Wikidata environment variable"
+        labels: [
+          {text: "env" span: (metadata $env).span}
+        ]
+        help: $"set the environment variable (ansi yellow)($var)(ansi reset)"
+      }
+    }
+  }
+
+  let update_function = {|type id|
+    let request = {
+      (
+        http get --full --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "X-Authenticated-User": $env.WIKIDATA_USERNAME
+        }
+        $"($wikidata_api_url)/entities/items/($id)"
+      )
+    }
+
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Wikidata edition ($id) from (ansi yellow)($wikidata_api_url)(ansi reset): ($error.debug)"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Wikidata item ($id) from (ansi yellow)($wikidata_api_url)/entities/items/($id)(ansi reset): ($response.body)"
+      return null
+    }
+    $response.body
+  }
+
+  let edition = (do $cache "wikidata-item" $wikidata_edition_id $update_function null)
+  let wikidata_work_ids = (
+    if ($edition | get --optional statements.P629 | is-not-empty) {
+      $edition.statements.P629 | where rank != "deprecated" | get --optional value.content
+    }
+  )
+  let works = (
+    $wikidata_work_ids | each {|wikidata_work_id|
+      let update_function = {|type id|
+        let request = {
+          (
+            http get --full --headers {
+              "User-Agent": $user_agent
+              "Accept": "application/json"
+              "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+              "X-Authenticated-User": $env.WIKIDATA_USERNAME
+            }
+            $"($wikidata_api_url)/entities/items/($id)"
+          )
+        }
+
+        let response = (
+          try {
+            retry_http $request $retries $retry_delay
+          } catch {|error|
+            log error $"Error getting Wikidata work at (ansi yellow)($wikidata_api_url)(ansi reset): ($error.debug)"
+            return null
+          }
+        )
+        if ($response.status != 200) {
+          log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Wikidata item ($id) from (ansi yellow)($wikidata_api_url)/entities/items/($id)(ansi reset): ($response.body)"
+          return null
+        }
+        # Avoid rate-limiting
+        sleep 0.1sec
+        $response.body
+      }
+      (do $cache "wikidata-item" $wikidata_work_id $update_function null)
+    }
+  )
+  {
+    edition: $edition
+    works: $works
+  }
+}
+
+# Parse the data from the Wikidata API for a Wikidata edition and its associated works
+#
+# Processing is limited to what information can be gleaned that doesn't require additional lookups.
+# Call process_wikidata_edition_and_works_metadata on the result to retrieve additional information that requires further lookups.
+export def parse_wikidata_edition_and_works_metadata [
+  form_of_creative_work_map: table<name: string, wikidata_id: string> = $form_of_creative_work_wikidata
+  genre_list: table<name: string, aliases: list<string>, wikidata_ids: list<string>> = $genre_allowlist # The table of mappings from Wikidata ID to genre
+  genres_to_age_rating_map: table<genres: list<string>, comic_info_age_rating: string, metron_info_age_rating: string> = $genre_to_age_rating_comic_info_map
+  intended_public_map: table<name: string, wikidata_id: string> = $intended_public_wikidata
+  intended_publics_to_age_rating_map: table<intended_publics: list<string>, comic_info_age_rating: string, metron_info_age_rating: string> = $intended_public_to_age_rating_comic_info_map
+  language_codes_map: table = $iso_language_codes_map
+]: [record -> record] {
+  let edition_and_works = $in
+  let edition = $edition_and_works.edition
+  let works = $edition_and_works | get --optional works
+
+  let sort_by_rank = {|a b|
+    let ranks = [preferred normal deprecated] | enumerate
+    ($ranks | where item == $a.rank | first) < ($ranks | where item == $b.rank | first)
+  }
+
+  # Edition-related properties
+
+  # P407
+  let language = (
+    let wikidata_languages = $edition | get --optional statements.P407;
+    if ($wikidata_languages | is-empty) {
+      error make {
+        msg: "missing language for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add the language to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P407(ansi reset)"
+      }
+    };
+    let wikidata_languages = $wikidata_languages | where rank != "deprecated";
+    if ($wikidata_languages | is-empty) {
+      error make {
+        msg: "missing non-deprecated language for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add a language to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P407(ansi reset) which isn't deprecated"
+      }
+    };
+    let wikidata_languages = (
+      $wikidata_languages
+      | sort-by --custom $sort_by_rank
+      | get --optional value.content
+    );
+    if ($wikidata_languages | is-empty) {
+      null
+    } else {
+      if ($wikidata_languages | length) > 1 {
+        log warning $"Multiple languages found for Wikidata edition (ansi yellow)($edition.id)(ansi reset): ($wikidata_languages). Using only the first."
+      }
+      let wikidata_language = $wikidata_languages | first
+      let languages = $language_codes_map | where wikidata_id == $wikidata_language
+      if ($languages | is-empty) {
+        error make {
+          msg: "missing language mapping for Wikidata item ID"
+          labels: [
+            {text: "wikidata_language" span: (metadata wikidata_language).span}
+          ]
+          help: $"add a mapping for the Wikidata language ID (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_language) | ansi link --text $wikidata_language)(ansi reset) to the language_codes_map table"
+        }
+      } else {
+        $languages.language | first
+      }
+    }
+  )
+
+  # P577: publication date
+  let publication_date = (
+    let wikidata_publication_dates = $edition | get --optional statements.P577;
+    if ($wikidata_publication_dates | is-empty) {
+      error make {
+        msg: "missing publication date for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add the publication date to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P407(ansi reset)"
+      }
+    };
+    let wikidata_publication_dates = $wikidata_publication_dates | where rank != "deprecated";
+    if ($wikidata_publication_dates | is-empty) {
+      error make {
+        msg: "missing non-deprecated publication date for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add a publication date to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P407(ansi reset) which isn't deprecated"
+      }
+    };
+    let wikidata_publication_dates = (
+      $wikidata_publication_dates
+      | sort-by --custom $sort_by_rank
+      | get --optional value.content
+    );
+    if ($wikidata_publication_dates | is-empty) {
+      null
+    } else {
+      if ($wikidata_publication_dates | length) > 1 {
+        log warning $"Multiple publication dates found for Wikidata edition (ansi yellow)($edition.id)(ansi reset): ($wikidata_publication_dates). Using only the first."
+      }
+      let wikidata_publication_date = $wikidata_publication_dates | first
+      if ($wikidata_publication_date.calendarmodel != "http://www.wikidata.org/entity/Q1985727") {
+        error make {
+          msg: "unsupported calendar model for publication date"
+          labels: [
+            {text: "wikidata_publication_date.calendarmodel" span: (metadata wikidata_publication_date.calendarmodel).span}
+          ]
+          help: $"the publication date on the Wikidata edition (ansi yellow)($edition.id)(ansi reset) has a calendar model of (ansi yellow)($wikidata_publication_date.calendarmodel)(ansi reset) which is not supported. Only (ansi yellow)(http://www.wikidata.org/entity/Q1985727)(ansi reset) is supported."
+        }
+      }
+      $wikidata_publication_date.time | str trim --left --char "+" | into datetime --timezone UTC
+    }
+  )
+
+  let sort_by_rank_then_wikidata_id = {|a b|
+    let ranks = [preferred normal deprecated] | enumerate
+    if ($a.rank == $b.rank) {
+      $a.wikidata_id < $b.wikidata_id
+    } else {
+      ($ranks | where item == $a.rank | first) < ($ranks | where item == $b.rank | first)
+    }
+  }
+
+  # On Wikidata, typically the publisher is actually the imprint.
+  # This can be further verified by checking that the publisher is an instance of an imprint or one of its subclasses.
+  # The publishers require further processing.
+  # Uses object_named_as for the name if present
+  let publishers = (
+    # P123: publisher
+    # P1932: object named as
+    let wikidata_publishers = $edition | get --optional statements.P123 | where {|item| $item | is-not-empty};
+    if ($wikidata_publishers | is-empty) {
+      error make {
+        msg: "missing publisher for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add the publisher to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P123(ansi reset)"
+      }
+    };
+    let wikidata_publishers = $wikidata_publishers | where rank != "deprecated";
+    if ($wikidata_publishers | is-empty) {
+      error make {
+        msg: "missing non-deprecated publisher for Wikidata edition"
+        labels: [
+          {text: "edition" span: (metadata $edition).span}
+        ]
+        help: $"add a publisher to the Wikidata edition (ansi yellow)(('https://www.wikidata.org/wiki/' + $edition.id) | ansi link --text $edition.id)(ansi reset) with property (ansi yellow)P123(ansi reset) which isn't deprecated"
+      }
+    };
+    let wikidata_publishers = $wikidata_publishers | sort-by --custom $sort_by_rank_then_wikidata_id;
+    let wikidata_publishers = $wikidata_publishers | each {|wikidata_publisher|
+      let object_named_as = $wikidata_publisher | get qualifiers | where property.id == "P1932" | get --optional value.content
+      {
+        wikidata_id: $wikidata_publisher.value.content
+        object_named_as: $object_named_as
+      }
+    };
+    if ($wikidata_publishers | is-empty) {
+      []
+    } else {
+      $wikidata_publishers
+    }
+  )
+
+  let omnibus = (
+    # P31: instance of
+    "Q13137339" in $edition.statements.P31.value
+  )
+
+  # Work-related properties
+
+  let genres = (
+    let wikidata_genres = $works.statements | get --optional P136 | where {|item| $item | is-not-empty};
+    let wikidata_genres = (
+      if ($wikidata_genres | is-empty) {
+        []
+      } else {
+        let wikidata_genres = $wikidata_genres | flatten | where rank != "deprecated"
+        if ($wikidata_genres | is-empty) {
+          error make {
+            msg: "missing non-deprecated genres for Wikidata works"
+            labels: [
+              {text: "works" span: (metadata $works).span}
+            ]
+            help: $"add non-deprecated genres, property (ansi yellow)P136(ansi reset), to the Wikidata works"
+          }
+        } else {
+          # log debug $"Wikidata genres: ($wikidata_genres | to nuon)"
+          $wikidata_genres | get --optional value.content | uniq
+        }
+      }
+    );
+    $wikidata_genres | each {|wikidata_genre|
+      let $matching_genres = $genre_list | where {|g| $wikidata_genre in $g.wikidata_ids}
+      if ($matching_genres | is-empty) {
+        error make {
+          msg: "missing wikidata id for genre"
+          labels: [
+            {text: "wikidata_genre" span: (metadata $wikidata_genre).span}
+          ]
+          help: $"add the wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_genre) | ansi link --text $wikidata_genre)(ansi reset) to the genre table"
+        }
+      } else if ($matching_genres | length) > 1 {
+        error make {
+          msg: "duplicate wikidata id for genre"
+          labels: [
+            {text: "wikidata_genre" span: (metadata $wikidata_genre).span}
+          ]
+          help: $"remove the duplicate wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_genre) | ansi link --text $wikidata_genre)(ansi reset) from the genre table"
+        }
+      } else {
+        $matching_genres.name | first
+      }
+    } | sort
+  )
+
+  let forms_of_creative_work = (
+    # P7937: form of creative work
+    let wikidata_forms = $works.statements | get --optional P7937 | where {|item| $item | is-not-empty};
+    let wikidata_forms = (
+      if ($wikidata_forms | is-empty) {
+        []
+      } else {
+        let wikidata_forms = $wikidata_forms | flatten | where rank != "deprecated"
+        if ($wikidata_forms | is-empty) {
+          error make {
+            msg: "missing non-deprecated forms for Wikidata works"
+            labels: [
+              {text: "works" span: (metadata $works).span}
+            ]
+            help: $"add non-deprecated forms, property (ansi yellow)P7937(ansi reset), to the Wikidata works"
+          }
+        } else {
+          $wikidata_forms | get --optional value.content | uniq
+        }
+      }
+    );
+    # log debug $"Wikidata forms of creative work: ($wikidata_forms | to nuon)";
+    $wikidata_forms | each {|wikidata_form|
+      let $matching_forms = $form_of_creative_work_map | where wikidata_id == $wikidata_form
+      if ($matching_forms | is-empty) {
+        error make {
+          msg: "missing wikidata id for form of creative work"
+          labels: [
+            {text: "wikidata_form" span: (metadata $wikidata_form).span}
+          ]
+          help: $"add the wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_form) | ansi link --text $wikidata_form)(ansi reset) to the form of creative works table"
+        }
+      } else if ($matching_forms | length) > 1 {
+        error make {
+          msg: "duplicate wikidata id for form of creative work"
+          labels: [
+            {text: "wikidata_form" span: (metadata $wikidata_form).span}
+          ]
+          help: $"remove the duplicate wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_form) | ansi link --text $wikidata_form)(ansi reset) from the form of creative works table"
+        }
+      } else {
+        $matching_forms.name | first
+      }
+    } | sort
+  )
+
+  # todo age rating
+  let intended_publics = (
+    # P2360: intended public
+    let wikidata_intended_publics = $works.statements | get --optional P2360 | where {|item| $item | is-not-empty};
+    let wikidata_intended_publics = (
+      if ($wikidata_intended_publics | is-empty) {
+        []
+      } else {
+        let wikidata_intended_publics = $wikidata_intended_publics | flatten | where rank != "deprecated"
+        if ($wikidata_intended_publics | is-empty) {
+          error make {
+            msg: "missing non-deprecated intended public for Wikidata works"
+            labels: [
+              {text: "works" span: (metadata $works).span}
+            ]
+            help: $"add non-deprecated intended public, property (ansi yellow)P2360(ansi reset), to the Wikidata works"
+          }
+        } else {
+          $wikidata_intended_publics | get --optional value.content | uniq
+        }
+      }
+    );
+    $wikidata_intended_publics | each {|wikidata_intended_public|
+      let $matching_intended_publics = $intended_public_map | where wikidata_id == $wikidata_intended_public
+      if ($matching_intended_publics | is-empty) {
+        # todo This should probably be loosened to just ignore unknown intended publics.
+        error make {
+          msg: "missing wikidata id mapping for intended public"
+          labels: [
+            {text: "wikidata_intended_public" span: (metadata $wikidata_intended_public).span}
+          ]
+          help: $"add the wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_intended_public) | ansi link --text $wikidata_intended_public)(ansi reset) to the intended publics table"
+        }
+      } else if ($matching_intended_publics | length) > 1 {
+        error make {
+          msg: "duplicate wikidata id mapping for intended public"
+          labels: [
+            {text: "wikidata_intended_public" span: (metadata $wikidata_intended_public).span}
+          ]
+          help: $"remove the duplicate wikidata id (ansi yellow)(('https://www.wikidata.org/wiki/' + $wikidata_intended_public) | ansi link --text $wikidata_intended_public)(ansi reset) from the intended publics table"
+        }
+      } else {
+        $matching_intended_publics.name | first
+      }
+    } | sort
+  )
+
+  let manga = (
+    if ($forms_of_creative_work | any {|form| $form in ["manga" "manga volume" "manga chapter"]}) {
+      "YesAndRightToLeft"
+    } else if  ($forms_of_creative_work | any {|form| $form in ["manhwa" "manhwa volume"]}) {
+      # Not technically true, but this implies that the volume should be treated in the same manner as it is for manga in the ComicInfo.xml.
+      "Yes"
+    } else {
+      "No"
+    }
+  )
+
+  # Requires subsequent processing to get the label language.
+  let main_subjects = (
+    # P921: main subject
+    let wikidata_main_subjects = $works.statements | get --optional P921 | where {|item| $item | is-not-empty};
+    if ($wikidata_main_subjects | is-empty) {
+      []
+    } else {
+      # log debug $"Wikidata main subjects: ($wikidata_main_subjects | to nuon)"
+      let wikidata_main_subjects = $wikidata_main_subjects | flatten | where rank != "deprecated"
+      if ($wikidata_main_subjects | is-empty) {
+        error make {
+          msg: "missing non-deprecated main subject for Wikidata works"
+          labels: [
+            {text: "works" span: (metadata $works).span}
+          ]
+          help: $"add non-deprecated main subject, property (ansi yellow)P921(ansi reset), to the Wikidata works"
+        }
+      } else {
+        $wikidata_main_subjects | sort-by --custom $sort_by_rank | get --optional value.content | sort | uniq
+      }
+    }
+  )
+
+  let tags = (
+    []
+    | append (
+      if $omnibus {
+        "omnibus"
+      }
+    )
+    | append (
+      if ($forms_of_creative_work | is-not-empty) {
+        # Don't include manga/manhwa volume/chapter tags for brevity.
+        if "manga volume" in $forms_of_creative_work or "manga chapter" in $forms_of_creative_work {
+          "manga"
+        } else if "manhwa volume" in $forms_of_creative_work or "manhwa chapter" in $forms_of_creative_work {
+          "manhwa"
+        } else {
+          $forms_of_creative_work
+        }
+      }
+    )
+    | append (
+      if ($intended_publics | is-not-empty) {
+        # Only use certain intended publics as tags, at least for now.
+        $intended_publics | where {|intended_public| $intended_public in [shōnen seinen shōjo josei]}
+      }
+    )
+    | sort
+    | uniq
+  )
+
+  let comic_info_age_rating = (
+    let genre_age_rating = $genres_to_age_rating_map | where {|genre_to_age_rating|
+      $genre_to_age_rating.genres | any {|genre| $genre in $genres}
+    };
+    let intended_public_age_rating = $intended_publics_to_age_rating_map | where {|intended_public_to_age_rating|
+      $intended_public_to_age_rating.intended_publics | any {|intended_public| $intended_public in $intended_publics}
+    };
+    let age_ratings = $genre_age_rating | append $intended_public_age_rating;
+    let age_ratings = $age_ratings | each {|age_rating|
+      let age_range_begin = $age_rating_map | where {|comic_info_age_rating|
+        $comic_info_age_rating.comic_info == $age_rating.comic_info_age_rating
+      } | get --optional age_range_begin | first
+      $age_rating | insert age_range_begin $age_range_begin
+    };
+    if ($age_ratings | is-not-empty) {
+      $age_ratings | sort-by --reverse age_range_begin | first | get comic_info_age_rating
+    }
+  )
+
+  # tags:
+  # omnibus edition -> format?
+
+  (
+    {}
+    | upsert_if_value comic_info_age_rating $comic_info_age_rating
+    | upsert_if_value forms_of_creative_work $forms_of_creative_work
+    | upsert_if_value genres $genres
+    | upsert_if_value intended_publics $intended_publics
+    | upsert_if_value language $language
+    | upsert_if_value main_subjects $main_subjects
+    | upsert_if_value manga $manga
+    | upsert_if_value publication_date $publication_date
+    | upsert_if_value publishers $publishers
+    | upsert_if_value tags $tags
+  )
+}
+
+# Process the metadata for a Wikidata edition and its associated works for items requiring additional lookups to the Wikidata API
+#
+# Should be called on the result of parse_wikidata_edition_and_works_metadata.
+# The fields that are processed further are:
+#   main_subjects: Labels are looked up and added to tags
+#   publishers: Labels are looked up for publishers and they are divided between publishers and imprints
+export def process_wikidata_edition_and_works_metadata [
+  wikidata_language_code: string # The language code to use when looking up labels
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [record -> record] {
+  let metadata = $in
+
+  if ($wikidata_language_code | str length) != 2 {
+    error make {
+      msg: "invalid Wikidata language code"
+      labels: [
+        {text: "wikidata_language_code" span: (metadata $wikidata_language_code).span}
+      ]
+      help: "the wikidata_language_code argument must be a 2-letter language code"
+    }
+  }
+
+  if ($metadata | is-empty) {
+    return $metadata
+    # error make {
+    #   msg: "empty edition and works data"
+    #   labels: [
+    #     {text: "edition_and_works" span: (metadata $edition_and_works).span}
+    #   ]
+    #   help: $"pipe in the edition and works data"
+    # }
+  }
+
+  for var in [WIKIDATA_USERNAME MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      error make {
+        msg: "missing required Wikidata environment variable"
+        labels: [
+          {text: "env" span: (metadata $env).span}
+        ]
+        help: $"set the environment variable (ansi yellow)($var)(ansi reset)"
+      }
+    }
+  }
+
+  let label_update_function = {|type id|
+    let request = {
+      (
+        http get --full --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "X-Authenticated-User": $env.WIKIDATA_USERNAME
+        }
+        $"($wikidata_api_url)/entities/items/($id)/labels/($wikidata_language_code)"
+      )
+    }
+
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting the (ansi yellow)($wikidata_language_code)(ansi reset) label of Wikidata item (ansi yellow)($id)(ansi reset) from (ansi yellow)($wikidata_api_url)/entities/items/($id)/labels/($wikidata_language_code)(ansi reset): ($error.debug)"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting the (ansi yellow)($wikidata_language_code)(ansi reset) label of Wikidata item ($id) from (ansi yellow)($wikidata_api_url)/entities/items/($id)/labels/($wikidata_language_code)(ansi reset): ($response.body)"
+      return null
+    }
+    # Avoid rate-limiting
+    sleep 0.1sec
+    { label: $response.body }
+  }
+
+  # main_subject
+  let main_subjects = (
+    let wikidata_main_subjects = $metadata | get --optional main_subjects | each {|wikidata_main_subject|
+      let label = (do $cache "wikidata-label" $wikidata_main_subject $label_update_function $wikidata_language_code) | get --optional label
+      if ($label | is-empty) {
+        log warning $"Missing (ansi yellow)($wikidata_language_code)(ansi reset) label for main subject Wikidata item (ansi yellow)($wikidata_main_subject)(ansi reset). Ignoring main subject."
+        null
+      } else {
+        $label
+      }
+    };
+    if ($wikidata_main_subjects | is-empty) {
+      []
+    } else {
+      $wikidata_main_subjects | where {|label| $label | is-not-empty} | sort | uniq
+    }
+  )
+
+  let item_update_function = {|type id|
+    let request = {
+      (
+        http get --full --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "X-Authenticated-User": $env.WIKIDATA_USERNAME
+        }
+        $"($wikidata_api_url)/entities/items/($id)"
+      )
+    }
+
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Wikidata item (ansi yellow)($id)(ansi reset) from (ansi yellow)($wikidata_api_url)/entities/items/($id)(ansi reset): ($error.debug)"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Wikidata item ($id) from (ansi yellow)($wikidata_api_url)/entities/items/($id)(ansi reset): ($response.body)"
+      return null
+    }
+    # Avoid rate-limiting
+    sleep 0.1sec
+    $response.body
+  }
+
+  let imprint_wikidata_ids = [
+    Q2608849 # imprint
+    Q115693088 # manga imprint
+    Q115693146 # comic book imprint
+    Q139545998 # light novel imprint
+  ]
+
+  let publishers = (
+    let wikidata_publishers = $metadata | get --optional publishers | each {|wikidata_publisher|
+      let item = (do $cache "wikidata-item" $wikidata_publisher.wikidata_id $item_update_function null)
+      let name = (
+        # For consistency, ignore object named as for now
+        # if ($wikidata_publisher | get --optional object_named_as | is-empty) {
+          if ($item | get --optional labels | get --optional $wikidata_language_code | is-empty) {
+            log error $"Missing (ansi yellow)($wikidata_language_code)(ansi reset) label for publisher Wikidata item (ansi yellow)($wikidata_publisher.wikidata_id)(ansi reset)."
+            null
+          } else {
+            $item.labels | get $wikidata_language_code
+          }
+        # } else {
+        #   $wikidata_publisher.object_named_as
+        # }
+      )
+      # Is the item an imprint of some kind?
+      # todo Get the actual publisher name when the item is an imprint.
+      # This will probably be complicated.
+      # P31: instance of
+      let is_imprint = $item | get --optional statements.P31.value.content | any {|item| $item in $imprint_wikidata_ids}
+      # log debug $"is_imprint: ($is_imprint)"
+      {
+        name: $name
+        is_imprint: $is_imprint
+      }
+    };
+    if ($wikidata_publishers | is-empty) {
+      []
+    } else {
+      $wikidata_publishers | where {|item| $item.name | is-not-empty} | uniq
+    }
+  )
+
+  let tags = (
+    if ($metadata | get --optional tags | is-empty) {
+      []
+    } else {
+      $metadata.tags
+    } | append $main_subjects | sort
+  )
+
+  (
+    $metadata
+    | upsert tags $tags
+    | upsert_if_value imprints ($publishers | where is_imprint | get --optional name)
+    | upsert_if_value main_subjects $main_subjects
+    | upsert_if_value publishers ($publishers | where not is_imprint | get --optional name)
+  )
+}
+
+
+# Calculate the SHA3-512 checksum for a file using rhash.
+export def hash_sha3_512 []: [string -> string] {
+  # File for which to generate the checksum.
+  let file = $in
+  if ($file | is-empty) {
+    error make {
+      msg: "no file provided"
+      labels: [
+        {text: "in" span: (metadata $in).span}
+      ]
+      help: "pipe in the path of the file to hash"
+    }
+  }
+  log debug $"Running command: (ansi yellow)^rhash --printf '%x{sha3-512}' '($file)'(ansi reset)"
+  let result = do { ^rhash --printf '%x{sha3-512}' $file } | complete
+  if ($result.exit_code != 0) {
+    error make {
+      msg: "non-zero exit code from rhash while calculating SHA3-512 checksum"
+      labels: [
+        {text: "result.exit_code" span: (metadata $result.exit_code).span}
+      ]
+      help: $"error calculating the SHA3-512 checksum for the file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+    }
+  }
+  if ($result.stdout | is-empty) {
+    error make {
+      msg: "missing SHA3-512 checksum in stdout"
+      labels: [
+        {text: "result.stdout" span: (metadata $result.stdout).span}
+      ]
+      help: $"no SHA3-512 checksum output by rhash for the file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+    }
+  }
+  $result.stdout | str trim
+}
+
+# Calculate the BLAKE3 checksum for a file using the b3sum utility.
+export def hash_blake3 []: [string -> string] {
+  # File for which to generate the checksum.
+  let file = $in
+  if ($file | is-empty) {
+    error make {
+      msg: "no file provided"
+      labels: [
+        {text: "in" span: (metadata $in).span}
+      ]
+      help: "pipe in the path of the file to hash"
+    }
+  }
+  log debug $"Running command: (ansi yellow)^b3sum --no-names '($file)'(ansi reset)"
+  let result = do { ^b3sum --no-names $file } | complete
+  if ($result.exit_code != 0) {
+    error make {
+      msg: "non-zero exit code from b3sum while calculating the BLAKE3 checksum"
+      labels: [
+        {text: "result.exit_code" span: (metadata $result.exit_code).span}
+      ]
+      help: $"error calculating the BLAKE3 checksum for the file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+    }
+  }
+  if ($result.stdout | is-empty) {
+    error make {
+      msg: "missing BLAKE3 checksum in stdout"
+      labels: [
+        {text: "result.stdout" span: (metadata $result.stdout).span}
+      ]
+      help: $"no BLAKE3 checksum output by b3sum for the file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+    }
+  }
+  $result.stdout | str trim
+}
+
+# Search for an edition on Wikidata by BLAKE3 or SHA3-512 checksum.
+#
+# Requires the environment variable MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN to set to a Wikidata access token.
+# The environment variable WIKIDATA_USERNAME must also be set to your Wikidata username.
+#
+# This will only work for unmodified release assets, of course.
+export def wikidata_search_editions_by_checksum [
+  type: string # The type of checksum, either "blake3" or "sha3-512"
+  file_size: filesize # The size of the file
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> list<string>] {
+  let checksum = $in
+  if ($checksum | is-empty) {
+    log error "No checksum provided!"
+    return null
+  }
+  if $type not-in [blake3 sha3-512] {
+    log error $"The type must be either (ansi yellow)blake3(ansi reset) or (ansi yellow)sha3-512(ansi reset)"
+    return null
+  }
+
+  for var in [WIKIDATA_USERNAME MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      return null
+    }
+  }
+
+  let checksum_type = (
+    if $type == "blake3" {
+      "Q81575705"
+    } else if $type == "sha3-512" {
+      "Q110651449"
+    }
+  )
+
+  # let data_size_bytes = $file_size | format filesize B
+  # let data_size_mebibytes = $file_size | format filesize MiB
+
+  # todo Use data size.
+  # Data size isn't normalizable on Wikidata.
+  # So, I need to do something special to normalize the data.
+  #
+  # ?statement pq:P3575 ?nodeDataSize.
+  # ?statement pqv:P3575 ?valueNodeDataSize.
+  # ?valueNodeDataSize wikibase:quantityAmount "+160.16015625"^^xsd:decimal.
+  # ?valueNodeDataSize wikibase:quantityUnit wd:Q79758.
+
+  let sparql_query = $"SELECT DISTINCT ?edition WHERE {
+    ?edition wdt:P31/wdt:P279* wd:Q3331189.
+    ?edition p:P4092 ?statement.
+    ?statement ps:P4092 '($checksum)'.
+    ?statement pq:P459 wd:($checksum_type).
+  }"
+
+  # log debug $"sparql_query: ($sparql_query)"
+
+  # https://query.wikidata.org/sparql?format=json&query=
+  let request = {
+    (
+      http get
+        --full
+        --headers {
+          "User-Agent": $user_agent
+          "Accept": "application/json"
+          "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
+          "X-Authenticated-User": $env.WIKIDATA_USERNAME
+        }
+        $"($wikidata_sparql_api_url)($sparql_query | url encode)"
+    )
+  }
+
+  let response = (
+    try {
+      retry_http $request $retries $retry_delay
+    } catch {|error|
+      log error $"Error getting Wikidata edition by the ($type | str upcase) checksum ($checksum) from (ansi yellow)($wikidata_sparql_api_url)($sparql_query | url encode)(ansi reset): ($error.debug)"
+      return null
+    }
+  )
+  if ($response.status != 200) {
+    log error $"HTTP error (ansi red)($response.status)(ansi reset) searching for Wikidata editions with the ($type | str upcase) checksum ($checksum) with SPARQL query ($sparql_query) at (ansi yellow)($wikidata_sparql_api_url)($sparql_query | url encode)(ansi reset): ($response.body)"
+    return null
+  }
+  let bindings = $response.body | from json | get results.bindings
+  if ($bindings | is-empty) {
+    return null
+  }
+  (
+    $bindings
+    | get edition
+    | where type == "uri"
+    | get value
+    | str replace "http://www.wikidata.org/entity/" ""
+  )
+}
+
 # Search for editions on Wikidata by Amazon ASIN.
 #
 # Requires the environment variable MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN to set to a Wikidata access token.
@@ -2815,7 +4459,7 @@ export def wikidata_search_editions_by_asin [
   }
 
   let sparql_query = $"SELECT DISTINCT ?edition WHERE {
-    ?edition wdt:P31/wdt:P279* wd:Q3331189/wd:Q122731938.
+    ?edition wdt:P31/wdt:P279* wd:Q3331189.
     ?edition wdt:P5749 '($asin)'.
   }"
 
@@ -2832,6 +4476,9 @@ export def wikidata_search_editions_by_asin [
         $"($wikidata_sparql_api_url)($sparql_query | url encode)"
     )
   }
+
+  # log debug $"sparql_query: ($sparql_query)"
+
   let response = (
     try {
       retry_http $request $retries $retry_delay
@@ -2921,6 +4568,106 @@ export def wikidata_search_editions_by_comic_vine_id [
     | get value
     | str replace "http://www.wikidata.org/entity/" ""
   )
+}
+
+export def get_comic_vine_issue [
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> list<string>] {
+  let comic_vine_id = $in
+  let comic_vine_id = (
+    if ($comic_vine_id | str starts-with "4000-") {
+      $comic_vine_id
+    } else {
+      "4000-" + $comic_vine_id
+    }
+  )
+  for var in [COMIC_VINE_API_KEY] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      return null
+    }
+  }
+
+  let update_cache = {|type id|
+    log debug $"Getting Comic Vine data for issue ($id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset)"
+    let request = {
+      (
+        http get
+          --full
+          --headers {
+            "User-Agent": $user_agent
+            "Accept": "application/json"
+          }
+          $"https://comicvine.gamespot.com/api/issue/($id)/?api_key=($env.COMIC_VINE_API_KEY)&format=json"
+      )
+    }
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Comic Vine data for issue ($id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($id)/?api_key=<api-key>&format=json(ansi reset): ($error.debug)"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Comic Vine issue data with Comic Vine ID ($id) from (ansi yellow)https://comicvine.gamespot.com/api/issue/($id)/?api_key=<api-key>&format=json(ansi reset): ($response.body)"
+      return null
+    }
+    # log debug $"response.body: ($response.body)"
+    $response.body.results
+  }
+  do $cache "comic-vine-issue" $comic_vine_id $update_cache ""
+}
+
+export def get_comic_vine_volume [
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> list<string>] {
+  let comic_vine_id = $in
+  let comic_vine_id = (
+    if ($comic_vine_id | str starts-with "4050-") {
+      $comic_vine_id
+    } else {
+      "4050-" + $comic_vine_id
+    }
+  )
+  for var in [COMIC_VINE_API_KEY] {
+    if ($env | get --optional $var | is-empty) {
+      log error $"The environment variable ($var) must be set."
+      return null
+    }
+  }
+
+  let update_cache = {|type id|
+    let request = {
+      (
+        http get
+          --full
+          --headers {
+            "User-Agent": $user_agent
+            "Accept": "application/json"
+          }
+          $"https://comicvine.gamespot.com/api/volume/($id)/?api_key=($env.COMIC_VINE_API_KEY)&format=json"
+      )
+    }
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Comic Vine data for volume ($id) from (ansi yellow)https://comicvine.gamespot.com/api/volume/($id)/?api_key=<api-key>&format=json(ansi reset): ($error.debug)"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) getting Comic Vine volume data with Comic Vine ID ($id) from (ansi yellow)https://comicvine.gamespot.com/api/volume/($comic_vine_id)/?api_key=<api-key>&format=json(ansi reset): ($response.body)"
+      return null
+    }
+    $response.body.results
+  }
+  do $cache "comic-vine-issue" $comic_vine_id $update_cache ""
 }
 
 # Get identifiers for an edition on Wikidata
@@ -3060,53 +4807,11 @@ export def bookbrainz_get_edition_identifiers [
   $response.body.identifiers
 }
 
-# Fetch metadata for the EPUB using Comic Vine and embed it
-#
-# The metadata for Authors and Title from the Comic Vine Calibre plugin are corrected here.
-# The title includes the issue number twice in the name, which is kind of ugly, so that is fixed.
-# All creators are tagged as authors which is incorrect.
-# To accommodate this, authors must be passed directly.
-#
-export def tag_epub_comic_vine [
-    comic_vine_issue_id: string # The unique Comic Vine id for the issue
-    authors: list<string> # A list of authors to use
-    title: string # The title to use
-    --working-directory: directory
-]: path -> path {
-    let epub = $in
-    let opf_file = ({ parent: $working_directory, stem: $comic_vine_issue_id, extension: "opf" } | path join)
-    log debug $"Running (ansi yellow)^fetch-ebook-metadata --allowed-plugin Comicvine --identifier 'comicvine:($comic_vine_issue_id)' --opf(ansi reset)";
-    let opf = (
-      ^fetch-ebook-metadata
-        --allowed-plugin "Comicvine"
-        --identifier $"comicvine:($comic_vine_issue_id)"
-        --opf
-      | from xml
-    )
-    log debug $"The opf metadata for Comic Vine issue id (ansi purple_bold)($comic_vine_issue_id)(ansi reset) is:\n($opf)\n"
-    # todo edit XML directly?
-    (
-      $opf
-      | to xml
-      | save --force $opf_file
-    )
-    log debug $"Running (ansi yellow)^ebook-meta ($epub) --authors ($authors | str join '&') --from-opf '($working_directory)/($comic_vine_issue_id).opf' --title '($title)'(ansi reset)";
-    (
-      ^ebook-meta
-        $epub
-        --authors ($authors | str join "&")
-        --from-opf $"($working_directory)/($comic_vine_issue_id).opf"
-        --title $title
-    )
-    rm $opf_file
-    $epub
-}
-
 # Fetch metadata for an ebook
 export def fetch-ebook-metadata [
   ...args: string
   # Remove Comicvine because it can cause trouble, although it does have entries for some Light Novels apparently.
-  --allowed-plugins: list<string> = ["Hardcover" "Barnes & Noble" "Kobo Metadata" Goodreads Google "Google Images" "Amazon.com" Edelweiss "Open Library" "Big Book Search"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
+  --allowed-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
   # --allowed-plugins: list<string> = [Google "Amazon.com"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
   --authors: list<string> # A list of authors to use
   --cover: path # Path to which to download the cover
@@ -3118,7 +4823,7 @@ export def fetch-ebook-metadata [
     if ($allowed_plugins | is-empty) {
       null
     } else {
-      $allowed_plugins | par-each {|plugin| $"--allowed-plugin=($plugin)"}
+      $allowed_plugins | each {|plugin| $"--allowed-plugin=($plugin)"}
     }
   )
   let authors = (
@@ -3250,23 +4955,6 @@ export def extract_book_metadata [
   }
 }
 
-# # Use the metadata.opf and cover.ext files for metadata
-# export def get_metadata_from_opf [
-#   --working-directory: directory
-# ]: path -> record<opf: record, cover: path> {
-#   let book = $in;
-#   let opf_file = ({ parent: $working_directory, stem: ($book | path parse | get stem), extension: "opf" } | path join)
-#   let cover_file = ({ parent: $working_directory, stem: ($book | path parse | get stem | $"($in)-cover"), extension: "" } | path join)
-#   (
-#     ^ebook-meta
-#     --get-cover $cover_file
-#     --to-opf $opf_file
-#     $book
-#   )
-#   # todo Remove title == "Untitled" and creator == "Unknown"?
-#   { opf: ($opf_file | open | from xml), cover: ($cover_file | rename_image_with_extension) }
-# }
-
 # Rename an image with the proper extension for its file type
 export def rename_image_with_extension [] : path -> path {
   let old = $in
@@ -3288,7 +4976,7 @@ export def rename_image_with_extension [] : path -> path {
 # Fetch metadata for an eBook with Calibre.
 export def fetch_book_metadata [
   working_directory: directory
-  --allowed-plugins: list<string>
+  --allowed-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"]
   --authors: list<string>
   --identifiers: list<string>
   --isbn: string
@@ -3348,10 +5036,10 @@ export def fetch_book_metadata [
     | where tag == "identifier"
   )
   let isbn = (
-    if $isbn == null and ($all_opf_identifiers != null) {
+    if ($isbn | is-empty) and ($all_opf_identifiers | is-not-empty) {
       let all_opf_isbn = (
         $all_opf_identifiers
-        | where attributes.scheme == "ISBN"
+        | where {|it| ($it.attributes | get --optional scheme) == "ISBN"}
       )
       if ($all_opf_isbn | is-empty) {
         null
@@ -3372,10 +5060,10 @@ export def fetch_book_metadata [
   # }
   let identifiers = (
     # todo Merge identifiers?
-    if $isbn == null and ($all_opf_identifiers != null) {
+    if ($isbn | is-empty) and ($all_opf_identifiers | is-not-empty) {
       let all_opf_non_isbn = (
         $all_opf_identifiers
-        | where attributes.scheme != "ISBN"
+        | where {|it| ($it.attributes | get --optional scheme) != "ISBN"}
       )
       if ($all_opf_non_isbn | is-empty) {
         null
@@ -3620,123 +5308,6 @@ export def embed_book_metadata []: [
   $input
 }
 
-# export def tag_epub [
-#     # --allowed-plugins: list<string> # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
-#     # --authors: list<string> # A list of authors to use
-#     # --cover: path # Path to which to download the cover
-#     # --identifiers: list<string> # A list of identifiers
-#     # --isbn: string # The unique ComicVine id for the issue
-#     # --title: string # The title to use
-#     --working-directory: directory
-# ]: record<epub: path, opf: record, cover: path> -> path {
-#     let epub = $in
-#     # let opf_file = ({ parent: $working_directory, stem: ($epub | path parse | get stem), extension: "opf" } | path join)
-#     # let cover = ({ parent: $working_directory, stem: ($epub | path parse | get stem), extension: "opf" } | path join)
-#     let result = fetch-ebook-metadata
-#     log debug $"The fetched metadata for the book (ansi purple_bold)($epub)(ansi reset) is:\n($result.opf)\n"
-#     (
-#         $result.opf
-#         | to xml
-#         | save --force $opf_file
-#     )
-#     (
-#         ^ebook-meta
-#             $epub
-#             # --authors ($authors | str join "&")
-#             # --cover
-#             --from-opf $"($working_directory)/($comic_vine_issue_id).opf"
-#             # --title $title
-#     )
-#     rm $opf_file
-#     # rm $cover
-#     $epub
-# }
-
-# Convert images in a CBZ to lossless JXL.
-# JXL should be a great archival format going forward and is a significant reduction in size over JPEG, even using lossless compression.
-# AVIF is an alternative format which could be used for archival purposes.
-# I decided to go with JXL, but haven't looked into both formats exhaustively.
-#
-# CBconvert uses lossless encoding when the quality is set to 100.
-# The intent is for this to be archival quality.
-# The EPUB is saved to ensure that the original source material remains intact, just in case I messed something up in the conversion process.
-#
-# Unfortunately, the JXL format isn't supported by KOReader yet.
-#
-# Okay, so, updating CBConvert to 1.1.0 results in proper JXL lossless compression I'm pretty sure.
-# However, it results in significantly larger files than the source JPEGs.
-# I'll probably only want to use JXL when the source files are PNGs.
-export def convert_to_lossless_jxl []: path -> path {
-    let input_file = $in
-    let components = ($input_file | path parse)
-    let original_size = (ls $input_file | first | get size)
-    let file = (
-        $input_file | cbconvert
-            --format "jxl"
-            --quality 100 # lossless
-
-    )
-    let current_size = (ls $file | first | get size)
-    let average = (($original_size + $current_size) / 2)
-    let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    let size_table = [[original current "% difference"]; [$original_size $current_size $percent_difference]]
-    log info $"Converted (ansi yellow)($input_file)(ansi reset) to (ansi yellow)($file)(ansi reset) to JPEG-XL: ($size_table)"
-    if $current_size > $original_size {
-      log warning "JPEG-XL comic archive increased in size compared to the original input file!"
-    }
-    $file
-}
-
-# Convert a copy for my primary e-reader:
-# Kobo Elipsa 2E: 1404x1872 (Gamma 1.8).
-# todo I'm not sure this is even really necessary
-# Using the correct resolution does seem to result in much faster page loads.
-# Although, maybe that's due to using webp?
-# I should verify.
-export def cbconvert [
-    suffix: string = "" # Suffix to add to the CBZ filename
-    --format: string # The image format to convert to
-    --height: string # The height of the converted images
-    --quality: string # The quality setting to use for the encoder
-    --width: string # The width of the converted images
-]: path -> path {
-  let file = $in
-  let components = ($file | path parse)
-  # todo Use some sort of wrapper to print out command-line of command being run?
-  # todo This doesn't work right with jpegs.
-  # Create a temporary directory on the filesystem to avoid running out of RAM.
-  let tmpdir = mktemp --directory cbconvert.tmp.XXXXXXX --tmpdir-path (pwd)
-  $env.TMPDIR = $tmpdir
-  if $height == null and $width == null {
-    log debug $"Running command: cbconvert --filter 7 --format ($format) --height ($height) --outdir ($components.parent) --quality ($quality) --suffix ($suffix) --width ($width) ($file)"
-    (
-      ^cbconvert convert
-        --filter 7 # Use the highest quality resampling filter.
-        --format $format
-        --outdir $components.parent
-        --quality $quality
-        --suffix $suffix
-        $file
-    )
-  } else {
-    log debug $"Running command: cbconvert --filter 7 --format ($format) --height ($height) --outdir ($components.parent) --quality ($quality) --suffix ($suffix) --width ($width) ($file)"
-    (
-      ^cbconvert convert
-        --filter 7 # Use the highest quality resampling filter.
-        --fit
-        --format $format
-        --height $height
-        --outdir $components.parent
-        --quality $quality
-        --suffix $suffix
-        --width $width
-        $file
-    )
-  }
-  rm --force --recursive $tmpdir
-  $components | { parent: $components.parent, stem: ($components.stem + $suffix), extension: "cbz" } | path join
-}
-
 # Convert a copy for my primary e-reader:
 # Kobo Elipsa 2E: 1404x1872 (Gamma 1.8).
 # todo I'm not sure this is even really necessary
@@ -3753,67 +5324,51 @@ export def convert_for_ereader [
     let input_format = $components.extension
 
     let image_format = (
-        if $input_format in ["cbz" "epub" "zip"] {
-            let image_extension = ($file | get_image_extension);
-            if ($image_extension == null) {
-                log error "Failed to determine the image file format"
-                exit 1
-            }
-            $image_extension
-        } else {
-            null
+      if $input_format in ["cbz" "epub" "zip"] {
+        let image_extension = ($file | get_image_extension);
+        if ($image_extension == null) {
+          log error "Failed to determine the image file format"
+          exit 1
         }
+        $image_extension
+      } else {
+        null
+      }
     )
 
-    # todo Use KCC for PDFs too?
-
     # Use KCC because it won't look right when converting jpegs with cbconvert 1.1.0.
-    if $image_format in ["jpeg" "jpg"] {
-        (
-            let components = ($file | path parse);
-            let temp = (
-                {
-                    parent: $working_directory,
-                    stem: $components.stem,
-                    extension: $components.extension
-                }
-                | path join
-            );
-            cp $file $temp;
-            let components = ($temp | path parse);
-            let kcc_output = (
-                {
-                    parent: $components.parent,
-                    stem: ($components.stem + "_kcc0"),
-                    extension: $components.extension
-                }
-                | path join
-            );
-            let output = (
-                {
-                    parent: $components.parent,
-                    stem: ($components.stem + $suffix),
-                    extension: $components.extension
-                }
-                | path join
-            );
-            log debug $"Running command: flatpak run --command=kcc-c2e io.github.ciromattia.kcc --profile KoE --manga-style --forcecolor --format CBZ --output '($temp)' --targetsize 10000 --upscale '($temp)'";
-            (^flatpak run --command=kcc-c2e io.github.ciromattia.kcc --profile KoE --manga-style --forcecolor --format CBZ --output $temp --targetsize 10000 --upscale $temp);
-            mv $kcc_output $output;
-            rm $temp;
-            $output
-        )
-    } else {
-        (
-            $file
-            | cbconvert $suffix
-                # Alternatively, PNG could also be used for PDFs i.e. when image_format is null.
-                --format (if $image_format in [ "avif" "jxl" "png", ] { "png" } else { "jpeg" })
-                --height ($ereader_profiles | where model == $ereader | first | get height)
-                --quality 100
-                --width ($ereader_profiles | where model == $ereader | first | get width)
-        )
-    }
+    let components = ($file | path parse);
+    let temp = (
+        {
+            parent: $working_directory,
+            stem: $components.stem,
+            extension: $components.extension
+        }
+        | path join
+    )
+    cp $file $temp
+    let components = ($temp | path parse);
+    let kcc_output = (
+        {
+            parent: $components.parent,
+            stem: ($components.stem + "_kcc0"),
+            extension: $components.extension
+        }
+        | path join
+    )
+    let output = (
+        {
+            parent: $components.parent,
+            stem: ($components.stem + $suffix),
+            extension: $components.extension
+        }
+        | path join
+    )
+    log debug $"Running command: flatpak run --command=kcc-c2e io.github.ciromattia.kcc --profile KoE --manga-style --forcecolor --format CBZ --output '($temp)' --targetsize 10000 --upscale '($temp)'"
+    (^flatpak run --command=kcc-c2e io.github.ciromattia.kcc --profile KoE --manga-style --forcecolor --format CBZ --output $temp --targetsize 10000 --upscale $temp)
+    mv $kcc_output $output
+    rm $temp
+    $output
     # The output is always a CBZ file.
     $components | update stem ($components.stem + $suffix) | update extension "cbz" | path join
 }
@@ -4596,9 +6151,16 @@ export def into_tone_format []: record -> record {
           if ($contributors_for_role | is-not-empty) {
             {$role: $contributors_for_role}
           }
-        } | reduce {|it, acc|
-          $acc | merge_or_input $it
-        };
+        }
+        let r = (
+          if ($r | is-empty) {
+            $r
+          } else {
+            $r | reduce {|it, acc|
+              $acc | merge_or_input $it
+            }
+          }
+        );
         $input | merge_or_input $r
       } else {
         $input
@@ -4988,6 +6550,10 @@ export def fetch_and_parse_musicbrainz_work [
     let work = (
       $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay
     )
+
+    # Avoid rate-limiting when called repeatedly from a loop.
+    sleep 0.1sec
+
     if ($work | is-not-empty) {
       $work | parse_musicbrainz_work
     }
@@ -7582,6 +9148,7 @@ export def tag_audiobook_tracks_by_musicbrainz_release_id [
   cover_art_directory: directory
   cache: closure
   combine_chapter_parts = false # Combine chapters split into multiple parts into individual chapters
+  # todo Expose duration threshold as a command-line option for situations where it needs to be increased.
   duration_threshold: duration = 2sec # The acceptable difference in track length of the file vs. the length of the track in MusicBrainz
   chapters_duration_threshold: duration = 3sec # The acceptable difference in the duration of the release vs. the duration of a MusicBrainz Release for chapters
   --retries: int = 3
@@ -8022,7 +9589,32 @@ export def parse_genres_and_tags []: record<genres: table<name: string, count: i
   if ($input | get --optional tags | is-empty) or "tags" not-in ($input | columns) {
     if "genres" in ($input | columns) and ($input | get --optional genres | is-not-empty) {
       return {
-        genres: ($input | get --optional genres | sort-by --custom $sort | uniq-by name)
+        genres: (
+          $input
+          | get --optional genres
+          | reduce --fold [] {|tag acc|
+            let lowercase_tag = $tag.name | str downcase
+            let matching_tags = $genre_allowlist | where {|allowed_tag|
+              ($allowed_tag.name | str downcase) == $lowercase_tag or ($allowed_tag.aliases | any {|alias| $lowercase_tag == ($alias | str downcase)})
+            }
+            if ($matching_tags | is-empty) {
+              log debug $"Ignoring genre: (ansi purple)($tag.name)(ansi reset)"
+              $acc
+            } else if ($matching_tags | length) == 1 {
+              $acc | append {name: ($matching_tags.name | first), count: $tag.count}
+            } else {
+              error make {
+                msg: "multiple matches in the allowlist"
+                labels: [
+                  {text: "matching_tags" span: (metadata $matching_tags).span}
+                ]
+                help: $"found multiple matches for (ansi yellow)($tag.name)(ansi reset) in the allowlist ($genre_allowlist): (ansi yellow)($matching_tags)(ansi reset)"
+              }
+            }
+          }
+          | sort-by --custom $sort
+          | uniq-by name
+        )
         tags: []
       }
     }
@@ -8035,16 +9627,50 @@ export def parse_genres_and_tags []: record<genres: table<name: string, count: i
   let genres = $input | get --optional genres | append (
     $input.tags
     # | select name count
-    | where {|tag|
-      $tag.name not-in $musicbrainz_non_genre_tags
+    | reduce --fold [] {|tag acc|
+      let lowercase_tag = $tag.name | str downcase
+      let matching_tags = $genre_allowlist | where {|allowed_tag|
+        (($allowed_tag.name | str downcase) == $lowercase_tag) or ($allowed_tag.aliases | any {|alias| $lowercase_tag == ($alias | str downcase)})
+      }
+      if ($matching_tags | is-empty) {
+        log debug $"Ignoring genre: (ansi purple)($tag.name)(ansi reset)"
+        $acc
+      } else if ($matching_tags | length) == 1 {
+        $acc | append {name: ($matching_tags.name | first), count: $tag.count}
+      } else {
+        error make {
+          msg: "multiple matches in the allowlist"
+          labels: [
+            {text: "matching_tags" span: (metadata $matching_tags).span}
+          ]
+          help: $"found multiple matches for (ansi yellow)($tag.name)(ansi reset) in the allowlist ($genre_allowlist): (ansi yellow)($matching_tags)(ansi reset)"
+        }
+      }
     }
   ) | sort-by --custom $sort | uniq-by name
 
   let tags = (
     $input.tags
     # | select name count
-    | where {|tag|
-      $tag.name not-in ($genres | get --optional name)
+    | reduce --fold [] {|tag acc|
+      let lowercase_tag = $tag.name | str downcase
+      let matching_tags = $tag_allowlist | where {|allowed_tag|
+        (($allowed_tag.name | str downcase) == $lowercase_tag) or ($allowed_tag.aliases | any {|alias| $lowercase_tag == ($alias | str downcase)})
+      }
+      if ($matching_tags | is-empty) {
+        log debug $"Ignoring tag: (ansi purple)($tag.name)(ansi reset)"
+        $acc
+      } else if ($matching_tags | length) == 1 {
+        $acc | append {name: ($matching_tags.name | first), count: $tag.count}
+      } else {
+        error make {
+          msg: "multiple matches in the allowlist"
+          labels: [
+            {text: "matching_tags" span: (metadata $matching_tags).span}
+          ]
+          help: $"found multiple matches for (ansi yellow)($tag.name)(ansi reset) in the allowlist ($tag_allowlist): (ansi yellow)($matching_tags)(ansi reset)"
+        }
+      }
     }
     # sort by the count, highest to lowest, and then name alphabetically
     | sort-by --custom $sort

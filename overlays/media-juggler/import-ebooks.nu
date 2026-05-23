@@ -43,8 +43,13 @@ def main [
     exit 1
   }
 
-  if $isbn != null and ($files | length) > 1 {
+  if ($isbn | is-not-empty) and ($files | length) > 1 {
     log error "Setting the ISBN for multiple files is not allowed as it can result in overwriting the final file"
+    exit 1
+  }
+
+  if not ($isbn | validate_isbn) {
+    log error $"The ISBN (ansi red)($isbn)(ansi reset) is invalid"
     exit 1
   }
 
@@ -61,6 +66,20 @@ def main [
     }
   )
 
+  let keep = (
+    if ($keep | is-not-empty) {
+      $keep
+    } else if ($config | get --optional keep | is-not-empty) {
+      $config.keep
+    }
+  )
+  let use_rsync = (
+    if ($use_rsync | is-not-empty) {
+      $use_rsync
+    } else if ($config | get --optional use_rsync | is-not-empty) {
+      $config.use_rsync
+    }
+  )
   let destination = (
     if ($destination | is-not-empty) {
       $destination
@@ -291,44 +310,26 @@ def main [
     }
   )
 
-  let original_metadata = $file | get_metadata $temporary_directory
+  let original_metadata = $formats | get $input_format | extract_ebook_metadata $temporary_directory
   log debug $"original_metadata: ($original_metadata)"
 
   log debug "Attempting to get the ISBN from existing metadata"
-  let metadata_isbn = $original_metadata | isbn_from_metadata
-  if $metadata_isbn != null {
+  let metadata_isbn = $original_metadata | get --optional isbn
+  if ($metadata_isbn | is-not-empty) {
     log debug $"Found the ISBN (ansi purple)($metadata_isbn)(ansi reset) in the book's metadata"
   }
 
   log debug "Attempting to get the ISBN from the first ten and last ten pages of the book"
   let book_isbn_numbers = (
-    let isbn_numbers = $file | isbn_from_pages $temporary_directory;
-    if ($isbn_numbers | is-empty) {
-      # Check images for the ISBN if text doesn't work out.
-      if "pdf" in $formats {
-        let cbz = $formats.pdf | cbconvert --format "jpeg" --quality 90
-        let isbn_from_cbz = $cbz | isbn_from_pages $temporary_directory
-        rm $cbz
-        if ($isbn_from_cbz | is-not-empty) {
-          $isbn_from_cbz
-        }
-      } else if "epub" in $formats {
-        let isbn_from_epub = $formats.epub | isbn_from_pages $temporary_directory
-        if ($isbn_from_epub | is-not-empty) {
-          $isbn_from_epub
-        }
-      }
-    } else {
-      $isbn_numbers
-    }
+    $formats | get $input_format | isbn_from_pages $temporary_directory
   )
-  if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
+  if ($book_isbn_numbers | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
     log debug $"Found ISBN numbers in the book's pages: (ansi purple)($book_isbn_numbers)(ansi reset)"
   }
 
   # Determine the most likely ISBN from the metadata and pages
   let likely_isbn_from_pages_and_metadata = (
-    if $metadata_isbn != null and $book_isbn_numbers != null {
+    if ($metadata_isbn | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
       if ($book_isbn_numbers | is-empty) {
         log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
         $metadata_isbn
@@ -350,7 +351,7 @@ def main [
           log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
           $book_isbn_numbers | first
         } else {
-          if $isbn == null {
+          if ($isbn | is-empty) {
             rm --force --recursive $temporary_directory
             return {
               file: $original_file
@@ -361,10 +362,10 @@ def main [
           }
         }
       }
-    } else if $metadata_isbn != null {
+    } else if ($metadata_isbn | is-not-empty) {
       log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
       $metadata_isbn
-    } else if $book_isbn_numbers != null and ($book_isbn_numbers | is-not-empty) {
+    } else if ($book_isbn_numbers | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
       if ($book_isbn_numbers | length) == 1 {
         log debug $"Found a single ISBN in the pages of the book: (ansi purple)($book_isbn_numbers | first)(ansi reset)"
         $book_isbn_numbers | first
@@ -379,8 +380,8 @@ def main [
   )
 
   let isbn = (
-    if $isbn == null {
-      if $likely_isbn_from_pages_and_metadata == null {
+    if ($isbn | is-empty) {
+      if ($likely_isbn_from_pages_and_metadata | is-empty) {
         log warning $"Unable to determine the ISBN from metadata or the pages of the book"
       } else {
         $likely_isbn_from_pages_and_metadata
@@ -423,7 +424,7 @@ def main [
       let input = $in;
       if ($isbn | is-empty) {
         # Don't use Kobo unless we know the ISBN... or it will probably find something arbitrary and wrong instead of the actual book.
-        let result = $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] $temporary_directory
+        let result = $input | fetch_book_metadata --allowed-plugins ["Hardcover" "Wikidata"] $temporary_directory
         if $result.opf == null {
           {
             book: $input
@@ -461,8 +462,8 @@ def main [
           } else if $fetched_isbn == $isbn {
             $result
           } else {
-            log info "Fetched ISBN doesn't match the ISBN used to search! Will attempt another search with only the Google and Amazon.com metadata sources"
-            let result = $input | fetch_book_metadata --allowed-plugins ["Google" "Amazon.com"] --isbn $isbn $temporary_directory
+            log info "Fetched ISBN doesn't match the ISBN used to search! Will attempt another search with only the Hardcover and Wikidata metadata sources"
+            let result = $input | fetch_book_metadata --allowed-plugins ["Hardcover" "Wikidata"] --isbn $isbn $temporary_directory
             if $result.opf == null {
               {
                 book: $input

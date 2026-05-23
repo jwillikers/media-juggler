@@ -1,5 +1,6 @@
 #!/usr/bin/env nu
 
+# todo Don't bother embedding chapters in MP3 files?
 # todo Incorporate Hardcover.app edition id in metadata as HardcoverEditionID.
 # todo Consider using bragibooks instead: https://github.com/djdembeck/bragibooks
 # tone can rename files as needed
@@ -85,6 +86,16 @@ def main [
     let cached_file = [$cache_directory $type $filename] | path join
     try {
       let data = open $cached_file
+      if ($data | is-empty) {
+        rm $cached_file
+        error make {
+          msg: "empty cached file"
+          labels: [
+              {text: "cached_file" span: (metadata $cached_file).span}
+          ]
+          help: $"the empty ($cached_file) has been deleted. Try re-running."
+        }
+      }
       # The integer duration must be converted to a Nushell duration when loading a release from a JSON file.
       if $type == "release" {
         $data | update tracks (
@@ -109,7 +120,17 @@ def main [
     } catch {
       let result = do $update_function $type $id
       mkdir ($cached_file | path dirname)
-      $result | save --force $cached_file
+      if ($result | is-not-empty) {
+        $result | save --force $cached_file
+      } else {
+        error make {
+          msg: "empty or null result"
+          labels: [
+              {text: "result" span: (metadata $result).span}
+          ]
+          help: "try re-running when the service is available"
+        }
+      }
       $result
     }
   }
@@ -139,21 +160,21 @@ def main [
   )
 
   let keep = (
-    if $keep != null {
+    if ($keep | is-not-empty) {
       $keep
     } else if ($config | get --optional keep | is-not-empty) {
       $config.keep
     }
   )
   let merge = (
-    if $merge != null {
+    if ($merge | is-not-empty) {
       $merge
     } else if ($config | get --optional merge | is-not-empty) {
       $config.merge
     }
   )
   let use_rsync = (
-    if $use_rsync != null {
+    if ($use_rsync | is-not-empty) {
       $use_rsync
     } else if ($config | get --optional use_rsync | is-not-empty) {
       $config.use_rsync
