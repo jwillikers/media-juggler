@@ -1481,7 +1481,7 @@ def main [
       let new_file_name = (
         $previous_file_name | path parse | update stem (
           if $manga == "No" {
-            $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue | fill --alignment right --width 3 --character '0') \(($comic_metadata.publication_date | date format '%Y')\)"
+            $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue | fill --alignment right --width 3 --character '0') \(($comic_metadata.publication_date | format date '%Y')\)"
           } else {
             # Kavita will assume that the issue number is a chapter for manga libraries.
             # Add the letter v before the issue number instead of a hashtag so that it understands it is the volume number.
@@ -1674,7 +1674,7 @@ def main [
             }
           );
           if ($comic_metadata | get --optional publication_date | is-not-empty) {
-            $"--date=($comic_metadata.publication_date | date format "%Y-%m-%d")"
+            $"--date=($comic_metadata.publication_date | format date "%Y-%m-%d")"
           } else if ($year | is-not-empty) and ($month | is-not-empty) and ($day | is-not-empty) {
             $"--date=($year)-($month)-($day)"
           } else if ($year | is-not-empty) {
