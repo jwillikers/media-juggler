@@ -1689,7 +1689,6 @@ def main [
           ...$args
           # Keep the title in PDFs for now, since Kavita doesn't really change it's behavior whether one is included or not.
           --title ($title | standardize_title)
-          --tags ""
           # Remove the title sort field.
           # --title-sort ""
           --authors ($authors | str join "&")
