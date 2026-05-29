@@ -33,6 +33,7 @@ def main [
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library" "Kobo Metadata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
+  --ignore-mismatched-isbn-in-pages
   --isbn: string
   # --jxl # Convert lossless PNG images to JXL
   # --interactive # Ask for input from the user
@@ -902,12 +903,14 @@ def main [
           log error $"The provided ISBN (ansi purple)($isbn)(ansi reset) does not match the one found using the book's metadata and pages (ansi purple)($likely_isbn_from_pages_and_metadata)(ansi reset)"
           # todo Allow skipping this check for when the ISBN in the book is incorrect.
           # todo make error
-          if not $keep_tmp {
-            rm --force --recursive $temporary_directory
-          }
-          return {
-            file: $original_file
-            error: $"The provided ISBN (ansi purple)($isbn)(ansi reset) does not match the one found using the book's metadata and pages (ansi purple)($likely_isbn_from_pages_and_metadata)(ansi reset)"
+          if not ($ignore_mismatched_isbn_in_pages) {
+            if not $keep_tmp {
+              rm --force --recursive $temporary_directory
+            }
+            return {
+              file: $original_file
+              error: $"The provided ISBN (ansi purple)($isbn)(ansi reset) does not match the one found using the book's metadata and pages (ansi purple)($likely_isbn_from_pages_and_metadata)(ansi reset)"
+            }
           }
         }
       } else if ($book_isbn_numbers | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
