@@ -372,7 +372,7 @@ export def use_unicode_in_title []: string -> string {
 
 # Make the title look nice when named for a volume, i.e. use a comma before the volume word when there isn't any other punctuation.
 #
-# This basically end up being consistent with the MusicBrainz style guidelines.
+# This basically ends up following the MusicBrainz style guidelines.
 export def standardize_title []: string -> string {
   let title = $in
   # We don't want to replace the "-" before the volume part with an emdash or endash.

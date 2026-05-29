@@ -1533,25 +1533,40 @@ def main [
   log debug "Including the series as part of the title and making it consistent"
   let title = $comic_metadata | get --optional title
   let title = (
-    if ($title | is-not-empty) {
+    if ($title | is-empty) {
+      if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+        if ($comic_metadata.issue_count == 1) {
+          $comic_metadata.series | use_unicode_in_title
+        } else {
+          (($comic_metadata.series | use_unicode_in_title) + " - Volume " + $comic_metadata.issue) | standardize_title
+        }
+      } else {
+        # No title provided and can't determine the title!
+        if not $keep_tmp {
+          rm --force --recursive $temporary_directory
+        }
+        return {
+          file: $original_file
+          error: "No title provided and unable to determine appropriate title from the series metadata"
+        }
+      }
+    } else {
       if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: " {
         # Volume followed by subtitle
         let subtitle = $comic_metadata.title | parse --regex "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: (?<subtitle>.*)"
         if ($subtitle | is-not-empty) {
           # todo What if we get multiple regex matches?
-          $"($comic_metadata.series), Volume ($comic_metadata.issue): ($subtitle.subtitle | first)"
+          $"($comic_metadata.series) - Volume ($comic_metadata.issue): ($subtitle.subtitle | first)" | standardize_title | use_unicode_in_title
         } else {
-          $"($comic_metadata.series), Volume ($comic_metadata.issue)"
+          $"($comic_metadata.series) - Volume ($comic_metadata.issue)" | standardize_title | use_unicode_in_title
         }
       } else if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) " {
         # No subtitle
-        $"($comic_metadata.series), Volume ($comic_metadata.issue)"
+        $"($comic_metadata.series) - Volume ($comic_metadata.issue)" | standardize_title | use_unicode_in_title
       } else {
         # Subtitle is the tile
-        $"($comic_metadata.series), Volume ($comic_metadata.issue): ($comic_metadata.title)"
+        $"($comic_metadata.series) - Volume ($comic_metadata.issue): ($comic_metadata.title)" | standardize_title | use_unicode_in_title
       }
-    } else {
-      $title | use_unicode_in_title
     }
   )
   log info $"The title is now (ansi yellow)($title)(ansi reset)"
