@@ -2439,7 +2439,7 @@ export def from_comic_info_xml []: [record -> record] {
       $comic_info_contributors.person | uniq | reduce --fold [] {|person acc|
         # I need to remove the matched roles so that they aren't matched again.
         # log debug $"person: ($person)"
-       let roles = (
+        let roles = (
           $comic_vine_roles_map
           # Sort by the number of ComicInfo roles first so that we find the best Comic Vine role based on the highest number of matching ComicInfo roles.
           | sort-by --custom {|a b| ($a.comic_info_roles | length) >= ($b.comic_info_roles | length)}
@@ -5796,7 +5796,21 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
   # Realistically, illustrators could be attributed to a single track, but that's probably more likely for music than it is for audibooks.
   const book_contributor_roles = []
   let book_contributors = $all_contributors | where role in (["primary author"] | append $release_only_contributor_roles)
+  let book_contributors = (
+    if ($book_contributors | is-not-empty) {
+      $book_contributors | sort-by entity role name id
+    } else {
+      $book_contributors
+    }
+  )
   let track_contributors = $all_contributors | where role not-in $release_only_contributor_roles
+  let track_contributors = (
+    if ($track_contributors | is-not-empty) {
+      $track_contributors | sort-by entity role name id
+    } else {
+      $track_contributors
+    }
+  )
 
   let amazon_asin = (
     if "additionalFields" in $metadata and ($metadata.additionalFields | is-not-empty) and "asin" in $metadata.additionalFields {
@@ -7299,12 +7313,19 @@ export def parse_contributors []: table -> table<id: string, name: string, entit
     [label published "" publisher]
   ]
 
-  $inputs | par-each {|input|
-    let contributors = $relations | parse_contributor_by_type_from_musicbrainz_relations $input.entity $input.type $input.attribute
-    if ($contributors | is-not-empty) {
-      $contributors | insert entity $input.entity | insert role $input.role
-    }
-  } | flatten
+  let contributors = (
+    $inputs | par-each {|input|
+      let contributors = $relations | parse_contributor_by_type_from_musicbrainz_relations $input.entity $input.type $input.attribute
+      if ($contributors | is-not-empty) {
+        $contributors | insert entity $input.entity | insert role $input.role
+      }
+    } | flatten
+  )
+  if ($contributors | is-not-empty) {
+    $contributors | sort-by entity role name id
+  } else {
+    $contributors
+  }
 }
 
 # Parse series from MusicBrainz relationships
@@ -7927,6 +7948,13 @@ export def parse_musicbrainz_release []: [
     }
     | append $release_contributors
   ) | uniq
+  let contributors = (
+    if ($contributors | is-not-empty) {
+      $contributors | sort-by entity role name id
+    } else {
+      $contributors
+    }
+  )
   let publication_date = (
     if "date" in $metadata {
       $metadata | get date | into datetime

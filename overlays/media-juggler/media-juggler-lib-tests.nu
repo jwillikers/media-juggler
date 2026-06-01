@@ -393,23 +393,23 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
       title: "Dark One: Forgotten"
       contributors: [
         [id, name, entity, role];
-        ["", "Mia Barron", artist, composer]
-        ["", "Luis Bermudez", artist, composer]
-        ["", "William Elsman", artist, composer]
-        ["", "Kaleo Griffith", artist, composer]
-        ["", "Roxanne Hernandez", artist, composer]
-        ["", "Rachel L. Jacobs", artist, composer]
-        ["", "John H. Mayer", artist, composer]
-        ["", "Nan McNamara", artist, composer]
+        ["", "Avery Kidd Waddell", artist, composer]
         ["", "Jim Meskimen", artist, composer]
-        ["", "Sophie Oda", artist, composer]
+        ["", "John H. Mayer", artist, composer]
+        ["", "Kaleo Griffith", artist, composer]
         ["", "Keith Szarabajka", artist, composer]
         ["", "Kelli Tager", artist, composer]
-        ["", "Avery Kidd Waddell", artist, composer]
-        ["b7b9f742-8de0-44fd-afd3-fa536701d27e", "Brandon Sanderson", artist, writer]
-        ["f0e00197-4291-40cb-a448-c2f3c86f54c7", "Dan Wells", artist, writer]
+        ["", "Luis Bermudez", artist, composer]
+        ["", "Mia Barron", artist, composer]
+        ["", "Nan McNamara", artist, composer]
+        ["", "Rachel L. Jacobs", artist, composer]
+        ["", "Roxanne Hernandez", artist, composer]
+        ["", "Sophie Oda", artist, composer]
+        ["", "William Elsman", artist, composer]
         ["b7b9f742-8de0-44fd-afd3-fa536701d27e", "Brandon Sanderson", artist, "primary author"]
         ["f0e00197-4291-40cb-a448-c2f3c86f54c7", "Dan Wells", artist, "primary author"]
+        ["b7b9f742-8de0-44fd-afd3-fa536701d27e", "Brandon Sanderson", artist, writer]
+        ["f0e00197-4291-40cb-a448-c2f3c86f54c7", "Dan Wells", artist, writer]
       ]
       index: 1
       embedded_pictures: [
@@ -522,8 +522,8 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
       contributors: [
         [id name entity role];
         ["" "Damien Haas, Miranda Parkin" artist composer]
-        ["" "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist writer]
         ["" "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist "primary author"]
+        ["" "Akumi Agitogi read by Miranda Parkin, Damien Haas" artist writer]
       ]
       index: 1
       embedded_pictures: [
@@ -835,9 +835,9 @@ def test_into_tone_format_simple [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       contributors: [
         [id name entity role];
-        ["3" "Akumi Agitogi" artist "writer"]
         ["1" "Damien Haas" artist narrator]
         ["2" "Miranda Parkin" artist narrator]
+        ["3" "Akumi Agitogi" artist "writer"]
       ]
       index: 1
       embedded_pictures: [
@@ -917,9 +917,9 @@ def test_into_tone_format_complex [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       contributors: [
         [id name entity role];
-        ["3" "Akumi Agitogi" artist "writer"]
         ["1" "Damien Haas" artist narrator]
         ["2" "Miranda Parkin" artist narrator]
+        ["3" "Akumi Agitogi" artist "writer"]
       ]
       index: 1
       embedded_pictures: [
@@ -1002,9 +1002,9 @@ def test_tracks_into_tone_format_one_track [] {
       title: "My Happy Marriage, Vol. 2 - Track 001"
       contributors: [
         [id name entity role];
-        ["3" "Akumi Agitogi" artist "writer"]
         ["1" "Damien Haas" artist narrator]
         ["2" "Miranda Parkin" artist narrator]
+        ["3" "Akumi Agitogi" artist "writer"]
       ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       index: 1
@@ -1086,8 +1086,8 @@ def test_tracks_into_tone_format_two_tracks [] {
       title: "My Happy Marriage, Vol. 2 - Track 001"
       contributors: [
         [id name entity role];
-        ["3" "Akumi Agitogi" artist "writer"]
         ["2" "Miranda Parkin" artist narrator]
+        ["3" "Akumi Agitogi" artist "writer"]
       ]
       comment: "Akumi Agitogi Purchased from Libro.fm."
       index: 1
@@ -1102,9 +1102,9 @@ def test_tracks_into_tone_format_two_tracks [] {
       comment: "Akumi Agitogi Purchased from Libro.fm."
       contributors: [
         [id name entity role];
-        ["3" "Akumi Agitogi" artist "writer"]
         ["1" "Damien Haas" artist narrator]
         ["2" "Miranda Parkin" artist narrator]
+        ["3" "Akumi Agitogi" artist "writer"]
       ]
       index: 2
       embedded_pictures: [
@@ -1683,8 +1683,8 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
       title: "Baccano! Vol. 1: The Rolling Bootlegs"
       contributors: [
         [name id entity role];
-        ["Ryohgo Narita" "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab" artist "primary author"]
         ["Katsumi Enami" "9d82c45c-5383-4e19-b868-516ce05d3e60" artist illustrator]
+        ["Ryohgo Narita" "efc0e95e-2d3e-4219-8ebb-28ed3751e6ab" artist "primary author"]
         ["Audible Inc." "926e2da3-af75-4571-8159-fcceb8a0aed3" label distributor]
       ]
       musicbrainz_release_country: "XW"
@@ -1801,12 +1801,12 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
       title: "Bakemonogatari: Monster Tale, Part 01"
       contributors: [
         [id name entity role];
-        ["2c7b9427-6776-4969-8028-5de988724659" NISIOISIN artist "primary author"]
-        ["ac830008-5b9c-4f98-ae2b-cac499c40ad8" "Erik Kimerer" artist narrator]
-        ["91225f09-2f8e-4aee-8718-9329cac8ef03" "Erica Mendez" artist narrator]
-        ["9c1e9bd5-4ded-4944-8190-1fec6e530e64" "Keith Silverstein" artist narrator]
-        ["9fac1f69-0044-4b51-ad1c-6bee4c749b91" "Cristina Vee" artist narrator]
         ["4448c994-30ba-4095-8b6b-6068c3cc2152" VOFAN artist illustrator]
+        ["9fac1f69-0044-4b51-ad1c-6bee4c749b91" "Cristina Vee" artist narrator]
+        ["91225f09-2f8e-4aee-8718-9329cac8ef03" "Erica Mendez" artist narrator]
+        ["ac830008-5b9c-4f98-ae2b-cac499c40ad8" "Erik Kimerer" artist narrator]
+        ["9c1e9bd5-4ded-4944-8190-1fec6e530e64" "Keith Silverstein" artist narrator]
+        ["2c7b9427-6776-4969-8028-5de988724659" NISIOISIN artist "primary author"]
         ["158b7958-b872-4944-88a5-fd9d75c5d2e8" "Libro.fm" label distributor]
         ["47375c4f-1441-4e35-a700-b2d975a95b98" "Kodansha USA" label publisher]
       ]

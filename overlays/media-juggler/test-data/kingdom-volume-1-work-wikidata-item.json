@@ -1,0 +1,642 @@
+{
+  "type": "item",
+  "labels": {
+    "en": "Kingdom, Volume 1",
+    "ja": "キングダム 1"
+  },
+  "descriptions": {
+    "en": "2006 manga volume by Yasuhisa Hara"
+  },
+  "aliases": {
+    "en": [
+      "Kingdom 1",
+      "Kingdom, Vol. 1",
+      "Kingudamu 1"
+    ]
+  },
+  "statements": {
+    "P31": [
+      {
+        "id": "Q138684831$1b470aa9-4a31-c936-8c13-07d55821f0d0",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P31",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q7725634"
+        }
+      }
+    ],
+    "P50": [
+      {
+        "id": "Q138684831$718ad735-4aba-1a80-563d-42de94cf3d53",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P50",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q9116547"
+        }
+      }
+    ],
+    "P407": [
+      {
+        "id": "Q138684831$cd8cf2da-4486-bb52-f74f-a6692e3b4476",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P407",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q5287"
+        }
+      }
+    ],
+    "P7937": [
+      {
+        "id": "Q138684831$014f04f9-44de-7012-3cb1-7129309a7c46",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P7937",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q125632018"
+        }
+      },
+      {
+        "id": "Q138684831$5b5191ce-400d-b839-8b40-7dad87060603",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P7937",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q8274"
+        }
+      }
+    ],
+    "P1476": [
+      {
+        "id": "Q138684831$fb9656f1-403e-1149-afb9-90c58f154454",
+        "rank": "preferred",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P7452",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q71548220"
+            }
+          },
+          {
+            "property": {
+              "id": "P1814",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "キングダム 1"
+            }
+          },
+          {
+            "property": {
+              "id": "P2125",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Kingudamu 1"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P1476",
+          "data_type": "monolingualtext"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "text": "キングダム 1",
+            "language": "ja-hani"
+          }
+        }
+      },
+      {
+        "id": "Q138684831$5accfe21-4d01-1810-9deb-4e1266cb3aae",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P1476",
+          "data_type": "monolingualtext"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "text": "Kingdom, Volume 1",
+            "language": "en"
+          }
+        }
+      }
+    ],
+    "P136": [
+      {
+        "id": "Q138684831$1461cde2-40cf-a1d7-435c-1e8ef017f08f",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P136",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q136913634"
+        }
+      },
+      {
+        "id": "Q138684831$e3d0dde9-41ed-8fda-f4a3-ce79df64d48b",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P136",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q101240934"
+        }
+      },
+      {
+        "id": "Q138684831$f0f31317-43a3-35ac-2fe3-c6cdf7ff46c2",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P136",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q136913640"
+        }
+      }
+    ],
+    "P577": [
+      {
+        "id": "Q138684831$978901f1-4c0b-1146-78eb-a89211c9b9dd",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P577",
+          "data_type": "time"
+        },
+        "value": {
+          "type": "value",
+          "content": {
+            "time": "+2006-05-19T00:00:00Z",
+            "precision": 11,
+            "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+          }
+        }
+      }
+    ],
+    "P495": [
+      {
+        "id": "Q138684831$454aca80-4e3d-dd26-cb95-cbf845851a8e",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P495",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q17"
+        }
+      }
+    ],
+    "P478": [
+      {
+        "id": "Q138684831$434de694-4400-07ee-98bf-e6dfc9a4ac6a",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P478",
+          "data_type": "string"
+        },
+        "value": {
+          "type": "value",
+          "content": "1"
+        }
+      }
+    ],
+    "P110": [
+      {
+        "id": "Q138684831$7296562b-4c5f-d51c-ce27-938f5f20c733",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P110",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q9116547"
+        }
+      }
+    ],
+    "P179": [
+      {
+        "id": "Q138684831$8b8d64c7-4520-6fcb-a390-5fc60212d2a0",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1545",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "1"
+            }
+          },
+          {
+            "property": {
+              "id": "P155",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "novalue"
+            }
+          },
+          {
+            "property": {
+              "id": "P156",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q137362214"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P179",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q1058984"
+        }
+      }
+    ],
+    "P8345": [
+      {
+        "id": "Q138684831$74471db0-43c3-b335-2dad-74a3aaffbd81",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P8345",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q130544533"
+        }
+      }
+    ],
+    "P1434": [
+      {
+        "id": "Q138684831$372f8676-47c7-ec90-7070-ca42ffb6c385",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P1434",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q130900222"
+        }
+      }
+    ],
+    "P648": [
+      {
+        "id": "Q138684831$c2123743-49ad-eb29-f0b8-b43fea0e85da",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P648",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "OL20080294W"
+        }
+      }
+    ],
+    "P1085": [
+      {
+        "id": "Q138684831$3a57f441-44be-7076-2ece-c728da5b92a0",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P1085",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "10218797"
+        }
+      }
+    ],
+    "P8383": [
+      {
+        "id": "Q138684831$779674d7-40d9-c74c-22aa-658ec981a785",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P8383",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "24880847"
+        }
+      }
+    ],
+    "P6262": [
+      {
+        "id": "Q138684831$4e17eb70-4275-18d1-2da1-481938140689",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P1810",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "Vol.1"
+            }
+          },
+          {
+            "property": {
+              "id": "P407",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q1860"
+            }
+          },
+          {
+            "property": {
+              "id": "P9675",
+              "data_type": "string"
+            },
+            "value": {
+              "type": "value",
+              "content": "26568"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P6262",
+          "data_type": "external-id"
+        },
+        "value": {
+          "type": "value",
+          "content": "kingdom:Vol.1"
+        }
+      }
+    ],
+    "P747": [
+      {
+        "id": "Q138684831$786a1517-401f-3614-5e85-0cff231828bc",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P407",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q1860"
+            }
+          },
+          {
+            "property": {
+              "id": "P577",
+              "data_type": "time"
+            },
+            "value": {
+              "type": "value",
+              "content": {
+                "time": "+2025-11-11T00:00:00Z",
+                "precision": 11,
+                "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+              }
+            }
+          },
+          {
+            "property": {
+              "id": "P437",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q128093"
+            }
+          },
+          {
+            "property": {
+              "id": "P123",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q133697990"
+            }
+          },
+          {
+            "property": {
+              "id": "P212",
+              "data_type": "external-id"
+            },
+            "value": {
+              "type": "value",
+              "content": "978-1-9747-6026-8"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P747",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q138684907"
+        }
+      }
+    ],
+    "P2360": [
+      {
+        "id": "Q138684831$d600fc0e-477a-c391-f674-6d80878d0553",
+        "rank": "normal",
+        "qualifiers": [],
+        "references": [],
+        "property": {
+          "id": "P2360",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q237338"
+        }
+      }
+    ],
+    "P767": [
+      {
+        "id": "Q138684831$d580778a-427b-fa48-bb09-048f1e642abb",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P3831",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q139597822"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P767",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q136955745"
+        }
+      },
+      {
+        "id": "Q138684831$574d9c69-4028-4203-ec10-08ccee9bc3a8",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P3831",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q139597822"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P767",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q136955769"
+        }
+      },
+      {
+        "id": "Q138684831$31e24ab8-4811-1124-2c21-272986e697f8",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P3831",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q139597822"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P767",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q136955789"
+        }
+      }
+    ],
+    "P98": [
+      {
+        "id": "Q138684831$f67123d8-4e8a-cf01-d199-dee82a3ec286",
+        "rank": "normal",
+        "qualifiers": [
+          {
+            "property": {
+              "id": "P3831",
+              "data_type": "wikibase-item"
+            },
+            "value": {
+              "type": "value",
+              "content": "Q11565578"
+            }
+          }
+        ],
+        "references": [],
+        "property": {
+          "id": "P98",
+          "data_type": "wikibase-item"
+        },
+        "value": {
+          "type": "value",
+          "content": "Q136955699"
+        }
+      }
+    ]
+  },
+  "sitelinks": {},
+  "id": "Q138684831"
+}

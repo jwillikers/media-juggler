@@ -40,6 +40,8 @@ stdenv.mkDerivation (finalAttrs: {
   '';
 
   NIX_LDFLAGS = "-lm";
+  # Requires C17 or earlier since it uses the bool macro.
+  env.NIX_CFLAGS_COMPILE = "-std=c17";
 
   passthru = {
     tests.version = testers.testVersion {

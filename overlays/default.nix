@@ -15,7 +15,8 @@
         self = prev.python3.override {
           inherit self;
           packageOverrides = prev.lib.composeManyExtensions final.pythonPackagesOverlays;
-        }; in
+        };
+      in
       self;
     python3Packages = final.python3.pkgs;
   };
