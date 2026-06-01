@@ -81,7 +81,6 @@ self:
   nixpkgs.overlays = with self.overlays; [
     m4b-tool
     media-juggler
-    image_optim
     isbnlib2
   ];
 }
