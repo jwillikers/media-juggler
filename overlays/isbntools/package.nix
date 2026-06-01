@@ -19,6 +19,11 @@ python3Packages.buildPythonApplication rec {
     hash = "sha256-s47y14YHL/ihAUCnneDcTlyVQj3rUgUnBLD2dPBGD/Y=";
   };
 
+  # Support isbnlib2
+  postPatch = ''
+    substituteInPlace setup.py --replace-fail "isbnlib>=3.10.9,<3.11.0" "isbnlib>=3.11.0"
+  '';
+
   build-system = with python3Packages; [ setuptools ];
 
   dependencies = with python3Packages; [
@@ -39,6 +44,11 @@ python3Packages.buildPythonApplication rec {
     "test_shelvecache_editions"
     "test_shelvecache_setget"
     "test_shelvecache_contains"
+  ];
+
+  # Disable the rename test which relies on private functions in isbnlib which are not available in isbnlib2.
+  disabledTestPaths = [
+    "isbntools/contrib/test/test_rename.py"
   ];
 
   nativeInstallCheckInputs = [ versionCheckHook ];

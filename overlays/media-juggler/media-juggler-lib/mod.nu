@@ -97,15 +97,18 @@ export const genre_allowlist = [
   ["paranormal" [] [Q7135551]]
   [post-apocalyptic [] [Q197949 Q103016666 Q103111961]]
   ["psychological" [] [Q101240581 Q101240583]]
+  ["psychological drama" [] [Q108102008 Q139963570]]
   ["psychological horror" [] [Q604725 Q139041604]]
   ["psychological thriller" [] [Q590103 Q139041618]]
   ["romance" [romantic "romantic fiction"] [Q19765983 Q15637310 Q104536775]]
   ["romantic comedy" [romcom rom-com] [Q860626 Q15712145]]
   ["romantic fantasy" [romantasy] [Q930383]]
+  ["sexual comedy" ["sex comedy" "erotic comedy"] [Q2991560 Q138807680]]
+  # todo Should school and school life be separate genres?
+  ["school" [] [Q5366097 Q104536849]]
+  ["school life" [] [Q10670466]]
   ["science fantasy" [] [Q930383 Q137198951]]
   ["science fiction" [sci-fi] [Q24925 Q5366020 Q103925653]]
-  ["school life" [] [Q10670466]]
-  ["sexual comedy" ["sex comedy" "erotic comedy"] [Q2991560 Q138807680]]
   ["slice of life" [] [Q2561438 Q15428604]]
   ["speculative fiction" [] [Q9326077]]
   ["sports" [spokon] [Q139794801 Q2281511]]
@@ -369,7 +372,7 @@ export def use_unicode_in_title []: string -> string {
 
 # Make the title look nice when named for a volume, i.e. use a comma before the volume word when there isn't any other punctuation.
 #
-# This basically end up being consistent with the MusicBrainz style guidelines.
+# This basically ends up following the MusicBrainz style guidelines.
 export def standardize_title []: string -> string {
   let title = $in
   # We don't want to replace the "-" before the volume part with an emdash or endash.
@@ -2436,7 +2439,7 @@ export def from_comic_info_xml []: [record -> record] {
       $comic_info_contributors.person | uniq | reduce --fold [] {|person acc|
         # I need to remove the matched roles so that they aren't matched again.
         # log debug $"person: ($person)"
-       let roles = (
+        let roles = (
           $comic_vine_roles_map
           # Sort by the number of ComicInfo roles first so that we find the best Comic Vine role based on the highest number of matching ComicInfo roles.
           | sort-by --custom {|a b| ($a.comic_info_roles | length) >= ($b.comic_info_roles | length)}
@@ -5793,7 +5796,21 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
   # Realistically, illustrators could be attributed to a single track, but that's probably more likely for music than it is for audibooks.
   const book_contributor_roles = []
   let book_contributors = $all_contributors | where role in (["primary author"] | append $release_only_contributor_roles)
+  let book_contributors = (
+    if ($book_contributors | is-not-empty) {
+      $book_contributors | sort-by entity role name id
+    } else {
+      $book_contributors
+    }
+  )
   let track_contributors = $all_contributors | where role not-in $release_only_contributor_roles
+  let track_contributors = (
+    if ($track_contributors | is-not-empty) {
+      $track_contributors | sort-by entity role name id
+    } else {
+      $track_contributors
+    }
+  )
 
   let amazon_asin = (
     if "additionalFields" in $metadata and ($metadata.additionalFields | is-not-empty) and "asin" in $metadata.additionalFields {
@@ -7296,12 +7313,19 @@ export def parse_contributors []: table -> table<id: string, name: string, entit
     [label published "" publisher]
   ]
 
-  $inputs | par-each {|input|
-    let contributors = $relations | parse_contributor_by_type_from_musicbrainz_relations $input.entity $input.type $input.attribute
-    if ($contributors | is-not-empty) {
-      $contributors | insert entity $input.entity | insert role $input.role
-    }
-  } | flatten
+  let contributors = (
+    $inputs | par-each {|input|
+      let contributors = $relations | parse_contributor_by_type_from_musicbrainz_relations $input.entity $input.type $input.attribute
+      if ($contributors | is-not-empty) {
+        $contributors | insert entity $input.entity | insert role $input.role
+      }
+    } | flatten
+  )
+  if ($contributors | is-not-empty) {
+    $contributors | sort-by entity role name id
+  } else {
+    $contributors
+  }
 }
 
 # Parse series from MusicBrainz relationships
@@ -7924,6 +7948,13 @@ export def parse_musicbrainz_release []: [
     }
     | append $release_contributors
   ) | uniq
+  let contributors = (
+    if ($contributors | is-not-empty) {
+      $contributors | sort-by entity role name id
+    } else {
+      $contributors
+    }
+  )
   let publication_date = (
     if "date" in $metadata {
       $metadata | get date | into datetime

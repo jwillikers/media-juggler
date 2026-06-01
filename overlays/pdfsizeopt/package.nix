@@ -147,7 +147,6 @@ stdenv.mkDerivation (finalAttrs: {
             imgdataopt
             jbig2enc
             optipng
-            pngout
             python2
             sam2p
             zopfli

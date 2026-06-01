@@ -33,6 +33,7 @@ def main [
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library" "Kobo Metadata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
+  --ignore-mismatched-isbn-in-pages
   --isbn: string
   # --jxl # Convert lossless PNG images to JXL
   # --interactive # Ask for input from the user
@@ -902,12 +903,14 @@ def main [
           log error $"The provided ISBN (ansi purple)($isbn)(ansi reset) does not match the one found using the book's metadata and pages (ansi purple)($likely_isbn_from_pages_and_metadata)(ansi reset)"
           # todo Allow skipping this check for when the ISBN in the book is incorrect.
           # todo make error
-          if not $keep_tmp {
-            rm --force --recursive $temporary_directory
-          }
-          return {
-            file: $original_file
-            error: $"The provided ISBN (ansi purple)($isbn)(ansi reset) does not match the one found using the book's metadata and pages (ansi purple)($likely_isbn_from_pages_and_metadata)(ansi reset)"
+          if not ($ignore_mismatched_isbn_in_pages) {
+            if not $keep_tmp {
+              rm --force --recursive $temporary_directory
+            }
+            return {
+              file: $original_file
+              error: $"The provided ISBN (ansi purple)($isbn)(ansi reset) does not match the one found using the book's metadata and pages (ansi purple)($likely_isbn_from_pages_and_metadata)(ansi reset)"
+            }
           }
         }
       } else if ($book_isbn_numbers | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
@@ -1481,7 +1484,7 @@ def main [
       let new_file_name = (
         $previous_file_name | path parse | update stem (
           if $manga == "No" {
-            $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue | fill --alignment right --width 3 --character '0') \(($comic_metadata.publication_date | date format '%Y')\)"
+            $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue | fill --alignment right --width 3 --character '0') \(($comic_metadata.publication_date | format date '%Y')\)"
           } else {
             # Kavita will assume that the issue number is a chapter for manga libraries.
             # Add the letter v before the issue number instead of a hashtag so that it understands it is the volume number.
@@ -1530,25 +1533,40 @@ def main [
   log debug "Including the series as part of the title and making it consistent"
   let title = $comic_metadata | get --optional title
   let title = (
-    if ($title | is-not-empty) {
+    if ($title | is-empty) {
+      if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+        if ($comic_metadata.issue_count == 1) {
+          $comic_metadata.series | use_unicode_in_title
+        } else {
+          (($comic_metadata.series | use_unicode_in_title) + " - Volume " + $comic_metadata.issue) | standardize_title
+        }
+      } else {
+        # No title provided and can't determine the title!
+        if not $keep_tmp {
+          rm --force --recursive $temporary_directory
+        }
+        return {
+          file: $original_file
+          error: "No title provided and unable to determine appropriate title from the series metadata"
+        }
+      }
+    } else {
       if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: " {
         # Volume followed by subtitle
         let subtitle = $comic_metadata.title | parse --regex "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: (?<subtitle>.*)"
         if ($subtitle | is-not-empty) {
           # todo What if we get multiple regex matches?
-          $"($comic_metadata.series), Volume ($comic_metadata.issue): ($subtitle.subtitle | first)"
+          $"($comic_metadata.series) - Volume ($comic_metadata.issue): ($subtitle.subtitle | first)" | standardize_title | use_unicode_in_title
         } else {
-          $"($comic_metadata.series), Volume ($comic_metadata.issue)"
+          $"($comic_metadata.series) - Volume ($comic_metadata.issue)" | standardize_title | use_unicode_in_title
         }
       } else if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) " {
         # No subtitle
-        $"($comic_metadata.series), Volume ($comic_metadata.issue)"
+        $"($comic_metadata.series) - Volume ($comic_metadata.issue)" | standardize_title | use_unicode_in_title
       } else {
         # Subtitle is the tile
-        $"($comic_metadata.series), Volume ($comic_metadata.issue): ($comic_metadata.title)"
+        $"($comic_metadata.series) - Volume ($comic_metadata.issue): ($comic_metadata.title)" | standardize_title | use_unicode_in_title
       }
-    } else {
-      $title | use_unicode_in_title
     }
   )
   log info $"The title is now (ansi yellow)($title)(ansi reset)"
@@ -1674,7 +1692,7 @@ def main [
             }
           );
           if ($comic_metadata | get --optional publication_date | is-not-empty) {
-            $"--date=($comic_metadata.publication_date | date format "%Y-%m-%d")"
+            $"--date=($comic_metadata.publication_date | format date "%Y-%m-%d")"
           } else if ($year | is-not-empty) and ($month | is-not-empty) and ($day | is-not-empty) {
             $"--date=($year)-($month)-($day)"
           } else if ($year | is-not-empty) {
@@ -1689,7 +1707,6 @@ def main [
           ...$args
           # Keep the title in PDFs for now, since Kavita doesn't really change it's behavior whether one is included or not.
           --title ($title | standardize_title)
-          --tags ""
           # Remove the title sort field.
           # --title-sort ""
           --authors ($authors | str join "&")

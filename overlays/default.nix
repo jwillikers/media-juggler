@@ -1,8 +1,8 @@
 { inputs }:
 {
-  image_optim = _final: prev: {
-    image_optim = prev.image_optim.override { withPngout = true; };
-  };
+  # image_optim = _final: prev: {
+  #   image_optim = prev.image_optim.override { withPngout = true; };
+  # };
   m4b-tool = inputs.m4b-tool.overlay;
   isbnlib2 = final: prev: {
     pythonPackagesOverlays = (prev.pythonPackagesOverlays or [ ]) ++ [
@@ -15,7 +15,8 @@
         self = prev.python3.override {
           inherit self;
           packageOverrides = prev.lib.composeManyExtensions final.pythonPackagesOverlays;
-        }; in
+        };
+      in
       self;
     python3Packages = final.python3.pkgs;
   };
@@ -27,7 +28,7 @@
     jpeg2png = prev.callPackage ./jpeg2png/package.nix { };
     jpegli = prev.callPackage ./jpegli/package.nix { };
     media-juggler = prev.callPackage ./media-juggler/package.nix { };
-    minuimus = prev.callPackage ./minuimus/package.nix { withPngout = true; };
+    minuimus = prev.callPackage ./minuimus/package.nix { withPngout = false; };
     pdfsizeopt = prev.callPackage ./pdfsizeopt/package.nix { };
     sam2p = prev.callPackage ./sam2p/package.nix { };
     tif22pnm = prev.callPackage ./tif22pnm/package.nix { };

@@ -17,7 +17,7 @@
         treefmt-nix.follows = "treefmt-nix";
       };
     };
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     pre-commit-hooks = {
       url = "github:cachix/pre-commit-hooks.nix";
@@ -48,7 +48,6 @@
       overlays = import ./overlays { inherit inputs; };
       overlaysList = with overlays; [
         overlays.m4b-tool
-        image_optim
         isbnlib2
         media-juggler
       ];
