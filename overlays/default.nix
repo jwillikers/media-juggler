@@ -27,9 +27,10 @@
     isbntools = prev.callPackage ./isbntools/package.nix { };
     jpeg2png = prev.callPackage ./jpeg2png/package.nix { };
     jpegli = prev.callPackage ./jpegli/package.nix { };
+    ghostscript_9_05_headless = prev.callPackage ./ghostscript_9_05_headless/package.nix { };
     media-juggler = prev.callPackage ./media-juggler/package.nix { };
     minuimus = prev.callPackage ./minuimus/package.nix { withPngout = false; };
-    pdfsizeopt = prev.callPackage ./pdfsizeopt/package.nix { };
+    pdfsizeopt = prev.callPackage ./pdfsizeopt/package.nix { withPngout = false; };
     sam2p = prev.callPackage ./sam2p/package.nix { };
     tif22pnm = prev.callPackage ./tif22pnm/package.nix { };
   };

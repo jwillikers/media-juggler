@@ -4,8 +4,7 @@
   advancecomp,
   efficient-compression-tool,
   fetchFromGitHub,
-  fetchurl,
-  ghostscript_headless,
+  ghostscript_9_05_headless,
   imgdataopt,
   jbig2enc,
   makeWrapper,
@@ -22,78 +21,7 @@
   oxipng,
   pngquant,
   pngcrush,
-  # For GhostScript
-  automake,
-  zlib,
 }:
-let
-  ghostscript_9_05_headless = ghostscript_headless.overrideAttrs (
-    _finalAttrs: previousAttrs: {
-      version = "9.05";
-
-      src = fetchurl {
-        url = "https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/ghostscript/ghostscript-9.05.tgz";
-        hash = "sha256-WT9391hHBL353kFZighKQgjDrTuUCh3h+q+PWaFcwgc=";
-      };
-
-      # For debugging
-      # dontStrip = true;
-      # enableDebugging = true;
-
-      patches = [
-        ./urw-font-files.patch
-        ./doc-no-ref.diff
-        ./ghostscript-9.05-glibc-timeval.patch
-        # https://github.com/chrstphrchvz/macports-ports/blob/197bfa253db6d2dcb589197fa99d2bd19793fa10/print/ghostscript/files/patch-base_fapi_ft.c.diff
-        ./ghostscript-9.05-freetype-2.10.3.patch
-        # https://github.com/chrstphrchvz/macports-ports/blob/197bfa253db6d2dcb589197fa99d2bd19793fa10/print/ghostscript/files/ghostpdl.git-06c920713e11.patch
-        ./ghostpdl.git-06c920713e11.patch
-      ];
-
-      nativeBuildInputs = previousAttrs.nativeBuildInputs ++ [ automake ];
-
-      preConfigure = ''
-        # https://ghostscript.com/doc/current/Make.htm
-        export CCAUX=$CC_FOR_BUILD
-        rm -rf jpeg libpng zlib jasper expat tiff lcms lcms2 lcms2mt jbig2dec freetype cups/libs ijs openjpeg
-
-        sed "s@if ( test -f \$(INCLUDE)[^ ]* )@if ( true )@; s@INCLUDE=/usr/include@INCLUDE=/no-such-path@" -i base/unix-aux.mak
-        sed "s@^ZLIBDIR=.*@ZLIBDIR=${zlib.dev}/include@" -i configure.ac
-
-        autoreconf -i
-      ''
-      + lib.optionalString stdenv.hostPlatform.isDarwin ''
-        export DARWIN_LDFLAGS_SO_PREFIX=$out/lib/
-      '';
-
-      configureFlags = previousAttrs.configureFlags ++ [
-        "--without-x"
-        "--disable-cups"
-      ];
-
-      # Fallback to c17 since the c23 standard will break everything.
-      env.NIX_CFLAGS_COMPILE = "-Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-missing-prototypes";
-
-      # The buildsystem doesn't link zlib correctly, so it has to be added here.
-      NIX_LDFLAGS = "-lz";
-
-      # Parallel install is broken.
-      enableParallelInstalling = false;
-
-      # As of NixOS 25.11 the installCheckPhase fails with a segmentation fault.
-      doInstallCheck = false;
-
-      # The doc output is empty, so it is removed here.
-      outputs = [
-        "out"
-        "man"
-        "fonts"
-      ];
-
-      meta.insecure = true;
-    }
-  );
-in
 stdenv.mkDerivation (finalAttrs: {
   pname = "pdfsizeopt";
   version = "2023-04-18";
