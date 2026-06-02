@@ -111,6 +111,8 @@
         packages = {
           inherit (pkgs) media-juggler;
           inherit (pkgs) calibre-plugins;
+          inherit (pkgs) pdfsizeopt;
+          inherit (pkgs) minuimus;
           default = pkgs.media-juggler;
         };
       }

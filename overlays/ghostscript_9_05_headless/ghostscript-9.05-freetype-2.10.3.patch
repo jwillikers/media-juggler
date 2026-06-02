@@ -1,0 +1,57 @@
+diff --git a/psi/fapi_ft.c b/psi/fapi_ft.c
+index 2f24eee..847c483 100644
+--- a/psi/fapi_ft.c
++++ b/psi/fapi_ft.c
+@@ -51,6 +51,14 @@
+ #include FT_IMAGE_H
+ #include FT_BITMAP_H
+ 
++#ifndef FT_CALLBACK_DEF
++#ifdef __cplusplus
++#define FT_CALLBACK_DEF( x )  extern "C"  x
++#else
++#define FT_CALLBACK_DEF( x )  static  x
++#endif
++#endif
++
+ /* Note: structure definitions here start with FF_, which stands for 'FAPI FreeType". */
+ 
+ typedef struct FF_server_s
+@@ -179,16 +187,16 @@ static int FF_open_read_stream (gs_memory_t *mem, char *fname, FT_Stream *fts)
+     if (code < 0){
+         goto error_out;
+     }
+-    
++
+     if (!pfn.fname) {
+         code = e_undefinedfilename;
+         goto error_out;
+     }
+-    
++
+     if (pfn.iodev == NULL) {
+         pfn.iodev = iodev_default(mem);
+     }
+-    
++
+     if (pfn.iodev) {
+         gx_io_device *const iodev = pfn.iodev;
+         iodev_proc_open_file((*open_file)) = iodev->procs.open_file;
+@@ -835,7 +843,7 @@ transform_decompose(FT_Matrix *a_transform, FT_UInt *xresp, FT_UInt *yresp,
+          * axes were coincident with the axes of the page.
+          */
+         bool use_x = true;
+-                
++
+         if (*xresp < *yresp) {
+             use_x = false;
+         }
+@@ -1598,7 +1606,7 @@ int gs_fapi_ft_instantiate( i_plugin_client_memory *a_memory, i_plugin_instance
+ {
+     FF_server *server = (FF_server*) a_memory->alloc(a_memory, sizeof (FF_server), "FF_server");
+     int code;
+-    
++
+     if (!server)
+         return e_VMerror;
+     memset(server, 0, sizeof(*server));

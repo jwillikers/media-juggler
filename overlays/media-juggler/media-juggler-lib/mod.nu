@@ -1199,7 +1199,12 @@ export def optimize_image [
   if $allow_lossy and ($path | path parse | get extension) in ["jpg" "jpeg"] {
     $path | optimize_jpeg
   } else {
-    $path | image_optim | optimize_image_ect
+    if ($path | path parse | get extension) in ["jpg" "jpeg"] {
+      # I haven't seen ECT achieve better optimization than image_optim for JPEG's.
+      $path | image_optim
+    } else {
+      $path | image_optim | optimize_image_ect
+    }
   }
   $path
 }
