@@ -196,7 +196,7 @@ index dd09f4b..06574d8 100755
 -  if(! $?) {$optimisers = $optimisers.",pngout";}
 +#   my $optimisers='--use-image-optimizer=optipng,advpng';
 +#   `which imgdataopt`;
-+  my $optimisers='--use-image-optimizer=oxipngmax_ect';
++  my $optimisers='--use-image-optimizer=pngcrush_oxipngmax_ect';
 +#   `which pngout`;
 +#   if(! $?) {$optimisers = $optimisers.",pngout";}
 +#   my $optimisers='--use-image-optimizer=pngcrush,oxipng,optipng,pngquant,pngout,ect,advpng';

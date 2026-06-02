@@ -7,7 +7,7 @@ index 48b2791..3bf2e3c 100644
          'pngout_gray_flags': '',
          'optipng_gray_flags': '',
 +        'pngcrush_gray_flags': '',
-+        'image_optim_set_gray_flags': '',
++        'pngcrush_oxipngmax_ect_gray_flags': '',
          'sam2p_np_gray_flags': '',
          'sam2p_pr_gray_flags': '',
      }
@@ -16,7 +16,7 @@ index 48b2791..3bf2e3c 100644
        # -nc: No color type reduction.
        cmd_values_dict['optipng_gray_flags'] = '-nc -np '
 +      cmd_values_dict['pngcrush_gray_flags'] = '-c 0 '
-+      cmd_values_dict['image_optim_set_gray_flags'] = '-c 0 '
++      cmd_values_dict['pngcrush_oxipngmax_ect_gray_flags'] = '-c 0 '
        cmd_values_dict['sam2p_np_gray_flags'] = '-s Gray1:Gray2:Gray4:Gray8:stop '
        cmd_values_dict['sam2p_pr_gray_flags'] = '-s Gray1:Gray2:Gray4:Gray8:stop '
      else:
@@ -50,10 +50,10 @@ index 48b2791..3bf2e3c 100644
 -    'zopflipng': 'zopflipng -y -m --filters=p %(sourcefnq)s %(targetfnq)s',
 +    'image_optim': 'image_optim %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
 +    'oxipng_ect': 'oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
-+    'oxipngmax_ect': 'oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
-+    # 'image_optim_set': 'pngcrush -blacken -ow -q -rem alla -reduce %(image_optim_set_gray_flags)s%(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s && pngquant --force --output=%(targetfnq)s --quality=100-100 --skip-if-larger --speed=3 256 -- %(targetfnq)s || true && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
-+    # 'image_optim_set_all': 'pngcrush -blacken -ow -q -rem alla -reduce %(pngcrush_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s && optipng %(targetfnq)s -clobber -o4 -fix -force %(optipng_gray_flags)s && pngquant --force --output=%(targetfnq)s --quality=100-100 --skip-if-larger --speed=3 256 -- %(targetfnq)s || true && pngout -force %(pngout_gray_flags)s%(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
-+    # 'image_optim_set_oxipng_max': 'pngcrush -ow -blacken -q -rem alla -reduce %(pngcrush_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && optipng %(sourcefnq)s -o4 -fix -force %(optipng_gray_flags)s-out %(targetfnq)s && pngquant --force --output=%(targetfnq)s --quality=100-100 --skip-if-larger --speed=3 256 -- %(sourcefnq)s || true && pngout -force %(pngout_gray_flags)s%(sourcefnq)s %(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
++    'oxipngmax_ect': 'oxipng --interlace 0 --quiet --strip all -o max --out %(targetfnq)s -- %(sourcefnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
++    # 'image_optim_set_oxipng_max': 'pngcrush -ow -blacken -q -rem alla -reduce %(image_optim_set_oxipng_max_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && optipng %(targetfnq)s -o4 -fix -force -out %(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
++    #'image_optim_set_oxipng_max': 'pngcrush -ow -blacken -q -rem alla -reduce %(image_optim_set_oxipng_max_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && optipng %(targetfnq)s -o4 -fix -force -out %(targetfnq)s && pngout -force %(targetfnq)s %(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
++    'pngcrush_oxipngmax_ect': 'pngcrush -force -l 0 -m 1 -noreduce -q -speed %(pngcrush_oxipngmax_ect_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max --out %(targetfnq)s -- %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
 +    'pngcrush': 'pngcrush -blacken -ow -q -rem alla -reduce %(pngcrush_gray_flags)s%(targetfnq)s',
 +    'oxipng': 'oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s',
 +    'oxipngmax': 'oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s',
