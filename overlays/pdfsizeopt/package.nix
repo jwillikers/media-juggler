@@ -36,11 +36,18 @@ let
         hash = "sha256-WT9391hHBL353kFZighKQgjDrTuUCh3h+q+PWaFcwgc=";
       };
 
+      # For debugging
+      # dontStrip = true;
+      # enableDebugging = true;
+
       patches = [
         ./urw-font-files.patch
         ./doc-no-ref.diff
         ./ghostscript-9.05-glibc-timeval.patch
+        # https://github.com/chrstphrchvz/macports-ports/blob/197bfa253db6d2dcb589197fa99d2bd19793fa10/print/ghostscript/files/patch-base_fapi_ft.c.diff
         ./ghostscript-9.05-freetype-2.10.3.patch
+        # https://github.com/chrstphrchvz/macports-ports/blob/197bfa253db6d2dcb589197fa99d2bd19793fa10/print/ghostscript/files/ghostpdl.git-06c920713e11.patch
+        ./ghostpdl.git-06c920713e11.patch
       ];
 
       nativeBuildInputs = previousAttrs.nativeBuildInputs ++ [ automake ];
@@ -65,7 +72,7 @@ let
       ];
 
       # Fallback to c17 since the c23 standard will break everything.
-      env.NIX_CFLAGS_COMPILE = "-std=c17 -Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-missing-prototypes";
+      env.NIX_CFLAGS_COMPILE = "-Wno-error -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-missing-prototypes";
 
       # The buildsystem doesn't link zlib correctly, so it has to be added here.
       NIX_LDFLAGS = "-lz";

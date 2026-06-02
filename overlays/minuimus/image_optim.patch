@@ -197,9 +197,9 @@ index dd09f4b..06574d8 100755
 +#   my $optimisers='--use-image-optimizer=optipng,advpng';
 +#   `which imgdataopt`;
 +  my $optimisers='--use-image-optimizer=oxipngmax_ect';
-+  `which pngout`;
-+  if(! $?) {$optimisers = $optimisers.",pngout";}
-+  # my $optimisers='--use-image-optimizer=pngcrush,oxipng,optipng,pngquant,pngout,ect,advpng';
++#   `which pngout`;
++#   if(! $?) {$optimisers = $optimisers.",pngout";}
++#   my $optimisers='--use-image-optimizer=pngcrush,oxipng,optipng,pngquant,pngout,ect,advpng';
   `which imgdataopt`;
    if(! $?) {$optimisers = $optimisers.",imgdataopt";}
    if(!$no_jbig2){
