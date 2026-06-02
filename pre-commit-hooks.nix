@@ -26,7 +26,6 @@
     # todo Enable lychee when asciidoc is supported.
     # See https://github.com/lycheeverse/lychee/issues/291
     # lychee.enable = true;
-    mixed-line-endings.enable = true;
     nil.enable = true;
     strip-location-metadata = {
       name = "Strip location metadata";
