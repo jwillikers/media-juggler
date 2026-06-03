@@ -54,7 +54,7 @@ index 48b2791..3bf2e3c 100644
 +    # 'image_optim_set_oxipng_max': 'pngcrush -ow -blacken -q -rem alla -reduce %(image_optim_set_oxipng_max_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && optipng %(targetfnq)s -o4 -fix -force -out %(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
 +    #'image_optim_set_oxipng_max': 'pngcrush -ow -blacken -q -rem alla -reduce %(image_optim_set_oxipng_max_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && optipng %(targetfnq)s -o4 -fix -force -out %(targetfnq)s && pngout -force %(targetfnq)s %(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
 +    'pngcrush_oxipngmax_ect': 'pngcrush -force -l 0 -m 1 -noreduce -q -speed %(pngcrush_oxipngmax_ect_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max --out %(targetfnq)s -- %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
-+    'pngcrush': 'pngcrush -blacken -ow -q -rem alla -reduce %(pngcrush_gray_flags)s%(targetfnq)s',
++    'pngcrush': 'pngcrush -blacken -force -q -rem alla -reduce %(pngcrush_gray_flags)s%(sourcefnq)s s%(targetfnq)s',
 +    'oxipng': 'oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s',
 +    'oxipngmax': 'oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s',
 +    'oxipngmaxzopfli': 'oxipng --interlace 0 --quiet --strip all -o max --zopfli -- %(targetfnq)s',
