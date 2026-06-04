@@ -1188,6 +1188,24 @@ export def image_optim []: path -> path {
   $path
 }
 
+# Optimize a PNG image
+#
+# Uses the media-juggler-png-optimizer.nu script which just runs oxipng followed by ect.
+# This is much faster than just running image_optim followed by ect, since image_optim includes a bunch of optimizers besides oxipng.
+# In a simple test, compression using oxipng followed by ect and image_optim followed by ect resulted in a file of the same size.
+export def optimize_png []: path -> path {
+  let png = $in
+  log debug $"Running command: (ansi yellow)^optipng -o7 ($png)(ansi reset)"
+  let result = do {
+    ^media-juggler-png-optimizer $png
+  } | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^media-juggler-png-optimizer ($png)(ansi reset)\n($result.stderr)\n"
+    return $png
+  }
+  $png
+}
+
 # Optimize an image
 #
 # Lossless by default.
@@ -1199,9 +1217,12 @@ export def optimize_image [
   if $allow_lossy and ($path | path parse | get extension) in ["jpg" "jpeg"] {
     $path | optimize_jpeg
   } else {
-    if ($path | path parse | get extension) in ["jpg" "jpeg"] {
+    let extension = $path | path parse | get extension | str downcase
+    if $extension in ["jpg" "jpeg"] {
       # I haven't seen ECT achieve better optimization than image_optim for JPEG's.
       $path | image_optim
+    } else if $extension == "png" {
+      $path | optimize_png
     } else {
       $path | image_optim | optimize_image_ect
     }

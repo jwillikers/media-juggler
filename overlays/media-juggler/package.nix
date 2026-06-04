@@ -15,6 +15,7 @@
   lib,
   m4b-tool,
   makeWrapper,
+  media-juggler-png-optimizer,
   minuimus,
   mupdf-headless,
   nushell,
@@ -53,6 +54,7 @@ else
       # kcc
       keyfinder-cli
       m4b-tool
+      media-juggler-png-optimizer
       minuimus
       nushell
       picard
@@ -82,6 +84,7 @@ else
             calibre
             efficient-compression-tool
             image_optim
+            media-juggler-png-optimizer
             minuimus
             udisks
             util-linux
@@ -97,6 +100,7 @@ else
             ffmpeg
             image_optim
             isbntools
+            media-juggler-png-optimizer
             minuimus
             m4b-tool
             rhash
@@ -114,6 +118,7 @@ else
             efficient-compression-tool
             exiftool
             image_optim
+            media-juggler-png-optimizer
             imagemagick
             # kcc
             minuimus
@@ -135,6 +140,7 @@ else
             file
             image_optim
             isbntools
+            media-juggler-png-optimizer
             minuimus
             mupdf-headless
             rsync
@@ -152,6 +158,7 @@ else
             efficient-compression-tool
             image_optim
             # jpegli
+            media-juggler-png-optimizer
             rsync
             keyfinder-cli
             picard # For mbsubmit Beets plugin

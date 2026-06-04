@@ -47,6 +47,7 @@
     let
       overlays = import ./overlays { inherit inputs; };
       overlaysList = with overlays; [
+        efficient-compression-tool
         overlays.m4b-tool
         isbnlib2
         media-juggler
@@ -109,10 +110,11 @@
         };
         formatter = treefmtEval.config.build.wrapper;
         packages = {
-          inherit (pkgs) media-juggler;
           inherit (pkgs) calibre-plugins;
-          inherit (pkgs) pdfsizeopt;
+          inherit (pkgs) media-juggler;
+          inherit (pkgs) media-juggler-png-optimizer;
           inherit (pkgs) minuimus;
+          inherit (pkgs) pdfsizeopt;
           default = pkgs.media-juggler;
         };
       }

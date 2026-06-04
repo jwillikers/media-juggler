@@ -18,9 +18,10 @@
   zopfli,
   # patch
   image_optim,
+  media-juggler-png-optimizer,
   oxipng,
-  pngquant,
   pngcrush,
+  pngquant,
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname = "pdfsizeopt";
@@ -87,9 +88,10 @@ stdenv.mkDerivation (finalAttrs: {
             zopfli
             # patch
             image_optim
+            media-juggler-png-optimizer
             oxipng
-            pngquant
             pngcrush
+            pngquant
           ]
           ++ lib.optionals withPngout [ pngout ]
         )

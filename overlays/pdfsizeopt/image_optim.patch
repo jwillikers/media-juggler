@@ -7,7 +7,7 @@ index 48b2791..3bf2e3c 100644
          'pngout_gray_flags': '',
          'optipng_gray_flags': '',
 +        'pngcrush_gray_flags': '',
-+        'pngcrush_oxipngmax_ect_gray_flags': '',
++        'media_juggler_png_optimizer_gray_flags': '',
          'sam2p_np_gray_flags': '',
          'sam2p_pr_gray_flags': '',
      }
@@ -16,7 +16,7 @@ index 48b2791..3bf2e3c 100644
        # -nc: No color type reduction.
        cmd_values_dict['optipng_gray_flags'] = '-nc -np '
 +      cmd_values_dict['pngcrush_gray_flags'] = '-c 0 '
-+      cmd_values_dict['pngcrush_oxipngmax_ect_gray_flags'] = '-c 0 '
++      cmd_values_dict['media_juggler_png_optimizer_gray_flags'] = '--force-gray-scale '
        cmd_values_dict['sam2p_np_gray_flags'] = '-s Gray1:Gray2:Gray4:Gray8:stop '
        cmd_values_dict['sam2p_pr_gray_flags'] = '-s Gray1:Gray2:Gray4:Gray8:stop '
      else:
@@ -26,10 +26,10 @@ index 48b2791..3bf2e3c 100644
      return ('pngout' in cmd_name or 'zopflipng' in cmd_name or
 -            'optipng' in cmd_name or 'ect' in cmd_name or
 -            'advpng' in cmd_name or 'pngwolf' in cmd_name)
-+            'optipng' in cmd_name or 'ect' in cmd_name or 'oxipng' in cmd_name or
++            'optipng' in cmd_name or 'ect' in cmd_name or 'oxipng' in cmd_name or 'media_juggler_png_optimizer' in cmd_name or
 +            'pngcrush' in cmd_name or 'pngquant' in cmd_name or 'image_optim_set' in cmd_name or
 +            'advpng' in cmd_name or 'pngwolf' in cmd_name or 'image_optim' in cmd_name)
- 
+
    def _ConvertImageWithJbig2(self, image, cmd_name, cmd_pattern, obj_num,
                               color_type):
 @@ -7825,6 +7830,8 @@ class PdfData(object):
@@ -51,7 +51,7 @@ index 48b2791..3bf2e3c 100644
 +    'image_optim': 'image_optim %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
 +    'oxipng_ect': 'oxipng --interlace 0 --quiet --strip all -o 3 -- %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
 +    'oxipngmax_ect': 'oxipng --interlace 0 --quiet --strip all -o max --out %(targetfnq)s -- %(sourcefnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
-+    # 'image_optim_set_oxipng_max': 'pngcrush -ow -blacken -q -rem alla -reduce %(image_optim_set_oxipng_max_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && optipng %(targetfnq)s -o4 -fix -force -out %(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
++    'media_juggler_png_optimizer': 'media-juggler-png-optimizer.nu %(media_juggler_png_optimizer_gray_flags)s --destination %(targetfnq)s %(sourcefnq)s',
 +    #'image_optim_set_oxipng_max': 'pngcrush -ow -blacken -q -rem alla -reduce %(image_optim_set_oxipng_max_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max -- %(targetfnq)s && optipng %(targetfnq)s -o4 -fix -force -out %(targetfnq)s && pngout -force %(targetfnq)s %(targetfnq)s && advpng -z3 -f %(targetfnq)s && ect -9 -strip %(targetfnq)s',
 +    'pngcrush_oxipngmax_ect': 'pngcrush -force -l 0 -m 1 -noreduce -q -speed %(pngcrush_oxipngmax_ect_gray_flags)s%(sourcefnq)s %(targetfnq)s && oxipng --interlace 0 --quiet --strip all -o max --out %(targetfnq)s -- %(targetfnq)s && ect -9 -strip --mt-deflate %(targetfnq)s',
 +    'pngcrush': 'pngcrush -blacken -force -q -rem alla -reduce %(pngcrush_gray_flags)s%(sourcefnq)s s%(targetfnq)s',

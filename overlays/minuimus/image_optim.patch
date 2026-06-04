@@ -124,7 +124,7 @@ index dd09f4b..06574d8 100755
 +  # testcommand('optipng');
 +  # testcommand('advdef');
 +  # testcommand('advpng');
-+  testcommand('image_optim');
++  testcommand('media-juggler-png-optimizer.nu');
  
    my $anim=is_animated_png($file);
  
@@ -134,7 +134,7 @@ index dd09f4b..06574d8 100755
  
 -  system('optipng', '-quiet','-o6', '-nc', '-nb', $file);
 +  # system('optipng', '-quiet','-o6', '-nc', '-nb', $file);
-+  system('image_optim', $file);
++  system('media-juggler-png-optimizer.nu', $file);
  
 -  if ($anim) {
 -    system('advdef', '-z4', '-q', $file);
@@ -196,7 +196,7 @@ index dd09f4b..06574d8 100755
 -  if(! $?) {$optimisers = $optimisers.",pngout";}
 +#   my $optimisers='--use-image-optimizer=optipng,advpng';
 +#   `which imgdataopt`;
-+  my $optimisers='--use-image-optimizer=pngcrush_oxipngmax_ect';
++  my $optimisers='--use-image-optimizer=media_juggler_png_optimizer';
 +#   `which pngout`;
 +#   if(! $?) {$optimisers = $optimisers.",pngout";}
 +#   my $optimisers='--use-image-optimizer=pngcrush,oxipng,optipng,pngquant,pngout,ect,advpng';
