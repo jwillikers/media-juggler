@@ -1973,9 +1973,13 @@ def main [
     mkdir $destination
     mv --force ($formats | get $output_format) $destination
     if $output_format == "pdf" {
-      mv --force $formats.comic_info $destination
-      mv --force $formats.metron_info $destination
-      if "cover" in $formats and ($formats.cover | is-not-empty) {
+      if ($formats | get --optional comic_info | is-not-empty) {
+        mv --force $formats.comic_info $destination
+      }
+      if ($formats | get --optional metron_info | is-not-empty) {
+        mv --force $formats.metron_info $destination
+      }
+      if ($formats | get --optional cover | is-not-empty) {
         mv --force $formats.cover $destination
       }
     }
