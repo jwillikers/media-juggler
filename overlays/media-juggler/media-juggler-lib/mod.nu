@@ -3612,7 +3612,7 @@ export def fetch_wikidata_edition_and_works_metadata [
         http get --full --headers {
           "User-Agent": $user_agent
           "Accept": "application/json"
-          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
           "X-Authenticated-User": $env.WIKIDATA_USERNAME
         }
         $"($wikidata_api_url)/entities/items/($id)"
@@ -3648,7 +3648,7 @@ export def fetch_wikidata_edition_and_works_metadata [
             http get --full --headers {
               "User-Agent": $user_agent
               "Accept": "application/json"
-              "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+              "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
               "X-Authenticated-User": $env.WIKIDATA_USERNAME
             }
             $"($wikidata_api_url)/entities/items/($id)"
@@ -4149,7 +4149,7 @@ export def process_wikidata_edition_and_works_metadata [
         http get --full --headers {
           "User-Agent": $user_agent
           "Accept": "application/json"
-          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
           "X-Authenticated-User": $env.WIKIDATA_USERNAME
         }
         $"($wikidata_api_url)/entities/items/($id)/labels/($wikidata_language_code)"
@@ -4197,7 +4197,7 @@ export def process_wikidata_edition_and_works_metadata [
         http get --full --headers {
           "User-Agent": $user_agent
           "Accept": "application/json"
-          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
           "X-Authenticated-User": $env.WIKIDATA_USERNAME
         }
         $"($wikidata_api_url)/entities/items/($id)"
@@ -4703,7 +4703,7 @@ export def wikidata_get_edition_identifiers [
       http get --full --headers {
         "User-Agent": $user_agent
         "Accept": "application/json"
-        "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+        "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
         "X-Authenticated-User": $env.WIKIDATA_USERNAME
       }
       $"($wikidata_api_url)/entities/items/($wikidata_edition_id)/statements"
