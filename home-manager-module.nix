@@ -67,13 +67,6 @@ self:
     ];
   };
 
-  systemd.user = {
-    tmpfiles.rules = [
-      "d ${config.home.homeDirectory}/Books 0750 ${config.home.username} ${config.home.username} - -"
-      "d ${config.home.homeDirectory}/Books/Audiobooks 0750 ${config.home.username} ${config.home.username} - -"
-    ];
-  };
-
   nixpkgs.overlays = with self.overlays; [
     m4b-tool
     media-juggler
