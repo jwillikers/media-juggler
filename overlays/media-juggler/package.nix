@@ -20,6 +20,7 @@
   nushell,
   picard,
   rhash,
+  rsync,
   stdenvNoCC,
   tesseract,
   tone,
@@ -55,6 +56,7 @@ else
       minuimus
       nushell
       picard
+      rsync
       tesseract
       udisks
       util-linux
@@ -98,6 +100,7 @@ else
             minuimus
             m4b-tool
             rhash
+            rsync
             tone
             zip
           ]
@@ -116,6 +119,7 @@ else
             minuimus
             mupdf-headless
             rhash
+            rsync
             tesseract
             udisks
             util-linux
@@ -133,6 +137,7 @@ else
             isbntools
             minuimus
             mupdf-headless
+            rsync
             tesseract
             udisks
             util-linux
@@ -147,6 +152,7 @@ else
             efficient-compression-tool
             image_optim
             # jpegli
+            rsync
             keyfinder-cli
             picard # For mbsubmit Beets plugin
           ]
