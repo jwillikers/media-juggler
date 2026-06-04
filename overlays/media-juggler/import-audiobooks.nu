@@ -315,7 +315,7 @@ def main [
       } else {
         $file
       }
-    }
+    } | sort --natural
   )
 
   # Next, unzip any zip archives
@@ -342,6 +342,7 @@ def main [
     }
   )
 
+  # todo Optimize FLACs
   let optimized_file_hashes = (
     try {
       open $optimized_files_cache_file
