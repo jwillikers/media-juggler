@@ -512,8 +512,7 @@ def main [
     if ($isbn | is-empty) and ($bookbrainz_edition_id | is-empty) and ($wikidata_edition_id | is-empty) {
       if ($isbn | is-empty) {
         if ($existing_metadata | is-not-empty) {
-          let metadata_isbn = $existing_metadata | get --optional isbn
-          if ($existing_metadata.isbn | is-not-empty) {
+          if ($existing_metadata | get --optional isbn | is-not-empty) {
             $existing_metadata.isbn
           }
         }
