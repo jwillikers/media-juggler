@@ -4669,7 +4669,7 @@ def test_escape_special_glob_characters_empty_input [] {
 
 def test_escape_special_glob_characters_escape_square_brackets [] {
   let input = '/var/[Special Directory]'
-  let expected = '/var/\[Special Directory\]'
+  let expected = '/var/\\[Special Directory\\]'
   assert equal ($input | escape_special_glob_characters) $expected
 }
 
@@ -4692,7 +4692,7 @@ def test_escape_special_glob_characters_escape_nothing [] {
 
 def test_escape_special_glob_characters_escape_all_special_characters [] {
   let input = '/var/][nothing }{special here!/...($money: 20.*,)'
-  let expected = '/var/\]\[nothing [}][{]special here!/...[(][$]money[:] 20.[*][,][)]'
+  let expected = '/var/\\]\\[nothing [}][{]special here!/...[(][$]money[:] 20.[*][,][)]'
   assert equal ($input | escape_special_glob_characters) $expected
 }
 

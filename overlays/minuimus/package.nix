@@ -29,6 +29,7 @@
   libwebp,
   lzip,
   makeWrapper,
+  media-juggler-png-optimizer,
   mupdf-headless,
   nix-update-script,
   optipng,
@@ -130,6 +131,7 @@ stdenv.mkDerivation {
             libtiff
             libwebp
             lzip
+            media-juggler-png-optimizer
             mupdf-headless
             optipng
             p7zip

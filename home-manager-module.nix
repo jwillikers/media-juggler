@@ -58,17 +58,13 @@ self:
         onChange = "cat ${config.xdg.configHome}/calibre/tweaks_source.json > ${config.xdg.configHome}/calibre/tweaks.json";
       };
     };
-    packages =
-      with pkgs;
-      [
-        calibre
-        # comictagger
-        keyfinder-cli # todo Fix beets to properly be wrapped with this?
-        minio-client
-      ]
-      ++ (with pkgs; [
-        media-juggler
-      ]);
+    packages = with pkgs; [
+      calibre
+      keyfinder-cli # todo Fix beets to properly be wrapped with this?
+      minio-client
+      media-juggler
+      media-juggler-png-optimizer
+    ];
   };
 
   systemd.user = {

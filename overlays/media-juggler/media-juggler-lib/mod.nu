@@ -181,8 +181,9 @@ export const genre_to_age_rating_comic_info_map = [
 # Surround special characters in a string with square brackets
 #
 # Use this on strings before adding glob characters.
-# Not that I can't actually escape backslashes, so those will cause the glob expression to fail outright.
+# Note that I can't actually escape backslashes, so those will cause the glob expression to fail outright.
 # Maybe this will be fixed in Nushell at some point?
+# Seems like double backslash works.
 export def escape_special_glob_characters []: string -> string {
   let input = $in
   if ($input | describe) not-in ["glob" "string"] {
@@ -191,7 +192,7 @@ export def escape_special_glob_characters []: string -> string {
   const special_glob_characters = ['[' ']' '(' ')' '{' '}' '*' '?' ':' '$' ',']
   $special_glob_characters | reduce --fold $input {|character, acc|
     if $character in ["[" "]"] {
-      $acc | str replace --all $character ('\' + $character)
+      $acc | str replace --all $character ('\\' + $character)
     } else {
       $acc | str replace --all $character ('[' + $character + ']')
     }
@@ -1188,6 +1189,24 @@ export def image_optim []: path -> path {
   $path
 }
 
+# Optimize a PNG image
+#
+# Uses the media-juggler-png-optimizer.nu script which just runs oxipng followed by ect.
+# This is much faster than just running image_optim followed by ect, since image_optim includes a bunch of optimizers besides oxipng.
+# In a simple test, compression using oxipng followed by ect and image_optim followed by ect resulted in a file of the same size.
+export def optimize_png []: path -> path {
+  let png = $in
+  log debug $"Running command: (ansi yellow)^optipng -o7 ($png)(ansi reset)"
+  let result = do {
+    ^media-juggler-png-optimizer $png
+  } | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^media-juggler-png-optimizer ($png)(ansi reset)\n($result.stderr)\n"
+    return $png
+  }
+  $png
+}
+
 # Optimize an image
 #
 # Lossless by default.
@@ -1199,9 +1218,12 @@ export def optimize_image [
   if $allow_lossy and ($path | path parse | get extension) in ["jpg" "jpeg"] {
     $path | optimize_jpeg
   } else {
-    if ($path | path parse | get extension) in ["jpg" "jpeg"] {
+    let extension = $path | path parse | get extension | str downcase
+    if $extension in ["jpg" "jpeg"] {
       # I haven't seen ECT achieve better optimization than image_optim for JPEG's.
       $path | image_optim
+    } else if $extension == "png" {
+      $path | optimize_png
     } else {
       $path | image_optim | optimize_image_ect
     }
@@ -3052,7 +3074,18 @@ export def from_opf_xml []: [
         } else {
           # Ignore multiple ids of the same type.
           # todo Warn if there are multiple, distinct IDs for the same scheme.
-          $acc | append {type: $identifier_schemes_and_type.type, id: ($matching_ids | get content | first | get content | first)}
+          $acc | append {
+            type: $identifier_schemes_and_type.type
+            id: (
+              # if ($identifier_schemes_and_type.type == "comic_vine_issue_id") {
+              #   "4000-" + ($matching_ids | get content | first | get content | first)
+              # } else if ($identifier_schemes_and_type.type == "comic_vine_volume_id") {
+              #   "4050-" + ($matching_ids | get content | first | get content | first)
+              # } else {
+              $matching_ids | get content | first | get content | first
+              # }
+            )
+          }
         }
       }
     }
@@ -3290,6 +3323,7 @@ export def extract_ebook_metadata [
       let metadata = (
         open $metadata_file | from xml
       )
+      # log debug $"metadata: ($metadata | to nuon)"
       rm $metadata_file
       $metadata
     }
@@ -3297,7 +3331,7 @@ export def extract_ebook_metadata [
   if ($metadata | is-not-empty) {
     if "comic_info" in $metadata {
       $metadata | from_comic_info_xml
-    } else if "package" in $metadata {
+    } else if ($metadata | get --optional tag) == "package" {
       $metadata | from_opf_xml
     }
   }
@@ -3612,7 +3646,7 @@ export def fetch_wikidata_edition_and_works_metadata [
         http get --full --headers {
           "User-Agent": $user_agent
           "Accept": "application/json"
-          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
           "X-Authenticated-User": $env.WIKIDATA_USERNAME
         }
         $"($wikidata_api_url)/entities/items/($id)"
@@ -3648,7 +3682,7 @@ export def fetch_wikidata_edition_and_works_metadata [
             http get --full --headers {
               "User-Agent": $user_agent
               "Accept": "application/json"
-              "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+              "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
               "X-Authenticated-User": $env.WIKIDATA_USERNAME
             }
             $"($wikidata_api_url)/entities/items/($id)"
@@ -4149,7 +4183,7 @@ export def process_wikidata_edition_and_works_metadata [
         http get --full --headers {
           "User-Agent": $user_agent
           "Accept": "application/json"
-          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
           "X-Authenticated-User": $env.WIKIDATA_USERNAME
         }
         $"($wikidata_api_url)/entities/items/($id)/labels/($wikidata_language_code)"
@@ -4197,7 +4231,7 @@ export def process_wikidata_edition_and_works_metadata [
         http get --full --headers {
           "User-Agent": $user_agent
           "Accept": "application/json"
-          "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+          "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
           "X-Authenticated-User": $env.WIKIDATA_USERNAME
         }
         $"($wikidata_api_url)/entities/items/($id)"
@@ -4703,7 +4737,7 @@ export def wikidata_get_edition_identifiers [
       http get --full --headers {
         "User-Agent": $user_agent
         "Accept": "application/json"
-        "Authorization": $"Bearer ($env.WIKIDATA_ACCESS_TOKEN)"
+        "Authorization": $"Bearer ($env.MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN)"
         "X-Authenticated-User": $env.WIKIDATA_USERNAME
       }
       $"($wikidata_api_url)/entities/items/($wikidata_edition_id)/statements"
