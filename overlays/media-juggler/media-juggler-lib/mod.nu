@@ -349,7 +349,8 @@ export def sanitize_file_name []: string -> string {
   } else if $name == ".." {
     "‥"
   } else {
-    $name | str replace --all '/' '⁄'
+    # Replace forward slash, a.k.a. solidus, with big solidus
+    $name | str replace --all '/' '⧸'
   }
 }
 
