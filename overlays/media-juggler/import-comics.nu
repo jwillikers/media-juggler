@@ -1491,7 +1491,7 @@ def main [
             # Add the letter v before the issue number instead of a hashtag so that it understands it is the volume number.
             # Also, leave off the year and volume to avoid confusing Kavita.
             $"($comic_metadata.series) - Volume ($comic_metadata.issue | fill --alignment right --width 3 --character '0')"
-          }
+          } | use_unicode_in_title | sanitize_file_name
         )
       ) | path join;
       if $new_file_name != $previous_file_name {
