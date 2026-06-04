@@ -181,8 +181,9 @@ export const genre_to_age_rating_comic_info_map = [
 # Surround special characters in a string with square brackets
 #
 # Use this on strings before adding glob characters.
-# Not that I can't actually escape backslashes, so those will cause the glob expression to fail outright.
+# Note that I can't actually escape backslashes, so those will cause the glob expression to fail outright.
 # Maybe this will be fixed in Nushell at some point?
+# Seems like double backslash works.
 export def escape_special_glob_characters []: string -> string {
   let input = $in
   if ($input | describe) not-in ["glob" "string"] {
@@ -191,7 +192,7 @@ export def escape_special_glob_characters []: string -> string {
   const special_glob_characters = ['[' ']' '(' ')' '{' '}' '*' '?' ':' '$' ',']
   $special_glob_characters | reduce --fold $input {|character, acc|
     if $character in ["[" "]"] {
-      $acc | str replace --all $character ('\' + $character)
+      $acc | str replace --all $character ('\\' + $character)
     } else {
       $acc | str replace --all $character ('[' + $character + ']')
     }
@@ -3073,7 +3074,18 @@ export def from_opf_xml []: [
         } else {
           # Ignore multiple ids of the same type.
           # todo Warn if there are multiple, distinct IDs for the same scheme.
-          $acc | append {type: $identifier_schemes_and_type.type, id: ($matching_ids | get content | first | get content | first)}
+          $acc | append {
+            type: $identifier_schemes_and_type.type
+            id: (
+              # if ($identifier_schemes_and_type.type == "comic_vine_issue_id") {
+              #   "4000-" + ($matching_ids | get content | first | get content | first)
+              # } else if ($identifier_schemes_and_type.type == "comic_vine_volume_id") {
+              #   "4050-" + ($matching_ids | get content | first | get content | first)
+              # } else {
+              $matching_ids | get content | first | get content | first
+              # }
+            )
+          }
         }
       }
     }
@@ -3311,6 +3323,7 @@ export def extract_ebook_metadata [
       let metadata = (
         open $metadata_file | from xml
       )
+      # log debug $"metadata: ($metadata | to nuon)"
       rm $metadata_file
       $metadata
     }
@@ -3318,7 +3331,7 @@ export def extract_ebook_metadata [
   if ($metadata | is-not-empty) {
     if "comic_info" in $metadata {
       $metadata | from_comic_info_xml
-    } else if "package" in $metadata {
+    } else if ($metadata | get --optional tag) == "package" {
       $metadata | from_opf_xml
     }
   }

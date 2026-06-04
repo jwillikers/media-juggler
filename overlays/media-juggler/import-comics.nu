@@ -394,7 +394,7 @@ def main [
       let file = $original_file
       let server = $file | split_ssh_path | get server
       let covers = (
-        $"($file | path dirname | escape_special_glob_characters | str replace '[:]' ':')/cover.*"
+        $"($file | path dirname | escape_special_glob_characters | str replace '[:]' ':' | str replace --all '\' '\\')/cover.*"
         | ssh glob "--no-dir" "--no-symlink"
         | where {|f|
           let components = ($f | path parse);
@@ -501,6 +501,7 @@ def main [
   let existing_metadata = (
     $formats | get $input_format | extract_ebook_metadata $temporary_directory
   )
+  # log debug $"existing_metadata: ($existing_metadata | to json)"
 
   # If no primary ids, i.e. ISBN, BookBrainz edition ID, and Wikidata item ID, are provided, try using the primary ids available in the metadata.
   # If an ISBN, BookBrainz edition ID, or Wikidata item ID are provided, we'll try to use those to look up the other IDs using the provided ones.
@@ -571,7 +572,7 @@ def main [
           let comic_vine_issue_ids = $ids | where type == "comic_vine_issue_id"
           if ($comic_vine_issue_ids | is-not-empty) {
             # todo Warn if multiple
-            $comic_vine_issue_ids | first
+            $comic_vine_issue_ids.id | first
           }
         }
       }
@@ -588,15 +589,15 @@ def main [
         if ($acc | is-empty) {
           let checksum = (
             if $checksum_type == "blake3" {
-              $original_file | hash_blake3
+              $file | hash_blake3
             } else if $checksum_type == "sha3-512" {
-              $original_file | hash_sha3_512
+              $file | hash_sha3_512
             } else {
               log error $"This should never happen."
               exit 1
             }
           )
-          let file_size = du $original_file | first | get physical
+          let file_size = du $file | first | get physical
           let editions = $checksum | wikidata_search_editions_by_checksum $checksum_type $file_size
           if ($editions | is-empty) {
             # No editions found.
