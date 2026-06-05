@@ -1495,7 +1495,7 @@ export def same_image [
   # Compare hashes of image data.
   # This works regardless of the amount of lossless optimization of the image.
   let checksum1 = $image1 | image_data_hash
-  let checksum1 = $image2 | image_data_hash
+  let checksum2 = $image2 | image_data_hash
   if $checksum1 == $checksum2 {
     return true
   }
