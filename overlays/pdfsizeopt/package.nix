@@ -13,7 +13,7 @@
   withPngout ? false,
   pngout, # disabled by default because it's unfree
   python2,
-  sam2p,
+  # sam2p,
   versionCheckHook,
   zopfli,
   # patch
@@ -55,7 +55,8 @@ stdenv.mkDerivation (finalAttrs: {
     jbig2enc
     makeWrapper
     python2
-    sam2p
+    # sam2p can corrupt data
+    # sam2p
   ];
 
   buildPhase = ''
@@ -84,7 +85,7 @@ stdenv.mkDerivation (finalAttrs: {
             jbig2enc
             optipng
             python2
-            sam2p
+            # sam2p
             zopfli
             # patch
             image_optim
