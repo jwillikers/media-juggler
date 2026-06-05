@@ -8,5 +8,5 @@ extend-ignore-re = [
 PNGs = "PNGs"
 
 [default.extend-words]
-opf = "opf"
 ect = "ect"
+opf = "opf"
