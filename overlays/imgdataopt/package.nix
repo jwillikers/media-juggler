@@ -25,9 +25,11 @@ stdenv.mkDerivation {
 
   makeFlags = [ "imgdataopt.lz" ];
 
+  # Adds a symlink for sam2p.
   installPhase = ''
     runHook preInstall
     install -Dm0755 imgdataopt.lz $out/bin/imgdataopt
+    ln -sr $out/bin/imgdataopt $out/bin/sam2p
     runHook postInstall
   '';
 

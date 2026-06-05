@@ -75,6 +75,7 @@ stdenv.mkDerivation {
     ./ghostscript-9.05-glibc-timeval.patch
     # https://github.com/chrstphrchvz/macports-ports/blob/197bfa253db6d2dcb589197fa99d2bd19793fa10/print/ghostscript/files/patch-base_fapi_ft.c.diff
     ./ghostscript-9.05-freetype-2.10.3.patch
+    # todo Test if this patch is necessary
     # https://github.com/chrstphrchvz/macports-ports/blob/197bfa253db6d2dcb589197fa99d2bd19793fa10/print/ghostscript/files/ghostpdl.git-06c920713e11.patch
     ./ghostpdl.git-06c920713e11.patch
   ];
