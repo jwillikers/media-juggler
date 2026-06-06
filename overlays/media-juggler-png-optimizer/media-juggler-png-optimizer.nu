@@ -115,6 +115,7 @@ def main [
   } | complete
   if $result.exit_code != 0 {
     log error $"Error running '^ect -9 -strip --mt-deflate \"($temp_destination)\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    rm --force $temp_destination
     exit 1
   }
   if not ($force_gray_scale) {
@@ -128,6 +129,7 @@ def main [
       } | complete
       if $result.exit_code != 0 {
         log error $"Error running '^ect -9 -strip --mt-deflate --reuse \"($temp_destination)\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+        rm --force $temp_destination
         exit 1
       }
       let new_image_checksum = $temp_destination | image_data_hash
