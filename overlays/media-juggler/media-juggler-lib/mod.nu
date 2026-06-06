@@ -1387,6 +1387,9 @@ export def optimize_pdf [
     log info $"Error running '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
+  # todo Check if one or both of these should be output.
+  log info $"minuimus.pl stderr: ($result.stderr)"
+  log info $"minuimus.pl stdout: ($result.stdout)"
   let current_size = ls $pdf | get size | first
   let average = (($original_size + $current_size) / 2)
   let percent_difference = ((($original_size - $current_size) / $average) * 100)
