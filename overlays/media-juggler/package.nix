@@ -19,6 +19,7 @@
   minuimus,
   mupdf-headless,
   nushell,
+  odiff,
   picard,
   rhash,
   rsync,
@@ -57,6 +58,7 @@ else
       media-juggler-png-optimizer
       minuimus
       nushell
+      odiff
       picard
       rsync
       tesseract
@@ -86,6 +88,7 @@ else
             image_optim
             media-juggler-png-optimizer
             minuimus
+            odiff
             udisks
             util-linux
             zip
@@ -100,9 +103,10 @@ else
             ffmpeg
             image_optim
             isbntools
+            m4b-tool
             media-juggler-png-optimizer
             minuimus
-            m4b-tool
+            odiff
             rhash
             rsync
             tone
@@ -123,6 +127,7 @@ else
             # kcc
             minuimus
             mupdf-headless
+            odiff
             rhash
             rsync
             tesseract
@@ -143,6 +148,7 @@ else
             media-juggler-png-optimizer
             minuimus
             mupdf-headless
+            odiff
             rsync
             tesseract
             udisks
@@ -159,6 +165,7 @@ else
             image_optim
             # jpegli
             media-juggler-png-optimizer
+            odiff
             rsync
             keyfinder-cli
             picard # For mbsubmit Beets plugin

@@ -3,6 +3,7 @@
   lib,
   makeWrapper,
   nushell,
+  odiff,
   oxipng,
   pngcrush,
   stdenvNoCC,
@@ -21,10 +22,7 @@ else
     doCheck = true;
 
     buildInputs = [
-      efficient-compression-tool
       nushell
-      oxipng
-      pngcrush
     ];
 
     installPhase = ''
@@ -34,6 +32,7 @@ else
         --prefix PATH : ${
           lib.makeBinPath [
             efficient-compression-tool
+            odiff
             oxipng
             pngcrush
           ]

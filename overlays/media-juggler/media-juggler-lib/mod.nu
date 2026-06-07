@@ -1477,6 +1477,19 @@ export def compare_image_phash [
   }
 }
 
+# Compare two images with odiff
+export def odiff_same_image [
+  image2: path
+]: path -> bool {
+  let image1 = $in
+  let result = do {^odiff --threshold 0.0 $image1 $image2} | complete
+  if $result.exit_code not-in [0, 21, 22] {
+    log info $"Error running '^odiff --threshold 0.0 \"($image1)\" \"($image2)\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    return null
+  }
+  $result.exit_code == 0
+}
+
 # Determines whether two image files are the same image.
 export def same_image [
   image2: path
@@ -1495,11 +1508,9 @@ export def same_image [
   if $checksum1 == $checksum2 {
     return true
   }
-  # Compare hashes of image data.
+  # Compare raw image data.
   # This works regardless of the amount of lossless optimization of the image.
-  let checksum1 = $image1 | image_data_hash
-  let checksum2 = $image2 | image_data_hash
-  if $checksum1 == $checksum2 {
+  if ($image1 | odiff_same_image $image2) {
     return true
   }
   # This will probably need dialed in over time.
