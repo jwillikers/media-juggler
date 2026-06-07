@@ -78,7 +78,7 @@ def main [
     ^oxipng --opt max --out $destination --quiet --strip safe -- $source
   } | complete
   if $result.exit_code != 0 {
-    log error $"Error running '^oxipng --quiet --strip safe -o max --out \"($destination)\" -- \"($source)\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    log error $"Error running '^oxipng --opt max --out \"($destination)\" --quiet --strip safe -- \"($source)\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     exit 1
   }
   if not ($force_gray_scale) and ($destination | path exists) {
@@ -87,10 +87,10 @@ def main [
       log warning "oxipng produced an image with different image data. Rerunning without modifying colortype."
       # Changes to the colortype may cause it to render differently, so redo without the colortype change.
       let result = do {
-        ^oxipng --nc safe --opt max --out $destination --quiet --strip -- $source
+        ^oxipng --nc --opt max --out $destination --quiet --strip safe -- $source
       } | complete
       if $result.exit_code != 0 {
-        log error $"Error running '^oxipng --nc --quiet --strip safe -o max --out \"($destination)\" -- \"($source)\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+        log error $"Error running '^oxipng --nc --opt max --out \"($destination)\" --quiet --strip safe -- \"($source)\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
         exit 1
       }
       if ($destination | path exists) {
