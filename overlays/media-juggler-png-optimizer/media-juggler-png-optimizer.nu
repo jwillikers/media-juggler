@@ -37,6 +37,7 @@ def main [
   source: path # The input image.
   --destination: path # The destination of the optimized image file.
   --force-gray-scale # Force the image to be gray scale.
+  --verify # Verify raw image data is unchanged.
 ] {
   if ($source | is-empty) {
     log error "No source file provided"
@@ -99,7 +100,7 @@ def main [
     rm --force $original_source
     exit 1
   }
-  if not ($force_gray_scale) and ($destination | path exists) and not ($original_source | same_image $destination) {
+  if $verify and  not ($force_gray_scale) and ($destination | path exists) and not ($original_source | same_image $destination) {
     log warning "oxipng produced an image with different image data. Rerunning without modifying colortype."
     # Changes to the colortype may cause it to render differently, so redo without the colortype change.
     let result = do {
@@ -133,7 +134,7 @@ def main [
     rm --force $original_source $temp_destination
     exit 1
   }
-  if not ($force_gray_scale) and not ($original_source | same_image $destination) {
+  if $verify and not ($force_gray_scale) and not ($original_source | same_image $destination) {
     log warning "ect produced an image with different image data. Rerunning with the --reuse flag."
     # Changes to the colortype cause it to render differently, so redo without the colortype change.
     cp --force $destination $temp_destination
