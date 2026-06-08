@@ -37,7 +37,7 @@ export def beet_import [
     submit
   )
   let imported_music = (
-    let music_files = glob ([($beets_directory | escape_special_glob_characters | str replace --all '\' '\\') "**" "*.{aac,flac,lrc,m4a,mp3,opus}"] | path join);
+    let music_files = glob ([($beets_directory | escape_special_glob_characters) "**" "*.{aac,flac,lrc,m4a,mp3,opus}"] | path join);
     if ($music_files | is-empty) {
       log error $"No music files found in (ansi yellow)($beets_directory)(ansi reset)!"
       exit 1
@@ -243,13 +243,13 @@ def main [
       let item = $original_item | split_ssh_path | get path
       let server = $item | split_ssh_path | get server
       if $item_type == "dir" {
-        $"($item | escape_special_glob_characters | str replace --all '\' '\\')/**/*" | ssh glob "--no-dir" "--no-symlink" | each {|file| $"($server):($file)"}
+        $"($item | escape_special_glob_characters)/**/*" | ssh glob "--no-dir" "--no-symlink" | each {|file| $"($server):($file)"}
       } else {
         $item | ssh ls --expand-path | where type == file | get name | each {|file| $"($server):($file)"}
       }
     } else {
       if $item_type == "dir" {
-        glob --no-dir --no-symlink (($original_item | path expand | escape_special_glob_characters | str replace --all '\' '\\') + "/**/*")
+        glob --no-dir --no-symlink (($original_item | path expand | escape_special_glob_characters) + "/**/*")
       } else {
         [($original_item | path expand)]
       }

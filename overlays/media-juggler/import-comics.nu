@@ -394,7 +394,7 @@ def main [
       let file = $original_file
       let server = $file | split_ssh_path | get server
       let covers = (
-        $"($file | path dirname | escape_special_glob_characters | str replace '[:]' ':' | str replace --all '\' '\\')/cover.*"
+        $"($file | path dirname | escape_special_glob_characters | str replace '[:]' ':')/cover.*"
         | ssh glob "--no-dir" "--no-symlink"
         | where {|f|
           let components = ($f | path parse);
@@ -418,7 +418,7 @@ def main [
         }
       }
     } else {
-      let covers = (glob $"($original_file | path dirname | escape_special_glob_characters | str replace --all '\' '\\')/cover.{($image_extensions | str join ',')}")
+      let covers = (glob $"($original_file | path dirname | escape_special_glob_characters)/cover.{($image_extensions | str join ',')}")
       if not ($covers | is-empty) {
         if ($covers | length) > 1 {
           if not $keep_tmp {

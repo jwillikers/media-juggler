@@ -192,7 +192,7 @@ export def escape_special_glob_characters []: string -> string {
   const special_glob_characters = ['[' ']' '(' ')' '{' '}' '*' '?' ':' '$' ',']
   $special_glob_characters | reduce --fold $input {|character, acc|
     if $character in ["[" "]"] {
-      $acc | str replace --all $character ('\\' + $character)
+      $acc | str replace --all $character ('\' + $character)
     } else {
       $acc | str replace --all $character ('[' + $character + ']')
     }
@@ -514,7 +514,7 @@ export def "ssh glob" [
 ]: path -> table {
   let input = $in
   let ssh_path = $input | split_ssh_path
-  ^ssh $ssh_path.server nu --commands $"\'glob ($glob_args | str join ' ') \"($ssh_path.path)\" | to json\'" | from json
+  ^ssh $ssh_path.server nu --commands $"\'glob ($glob_args | str join ' ') \"($ssh_path.path | str replace --all '\' '\\\\')\" | to json\'" | from json
 }
 
 # List files over SSH
