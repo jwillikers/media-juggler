@@ -1606,7 +1606,7 @@ def main [
                 if ($residual_optimization_files | is-empty) {
                   rm --force --recursive $pdf_optimization_directory
                 } else {
-                  let saved_optimization_directory = mktemp --tmpdir-path (pwd) (($title | use_unicode_in_title | sanitize_file_name) + "_pdf_optimization_files.XXXXXXXXXX")
+                  let saved_optimization_directory = mktemp --directory --tmpdir-path (pwd) (($title | use_unicode_in_title | sanitize_file_name) + "_pdf_optimization_files.XXXXXXXXXX")
                   cp --recursive $pdf_optimization_directory $saved_optimization_directory
                   log info $"Saved failed PDF optimization attempts in (ansi yellow)($saved_optimization_directory)(ansi reset)"
                 }

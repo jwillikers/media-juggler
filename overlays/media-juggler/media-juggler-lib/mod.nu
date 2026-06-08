@@ -1470,7 +1470,7 @@ export def optimize_pdf_pdfsizeopt [
   cd $working_directory
 
   # I'm going to assume that I should use the disk for the temp files instead of a temp directory given how large PDFs can be.
-  let tmp_dir = mktemp --tmpdir-path $working_directory "pdfsizeopt_tmp_dir.XXXXXXXXXX"
+  let tmp_dir = mktemp --directory --tmpdir-path $working_directory "pdfsizeopt_tmp_dir.XXXXXXXXXX"
 
   let input_pdf = $original_pdf
   let input_size = ls $input_pdf | get size | first
@@ -1506,7 +1506,7 @@ export def optimize_pdf_pdfsizeopt [
     } else {
       log error $"PDF image data changed when optimizing streams with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=no --do-optimize-images=no --do-optimize-streams=yes --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
       log debug "Determining which pages changed in the PDF"
-      let pages_directory = mktemp --tmpdir-path $working_directory "pdfsizeopt_streams_pages.XXXXXXXXXX"
+      let pages_directory = mktemp --directory --tmpdir-path $working_directory "pdfsizeopt_streams_pages.XXXXXXXXXX"
       let differing_pages = $input_pdf | compare_pdf_pages $output_pdf $pages_directory
       if ($differing_pages == null) {
         log error "Failed to determine differing pages!"
@@ -1553,7 +1553,7 @@ export def optimize_pdf_pdfsizeopt [
       log error $"PDF image data changed when optimizing fonts with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
       log error $"PDF image data changed when optimizing fonts with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --do-regenerate-all-fonts=no --do-unify-fonts=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
       log debug "Determining which pages changed in the PDF"
-      let pages_directory = mktemp --tmpdir-path $working_directory "pdfsizeopt_fonts_pages.XXXXXXXXXX"
+      let pages_directory = mktemp --directory --tmpdir-path $working_directory "pdfsizeopt_fonts_pages.XXXXXXXXXX"
       let differing_pages = $input_pdf | compare_pdf_pages $output_pdf $pages_directory
       if ($differing_pages == null) {
         log error "Failed to determine differing pages!"
@@ -1592,7 +1592,7 @@ export def optimize_pdf_pdfsizeopt [
       } else {
         log error $"PDF image data changed when optimizing fonts with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --do-regenerate-all-fonts=no --do-unify-fonts=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
         log debug "Determining which pages changed in the PDF"
-        let pages_directory = mktemp --tmpdir-path $working_directory "pdfsizeopt_fonts_no_unify_no_regenerate_pages.XXXXXXXXXX"
+        let pages_directory = mktemp --directory --tmpdir-path $working_directory "pdfsizeopt_fonts_no_unify_no_regenerate_pages.XXXXXXXXXX"
         let differing_pages = $input_pdf | compare_pdf_pages $output_pdf $pages_directory
         if ($differing_pages == null) {
           log error "Failed to determine differing pages!"
@@ -1640,7 +1640,7 @@ export def optimize_pdf_pdfsizeopt [
       # todo Should I retry without jbig2 like minuimus.pl does?
       log error $"PDF image data changed when optimizing images with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=no --do-optimize-images=yes --do-optimize-streams=no --use-image-optimizer=media_juggler_png_optimizer,imgdataopt,jbig2 --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
       log debug "Determining which pages changed in the PDF"
-      let pages_directory = mktemp --tmpdir-path $working_directory "pdfsizeopt_images.XXXXXXXXXX"
+      let pages_directory = mktemp --directory --tmpdir-path $working_directory "pdfsizeopt_images.XXXXXXXXXX"
       let differing_pages = $input_pdf | compare_pdf_pages $output_pdf $pages_directory
       if ($differing_pages == null) {
         log error "Failed to determine differing pages!"
@@ -1760,6 +1760,7 @@ export def optimize_pdf [
       } else {
         log debug $"No space saving achieved using pdfsizeopt to optimize the PDF (ansi yellow)($input_pdf)(ansi reset). Optimization lasted (ansi green)($duration)(ansi reset)"
       }
+      rm --force $input_pdf
       $output_pdf
     }
   )
