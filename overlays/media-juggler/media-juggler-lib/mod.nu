@@ -1381,7 +1381,14 @@ export def optimize_pdf [
   let original_size = ls $pdf | get size | first
   let start = date now
   log info $"Running the command '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($pdf)'"
-  let result = do {^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf} | complete
+
+  let result = with-env {
+    $env.QPDF_ZOPFLI: "force"
+  } {
+    do {
+    ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf
+    } | complete
+  }
   let duration = (date now) - $start
   if $result.exit_code != 0 {
     log info $"Error running '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
