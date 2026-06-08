@@ -200,7 +200,7 @@ def main [
 
   log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
-  let temporary_directory = (mktemp --directory "import-comics.XXXXXXXXXX")
+  let temporary_directory = (mktemp --directory --tmpdir-path (pwd) "import-comics.XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
   # try {
@@ -1591,7 +1591,27 @@ def main [
             let hash = open --raw $formats.pdf | hash sha256
             if $hash not-in $optimized_file_hashes.sha256 {
               log debug "Optimizing the PDF"
-              open --raw ($formats.pdf | optimize_pdf) | hash sha256
+              let pdf_optimization_directory = [$temporary_directory "pdf_optimization"] | path join
+              let optimized_pdf = (
+                $formats.pdf
+                | optimize_pdf $pdf_optimization_directory
+              )
+              if ($optimized_pdf | is-not-empty) {
+                mv --force $optimized_pdf $formats.pdf
+                # todo Determine if there was an optimization error, and if so, keep the directory for debugging.
+                # It should be possible to check if there is more than one file and then copy this directory somewhere safe.
+                let residual_optimization_files = (
+                  glob ([$pdf_optimization_directory "**" "*"] | path join) | each {|| ls $in} | flatten | where type == file
+                )
+                if ($residual_optimization_files | is-empty) {
+                  rm --force --recursive $pdf_optimization_directory
+                } else {
+                  let saved_optimization_directory = mktemp --tmpdir-path (pwd) (($title | use_unicode_in_title | sanitize_file_name) + "_pdf_optimization_files.XXXXXXXXXX")
+                  cp --recursive $pdf_optimization_directory $saved_optimization_directory
+                  log info $"Saved failed PDF optimization attempts in (ansi yellow)($saved_optimization_directory)(ansi reset)"
+                }
+                open --raw $formats.pdf | hash sha256
+              }
             }
           }
         ) | uniq | sort

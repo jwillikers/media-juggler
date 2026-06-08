@@ -206,7 +206,7 @@ def main [
 
   log info $"Importing (ansi purple)($original_item)(ansi reset)"
 
-  let temporary_directory = (mktemp --directory "import-music.XXXXXXXXXX")
+  let temporary_directory = (mktemp --directory --tmpdir-path (pwd) "import-music.XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
   let beets_config = (

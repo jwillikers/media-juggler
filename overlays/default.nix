@@ -48,6 +48,8 @@
     minuimus = prev.callPackage ./minuimus/package.nix {
       inherit media-juggler-png-optimizer;
       withPngout = false;
+      # media-juggler Runs pdfsizeopt for tighter control of it.
+      withPdfsizeopt = false;
     };
     pdfsizeopt = prev.callPackage ./pdfsizeopt/package.nix {
       inherit media-juggler-png-optimizer;

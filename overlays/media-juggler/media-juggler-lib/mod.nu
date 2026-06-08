@@ -1370,42 +1370,408 @@ export def optimize_zip [
   $archive
 }
 
+# Compare two PDFs for differences with diff-pdf
+export def compare_pdf [
+  pdf2: path # PDF to compare
+]: [
+  path -> bool
+] {
+  let pdf1 = $in
+  log debug $"Running command: '^diff-pdf (ansi yellow)($pdf1)(ansi reset) (ansi yellow)($pdf2)(ansi reset)'"
+  let result = do {
+    ^diff-pdf $pdf1 $pdf2
+  } | complete
+  if $result.exit_code not-in [0, 1] {
+    log error $"Error running: '^diff-pdf (ansi yellow)($pdf1)(ansi reset) (ansi yellow)($pdf2)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    return null
+  }
+  $result.exit_code == 0
+}
+
+# Compare two PDFs, returning the page numbers of pages that differ
+#
+# The PDFs should have the same number of pages.
+# The page number indices are 0-based.
+export def compare_pdf_pages [
+  pdf2: path # PDF to compare
+  working_directory: path
+]: [
+  path -> list<int>
+] {
+  let pdf1 = $in
+  # todo Compare PDFs using raw image data from pdftoppm
+  # Use -freetype yes?
+  # -aa yes? # Enables font aliasing.
+
+  mkdir $working_directory
+  let working_directory = $working_directory | path expand
+  cd $working_directory
+
+  let result = do {
+    ^pdftoppm -png -q $pdf1 root1
+  } | complete
+  if $result.exit_code != 0 {
+    log error $"Error running: '^pdftoppm (ansi yellow)($pdf1)(ansi reset) root1'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    cd -
+    return null
+  }
+
+  let result = do {
+    ^pdftoppm -png -q $pdf2 root2
+  } | complete
+  if $result.exit_code != 0 {
+    log error $"Error running: '^pdftoppm (ansi yellow)($pdf2)(ansi reset) root2'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    cd -
+    return null
+  }
+
+  let pdf1_files = glob ./root1-*.png | sort --natural
+  let pdf2_files = glob ./root2-*.png | sort --natural
+
+  if ($pdf1_files | length) != ($pdf2_files | length) {
+    log error $"PDF files have a different number of pages: (ansi yellow)($pdf1)(ansi reset) has (ansi purple)($pdf1_files | length)(ansi reset) pages and (ansi yellow)($pdf2)(ansi reset) has (ansi purple)($pdf2_files | length) pages(ansi reset)"
+    return null
+  }
+
+  let different_images = $pdf1_files | zip $pdf2_files | enumerate | reduce --fold [] {|it acc|
+    let equivalent = $it.item.0 | odiff_same_image $it.item.1
+    if ($equivalent | is-empty) {
+      log error $"Error comparing images (ansi yellow)($it.item.0)(ansi reset) and (ansi yellow)($it.item.1)(ansi reset) with odiff"
+      $acc | append $it.index
+    } else {
+      if $equivalent {
+        rm --force $it.item.1 $it.item.0
+        $acc
+      } else {
+        $acc | append $it.index
+      }
+    }
+  }
+
+  cd -
+  $different_images
+}
+
+# Optimize a PDF with pdfsizeopt
+#
+# To accommodate failures for what can be a long-running process, pdfsizeopt is run multiple times.
+# First, it optimizes streams, then fonts, and finally images.
+# The PDF is linearized with qpdf as the last step.
+export def optimize_pdf_pdfsizeopt [
+  working_directory: path # Working directory
+  # todo Add option to control image optimizers?
+  # ...args: string # Command-line options
+]: [
+  path -> path
+] {
+  let original_pdf = $in
+  mkdir $working_directory
+  let working_directory = $working_directory | path expand
+  cd $working_directory
+
+  # I'm going to assume that I should use the disk for the temp files instead of a temp directory given how large PDFs can be.
+  let tmp_dir = mktemp --tmpdir-path $working_directory "pdfsizeopt_tmp_dir.XXXXXXXXXX"
+
+  let input_pdf = $original_pdf
+  let input_size = ls $input_pdf | get size | first
+  let output_pdf = mktemp --suffix ".pso-streams.pdf" --tmpdir-path $working_directory
+
+  # Optimize streams
+  log debug $"Optimizing streams with pdfsizeopt: '^pdfsizeopt --do-optimize-fonts=no --do-optimize-images=no --do-optimize-streams=yes --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'"
+  let start = date now
+  let result = do {
+    ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" pdfsizeopt --do-optimize-fonts=no --do-optimize-images=no --do-optimize-streams=yes $"--tmp-dir=($tmp_dir)" $input_pdf $output_pdf
+  } | complete
+  let duration = (date now) - $start
+  if $result.exit_code != 0 {
+    log error $"Error running: '^pdfsizeopt --do-optimize-fonts=no --do-optimize-images=no --do-optimize-streams=yes --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    rm --force $output_pdf
+    rm --force --recursive $tmp_dir
+    cd -
+    return null
+  }
+  let input_pdf = (
+    if ($original_pdf | compare_pdf $output_pdf) {
+      let current_size = ls $output_pdf | get size | first
+      let average = (($input_size + $current_size) / 2)
+      let percent_difference = ((($input_size - $current_size) / $average) * 100)
+      if $current_size < $input_size {
+        log info $"PDF stream optimizations with pdfsizeopt resulted in a size reduction from a size of (ansi purple)($input_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+        $output_pdf
+      } else {
+        log info $"No space saving achieved optimizing the PDF streams of (ansi yellow)($input_pdf)(ansi reset) with pdfsizeopt. Optimization lasted (ansi green)($duration)(ansi reset)"
+        rm --force $output_pdf
+        $input_pdf
+      }
+    } else {
+      log error $"PDF image data changed when optimizing streams with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=no --do-optimize-images=no --do-optimize-streams=yes --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      log debug "Determining which pages changed in the PDF"
+      let pages_directory = mktemp --tmpdir-path $working_directory "pdfsizeopt_streams_pages.XXXXXXXXXX"
+      let differing_pages = $input_pdf | compare_pdf_pages $output_pdf $pages_directory
+      if ($differing_pages == null) {
+        log error "Failed to determine differing pages!"
+      } else {
+        log error $"Differing pages are: (ansi purple)($differing_pages)(ansi reset)"
+      }
+      $input_pdf
+    }
+  )
+  let input_size = ls $input_pdf | get size | first
+
+  # Optimize fonts
+  let output_pdf = mktemp --suffix ".pso-fonts.pdf" --tmpdir-path $working_directory
+  log debug $"Optimizing fonts with pdfsizeopt: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'"
+  let start = date now
+  let result = do {
+    ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no $"--tmp-dir=($tmp_dir)" $input_pdf $output_pdf
+  } | complete
+  let duration = (date now) - $start
+  if $result.exit_code != 0 {
+    log error $"Error running: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    rm --force $output_pdf
+    rm --force --recursive $tmp_dir
+    cd -
+    return null
+  }
+  let input_pdf = (
+    if ($original_pdf | compare_pdf $output_pdf) {
+      let current_size = ls $output_pdf | get size | first
+      let average = (($input_size + $current_size) / 2)
+      let percent_difference = ((($input_size - $current_size) / $average) * 100)
+      if $current_size < $input_size {
+        log info $"PDF font optimizations with pdfsizeopt resulted in a size reduction from a size of (ansi purple)($input_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+        if ($input_pdf not-in [$original_pdf $output_pdf]) {
+          rm --force $input_pdf
+        }
+        $output_pdf
+      } else {
+        log info $"No space saving achieved from optimizing PDF fonts in (ansi yellow)($input_pdf)(ansi reset) with pdfsizeopt. Optimization lasted (ansi green)($duration)(ansi reset)"
+        rm --force $output_pdf
+        $input_pdf
+      }
+    } else {
+      log error $"PDF image data changed when optimizing fonts with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      log error $"PDF image data changed when optimizing fonts with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --do-regenerate-all-fonts=no --do-unify-fonts=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      log debug "Determining which pages changed in the PDF"
+      let pages_directory = mktemp --tmpdir-path $working_directory "pdfsizeopt_fonts_pages.XXXXXXXXXX"
+      let differing_pages = $input_pdf | compare_pdf_pages $output_pdf $pages_directory
+      if ($differing_pages == null) {
+        log error "Failed to determine differing pages!"
+      } else {
+        log error $"Differing pages are: (ansi purple)($differing_pages)(ansi reset)"
+      }
+
+      log debug $"Running command: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --do-regenerate-all-fonts=no --do-unify-fonts=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'"
+      let start = date now
+      let result = do {
+        ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --do-regenerate-all-fonts=no --do-unify-fonts=no $"--tmp-dir=($tmp_dir)" $input_pdf $output_pdf
+      } | complete
+      let duration = (date now) - $start
+      if $result.exit_code != 0 {
+        log error $"Error running: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --do-regenerate-all-fonts=no --do-unify-fonts=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+        rm --force $output_pdf
+        rm --force --recursive $tmp_dir
+        cd -
+        return null
+      }
+      if ($original_pdf | compare_pdf $output_pdf) {
+        let current_size = ls $output_pdf | get size | first
+        let average = (($input_size + $current_size) / 2)
+        let percent_difference = ((($input_size - $current_size) / $average) * 100)
+        if $current_size < $input_size {
+          log info $"PDF font optimizations without font regeneration and unification with pdfsizeopt resulted in a size reduction from a size of (ansi purple)($input_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+          if ($input_pdf not-in [$original_pdf $output_pdf]) {
+            rm --force $input_pdf
+          }
+          $output_pdf
+        } else {
+          log info $"No space saving achieved from optimizing PDF fonts without font regeneration and unification in (ansi yellow)($input_pdf)(ansi reset) with pdfsizeopt. Optimization lasted (ansi green)($duration)(ansi reset)"
+          rm --force $output_pdf
+          $input_pdf
+        }
+      } else {
+        log error $"PDF image data changed when optimizing fonts with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=yes --do-optimize-images=no --do-optimize-streams=no --do-regenerate-all-fonts=no --do-unify-fonts=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+        log debug "Determining which pages changed in the PDF"
+        let pages_directory = mktemp --tmpdir-path $working_directory "pdfsizeopt_fonts_no_unify_no_regenerate_pages.XXXXXXXXXX"
+        let differing_pages = $input_pdf | compare_pdf_pages $output_pdf $pages_directory
+        if ($differing_pages == null) {
+          log error "Failed to determine differing pages!"
+        } else {
+          log error $"Differing pages are: (ansi purple)($differing_pages)(ansi reset)"
+        }
+        $input_pdf
+      }
+    }
+  )
+  let input_size = ls $input_pdf | get size | first
+
+  # Optimize images
+  let output_pdf = mktemp --suffix ".pso-images.pdf" --tmpdir-path $working_directory
+  log debug $"Optimizing images with pdfsizeopt: '^pdfsizeopt --do-optimize-fonts=no --do-optimize-images=yes --do-optimize-streams=no --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) --use-image-optimizer=media_juggler_png_optimizer,imgdataopt,jbig2 (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'"
+  let start = date now
+  let result = do {
+    ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" pdfsizeopt --do-optimize-fonts=no --do-optimize-images=yes --do-optimize-streams=no $"--tmp-dir=($tmp_dir)" --use-image-optimizer=media_juggler_png_optimizer,imgdataopt,jbig2 $input_pdf $output_pdf
+  } | complete
+  let duration = (date now) - $start
+  if $result.exit_code != 0 {
+    log error $"Error running: '^pdfsizeopt --do-optimize-fonts=no --do-optimize-images=no --do-optimize-streams=yes --use-image-optimizer=media_juggler_png_optimizer,imgdataopt,jbig2 --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    rm --force $output_pdf
+    rm --force --recursive $tmp_dir
+    cd -
+    return null
+  }
+  let input_pdf = (
+    if ($original_pdf | compare_pdf $output_pdf) {
+      let current_size = ls $output_pdf | get size | first
+      let average = (($input_size + $current_size) / 2)
+      let percent_difference = ((($input_size - $current_size) / $average) * 100)
+      if $current_size < $input_size {
+        log info $"PDF image optimizations with pdfsizeopt resulted in a size reduction from a size of (ansi purple)($input_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+        if ($input_pdf not-in [$original_pdf $output_pdf]) {
+          rm --force $input_pdf
+        }
+        $output_pdf
+      } else {
+        log info $"No space saving achieved from optimizing PDF images in (ansi yellow)($input_pdf)(ansi reset) with pdfsizeopt. Optimization lasted (ansi green)($duration)(ansi reset)"
+        rm --force $output_pdf
+        $input_pdf
+      }
+    } else {
+      # todo Should I retry without jbig2 like minuimus.pl does?
+      log error $"PDF image data changed when optimizing images with pdfsizeopt using the command: '^pdfsizeopt --do-optimize-fonts=no --do-optimize-images=yes --do-optimize-streams=no --use-image-optimizer=media_juggler_png_optimizer,imgdataopt,jbig2 --tmp-dir (ansi yellow)($tmp_dir)(ansi reset) (ansi yellow)($input_pdf)(ansi reset) (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      log debug "Determining which pages changed in the PDF"
+      let pages_directory = mktemp --tmpdir-path $working_directory "pdfsizeopt_images.XXXXXXXXXX"
+      let differing_pages = $input_pdf | compare_pdf_pages $output_pdf $pages_directory
+      if ($differing_pages == null) {
+        log error "Failed to determine differing pages!"
+      } else {
+        log error $"Differing pages are: (ansi purple)($differing_pages)(ansi reset)"
+      }
+      $input_pdf
+    }
+  )
+  let input_size = ls $input_pdf | get size | first
+
+  # Linearize with QPDF
+  let output_pdf = (
+    if ($input_size > 1MiB) {
+      let output_pdf = mktemp --suffix ".linearized.pdf" --tmpdir-path $working_directory
+      log debug $"Linearizing PDF with qpdf: '^qpdf (ansi yellow)($input_pdf)(ansi reset) --linearize --stream-data=preserve (ansi yellow)($output_pdf)(ansi reset)'"
+      let start = date now
+      let result = do {
+        ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" qpdf $input_pdf --linearize --stream-data=preserve $output_pdf
+      } | complete
+      let duration = (date now) - $start
+      if $result.exit_code != 0 {
+        log error $"Error running: '^qpdf (ansi yellow)($input_pdf)(ansi reset) --linearize --stream-data=preserve (ansi yellow)($output_pdf)(ansi reset)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+        rm --force $output_pdf
+        rm --force --recursive $tmp_dir
+        cd -
+        return null
+      }
+      let current_size = ls $output_pdf | get size | first
+      let average = (($input_size + $current_size) / 2)
+      let percent_difference = ((($input_size - $current_size) / $average) * 100)
+      # It's okay if the linearized PDF is larger.
+      if $current_size < $input_size {
+        log info $"PDF linearization with qpdf resulted in a size reduction from a size of (ansi purple)($input_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+      } else {
+        log info $"No space saving achieved from linearizing the PDF (ansi yellow)($input_pdf)(ansi reset) with pdfsizeopt. Optimization lasted (ansi green)($duration)(ansi reset)"
+      }
+      if ($input_pdf not-in [$original_pdf $output_pdf]) {
+        rm --force $input_pdf
+      }
+      $output_pdf
+    } else {
+      $input_pdf
+    }
+  )
+
+  rm --force --recursive $tmp_dir
+  cd -
+
+  $output_pdf
+}
+
 # Losslessly optimize a PDF using minuimus and pdfsizeopt.
 #
 # This can take a long time, so systemd-inhibit is used to ensure the system doesn't sleep.
-# todo Use minuimus / pdfsizeopt to optimize PDFs
 export def optimize_pdf [
+  working_directory: path # Working directory
   ...args: string # Arguments to pass to minuimus.pl
 ]: path -> path {
-  let $pdf = $in
-  let original_size = ls $pdf | get size | first
-  let start = date now
-  log info $"Running the command '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($pdf)'"
+  let $original_pdf = $in
+  let $input_pdf = $original_pdf
+  let original_size = ls $original_pdf | get size | first
 
+  mkdir $working_directory
+  let working_directory = $working_directory | path expand
+  cd $working_directory
+
+  let input_size = ls $input_pdf | get size | first
+  let output_pdf = mktemp --suffix ".minuimus.pdf" --tmpdir-path $working_directory
+
+  # First, we run minuimus.
+  cp --force $input_pdf $output_pdf
+  log info $"Running the command '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($output_pdf)'"
+  let start = date now
+  let original_start = $start
   let result = with-env {
-    $env.QPDF_ZOPFLI: "force"
+    QPDF_ZOPFLI: "force"
   } {
     do {
-    ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $pdf
+      ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" minuimus.pl ...$args $output_pdf
     } | complete
   }
   let duration = (date now) - $start
   if $result.exit_code != 0 {
-    log info $"Error running '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    log info $"Error running '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' minuimus.pl ($args | str join ' ') ($output_pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
   # todo Check if one or both of these should be output.
   log info $"minuimus.pl stderr: ($result.stderr)"
   log info $"minuimus.pl stdout: ($result.stdout)"
-  let current_size = ls $pdf | get size | first
-  let average = (($original_size + $current_size) / 2)
-  let percent_difference = ((($original_size - $current_size) / $average) * 100)
-  if $current_size < $original_size {
-    log info $"PDF (ansi yellow)($pdf)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+
+  let current_size = ls $output_pdf | get size | first
+  let average = (($input_size + $current_size) / 2)
+  let percent_difference = ((($input_size - $current_size) / $average) * 100)
+  if $current_size < $input_size {
+    log info $"minuimus optimized the PDF (ansi yellow)($input_pdf)(ansi reset) down from a size of (ansi purple)($input_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
   } else {
-    log debug $"No space saving achieved attempting to optimize the PDF (ansi yellow)($pdf)(ansi reset). Optimization lasted (ansi green)($duration)(ansi reset)"
+    log debug $"No space saving achieved using minuimus to optimize the PDF (ansi yellow)($input_pdf)(ansi reset). Optimization lasted (ansi green)($duration)(ansi reset)"
   }
-  $pdf
+  let input_pdf = $output_pdf
+  let input_size = ls $input_pdf | get size | first
+
+  let start = date now
+  let output_pdf = $input_pdf | optimize_pdf_pdfsizeopt $working_directory
+  let duration = (date now) - $start
+  let full_duration = (date now) - $original_start
+  let output_pdf = (
+    if ($output_pdf == null) {
+      log error "Failed to optimize the PDF with pdfsizeopt"
+      $input_pdf
+    } else {
+      let current_size = ls $output_pdf | get size | first
+      let average = (($input_size + $current_size) / 2)
+      let percent_difference = ((($input_size - $current_size) / $average) * 100)
+      if $current_size < $input_size {
+        log info $"pdfsizeopt successfully optimized the PDF (ansi yellow)($input_pdf)(ansi reset) down from a size of (ansi purple)($input_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+      } else {
+        log debug $"No space saving achieved using pdfsizeopt to optimize the PDF (ansi yellow)($input_pdf)(ansi reset). Optimization lasted (ansi green)($duration)(ansi reset)"
+      }
+      $output_pdf
+    }
+  )
+  let final_size = ls $output_pdf | get size | first
+  let average = (($original_size + $final_size) / 2)
+  let percent_difference = ((($original_size - $final_size) / $average) * 100)
+  if $final_size < $original_size {
+    log info $"Successfully optimized the PDF (ansi yellow)($original_pdf)(ansi reset) down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($final_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($full_duration)(ansi reset)."
+  } else {
+    log info $"No space saving achieved attempting to optimize the PDF (ansi yellow)($original_pdf)(ansi reset). Optimization lasted (ansi green)($full_duration)(ansi reset)"
+  }
+  $output_pdf
 }
 
 # Optimize and clean up an EPUB with Calibre
