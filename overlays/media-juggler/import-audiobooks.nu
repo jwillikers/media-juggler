@@ -223,13 +223,13 @@ def main [
         if ($item | is_ssh_path) {
           let server = $item | split_ssh_path | get server
           if $item_type == "dir" {
-            $"($item | escape_special_glob_characters)/**/*" | ssh glob "--no-dir" "--no-symlink" | each {|file| $"($server):($file)"}
+            $"($item | escape_special_glob_characters | str replace --all '\' '\\')/**/*" | ssh glob "--no-dir" "--no-symlink" | each {|file| $"($server):($file)"}
           } else {
             $item | ssh ls --expand-path | get name | each {|file| $"($server):($file)"}
           }
         } else {
           if $item_type == "dir" {
-            glob --no-dir --no-symlink (($item | path expand | escape_special_glob_characters) + "/**/*")
+            glob --no-dir --no-symlink (($item | path expand | escape_special_glob_characters | str replace --all '\' '\\') + "/**/*")
           } else {
             [($item | path expand)]
           }
@@ -334,7 +334,7 @@ def main [
 
   # Locate any supplementary documents, i.e. accompanying PDFs
   let audiobook = (
-    let accompanying_documents = (glob $"($audiobook.directory | escape_special_glob_characters)/*.{($audiobook_accompanying_document_file_extensions | str join ',')}");
+    let accompanying_documents = (glob $"($audiobook.directory | escape_special_glob_characters | str replace --all '\' '\\')/*.{($audiobook_accompanying_document_file_extensions | str join ',')}");
     if ($accompanying_documents | is-not-empty) {
       $audiobook | insert accompanying_documents $accompanying_documents
     } else {

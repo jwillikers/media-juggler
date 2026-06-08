@@ -418,7 +418,7 @@ def main [
         }
       }
     } else {
-      let covers = (glob $"($original_file | path dirname | escape_special_glob_characters)/cover.{($image_extensions | str join ',')}")
+      let covers = (glob $"($original_file | path dirname | escape_special_glob_characters | str replace --all '\' '\\')/cover.{($image_extensions | str join ',')}")
       if not ($covers | is-empty) {
         if ($covers | length) > 1 {
           if not $keep_tmp {
