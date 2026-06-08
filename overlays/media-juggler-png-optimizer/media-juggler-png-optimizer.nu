@@ -91,8 +91,7 @@ def main [
   )
 
   let result = do {
-    # todo --zopfli?
-    # --zopfli takes way longer but does optimize slightly more
+    # --zopfli is not used because it doesn't seem to give a size benefit when compared to running oxipng followed by ect in the current manner.
     ^oxipng --opt max --out $destination --quiet --strip safe -- $source
   } | complete
   if $result.exit_code != 0 {
