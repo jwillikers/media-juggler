@@ -287,7 +287,7 @@ def main [
 
   log info $"Importing audiobook files in directory (ansi purple)($audiobook.directory)(ansi reset)"
 
-  let temporary_directory = (mktemp --directory $"import-audiobooks.($audiobook.directory | path basename).XXXXXXXXXX")
+  let temporary_directory = (mktemp --directory --tmpdir-path (pwd) $"import-audiobooks.($audiobook.directory | path basename).XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
   # try {
@@ -361,11 +361,24 @@ def main [
               if ($accompanying_document | path parse | get extension) == "epub" {
                 $accompanying_document | polish_epub | optimize_zip
               } else if ($accompanying_document | path parse | get extension) == "pdf" {
-                $accompanying_document | optimize_pdf
+                let pdf_optimization_directory = [$temporary_directory "pdf_optimization"] | path join
+                let optimized_document = (
+                  $accompanying_document
+                  | optimize_pdf $pdf_optimization_directory
+                )
+                if ($optimized_document | is-empty) {
+                  null
+                } else {
+                  mv --force $optimized_document $accompanying_document
+                  rm --force --recursive $pdf_optimization_directory
+                  $accompanying_document
+                }
               } else if ($accompanying_document | path parse | get extension) == "cbz" {
                 $accompanying_document | optimize_zip
               }
-              $accompanying_document | open --raw | hash sha256
+              if ($accompanying_document | is-not-empty) {
+                $accompanying_document | open --raw | hash sha256
+              }
             }
           }
         }

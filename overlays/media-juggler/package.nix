@@ -4,6 +4,7 @@
   beets,
   calibre,
   chromaprint,
+  diff-pdf,
   efficient-compression-tool,
   exiftool,
   ffmpeg,
@@ -21,6 +22,7 @@
   nushell,
   odiff,
   picard,
+  qpdf,
   rhash,
   rsync,
   stdenvNoCC,
@@ -84,11 +86,13 @@ else
           lib.makeBinPath [
             advancecomp
             calibre
+            diff-pdf
             efficient-compression-tool
             image_optim
             media-juggler-png-optimizer
             minuimus
             odiff
+            qpdf
             udisks
             util-linux
             zip
@@ -97,8 +101,9 @@ else
       wrapProgram $out/bin/import-audiobooks.nu \
         --prefix PATH : ${
           lib.makeBinPath [
-            chromaprint
             b3sum
+            chromaprint
+            diff-pdf
             efficient-compression-tool
             ffmpeg
             image_optim
@@ -107,6 +112,7 @@ else
             media-juggler-png-optimizer
             minuimus
             odiff
+            qpdf
             rhash
             rsync
             tone
@@ -119,6 +125,7 @@ else
             advancecomp
             b3sum
             calibre
+            diff-pdf
             efficient-compression-tool
             exiftool
             image_optim
@@ -128,6 +135,7 @@ else
             minuimus
             mupdf-headless
             odiff
+            qpdf
             rhash
             rsync
             tesseract
@@ -141,6 +149,7 @@ else
           lib.makeBinPath [
             advancecomp
             calibre
+            diff-pdf
             efficient-compression-tool
             file
             image_optim
@@ -149,6 +158,7 @@ else
             minuimus
             mupdf-headless
             odiff
+            qpdf
             rsync
             tesseract
             udisks
@@ -161,11 +171,13 @@ else
           lib.makeBinPath [
             # todo optimize flacs like minuimus does?
             beets
+            diff-pdf
             efficient-compression-tool
             image_optim
             # jpegli
             media-juggler-png-optimizer
             odiff
+            qpdf
             rsync
             keyfinder-cli
             picard # For mbsubmit Beets plugin

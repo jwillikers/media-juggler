@@ -28,7 +28,12 @@
       self;
     python3Packages = final.python3.pkgs;
   };
-  media-juggler = _final: prev: rec {
+  media-juggler = final: prev: rec {
+    # Enable ZOPFLI support in QPDF
+    qpdf = prev.qpdf.overrideAttrs (prevAttrs: {
+      buildInputs = prevAttrs.buildInputs ++ [ final.zopfli ];
+      cmakeFlags = prevAttrs.cmakeFlags ++ [ (prev.lib.cmakeBool "ZOPFLI" true) ];
+    });
     calibre-plugins = prev.lib.recurseIntoAttrs (prev.callPackage ./calibre-plugins { });
     flexigif = prev.callPackage ./flexigif/package.nix { };
     imgdataopt = prev.callPackage ./imgdataopt/package.nix { };
@@ -43,6 +48,8 @@
     minuimus = prev.callPackage ./minuimus/package.nix {
       inherit media-juggler-png-optimizer;
       withPngout = false;
+      # media-juggler Runs pdfsizeopt for tighter control of it.
+      withPdfsizeopt = false;
     };
     pdfsizeopt = prev.callPackage ./pdfsizeopt/package.nix {
       inherit media-juggler-png-optimizer;

@@ -138,7 +138,7 @@ def main [
 
   log info $"Importing the file (ansi purple)($original_file)(ansi reset)"
 
-  let temporary_directory = (mktemp --directory "import-ebooks.XXXXXXXXXX")
+  let temporary_directory = (mktemp --directory --tmpdir-path (pwd) "import-ebooks.XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
     # try {
@@ -209,7 +209,7 @@ def main [
       let file = $original_file
       let server = $file | split_ssh_path | get server
       let covers = (
-        $"($file | path dirname | escape_special_glob_characters | str replace '[:]' ':' | str replace --all '\' '\\')/cover.*"
+        $"($file | path dirname | escape_special_glob_characters | str replace '[:]' ':')/cover.*"
         | ssh glob "--no-dir" "--no-symlink"
         | where {|f|
           let components = ($f | path parse);
@@ -540,7 +540,18 @@ def main [
           let hash = $book.book | open --raw | hash sha256
           if $hash not-in $optimized_file_hashes.sha256 {
             log debug "Optimizing the PDF"
-            $book.book | optimize_pdf | open --raw | hash sha256
+            let pdf_optimization_directory = [$temporary_directory "pdf_optimization"] | path join
+            let optimized_pdf = (
+              $book.book
+              | optimize_pdf $pdf_optimization_directory
+            )
+            if ($optimized_pdf | is-not-empty) {
+              mv --force $optimized_pdf $book.book
+              if not ($keep_tmp) {
+                rm --force --recursive $pdf_optimization_directory
+              }
+              open --raw $book.book | hash sha256
+            }
           }
         }
       ) | uniq | sort

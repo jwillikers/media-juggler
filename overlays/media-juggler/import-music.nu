@@ -37,7 +37,7 @@ export def beet_import [
     submit
   )
   let imported_music = (
-    let music_files = glob ([$beets_directory "**" "*.{aac,flac,lrc,m4a,mp3,opus}"] | path join);
+    let music_files = glob ([($beets_directory | escape_special_glob_characters) "**" "*.{aac,flac,lrc,m4a,mp3,opus}"] | path join);
     if ($music_files | is-empty) {
       log error $"No music files found in (ansi yellow)($beets_directory)(ansi reset)!"
       exit 1
@@ -206,7 +206,7 @@ def main [
 
   log info $"Importing (ansi purple)($original_item)(ansi reset)"
 
-  let temporary_directory = (mktemp --directory "import-music.XXXXXXXXXX")
+  let temporary_directory = (mktemp --directory --tmpdir-path (pwd) "import-music.XXXXXXXXXX")
   log info $"Using the temporary directory (ansi yellow)($temporary_directory)(ansi reset)"
 
   let beets_config = (

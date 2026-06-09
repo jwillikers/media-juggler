@@ -35,6 +35,7 @@
   optipng,
   p7zip,
   pdfsizeopt,
+  withPdfsizeopt ? true,
   perl,
   tif22pnm,
   withPngout ? false,
@@ -78,6 +79,11 @@ stdenv.mkDerivation {
       --replace-fail "gcc" "${stdenv.cc.targetPrefix}cc" \
       --replace-fail "zopfli/deflate.c zopfli/lz77.c zopfli/hash.c zopfli/tree.c zopfli/squeeze.c zopfli/blocksplitter.c  zopfli/cache.c zopfli/katajainen.c zopfli/util.c zopfli/zlib_container.c -lm" "-lzopfli" \
       --replace-fail "zopfli/deflate.c zopfli/lz77.c zopfli/hash.c zopfli/tree.c zopfli/squeeze.c zopfli/blocksplitter.c zopfli/cache.c zopfli/katajainen.c zopfli/util.c zopfli/zlib_container.c -lm" "-lzopfli"
+
+    ${lib.optionalString (!withPdfsizeopt) ''
+      substituteInPlace minuimus.pl \
+        --replace-fail "pdfsizeopt(\$file) && pdfsizeopt(\$file, 1);" "# pdfsizeopt(\$file) && pdfsizeopt(\$file, 1);"
+    ''}
   '';
 
   nativeBuildInputs = [
@@ -135,7 +141,6 @@ stdenv.mkDerivation {
             mupdf-headless
             optipng
             p7zip
-            pdfsizeopt
             poppler-utils
             tif22pnm # Not used directly, but existence is verified in minuimus.pl for pdfsizeopt
             pngout
@@ -145,6 +150,9 @@ stdenv.mkDerivation {
             unrar-free
             zip
             zpaq
+          ]
+          ++ lib.optionals withPdfsizeopt [
+            pdfsizeopt
           ]
           ++ lib.optionals withPngout [
             pngout
