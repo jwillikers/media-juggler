@@ -1729,8 +1729,8 @@ export def optimize_pdf [
     return null
   }
   # todo Check if one or both of these should be output.
-  log info $"minuimus.pl stderr: ($result.stderr)"
-  log info $"minuimus.pl stdout: ($result.stdout)"
+  log debug $"minuimus.pl stderr: ($result.stderr)"
+  log debug $"minuimus.pl stdout: ($result.stdout)"
 
   let current_size = ls $output_pdf | get size | first
   let average = (($input_size + $current_size) / 2)
@@ -1740,7 +1740,61 @@ export def optimize_pdf [
   } else {
     log debug $"No space saving achieved using minuimus to optimize the PDF (ansi yellow)($input_pdf)(ansi reset). Optimization lasted (ansi green)($duration)(ansi reset)"
   }
+
+  # Recompress streams with qpdf and zopfli.
+  # This is able to achieve better optimization than just using minuimus alone.
+  # minuimus appears to have trouble with particularly large streams.
+  # todo Do we need minuimus if we're running qpdf with zopfli?
+
+  # QPDF_ZOPFLI=force ^qpdf input.pdf --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize output.pdf
+  log info $"Running the command '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' qpdf ($input_pdf) --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize ($output_pdf)'"
   let input_pdf = $output_pdf
+  let input_size = ls $input_pdf | get size | first
+  let output_pdf = mktemp --suffix ".qpdf-zopfli.pdf" --tmpdir-path $working_directory
+  let start = date now
+  let original_start = $start
+  let result = with-env {
+    QPDF_ZOPFLI: "force"
+  } {
+    do {
+      ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" qpdf $input_pdf --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize $output_pdf
+    } | complete
+  }
+  let duration = (date now) - $start
+  if $result.exit_code != 0 {
+    log info $"Error running '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' qpdf ($input_pdf) --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize ($output_pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    return null
+  }
+  let input_pdf = (
+    if ($original_pdf | compare_pdf $output_pdf) {
+      let current_size = ls $output_pdf | get size | first
+      let average = (($input_size + $current_size) / 2)
+      let percent_difference = ((($input_size - $current_size) / $average) * 100)
+      if $current_size < $input_size {
+        log info $"PDF stream optimizations with qpdf and zopfli resulted in a size reduction from a size of (ansi purple)($input_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+        if ($input_pdf not-in [$original_pdf $output_pdf]) {
+          rm --force $input_pdf
+        }
+        $output_pdf
+      } else {
+        log info $"No space saving achieved from optimizing PDF streams in (ansi yellow)($input_pdf)(ansi reset) with qpdf and zopfli. Optimization lasted (ansi green)($duration)(ansi reset)"
+        rm --force $output_pdf
+        $input_pdf
+      }
+    } else {
+      # todo Should I retry without jbig2 like minuimus.pl does?
+      log error $"PDF image data changed when optimizing streams with qpdf and zopfli using the command: '^qpdf ($input_pdf) --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize ($output_pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      log debug "Determining which pages changed in the PDF"
+      let pages_directory = mktemp --directory --tmpdir-path $working_directory "qpdf_zopfli.XXXXXXXXXX"
+      let differing_pages = $input_pdf | compare_pdf_pages $output_pdf $pages_directory
+      if ($differing_pages == null) {
+        log error "Failed to determine differing pages!"
+      } else {
+        log error $"Differing pages are: (ansi purple)($differing_pages)(ansi reset)"
+      }
+      $input_pdf
+    }
+  )
   let input_size = ls $input_pdf | get size | first
 
   let start = date now
@@ -1764,6 +1818,7 @@ export def optimize_pdf [
       $output_pdf
     }
   )
+
   let final_size = ls $output_pdf | get size | first
   let average = (($original_size + $final_size) / 2)
   let percent_difference = ((($original_size - $final_size) / $average) * 100)
