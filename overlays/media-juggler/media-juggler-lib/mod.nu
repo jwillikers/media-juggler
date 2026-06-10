@@ -3387,7 +3387,7 @@ export def from_opf_xml []: [
   let credits = (
     let creators = $metadata_content | where tag == creator;
     if ($creators | is-not-empty) {
-      let authors = $creators | where {|it| "role" in ($it.attributes | columns) and $it.attributes.role == "aut" }
+      let authors = $creators | where {|it| ($it.attributes | get --optional role) == "aut"}
       if ($authors | is-not-empty) {
         $authors | get content | first | get content | flatten | uniq | each {|author|
           {
@@ -3414,7 +3414,7 @@ export def from_opf_xml []: [
   let series = (
     let meta = $metadata_content | where tag == meta;
     if ($meta | is-not-empty) {
-      let series = $meta | where attributes.name == "calibre:series"
+      let series = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series"}
       if ($series | is-not-empty) {
         # todo Warn if there are multiple series
         $series | first | get attributes.content
@@ -3425,7 +3425,7 @@ export def from_opf_xml []: [
   let issue = (
     let meta = $metadata_content | where tag == meta;
     if ($meta | is-not-empty) {
-      let series_indices = $meta | where attributes.name == "calibre:series_index"
+      let series_indices = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series_index"}
       if ($series_indices | is-not-empty) {
         # todo Warn if there are multiple series indices
         $series_indices | first | get attributes.content
@@ -3511,7 +3511,7 @@ export def from_opf_xml []: [
     let ids = $metadata_content | where tag == identifier;
     if ($ids | is-not-empty) {
       $identifier_schemes | reduce --fold [] {|identifier_schemes_and_type acc|
-        let matching_ids = $ids | where {|it| ($it.attributes.scheme | str upcase) in $identifier_schemes_and_type.schemes }
+        let matching_ids = $ids | where {|it| ($it.attributes | get --optional scheme | is-not-empty) and ($it.attributes.scheme | str upcase) in $identifier_schemes_and_type.schemes }
         if ($matching_ids | is-empty) {
           $acc
         } else {
@@ -3539,9 +3539,32 @@ export def from_opf_xml []: [
   let isbn = (
     let ids = $metadata_content | where tag == identifier;
     if ($ids | is-not-empty) {
-      let isbns = $ids | where attributes.scheme == "ISBN"
+      let isbns = $ids | where {|it| ($it.attributes | get --optional scheme) == "ISBN"}
       if ($isbns | is-not-empty) {
         $isbns | get content | first | get content | flatten | uniq | first
+      } else {
+        # <dc:identifier id="pub-identifier">urn:isbn:9781506704197</dc:identifier>
+        # <meta property="identifier-type" refines="#pub-identifier" scheme="onix:codelist5">15</meta>
+        # log debug $"ids.content: ($ids.content | to json)"
+        let isbns = $ids | where {|it|
+          # log debug $"it: ($it | to json)"
+          # log debug $"it.content.0.content: ($it | get --optional content.0.content | to json)"
+          ($it | get --optional content.0.content) =~ '^urn:isbn:[0-9]{13}$'
+        }
+        # log debug $"isbns: ($isbns | to json)"
+        if ($isbns | is-not-empty) {
+          (
+            $isbns
+            | get content
+            | first
+            | get content
+            | flatten
+            | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$'
+            | get isbn
+            | uniq
+            | first
+          )
+        }
       }
     }
   )
