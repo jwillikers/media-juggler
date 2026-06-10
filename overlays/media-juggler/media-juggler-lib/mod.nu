@@ -1747,22 +1747,21 @@ export def optimize_pdf [
   # todo Do we need minuimus if we're running qpdf with zopfli?
 
   # QPDF_ZOPFLI=force ^qpdf input.pdf --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize output.pdf
-  log info $"Running the command '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' qpdf ($input_pdf) --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize ($output_pdf)'"
+  log info $"Running the command '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' qpdf ($input_pdf) --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flate --linearize ($output_pdf)'"
   let input_pdf = $output_pdf
   let input_size = ls $input_pdf | get size | first
   let output_pdf = mktemp --suffix ".qpdf-zopfli.pdf" --tmpdir-path $working_directory
   let start = date now
-  let original_start = $start
   let result = with-env {
     QPDF_ZOPFLI: "force"
   } {
     do {
-      ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" qpdf $input_pdf --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize $output_pdf
+      ^systemd-inhibit --what=sleep:shutdown --who="Media Juggler" --why="Running expensive file optimizations" qpdf $input_pdf --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flate --linearize $output_pdf
     } | complete
   }
   let duration = (date now) - $start
   if $result.exit_code != 0 {
-    log info $"Error running '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' qpdf ($input_pdf) --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize ($output_pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+    log info $"Error running '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' qpdf ($input_pdf) --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flate --linearize ($output_pdf)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
   let input_pdf = (

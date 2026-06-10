@@ -9,4 +9,5 @@ PNGs = "PNGs"
 
 [default.extend-words]
 ect = "ect"
+flate = "flate"
 opf = "opf"

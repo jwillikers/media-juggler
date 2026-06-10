@@ -32,6 +32,7 @@
     "ffprobe",
     "filesize",
     "flac",
+    "flate",
     "fpcalc",
     "goodreads",
     "ifdef",
