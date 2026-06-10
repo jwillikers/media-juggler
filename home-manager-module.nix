@@ -64,6 +64,7 @@ self:
       minio-client
       media-juggler
       media-juggler-png-optimizer
+      qpdf
     ];
   };
 

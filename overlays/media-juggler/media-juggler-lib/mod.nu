@@ -3387,7 +3387,7 @@ export def from_opf_xml []: [
   let credits = (
     let creators = $metadata_content | where tag == creator;
     if ($creators | is-not-empty) {
-      let authors = $creators | where attributes.role == "aut"
+      let authors = $creators | where {|it| "role" in ($it.attributes | columns) and $it.attributes.role == "aut" }
       if ($authors | is-not-empty) {
         $authors | get content | first | get content | flatten | uniq | each {|author|
           {
