@@ -283,7 +283,14 @@ def main [
   let original_book_files = [($original_file | split_ssh_path | get path)] | append $original_cover | append $original_opf
   log debug $"The original files for the book are (ansi yellow)($original_book_files)(ansi reset)"
 
-  let input_format = ($file | path parse | get extension)
+  let input_format = (
+    if $original_input_format == "acsm" {
+      "epub"
+    } else {
+      $original_input_format
+    }
+  )
+
   let output_format = (
     if $input_format == "pdf" {
       "pdf"
@@ -406,7 +413,7 @@ def main [
   let isbn = $isbn | str replace --all "-" ""
   if $isbn != null {
     log debug $"The ISBN is (ansi purple)($isbn)(ansi reset)"
-    if ($isbn | length) != 13 {
+    if ($isbn | str length) != 13 {
       log error $"The ISBN (ansi purple)($isbn)(ansi reset) does not contain exactly 13-characters"
       if not $keep_tmp {
         rm --force --recursive $temporary_directory

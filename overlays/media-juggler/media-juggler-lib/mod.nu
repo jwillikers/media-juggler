@@ -66,6 +66,7 @@ export const genre_allowlist = [
   [action ["action fiction"] [Q1762165 Q15637293 Q104537024 Q20087918]]
   [adventure ["adventure fiction"] [Q21802675 Q15712918 Q104536877]]
   [apocalyptic ["apocalyptic fiction"] [Q3919251]]
+  ["biography" [] [Q36279]]
   [comedy [] [Q40831 Q15286013 Q11298158]]
   ["comedy drama" [dramedy] [Q859369 Q15712927 Q104536976]]
   ["coming-of-age" ["coming of age" "coming of age story"] [Q2975633 Q135684998]]
@@ -82,7 +83,9 @@ export const genre_allowlist = [
   ["harem" [] [Q690342 Q111253933]]
   ["hentai" [] [Q172067 Q21997246]]
   ["high fantasy" ["epic fantasy"] [Q326439 Q138948720]]
-  ["historical" [] [Q1196408 Q101240934 Q11125143]]
+  ["history" ["historical non-fiction"] [Q116513838]]
+  ["historiography" [] [Q30277550]]
+  ["historical fiction" [] [Q1196408 Q101240934 Q11125143]]
   ["historical fantasy" [] [Q603291]]
   [horror [] [Q16575965 Q12767035]]
   ["isekai" [] [Q53911753]]
@@ -1898,7 +1901,10 @@ export def compare_image_phash [
     log error $"Error running '^magick compare -metric PHASH ($image1) ($image2) \"null:\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
-  let diff = $result.stderr | parse '{pixels_different} ({difference})' | first
+  # log debug $"Finished running '^magick compare -metric PHASH ($image1) ($image2) \"null:\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+  # log debug $"stderr: '($result.stderr)'"
+  let diff = $result.stderr | str trim | parse --regex '^(?P<pixels_different>[0-9.]+) \((?P<difference>[0-9.]+)\).*$' | first
+  # log debug $"diff: ($diff)"
   {
     pixels_different: ($diff.pixels_different | into float)
     difference: ($diff.difference | into float)
