@@ -487,6 +487,7 @@ def main [
   )
 
   let input_format = (
+    # todo ACSM files can also be PDFs
     if $original_input_format == "acsm" {
       "epub"
     } else if $original_input_format == "zip" {
