@@ -1901,7 +1901,10 @@ export def compare_image_phash [
     log error $"Error running '^magick compare -metric PHASH ($image1) ($image2) \"null:\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
-  let diff = $result.stderr | parse '{pixels_different} ({difference})' | first
+  # log debug $"Finished running '^magick compare -metric PHASH ($image1) ($image2) \"null:\"'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+  # log debug $"stderr: '($result.stderr)'"
+  let diff = $result.stderr | str trim | parse --regex '^(?P<pixels_different>[0-9.]+) \((?P<difference>[0-9.]+)\).*$' | first
+  # log debug $"diff: ($diff)"
   {
     pixels_different: ($diff.pixels_different | into float)
     difference: ($diff.difference | into float)
