@@ -92,6 +92,7 @@ export const genre_allowlist = [
   ["iyashikei" [] [Q97358333]]
   [LitRPG ["literary role-playing game" "literary RPG"] [Q25493967]]
   ["magical girl" [] [Q752321]]
+  ["martial arts" [] [Q136806262]]
   [mecha [] [Q4292083]]
   [military [] [Q21803247 Q136913640]]
   [mystery [] [Q6585139 Q15637305]]
