@@ -95,6 +95,7 @@ export const genre_allowlist = [
   ["martial arts" [] [Q136806262]]
   [mecha [] [Q4292083]]
   [military [] [Q21803247 Q136913640]]
+  ["military science fiction" [] [Q904447]]
   [mystery [] [Q6585139 Q15637305]]
   [neo-noir [] [Q2421031]]
   [non-fiction [nonfiction] [Q213051]]
@@ -364,9 +365,24 @@ export def use_unicode_in_title []: string -> string {
   let components = $title | split row --number 2 " - Volume "
   let title = (
     if ($components | length) > 1 {
-      $components | update 0 ($components | first | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…") | str join " - Volume "
+      $components | update 0 (
+        $components
+        | first
+        | str replace --all "'" "’"
+        | str replace --all "-" "‐"
+        | str replace --all "..." "…"
+        | str replace --all "1/2" "½"
+        | str replace --all "1⧸2" "½"
+      ) | str join " - Volume "
     } else {
-      $title | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…"
+      (
+        $title
+        | str replace --all "'" "’"
+        | str replace --all "-" "‐"
+        | str replace --all "..." "…"
+        | str replace --all "1/2" "½"
+        | str replace --all "1⧸2" "½"
+      )
     }
   )
   mut new_title = $title
@@ -1253,13 +1269,13 @@ export def optimize_images []: list<path> -> list<path> {
   let image_files = $image_files | where {|image| not ($image | path parse | get stem | str ends-with '-thumb') }
 
   let original_size = $image_files | reduce --fold 0b {|it acc|
-    $acc + (ls $it | get size | first)
+    $acc + (du $it | get physical | first)
   }
   $image_files | each {|image|
     $image | optimize_image
   }
   let current_size = $image_files | reduce --fold 0b {|it acc|
-    $acc + (ls $it | get size | first)
+    $acc + (du $it | get physical | first)
   }
 
   if $current_size < $original_size {
@@ -1276,7 +1292,7 @@ export def optimize_images []: list<path> -> list<path> {
 # Losslessly optimize the images in a ZIP archive such as an EPUB or CBZ
 export def optimize_images_in_zip []: path -> path {
   let archive = ($in | path expand)
-  let original_size = ls $archive | get size | first
+  let original_size = du $archive | get physical | first
   log debug $"Optimizing images in (ansi yellow)($archive)(ansi reset)"
   let temporary_directory = (mktemp --directory)
   let extraction_path = ($temporary_directory | path join "extracted")
@@ -1295,11 +1311,11 @@ export def optimize_images_in_zip []: path -> path {
   mv --force $temporary_archive $archive
   rm --force --recursive $temporary_directory
   log debug $"Finished compressing (ansi yellow)($archive)(ansi reset)"
-  let current_size = ls $archive | get size | first
+  let current_size = du $archive | get physical | first
   if $current_size < $original_size {
     let average = (($original_size + $current_size) / 2)
     let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log debug $"Images in ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    log debug $"ZIP archive with images (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
   } else {
     log debug $"No space saving achieved attempting to optimize the images in the ZIP archive (ansi yellow)($archive)(ansi reset)"
   }

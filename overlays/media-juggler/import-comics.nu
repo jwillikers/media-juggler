@@ -924,7 +924,11 @@ def main [
       $isbn
     }
   )
-  let isbn = $isbn | str replace --all "-" ""
+  let isbn = (
+    if ($isbn | is-not-empty) {
+      $isbn | str replace --all "-" ""
+    }
+  )
   if $isbn != null {
     log debug $"The ISBN is (ansi purple)($isbn)(ansi reset)"
     if $isbn !~ '^[0-9]{13}$' {
