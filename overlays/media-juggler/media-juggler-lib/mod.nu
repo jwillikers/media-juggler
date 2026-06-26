@@ -365,9 +365,24 @@ export def use_unicode_in_title []: string -> string {
   let components = $title | split row --number 2 " - Volume "
   let title = (
     if ($components | length) > 1 {
-      $components | update 0 ($components | first | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…") | str join " - Volume "
+      $components | update 0 (
+        $components
+        | first
+        | str replace --all "'" "’"
+        | str replace --all "-" "‐"
+        | str replace --all "..." "…"
+        | str replace --all "1/2" "½"
+        | str replace --all "1⧸2" "½"
+      ) | str join " - Volume "
     } else {
-      $title | str replace --all "'" "’" | str replace --all "-" "‐" | str replace --all "..." "…"
+      (
+        $title
+        | str replace --all "'" "’"
+        | str replace --all "-" "‐"
+        | str replace --all "..." "…"
+        | str replace --all "1/2" "½"
+        | str replace --all "1⧸2" "½"
+      )
     }
   )
   mut new_title = $title
