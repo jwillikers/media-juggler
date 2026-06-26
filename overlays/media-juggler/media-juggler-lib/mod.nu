@@ -95,6 +95,7 @@ export const genre_allowlist = [
   ["martial arts" [] [Q136806262]]
   [mecha [] [Q4292083]]
   [military [] [Q21803247 Q136913640]]
+  ["military science fiction" [] [Q904447]]
   [mystery [] [Q6585139 Q15637305]]
   [neo-noir [] [Q2421031]]
   [non-fiction [nonfiction] [Q213051]]
