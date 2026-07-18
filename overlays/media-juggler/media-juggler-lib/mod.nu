@@ -1911,6 +1911,9 @@ export def compare_image_phash [
 ]: [
   path -> record<pixels_different: float, difference: float>
 ] {
+  # ImagickMagick is normalizing the PHASH, causing images to appear the similar when they are actually quite different.
+  # https://github.com/ImageMagick/ImageMagick/issues/8759
+  # todo Switch to perceptualdiff CLI?
   let image1 = $in
   let result = do {^magick compare -metric PHASH $image1 $image2 "null:"} | complete
   # magick compare uses an exit code of 1 to indicate two images aren't the same.
@@ -1970,8 +1973,21 @@ export def same_image [
     log error $"Error calculating phash difference for images (ansi yellow)($image1)(ansi reset) and (ansi yellow)($image2)(ansi reset)"
     return null
   }
+
+  # ImagickMagick is normalizing the PHASH, causing images to appear the similar when they are actually quite different.
+  # https://github.com/ImageMagick/ImageMagick/issues/8759
+  # todo Switch to perceptualdiff CLI?
+  # todo Or if they are the same dimensions use NCC?
+  # When things were working, 1.0 worked well here.
+
+  # log warning "Skipping phash comparison due to normalization causing false positives."
+
+  ## In case of a false positive duplicate cover detection, temporarily comment the section below
+  ## Comment below
   if $phash_difference.difference < 1.0 {
     log debug $"Considering images (ansi yellow)($image1)(ansi reset) and (ansi yellow)($image2)(ansi reset) as the same since their phash difference (ansi purple)($phash_difference.difference)(ansi reset) is less than (ansi purple)1.0(ansi reset)"
+    log error "Aborting due to bug in phash. Remove similar cover manually or disable this check to avoid deleting incorrectly deleting a page."
+    exit
     return true
   }
   if $phash_difference.difference < 5.0 {
@@ -1979,6 +1995,7 @@ export def same_image [
     return false
   }
   log debug $"Images (ansi yellow)($image1)(ansi reset) and (ansi yellow)($image2)(ansi reset) are dissimilar since their phash difference (ansi purple)($phash_difference.difference)(ansi reset) is greater than (ansi purple)5.0(ansi reset)"
+  ## Comment above
   false
 }
 
