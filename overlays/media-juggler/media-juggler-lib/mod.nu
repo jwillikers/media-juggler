@@ -125,6 +125,7 @@ export const genre_allowlist = [
   ["vampire" [] [Q111019576 Q111019582]]
   ["villainess" [] []]
   ["western" [] [Q367591 Q139270219]]
+  ["yanki" ["yankee" "yanki" "yankii" "yankī"] [Q11345398 Q140723524]]
   ["young adult" ["ya"] [Q111984153]]
   ["yuri" [] [Q320568]]
 ]
