@@ -125,6 +125,7 @@ export const genre_allowlist = [
   ["vampire" [] [Q111019576 Q111019582]]
   ["villainess" [] []]
   ["western" [] [Q367591 Q139270219]]
+  ["yanki" ["yankee" "yanki" "yankii" "yankī"] [Q11345398 Q140723524]]
   ["young adult" ["ya"] [Q111984153]]
   ["yuri" [] [Q320568]]
 ]
@@ -7579,7 +7580,7 @@ export def determine_releases_from_acoustid_fingerprint_matches []: table<file: 
 
 # Parse the bit rate of an audio file from the output of the ffprobe command.
 #
-# Returns an integer representing the bit rate or null if there is a parsing error.
+# Returns an integer representing the bit rate in kbit/s or null if there is a parsing error.
 export def parse_ffprobe_audio_bit_rate []: [record<streams: table, format: record> -> int] {
   let ffprobe_output = $in
   if ($ffprobe_output | is-empty) {
@@ -7604,14 +7605,15 @@ export def parse_ffprobe_audio_bit_rate []: [record<streams: table, format: reco
     if "bit_rate" in $audio_stream {
       $audio_stream | get bit_rate
     } else {
-      # log warning $"parse_ffprobe_audio_bit_rate: no bit rate for audio stream: ($audio_stream)."
+      log warning $"parse_ffprobe_audio_bit_rate: no bit rate for audio stream: ($audio_stream)."
       return null
     }
   )
-  $bit_rate | into int
+  # Convert to kilobits-per-second (kbit/s) from bits-per-second (bps).
+  ($bit_rate | into int) // 1000
 }
 
-# Get the bit rate of an audio file in kibibits-per-second from the output of the file command.
+# Get the bit rate of an audio file in kbit/s from the output of the file command.
 export def parse_file_audio_bit_rate []: [string -> int] {
   let file_output = $in
   if ($file_output | is-empty) {
@@ -9274,9 +9276,8 @@ export def tag_audiobook [
           let bit_rate = (
             # todo Uncomment this if needed
             # try {
-              # todo Fix this not outputting anything useful for id3 2.4.0?
-              # log info $"tag_audiobook: Parsing audio bit rate for file: ($track.file)";
-              ^file --brief $track.file | parse_file_audio_bit_rate
+              # log debug $"tag_audiobook: Parsing audio bit rate for file: ($track.file)";
+              $track.file | ffprobe | parse_ffprobe_audio_bit_rate
             # } catch {|error|
             #   null
             # }
