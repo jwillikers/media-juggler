@@ -1218,12 +1218,12 @@ export def image_optim []: path -> path {
 # In a simple test, compression using oxipng followed by ect and image_optim followed by ect resulted in a file of the same size.
 export def optimize_png []: path -> path {
   let png = $in
-  log debug $"Running command: (ansi yellow)^optipng -o7 ($png)(ansi reset)"
+  log debug $"Running command: (ansi yellow)^media-juggler-png-optimizer.nu '($png)'(ansi reset)"
   let result = do {
-    ^media-juggler-png-optimizer $png
+    ^media-juggler-png-optimizer.nu $png
   } | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^media-juggler-png-optimizer ($png)(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^media-juggler-png-optimizer.nu '($png)'(ansi reset)\n($result.stderr)\n"
     return $png
   }
   $png
@@ -5360,7 +5360,7 @@ export def bookbrainz_get_edition_identifiers [
 export def fetch-ebook-metadata [
   ...args: string
   # Remove Comicvine because it can cause trouble, although it does have entries for some Light Novels apparently.
-  --allowed-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
+  --allowed-plugins: list<string> = ["Hardcover" "Wikidata"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
   # --allowed-plugins: list<string> = [Google "Amazon.com"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
   --authors: list<string> # A list of authors to use
   --cover: path # Path to which to download the cover

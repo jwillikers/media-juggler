@@ -24,8 +24,9 @@ use media-juggler-lib *
 # The path for a standalone book will look like "<authors>/<title>.epub".
 #
 def main [
+  type: string # Type of book, i.e. "book" or "light-novel"
   ...files: string # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. SSH style paths are supported.
-  --destination: directory = "meerkat:/var/media/books" # The directory under which to copy files. I also have a light-novels subdirectory dedicated to light novels.
+  --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I also have a light-novels subdirectory dedicated to light novels.
   --isbn: string # ISBN of the book
   # --identifiers: string # asin:XXXX
   --keep # Keep the original file
@@ -35,21 +36,65 @@ def main [
   --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
   --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
   --skip-upload # Don't upload files to the server
-  --title: string # The title of the comic or manga issue
+  --title: string # The title of the book
   --use-rsync
+  --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
+  --hardcover-edition-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
+  --hardcover-book-slug: string # The Hardcover Book Slug (only embedded in the metadata right now)
+  --open-library-edition-id: string # The Open Library edition ID (only embedded in the metadata right now)
+  # --open-library-work-id: string # The Open Library edition ID (only embedded in the metadata right now)
+  --wikidata-work-id: string # The Wikidata work ID (only embedded in the metadata right now)
+  --wikidata-edition-id: string # The Wikidata edition ID (only embedded in the metadata right now)
 ] {
   if ($files | is-empty) {
     log error "No files provided"
     exit 1
   }
 
-  if ($isbn | is-not-empty) and ($files | length) > 1 {
-    log error "Setting the ISBN for multiple files is not allowed as it can result in overwriting the final file"
+  if ($files | length) > 1 and (
+    ($isbn | is-not-empty)
+    or ($bookbrainz_edition_id  | is-not-empty)
+    or ($open_library_edition_id  | is-not-empty)
+    or ($hardcover_edition_id | is-not-empty)
+    or ($hardcover_book_slug | is-not-empty)
+    or ($open_library_edition_id | is-not-empty)
+    or ($wikidata_edition_id | is-not-empty)
+    or ($wikidata_work_id | is-not-empty)
+  ) {
+    log error "Setting identifiers for multiple files is not allowed as it will result in overwriting the final file"
     exit 1
   }
 
-  if not ($isbn | validate_isbn) {
+  if ($isbn | is-not-empty) and not ($isbn | validate_isbn) {
     log error $"The ISBN (ansi red)($isbn)(ansi reset) is invalid"
+    exit 1
+  }
+  if ($bookbrainz_edition_id | is-not-empty) and not ($bookbrainz_edition_id | is_identifier_valid bookbrainz_edition_id) {
+    log error $"Invalid BookBrainz edition ID (ansi purple)($bookbrainz_edition_id)(ansi reset)"
+    exit 1
+  }
+  if ($hardcover_edition_id | is-not-empty) and not ($hardcover_edition_id | is_identifier_valid hardcover_edition_id) {
+    log error $"The Hardcover edition ID (ansi purple)($hardcover_edition_id)(ansi reset) is not an integer"
+    exit 1
+  }
+  if (($hardcover_edition_id | is-empty) or ($hardcover_book_slug | is-empty)) and ($env | get --optional MEDIA_JUGGLER_HARDCOVER_API_TOKEN | is-empty) {
+    log error "The environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN must be set to a Hardcover API key if --hardcover-book-slug and --hardcover-api-key are not provided."
+    exit 1
+  }
+  if ($hardcover_book_slug | is-not-empty) and not ($hardcover_book_slug | is_identifier_valid hardcover_book_slug) {
+    log error $"The Hardcover book slug (ansi purple)($hardcover_book_slug)(ansi reset) is most likely invalid since it is an integer"
+    exit 1
+  }
+  if ($open_library_edition_id | is-not-empty) and not ($open_library_edition_id | is_identifier_valid open_library_edition_id) {
+    log error $"Invalid Open Library edition ID (ansi purple)($open_library_edition_id)(ansi reset)"
+    exit 1
+  }
+  if ($wikidata_edition_id | is-not-empty) and not ($wikidata_edition_id | is_identifier_valid wikidata_item_id) {
+    log error $"The Wikidata edition ID (ansi purple)($wikidata_edition_id)(ansi reset) must be formatted as the letter 'Q' followed by an integer"
+    exit 1
+  }
+  if ($wikidata_work_id | is-not-empty) and not ($wikidata_work_id | is_identifier_valid wikidata_item_id) {
+    log error $"The Wikidata work ID (ansi purple)($wikidata_work_id)(ansi reset) must be formatted as the letter 'Q' followed by an integer"
     exit 1
   }
 
@@ -80,11 +125,15 @@ def main [
       $config.use_rsync
     }
   )
+  if ($type not-in ["book" "light-novel"]) {
+    log error $"Invalid book type (ansi red)($type)(ansi reset). Must be one of: book, light-novel"
+    exit 1
+  }
   let destination = (
     if ($destination | is-not-empty) {
-      $destination
+      [$destination $"($type)s"] | path join
     } else if ($config | get --optional destination | is-not-empty) {
-      $config.destination
+      [$config.destination $"($type)s"] | path join
     }
   )
   if ($destination | is-empty) {
@@ -317,14 +366,276 @@ def main [
     }
   )
 
-  let original_metadata = $formats | get $input_format | extract_ebook_metadata $temporary_directory
-  log debug $"original_metadata: ($original_metadata)"
+  let existing_metadata = $formats | get $input_format | extract_ebook_metadata $temporary_directory
+  log debug $"existing_metadata: ($existing_metadata)"
 
-  log debug "Attempting to get the ISBN from existing metadata"
-  let metadata_isbn = $original_metadata | get --optional isbn
-  if ($metadata_isbn | is-not-empty) {
-    log debug $"Found the ISBN (ansi purple)($metadata_isbn)(ansi reset) in the book's metadata"
-  }
+  # If no primary ids, i.e. ISBN, BookBrainz edition ID, and Wikidata item ID, are provided, try using the primary ids available in the metadata.
+  # If an ISBN, BookBrainz edition ID, or Wikidata item ID are provided, we'll try to use those to look up the other IDs using the provided ones.
+  # However, for the Comic Vine ID, we'll use it from the existing metadata unless it is provided on the command-line.
+  # This is because Comic Vine IDs are only associated with other identifiers through Wikidata.
+  # todo Handle merging existing data and IDs.
+  let isbn = (
+    if ($isbn | is-empty) and ($bookbrainz_edition_id | is-empty) and ($wikidata_edition_id | is-empty) {
+      if ($isbn | is-empty) {
+        if ($existing_metadata | is-not-empty) {
+          if ($existing_metadata | get --optional isbn | is-not-empty) {
+            $existing_metadata.isbn
+          }
+        }
+      } else {
+        $isbn
+      }
+    } else {
+      $isbn
+    }
+  )
+  let bookbrainz_edition_id = (
+    if ($isbn | is-empty) and ($bookbrainz_edition_id | is-empty) and ($bookbrainz_edition_id | is-empty) {
+      if ($bookbrainz_edition_id | is-empty) {
+        if ($existing_metadata | is-not-empty) {
+          let ids = $existing_metadata | get --optional ids
+          if ($ids | is-not-empty) {
+            let bookbrainz_edition_ids = $ids | where type == "bookbrainz_edition_id"
+            if ($bookbrainz_edition_ids | is-not-empty) {
+              # todo Warn if multiple
+              $bookbrainz_edition_ids | first
+            }
+          }
+        }
+      } else {
+        $bookbrainz_edition_id
+      }
+    } else {
+      $wikidata_edition_id
+    }
+  )
+  let wikidata_edition_id = (
+    if ($isbn | is-empty) and ($bookbrainz_edition_id | is-empty) and ($wikidata_edition_id | is-empty) {
+      if ($wikidata_edition_id | is-empty) {
+        if ($existing_metadata | is-not-empty) {
+          let ids = $existing_metadata | get --optional ids
+          if ($ids | is-not-empty) {
+            let wikidata_edition_ids = $ids | where type == "wikidata_edition_id"
+            if ($wikidata_edition_ids | is-not-empty) {
+              # todo Warn if multiple
+              $wikidata_edition_ids | first
+            }
+          }
+        }
+      } else {
+        $wikidata_edition_id
+      }
+    } else {
+      $wikidata_edition_id
+    }
+  )
+
+  # First, try to locate the release based on its hash if no Wikidata id is specified.
+  let wikidata_edition_id = (
+    if $original_input_format != "acsm" and ($wikidata_edition_id | is-empty) {
+      # BLAKE3 and SHA3-512 checksums are currently supported.
+      ["blake3" "sha3-512"] | reduce --fold "" {|checksum_type acc|
+        if ($acc | is-empty) {
+          let checksum = (
+            if $checksum_type == "blake3" {
+              $file | hash_blake3
+            } else if $checksum_type == "sha3-512" {
+              $file | hash_sha3_512
+            } else {
+              log error $"This should never happen."
+              exit 1
+            }
+          )
+          let file_size = du $file | first | get physical
+          let editions = $checksum | wikidata_search_editions_by_checksum $checksum_type $file_size
+          if ($editions | is-empty) {
+            # No editions found.
+            log debug $"No Wikidata editions found for the ($checksum_type | str upcase) (ansi purple)($checksum)(ansi reset)"
+            null
+          } else if ($editions | length) == 1 {
+            log info $"Found Wikidata edition (ansi green)($editions | first)(ansi reset) for the ($checksum_type | str upcase) checksum"
+            $editions | first
+          } else {
+            log warning $"Multiple Wikidata editions found for the ($checksum_type | str upcase) (ansi purple)($checksum)(ansi reset): ($editions)"
+            null
+          }
+        } else {
+          return $acc
+        }
+      }
+    } else {
+      $wikidata_edition_id
+    }
+  )
+  let wikidata_edition_identifiers = (
+    if ($wikidata_edition_id | is-not-empty) and (($isbn | is-empty) or ($bookbrainz_edition_id | is-empty) or ($open_library_edition_id | is-empty)) {
+      $wikidata_edition_id | wikidata_get_edition_identifiers
+    }
+  )
+  let isbn = (
+    if ($isbn | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let isbns = $wikidata_edition_identifiers | get --optional "ISBN-13"
+      if ($isbns | is-empty) {
+        log warning $"No ISBN-13s found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($isbns | length) == 1 {
+        $isbns | first
+      } else {
+        log warning $"Multiple ISBN-13s found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($isbns)"
+        null
+      }
+    } else {
+      $isbn
+    }
+  )
+  let bookbrainz_edition_id = (
+    if ($bookbrainz_edition_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let bookbrainz_edition_ids = $wikidata_edition_identifiers | get --optional "BookBrainz edition ID"
+      if ($bookbrainz_edition_ids | is-empty) {
+        log warning $"No BookBrainz edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($bookbrainz_edition_ids | length) == 1 {
+        $bookbrainz_edition_ids | first
+      } else {
+        log warning $"Multiple BookBrainz edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($bookbrainz_edition_ids)"
+        null
+      }
+    } else {
+      $bookbrainz_edition_id
+    }
+  )
+  let open_library_edition_id = (
+    if ($open_library_edition_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let open_library_edition_ids = $wikidata_edition_identifiers | get --optional "Open Library ID"
+      if ($open_library_edition_ids | is-empty) {
+        log warning $"No OpenLibrary Book IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($open_library_edition_ids | length) == 1 {
+        $open_library_edition_ids | first
+      } else {
+        log warning $"Multiple OpenLibrary Book IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($open_library_edition_ids)"
+        null
+      }
+    } else {
+      $open_library_edition_id
+    }
+  )
+
+  # Get missing identifiers based on provided identifiers.
+  # todo Search Open Library to.
+
+  # If BookBrainz ID is provided and any identifiers are missing, attempt to get them from BookBrainz.
+  let bookbrainz_edition_identifiers = (
+    if ($bookbrainz_edition_id | is-not-empty) and (($isbn | is-empty) or ($wikidata_edition_id | is-empty) or ($open_library_edition_id | is-empty)) {
+      $bookbrainz_edition_id | bookbrainz_get_edition_identifiers
+    }
+  )
+  let isbn = (
+    if ($isbn | is-empty) and ($bookbrainz_edition_identifiers | is-not-empty) {
+      let isbns = $bookbrainz_edition_identifiers | where type == "ISBN-13"
+      if ($isbns | is-empty) {
+        log warning $"No ISBN-13s found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset)"
+        null
+      } else if ($isbns | length) == 1 {
+        $isbns.value | first
+      } else {
+        log warning $"Multiple ISBN-13s found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset): ($isbns.value)"
+        null
+      }
+    } else {
+      $isbn
+    }
+  )
+  let wikidata_edition_id = (
+    if ($wikidata_edition_id | is-empty) and ($bookbrainz_edition_identifiers | is-not-empty) {
+      let wikidata_edition_ids = $bookbrainz_edition_identifiers | where type == "Wikidata Edition ID"
+      if ($wikidata_edition_ids | is-empty) {
+        log warning $"No Wikidata Edition IDs found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset)"
+        null
+      } else if ($wikidata_edition_ids | length) == 1 {
+        $wikidata_edition_ids.value | first
+      } else {
+        log warning $"Multiple Wikidata Edition IDs found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset): ($wikidata_edition_ids.value)"
+        null
+      }
+    } else {
+      $wikidata_edition_id
+    }
+  )
+  let open_library_edition_id = (
+    if ($open_library_edition_id | is-empty) and ($bookbrainz_edition_identifiers | is-not-empty) {
+      let open_library_edition_ids = $bookbrainz_edition_identifiers | where type == "OpenLibrary Book ID"
+      if ($open_library_edition_ids | is-empty) {
+        log warning $"No OpenLibrary Book IDs found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset)"
+        null
+      } else if ($open_library_edition_ids | length) == 1 {
+        $open_library_edition_ids.value | first
+      } else {
+        log warning $"Multiple OpenLibrary Book IDs found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset): ($open_library_edition_ids.value)"
+        null
+      }
+    } else {
+      $open_library_edition_id
+    }
+  )
+
+  # If Wikidata ID is provided and any identifiers are missing, attempt to get them from Wikidata.
+  # The Wikidata ID will be empty here if a wikidata ID wasn't found via a file checksum or BookBrainz.
+  let wikidata_edition_identifiers = (
+    if ($wikidata_edition_identifiers | is-empty) and ($wikidata_edition_id | is-not-empty) and (($isbn | is-empty) or ($bookbrainz_edition_id | is-empty) or ($open_library_edition_id | is-empty)) {
+      $wikidata_edition_id | wikidata_get_edition_identifiers
+    } else {
+      $wikidata_edition_identifiers
+    }
+  )
+  let isbn = (
+    if ($isbn | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let isbns = $wikidata_edition_identifiers | get --optional "ISBN-13"
+      if ($isbns | is-empty) {
+        log warning $"No ISBN-13s found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($isbns | length) == 1 {
+        $isbns | first
+      } else {
+        log warning $"Multiple ISBN-13s found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($isbns)"
+        null
+      }
+    } else {
+      $isbn
+    }
+  )
+  let bookbrainz_edition_id = (
+    if ($bookbrainz_edition_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let bookbrainz_edition_ids = $wikidata_edition_identifiers | get --optional "BookBrainz edition ID"
+      if ($bookbrainz_edition_ids | is-empty) {
+        log warning $"No BookBrainz edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($bookbrainz_edition_ids | length) == 1 {
+        $bookbrainz_edition_ids | first
+      } else {
+        log warning $"Multiple BookBrainz edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($bookbrainz_edition_ids)"
+        null
+      }
+    } else {
+      $bookbrainz_edition_id
+    }
+  )
+  let open_library_edition_id = (
+    if ($open_library_edition_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let open_library_edition_ids = $wikidata_edition_identifiers | get --optional "Open Library ID"
+      if ($open_library_edition_ids | is-empty) {
+        log warning $"No OpenLibrary Book IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($open_library_edition_ids | length) == 1 {
+        $open_library_edition_ids | first
+      } else {
+        log warning $"Multiple OpenLibrary Book IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($open_library_edition_ids)"
+        null
+      }
+    } else {
+      $open_library_edition_id
+    }
+  )
 
   log debug "Attempting to get the ISBN from the first ten and last ten pages of the book"
   let book_isbn_numbers = (
@@ -336,11 +647,11 @@ def main [
 
   # Determine the most likely ISBN from the metadata and pages
   let likely_isbn_from_pages_and_metadata = (
-    if ($metadata_isbn | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
+    if ($existing_metadata | get --optional isbn | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
       if ($book_isbn_numbers | is-empty) {
-        log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
-        $metadata_isbn
-      } else if $metadata_isbn in $book_isbn_numbers {
+        log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($existing_metadata | get --optional isbn)(ansi reset)"
+        $existing_metadata | get --optional isbn
+      } else if ($existing_metadata | get --optional isbn) in $book_isbn_numbers {
         if ($book_isbn_numbers | length) == 1 {
           log debug "Found an exact match between the ISBN in the metadata and the ISBN in the pages of the book"
         } else if ($book_isbn_numbers | length) > 10 {
@@ -350,28 +661,28 @@ def main [
             error: $"Found more than 10 ISBN numbers in the pages of the book: (ansi purple)($book_isbn_numbers)(ansi reset)"
           }
         }
-        $metadata_isbn
+        $existing_metadata | get --optional isbn
       } else {
         # todo If only one number is available in the pages, should it be preferred?
-        log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+        log warning $"The ISBN from the book's metadata, (ansi purple)($existing_metadata | get --optional isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
         if ($book_isbn_numbers | length) == 1 {
-          log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+          log warning $"The ISBN from the book's metadata, (ansi purple)($existing_metadata | get --optional isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
           $book_isbn_numbers | first
         } else {
           if ($isbn | is-empty) {
             rm --force --recursive $temporary_directory
             return {
               file: $original_file
-              error: $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset). Use the `--isbn` flag to set the ISBN instead."
+              error: $"The ISBN from the book's metadata, (ansi purple)($existing_metadata | get --optional isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset). Use the `--isbn` flag to set the ISBN instead."
             }
           } else {
-            log warning $"The ISBN from the book's metadata, (ansi purple)($metadata_isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
+            log warning $"The ISBN from the book's metadata, (ansi purple)($existing_metadata | get --optional isbn)(ansi reset) not among the ISBN numbers found in the books pages: (ansi purple)($book_isbn_numbers)(ansi reset)."
           }
         }
       }
-    } else if ($metadata_isbn | is-not-empty) {
-      log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($metadata_isbn)(ansi reset)"
-      $metadata_isbn
+    } else if ($existing_metadata | get --optional isbn | is-not-empty) {
+      log debug $"No ISBN numbers found in the pages of the book. Using the ISBN from the book's metadata (ansi purple)($existing_metadata | get --optional isbn)(ansi reset)"
+      $existing_metadata | get --optional isbn
     } else if ($book_isbn_numbers | is-not-empty) and ($book_isbn_numbers | is-not-empty) {
       if ($book_isbn_numbers | length) == 1 {
         log debug $"Found a single ISBN in the pages of the book: (ansi purple)($book_isbn_numbers | first)(ansi reset)"
@@ -439,7 +750,7 @@ def main [
             opf: null
           }
         } else {
-          let original_title = $original_metadata | title_from_metadata
+          let original_title = $existing_metadata | title_from_metadata
           let fetched_title = $result.opf | title_from_opf
           if $fetched_title == $original_title {
             $result
@@ -462,7 +773,7 @@ def main [
             opf: null
           }
         } else {
-          let fetched_isbn = $result.opf | isbn_from_opf
+          let fetched_isbn = $result.opf | from_opf_xml | get --optional isbn
           if ($fetched_isbn | is-empty) {
             log warning "No ISBN in retrieved metadata!"
             $result
@@ -478,7 +789,7 @@ def main [
                 opf: null
               }
             } else {
-              let fetched_isbn = $result.opf | isbn_from_opf
+              let fetched_isbn = $result.opf | from_opf_xml | get --optional isbn
               if $fetched_isbn == null or ($fetched_isbn | is-empty) {
                 log warning "No ISBN in retrieved metadata!"
                 $result
@@ -501,13 +812,13 @@ def main [
       let input = $in;
       log debug $"input: ($input)";
       $input | update opf (
-        if ($input | get --optional opf | is-not-empty) and ($original_metadata | get --optional opf | is-not-empty) {
+        if ($input | get --optional opf | is-not-empty) and ($existing_metadata | get --optional opf | is-not-empty) {
           # todo Should probably have a better way of merging metadata
-          $original_metadata.opf | merge $input.opf
+          $existing_metadata.opf | merge $input.opf
         } else if ($input | get --optional opf | is-not-empty) {
           $input.opf
-        } else if ($original_metadata | get --optional opf | is-not-empty) {
-          $original_metadata.opf
+        } else if ($existing_metadata | get --optional opf | is-not-empty) {
+          $existing_metadata.opf
         } else {
           log error "No metadata!"
         }
@@ -589,11 +900,48 @@ def main [
     )
     log debug $"Authors: ($authors)"
 
+    let series = (
+      $book.opf
+      | open
+      | from xml
+      | get content
+      | where tag == "metadata"
+      | first
+      | get content
+      | where tag == "meta"
+      | where attributes.name == "calibre:series"
+      | get attributes.content
+      | str trim
+      | where {|series| not ($series | is-empty)}
+    )
+    let series = (
+      if ($series | length) == 1 {
+        # todo Include series year in series folder name.
+        log debug $"Series: ($series | first)"
+        # $series | first | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
+        $series | first | use_unicode_in_title | sanitize_file_name | $in + $" [($output_format)]"
+      } else if ($series | length) > 1 {
+        log info $"Multiple series found in the metadata: (ansi yellow)($series)(ansi reset). Ignoring series."
+      } else {
+
+      }
+    )
+    # Remove disambiguation for light novels.
+    # todo Do this for the title as well.
+    let series = (
+      if ($series | is-empty) {
+      } else {
+        $series | str replace --all " (Light Novel)" ""
+      }
+    )
+
     let authors_subdirectory = $authors | str join ", "
     let target_subdirectory = (
-      [$authors_subdirectory]
-      # todo Add series subdirectory here
-      | path join
+      if ($series | is-empty) {
+        $authors_subdirectory
+      } else {
+        $series
+      }
     )
     let target_directory = [$destination $target_subdirectory] | path join
     log debug $"Target directory: ($target_directory)"
@@ -606,6 +954,7 @@ def main [
       } | path join
     )
     log debug $"Target destination: ($target_destination)"
+    # todo Remove sidecar opf.
     let opf_target_destination = (
       if $output_format == "pdf" {
         let components = $book.book | path parse;
