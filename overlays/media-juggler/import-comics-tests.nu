@@ -1062,6 +1062,182 @@ def test_from_opf_xml [] {
   test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf
 }
 
+def test_to_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
+  let input = {
+    credits: [
+      [creator, role, primary, language];
+      ["Chica Umino", Writer, true, ""]
+    ]
+    publishers: ["Denpa"]
+    genres: [
+      coming-of-age
+      romance
+      "slice of life"
+    ]
+    language: "english"
+    title: "March Comes in Like a Lion, Vol. 1",
+    description: "Rei Kiriyama is a child prodigy. Rei Kiriyama is also an orphan who lives alone in an empty apartment. Rei Kiriyama is a teen working in an adult's world.
+
+Life is complicated for Rei. He's an up-and-coming shogi (Japanese chess) player on the verge of turning pro but he has no homelife or much of a life period outside his board game but thankfully with the help of some life-long friends he has an opportunity start all over again.
+
+Note: This volume was released digitally (05/03/2023) before paperback (06/06/2023).
+
+## Chapter Titles
+* Chapter 1: Rei Kiriyama
+* Chapter 2: A Riverside Town
+* Chapter 3: Akari
+* Chapter 4: The Other Side of the Bridge
+* Chapter 5: Harunobu
+* Chapter 6: Beyond the Night Sky
+* Chapter 7: Hina
+* Chapter 8: VS.
+* Chapter 9: Contract
+* Chapter 10: Over the Cuckoo's Nest"
+    publication_date: (2023-05-01T05:00:00+00:00 | into datetime)
+    ids: [
+      [type, id];
+      [hardcover_book_slug, "march-comes-in-like-a-lion-volume-1"],
+      [hardcover_edition_id, "30930924"],
+      [comic_vine_issue_id, "987377"],
+      [bookbrainz_edition_id, "594a8ec2-6301-4c20-ae22-2c43840416b2"],
+      [wikidata_item_id, "Q139556252"]
+    ],
+    series: "March Comes in Like a Lion",
+    issue: "1",
+    isbn: "9781634428132"
+  }
+  let expected = {
+    tag: "package"
+    attributes: {
+      # unique-identifier: calibre_id
+      version: "3.0"
+    },
+    content: [
+      [tag, attributes, content];
+      [
+        metadata,
+        {},
+        [
+          [tag, attributes, content];
+          [
+            creator,
+            {
+              role: aut,
+              # file-as: "Umino, Chica"
+            },
+            [
+              [tag, attributes, content];
+              [null, null, "Chica Umino"]
+            ]
+          ],
+          [
+            date
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, "2023-05-01T05:00:00+00:00"]
+            ]
+          ]
+          [
+            description
+            {}
+            [
+              [tag, attributes, content];
+              [
+                null,
+                null,
+                "Rei Kiriyama is a child prodigy. Rei Kiriyama is also an orphan who lives alone in an empty apartment. Rei Kiriyama is a teen working in an adult's world.
+
+Life is complicated for Rei. He's an up-and-coming shogi (Japanese chess) player on the verge of turning pro but he has no homelife or much of a life period outside his board game but thankfully with the help of some life-long friends he has an opportunity start all over again.
+
+Note: This volume was released digitally (05/03/2023) before paperback (06/06/2023).
+
+## Chapter Titles
+* Chapter 1: Rei Kiriyama
+* Chapter 2: A Riverside Town
+* Chapter 3: Akari
+* Chapter 4: The Other Side of the Bridge
+* Chapter 5: Harunobu
+* Chapter 6: Beyond the Night Sky
+* Chapter 7: Hina
+* Chapter 8: VS.
+* Chapter 9: Contract
+* Chapter 10: Over the Cuckoo's Nest"
+              ]
+            ]
+          ],
+          [identifier, {scheme: HARDCOVER-EDITION}, [[tag, attributes, content]; [null, null, "30930924"]]]
+          [identifier, {scheme: BOOKBRAINZ-EDITION}, [[tag, attributes, content]; [null, null, "594a8ec2-6301-4c20-ae22-2c43840416b2"]]]
+          [identifier, {scheme: ISBN}, [[tag, attributes, content]; [null, null, "9781634428132"]]]
+          [identifier, {scheme: COMICVINE}, [[tag, attributes, content]; [null, null, "987377"]]]
+          [identifier, {scheme: WIKIDATA-EDITION}, [[tag, attributes, content]; [null, null, "Q139556252"]]]
+          [
+            identifier
+            {scheme: HARDCOVER}
+            [
+              [tag, attributes, content];
+              [null, null, "march-comes-in-like-a-lion-volume-1"]
+            ]
+          ],
+          [
+            identifier
+            {scheme: HARDCOVER-SLUG}
+            [
+              [tag, attributes, content]; [null, null, "march-comes-in-like-a-lion-volume-1"]
+            ]
+          ]
+          # [identifier {scheme: HARDCOVER-ID} [[tag, attributes, content]; [null, null, "908381"]]]
+          # [identifier, {scheme: COMICVINE-VOLUME}, [[tag, attributes, content]; [null, null, "150064"]]]
+          [
+            language
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, eng]
+            ]
+          ]
+          [meta, {name: "calibre:series", content: "March Comes in Like a Lion"}, []]
+          [meta, {name: "calibre:series_index", content: "1"}, []]
+          # [meta, {name: "calibre:title_sort", content: "March Comes in Like a Lion, Vol. 1"}, []]
+          [
+            publisher
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, Denpa]
+            ]
+          ]
+          [subject, {}, [[tag, attributes, content]; [null, null, coming-of-age]]]
+          [subject, {}, [[tag, attributes, content]; [null, null, romance]]]
+          [subject, {}, [[tag, attributes, content]; [null, null, "slice of life"]]]
+          [
+            title,
+            {},
+            [
+              [tag, attributes, content];
+              [null, null, "March Comes in Like a Lion, Vol. 1"]
+            ]
+          ],
+        ]
+      ]
+    ]
+  }
+  # log debug $"\n($input | to_opf_xml | to nuon)\n"
+  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "creator") ($expected | get content | first | get content | where tag == "creator")
+  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "description") ($expected | get content | first | get content | where tag == "description")
+  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "date") ($expected | get content | first | get content | where tag == "date")
+  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "language") ($expected | get content | first | get content | where tag == "language")
+  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "identifier") ($expected | get content | first | get content | where tag == "identifier")
+  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "meta") ($expected | get content | first | get content | where tag == "meta")
+  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "subject") ($expected | get content | first | get content | where tag == "subject")
+  # assert equal ($input | to_opf_xml | get content | first | get content) ($expected | get content | first | get content)
+  assert equal ($input | to_opf_xml) $expected
+}
+
+def test_to_opf_xml [] {
+  test_to_opf_xml_march_comes_in_like_a_lion_volume_1_pdf
+}
+
 def test_sanitize_genres_or_tags_empty_allowlist [] {
   let input = [coming-of-age fantasy romantasy]
   assert error {|| $input | sanitize_genres_or_tags []}
@@ -1154,6 +1330,7 @@ def main [] {
   test_sanitize_genres_or_tags
   test_into_comic_info_xml
   test_from_opf_xml
+  test_to_opf_xml
   test_from_comic_info_xml
   test_parse_wikidata_edition_and_works_metadata
   # test_from_metron_info_xml

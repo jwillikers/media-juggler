@@ -184,6 +184,103 @@ export const genre_to_age_rating_comic_info_map = [
   [[hentai] "X18+" "Adult"]
 ]
 
+# https://en.wikipedia.org/wiki/IETF_language_tag
+# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
+export const iso_language_codes_map = [
+  [language iso_639_1 iso_639_3 ietf_bcp_47 default_language wikidata_id];
+  ["english" "en" "eng" "en" true Q1860]
+  ["american english" "en" "eng" "en-US" false Q7976]
+  ["british english" "en" "eng" "en-GB" false Q7979]
+  ["chinese" "zh" "zho" "zh" true Q7850]
+  ["german" "de" "deu" "de" false Q188]
+  ["japanese" "ja" "jpn" "ja" true Q5287]
+  ["japanese hiragana" "ja" "jpn" "ja-hira" false Q53979341]
+  ["japanese katakana" "ja" "jpn" "ja-kana" false Q53979342]
+  ["japanese kana" "ja" "jpn" "ja-hrkt" false Q53979345]
+  ["japanese kanji" "ja" "jpn" "ja-hani" false Q53979504]
+  ["japanese romanized" "ja" "jpn" "ja-Latn" false Q53979348]
+  ["korean" "ko" "kor" "ko" true Q9176]
+  ["spanish" "es" "spa" "es" true Q1321]
+]
+
+export const comic_info_fields = [
+  [tag delimiter];
+  [Title null]
+  [LocalizedSeries null]
+  [Series null]
+  [SeriesGroup ","]
+  [StoryArc ","]
+  [StoryArcNumber ","]
+  [AlternativeSeries null]
+  [AlternativeCount null]
+  [SeriesSort null]
+  [Count null]
+  [Number null]
+  [Volume null]
+  [Summary null]
+  [Notes null]
+  [Year null]
+  [Month null]
+  [Day null]
+  [Locations ","]
+  [Characters ","]
+  [Teams ","]
+  [MainCharacterOrTeam null]
+  [ScanInformation null]
+  [Writer ","]
+  [Penciller ","]
+  [Inker ","]
+  [Colorist ","]
+  [Letterer ","]
+  [CoverArtist ","]
+  [Editor ","]
+  [Translator ","]
+  [Publisher null]
+  [Imprint null]
+  [Genre ","]
+  [Tags ","]
+  [Web " "]
+  [PageCount null]
+  [LanguageISO null]
+  [GTIN null]
+  [Format null]
+  [Manga null]
+  [AgeRating null]
+]
+
+export const comic_vine_roles_map = [
+  [comic_vine_roles comic_info_roles];
+  [[Writer] [Writer]]
+  [[Penciller] [Penciller]]
+  [[Inker] [Inker]]
+  [[Colorist] [Colorist]]
+  [[Letterer] [Letterer]]
+  # I think ComicTagger does Penciller and Inker by default for Artist.
+  # I also include Colorist since usually, there's color of some sort in most comics and manga, even if it's only on the cover for manga.
+  [[Artist] [Penciller Inker Colorist]]
+  # [[Designer] []]
+  # CoverArtist requires both the Cover and the Artist roles.
+  [[Cover Artist] [CoverArtist]]
+  [[Editor] [Editor]]
+  [[Translator] [Translator]]
+  # [[Production] []]
+]
+
+export const opf_identifier_schemes = [
+  [schemes type];
+  # [[GOODREADS] goodreads_version_id]
+  [[HARDCOVER HARDCOVER-SLUG] hardcover_book_slug]
+  # [[HARDCOVER-ID] hardcover_book_id]
+  [[HARDCOVER-EDITION] hardcover_edition_id]
+  [[COMICVINE] comic_vine_issue_id]
+  # [[COMICVINE-VOLUME] comic_vine_volume_id]
+  [[BOOKBRAINZ-EDITION] bookbrainz_edition_id]
+  [[WIKIDATA-EDITION] wikidata_item_id]
+  # [ISBN isbn]
+  # [STORYGRAPH storygraph_edition_id]
+  # [GOOGLE google_books_id]
+]
+
 # Surround special characters in a string with square brackets
 #
 # Use this on strings before adding glob characters.
@@ -2752,69 +2849,6 @@ export def identifier_from_url [
   }
 }
 
-export const comic_info_fields = [
-  [tag delimiter];
-  [Title null]
-  [LocalizedSeries null]
-  [Series null]
-  [SeriesGroup ","]
-  [StoryArc ","]
-  [StoryArcNumber ","]
-  [AlternativeSeries null]
-  [AlternativeCount null]
-  [SeriesSort null]
-  [Count null]
-  [Number null]
-  [Volume null]
-  [Summary null]
-  [Notes null]
-  [Year null]
-  [Month null]
-  [Day null]
-  [Locations ","]
-  [Characters ","]
-  [Teams ","]
-  [MainCharacterOrTeam null]
-  [ScanInformation null]
-  [Writer ","]
-  [Penciller ","]
-  [Inker ","]
-  [Colorist ","]
-  [Letterer ","]
-  [CoverArtist ","]
-  [Editor ","]
-  [Translator ","]
-  [Publisher null]
-  [Imprint null]
-  [Genre ","]
-  [Tags ","]
-  [Web " "]
-  [PageCount null]
-  [LanguageISO null]
-  [GTIN null]
-  [Format null]
-  [Manga null]
-  [AgeRating null]
-]
-
-export const comic_vine_roles_map = [
-  [comic_vine_roles comic_info_roles];
-  [[Writer] [Writer]]
-  [[Penciller] [Penciller]]
-  [[Inker] [Inker]]
-  [[Colorist] [Colorist]]
-  [[Letterer] [Letterer]]
-  # I think ComicTagger does Penciller and Inker by default for Artist.
-  # I also include Colorist since usually, there's color of some sort in most comics and manga, even if it's only on the cover for manga.
-  [[Artist] [Penciller Inker Colorist]]
-  # [[Designer] []]
-  # CoverArtist requires both the Cover and the Artist roles.
-  [[Cover Artist] [CoverArtist]]
-  [[Editor] [Editor]]
-  [[Translator] [Translator]]
-  # [[Production] []]
-]
-
 # Filter and rename genres or tags according to the allow list
 export def sanitize_genres_or_tags [
   allowlist: table<name: string, aliases: list<string>> # The allow list
@@ -3412,7 +3446,9 @@ export def from_pdf_metadata []: [
 }
 
 # Parse metadata from an EPUB's content.opf XML file
-export def from_opf_xml []: [
+export def from_opf_xml [
+  identifier_schemes: table = $opf_identifier_schemes
+]: [
   record -> record
 ] {
   let opf = $in
@@ -3533,21 +3569,6 @@ export def from_opf_xml []: [
     }
   )
 
-  let identifier_schemes = [
-    [schemes type];
-    # [[GOODREADS] goodreads_version_id]
-    [[HARDCOVER HARDCOVER-SLUG] hardcover_book_slug]
-    # [[HARDCOVER-ID] hardcover_book_id]
-    [[HARDCOVER-EDITION] hardcover_edition_id]
-    [[COMICVINE] comic_vine_issue_id]
-    # [[COMICVINE-VOLUME] comic_vine_volume_id]
-    [[BOOKBRAINZ-EDITION] bookbrainz_edition_id]
-    [[WIKIDATA-EDITION] wikidata_item_id]
-    # [ISBN isbn]
-    # [STORYGRAPH storygraph_edition_id]
-    # [GOOGLE google_books_id]
-  ]
-
   let ids = (
     let ids = $metadata_content | where tag == identifier;
     if ($ids | is-not-empty) {
@@ -3627,6 +3648,296 @@ export def from_opf_xml []: [
   )
 }
 
+# Output metadata in the format used by an EPUB's content.opf XML file
+export def to_opf_xml [
+  language_codes_map: table = $iso_language_codes_map
+  identifier_schemes: table = $opf_identifier_schemes
+]: [
+  record -> record
+] {
+  let metadata = $in
+
+  # todo I should probably just work with the metadata content field instead.
+  # [[tag, attributes, content]; []]
+  let opf_metadata = []
+
+  # We don't write OPF metadata for manga, so don't worry about including the illustrator as an author.
+  let primary_authors = (
+    let credits = $metadata | get --optional credits;
+    if ($credits | is-empty) {
+
+    } else {
+      let writers = $credits | where role == "Writer"
+      if ($writers | is-empty) {
+      } else {
+        let primary_writers = $writers | where primary == true
+        if ($primary_writers | is-empty) {
+          $writers | get creator | uniq
+        } else {
+          $primary_writers | get creator | uniq
+        }
+      }
+    }
+  )
+  let opf_metadata = $opf_metadata | append (
+    $primary_authors | reduce --fold [] {|primary_author acc|
+      $acc | append [
+        [tag, attributes, content];
+        [
+          "creator"
+          {
+            role: aut
+            # todo Add sort name?
+            # file-as: "Umino, Chica"
+          }
+          [
+            [tag, attributes, content];
+            [null, null, $primary_author]
+          ]
+        ]
+      ]
+    }
+  )
+
+  # title
+  let opf_metadata = (
+    if ($metadata | get --optional title | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "title"
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, $metadata.title]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+
+  # language
+  # todo Handle language missing from map.
+  let opf_metadata = (
+    if ($metadata | get --optional language | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "language"
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, ($metadata.language | into_language_code iso_639_3 $language_codes_map)]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+
+  # description
+  let opf_metadata = (
+    if ($metadata | get --optional description | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "description"
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, $metadata.description]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+
+  # date
+  let opf_metadata = (
+    if ($metadata | get --optional publication_date | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "date"
+            {}
+            [
+              [tag, attributes, content];
+              # "2023-05-01T05:00:00+00:00"
+              [null, null, ($metadata.publication_date | date to-timezone "UTC" | format date '%FT%H:%M:%S%Z')]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+
+  # publisher
+  # Prefer imprint when present.
+  let publishers = (
+    if ($metadata | get --optional imprints | is-not-empty) {
+      $metadata.imprints
+    } else {
+      $metadata.publishers
+    }
+  )
+  let opf_metadata = $opf_metadata | append (
+    $publishers | reduce --fold [] {|publisher acc|
+      $acc | append [
+        [tag, attributes, content];
+        [
+          "publisher"
+          {}
+          [
+            [tag, attributes, content];
+            [null, null, $publisher]
+          ]
+        ]
+      ]
+    }
+  )
+
+  let opf_metadata = $opf_metadata | append (
+    $metadata.ids | reduce --fold [] {|id acc|
+      # for each type, add each scheme
+      let schemes = $identifier_schemes | where type == $id.type
+      if ($schemes | is-empty) {
+        log error $"Missing OPF schemes for type (ansi yellow)($id.type)(ansi reset)"
+        # todo make error if type is missing
+      } else if ($schemes | length) > 1 {
+        log error $"Multiple OPF schemes for type (ansi yellow)($id.type)(ansi reset): ($schemes)"
+        # todo make error if type is missing
+      }
+      $schemes | first | get schemes | reduce --fold $acc {|scheme inner_acc|
+        $inner_acc | append [
+          [tag, attributes, content];
+          [
+            "identifier"
+            {
+              scheme: $scheme
+            }
+            [
+              [tag, attributes, content];
+              [null, null, $id.id]
+            ]
+          ]
+        ]
+      }
+    } | append (
+      if ($metadata | get --optional isbn | is-empty) {
+      } else {
+        [
+          [tag, attributes, content];
+          [
+            "identifier"
+            {scheme: ISBN}
+            [
+              [tag, attributes, content];
+              [null, null, $metadata.isbn]
+            ]
+          ]
+        ]
+      }
+    )
+  )
+
+  # series
+  # Only a single series is supported.
+  # todo Sort series name?
+  # [meta, {name: "calibre:title_sort", content: "March Comes in Like a Lion, Vol. 1"}, []]
+  let opf_metadata = (
+    if ($metadata | get --optional series | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "meta"
+            {
+              name: "calibre:series"
+              content: $metadata.series
+            }
+            []
+          ]
+        ]
+      )
+    }
+  )
+  let opf_metadata = (
+    if ($metadata | get --optional issue | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "meta"
+            {
+              name: "calibre:series_index"
+              content: ($metadata.issue | into string)
+            }
+            []
+          ]
+        ]
+      )
+    }
+  )
+
+  # genres
+  let opf_metadata = $opf_metadata | append (
+    $metadata | get --optional genres | reduce --fold [] {|genre acc|
+      $acc | append [
+        [tag, attributes, content];
+        [
+          "subject"
+          {}
+          [
+            [tag, attributes, content];
+            [null, null, $genre]
+          ]
+        ]
+      ]
+    }
+  )
+
+  let opf_metadata = (
+    if ($opf_metadata | is-empty) {
+      []
+    } else {
+      $opf_metadata | sort-by tag content.content
+    }
+  )
+
+  {
+    "tag": "package"
+    attributes: {
+      version: "3.0"
+    },
+    content: [
+      [tag, attributes, content];
+      [
+        metadata,
+        {},
+        $opf_metadata
+      ]
+    ]
+  }
+}
+
 # Count the number of image files in a ZIP archive
 export def number_of_images_in_archive []: [path -> int] {
   let archive = $in
@@ -3635,25 +3946,6 @@ export def number_of_images_in_archive []: [path -> int] {
 
 # export const comic_metadata_template = {
 # }
-
-# https://en.wikipedia.org/wiki/IETF_language_tag
-# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
-export const iso_language_codes_map = [
-  [language iso_639_1 iso_639_3 ietf_bcp_47 default_language wikidata_id];
-  ["english" "en" "eng" "en" true Q1860]
-  ["american english" "en" "eng" "en-US" false Q7976]
-  ["british english" "en" "eng" "en-GB" false Q7979]
-  ["chinese" "zh" "zho" "zh" true Q7850]
-  ["german" "de" "deu" "de" false Q188]
-  ["japanese" "ja" "jpn" "ja" true Q5287]
-  ["japanese hiragana" "ja" "jpn" "ja-hira" false Q53979341]
-  ["japanese katakana" "ja" "jpn" "ja-kana" false Q53979342]
-  ["japanese kana" "ja" "jpn" "ja-hrkt" false Q53979345]
-  ["japanese kanji" "ja" "jpn" "ja-hani" false Q53979504]
-  ["japanese romanized" "ja" "jpn" "ja-Latn" false Q53979348]
-  ["korean" "ko" "kor" "ko" true Q9176]
-  ["spanish" "es" "spa" "es" true Q1321]
-]
 
 # Convert a language to it's corresponding IETF BCP 47 or ISO 639-3 language code
 #
