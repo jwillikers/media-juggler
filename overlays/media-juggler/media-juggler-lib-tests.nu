@@ -3615,7 +3615,7 @@ def test_parse_ffprobe_file_format [] {
 
 def test_parse_ffprobe_audio_bit_rate_aax [] {
   let input = open ([$test_data_dir "ffprobe_output_aax.json"] | path join)
-  let expected = 62794 # 64 kbps
+  let expected = 63 # 62794 # 64 kbps
   assert equal ($input | parse_ffprobe_audio_bit_rate) $expected
 }
 
@@ -3627,13 +3627,13 @@ def test_parse_ffprobe_audio_bit_rate_flac [] {
 
 def test_parse_ffprobe_audio_bit_rate_m4b_aac [] {
   let input = open ([$test_data_dir "ffprobe_output_m4b_aac.json"] | path join)
-  let expected = 64010 # 64 kbps
+  let expected = 64 # 64010 # 64 kbps
   assert equal ($input | parse_ffprobe_audio_bit_rate) $expected
 }
 
 def test_parse_ffprobe_audio_bit_rate_mp3 [] {
   let input = open ([$test_data_dir "ffprobe_output_mp3.json"] | path join)
-  let expected = 71824 # 64 kbps?
+  let expected = 72 # 71824 # 64 kbps?
   assert equal ($input | parse_ffprobe_audio_bit_rate) $expected
 }
 
@@ -3651,7 +3651,7 @@ def test_parse_ffprobe_audio_bit_rate_opus [] {
 
 def test_parse_ffprobe_audio_bit_rate_wav [] {
   let input = open ([$test_data_dir "ffprobe_output_wav.json"] | path join)
-  let expected = 1411200 # 1,411 kbps
+  let expected = 1411 # 1411200 # 1,411 kbps
   assert equal ($input | parse_ffprobe_audio_bit_rate) $expected
 }
 

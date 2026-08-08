@@ -8322,7 +8322,7 @@ export def parse_ffprobe_audio_bit_rate []: [record<streams: table, format: reco
     }
   )
   # Convert to kilobits-per-second (kbit/s) from bits-per-second (bps).
-  ($bit_rate | into int) // 1000
+  ((($bit_rate | into int) / 1000) | math round --precision 0) | into int
 }
 
 # Get the bit rate of an audio file in kbit/s from the output of the file command.
