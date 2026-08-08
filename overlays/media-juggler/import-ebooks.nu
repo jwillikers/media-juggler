@@ -24,14 +24,13 @@ use media-juggler-lib *
 # The path for a standalone book will look like "<authors>/<title>.epub".
 #
 def main [
-  type: string # Type of book, i.e. "book" or "light-novel"
   ...files: string # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. SSH style paths are supported.
   --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I also have a light-novels subdirectory dedicated to light novels.
   --isbn: string # ISBN of the book
   # --identifiers: string # asin:XXXX
   --keep # Keep the original file
   --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
-  --ereader-subdirectory: string = "Books/Books" # The subdirectory on the e-reader in-which to copy
+  --ereader-subdirectory: string = ".books" # The subdirectory on the e-reader in-which to copy
   --keep-tmp # Don't delete the temporary directory when there's an error
   --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
   --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
@@ -125,15 +124,11 @@ def main [
       $config.use_rsync
     }
   )
-  if ($type not-in ["book" "light-novel"]) {
-    log error $"Invalid book type (ansi red)($type)(ansi reset). Must be one of: book, light-novel"
-    exit 1
-  }
   let destination = (
     if ($destination | is-not-empty) {
-      [$destination $"($type)s"] | path join
+      $destination
     } else if ($config | get --optional destination | is-not-empty) {
-      [$config.destination $"($type)s"] | path join
+      $config.destination
     }
   )
   if ($destination | is-empty) {
@@ -165,7 +160,7 @@ def main [
     }
   )
   let ereader_mountpoint = (["/run/media" $username $ereader_disk_label] | path join)
-  let ereader_target_directory = ([$ereader_mountpoint $ereader_subdirectory] | path join)
+  let ereader_target_directory = ([$ereader_mountpoint $ereader_subdirectory $form_subdirectory] | path join)
   if $ereader != null and not $no_copy_to_ereader {
     if (^findmnt --target $ereader_target_directory | complete | get exit_code) != 0 {
       ^udisksctl mount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
@@ -721,8 +716,12 @@ def main [
       $isbn
     }
   )
-  let isbn = $isbn | str replace --all "-" ""
-  if $isbn != null {
+  let isbn = (
+    if ($isbn | is-not-empty) {
+      $isbn | str replace --all "-" ""
+    }
+  )
+  if ($isbn | is-not-empty) {
     log debug $"The ISBN is (ansi purple)($isbn)(ansi reset)"
     if ($isbn | str length) != 13 {
       log error $"The ISBN (ansi purple)($isbn)(ansi reset) does not contain exactly 13-characters"
@@ -736,103 +735,395 @@ def main [
     }
   }
 
-  let book = (
-    $formats | get $output_format
-    | (
-      let input = $in;
-      if ($isbn | is-empty) {
-        # Don't use Kobo unless we know the ISBN... or it will probably find something arbitrary and wrong instead of the actual book.
-        let result = $input | fetch_book_metadata --allowed-plugins ["Hardcover" "Wikidata"] $temporary_directory
-        if $result.opf == null {
-          {
-            book: $input
-            cover: null
-            opf: null
-          }
-        } else {
-          let original_title = $existing_metadata | title_from_metadata
-          let fetched_title = $result.opf | title_from_opf
-          if $fetched_title == $original_title {
-            $result
-          } else {
-            log warning $"The fetched title (ansi yellow)($fetched_title)(ansi reset) does not match the original title (ansi yellow)($original_title)(ansi reset). Ignoring metadata."
-            {
-              book: $input
-              cover: null
-              opf: null
-            }
-          }
-        }
+  # At this point, we should have an ISBN.
+  let hardcover_edition = (
+    if ($isbn | is-not-empty) and (($hardcover_edition_id | is-empty) or ($hardcover_book_slug | is-empty)) {
+      let editions = $isbn | hardcover_search_editions_by_exact_field isbn_13
+      if ($editions | is-empty) {
+        # No editions found.
+        log warning $"No Hardcover editions found for ISBN (ansi purple)($isbn)(ansi reset)"
+        null
+      } else if ($editions | length) == 1 {
+        $editions | first
       } else {
-        # todo output details of discovered metadata for verification
-        let result = $input | fetch_book_metadata --isbn $isbn $temporary_directory
-        if ($result.opf | is-empty) {
-          {
-            book: $input
-            cover: null
-            opf: null
-          }
+        log warning $"Multiple Hardcover editions found for the ISBN (ansi purple)($isbn)(ansi reset): ($editions). Filtering on digital editions."
+        # Reading format (1=Physical, 2=Audio, 3=Both, 4=Ebook)
+        let digital_editions = $editions | where reading_format_id == 4
+        if ($digital_editions | is-empty) {
+          log warning $"No Hardcover ebook editions found for ISBN (ansi purple)($isbn)(ansi reset)"
+          null
+        } else if ($digital_editions | length) == 1 {
+          $digital_editions | first
         } else {
-          let fetched_isbn = $result.opf | from_opf_xml | get --optional isbn
-          if ($fetched_isbn | is-empty) {
-            log warning "No ISBN in retrieved metadata!"
-            $result
-          } else if $fetched_isbn == $isbn {
-            $result
-          } else {
-            log info "Fetched ISBN doesn't match the ISBN used to search! Will attempt another search with only the Hardcover and Wikidata metadata sources"
-            let result = $input | fetch_book_metadata --allowed-plugins ["Hardcover" "Wikidata"] --isbn $isbn $temporary_directory
-            if $result.opf == null {
-              {
-                book: $input
-                cover: null
-                opf: null
-              }
-            } else {
-              let fetched_isbn = $result.opf | from_opf_xml | get --optional isbn
-              if $fetched_isbn == null or ($fetched_isbn | is-empty) {
-                log warning "No ISBN in retrieved metadata!"
-                $result
-              } else if $fetched_isbn == $isbn {
-                $result
-              } else {
-                log warning "No metadata found!"
-                {
-                  book: $input
-                  cover: null
-                  opf: null
-                }
-              }
-            }
-          }
+          log warning $"Multiple Hardcover ebook editions found for ISBN (ansi purple)($isbn)(ansi reset): ($digital_editions)"
+          null
         }
       }
-    )
-    | (
-      let input = $in;
-      log debug $"input: ($input)";
-      $input | update opf (
-        if ($input | get --optional opf | is-not-empty) and ($existing_metadata | get --optional opf | is-not-empty) {
-          # todo Should probably have a better way of merging metadata
-          $existing_metadata.opf | merge $input.opf
-        } else if ($input | get --optional opf | is-not-empty) {
-          $input.opf
-        } else if ($existing_metadata | get --optional opf | is-not-empty) {
-          $existing_metadata.opf
-        } else {
-          log error "No metadata!"
-        }
-      ) | update cover (
-        if ($cover | is-not-empty) {
-          $cover
-        } else {
-          $input.cover
-        }
-      )
-    )
-    | export_book_to_directory ($formats | get $output_format | path dirname)
-    | embed_book_metadata
+    } else {
+      # No ISBN, so not searching
+    }
   )
+  let hardcover_book_slug = (
+    if ($hardcover_book_slug | is-empty) {
+      if ($hardcover_edition | is-not-empty) {
+        $hardcover_edition.book.slug
+      }
+    } else {
+      $hardcover_book_slug
+    }
+  )
+  let hardcover_edition_id = (
+    if ($hardcover_edition_id | is-empty) {
+      if ($hardcover_edition | is-not-empty) {
+        $hardcover_edition.id | into string
+      }
+    } else {
+      $hardcover_edition_id
+    }
+  )
+
+
+  # Search for a BookBrainz edition by ISBN
+  let bookbrainz_edition_id = (
+    if ($isbn | is-empty) and ($bookbrainz_edition_id | is-not-empty) {
+      let editions = $isbn | bookbrainz_search_editions_by_isbn
+      if ($editions | is-empty) {
+        # No editions found.
+        log warning $"No BookBrainz editions found for ISBN (ansi purple)($isbn)(ansi reset)"
+        null
+      } else if ($editions | length) == 1 {
+        $editions | first
+      } else {
+        log warning $"Multiple BookBrainz editions found for the ISBN (ansi purple)($isbn)(ansi reset): ($editions). Filtering on ebooks."
+        # formatId 3 == ebook
+        let digital_editions = $editions | where formatId == 3
+        if ($digital_editions | is-empty) {
+          log warning $"No BookBrainz ebook editions found for ISBN (ansi purple)($isbn)(ansi reset)"
+          null
+        } else if ($digital_editions | length) == 1 {
+          $digital_editions | first
+        } else {
+          log warning $"Multiple BookBrainz ebook editions found for ISBN (ansi purple)($isbn)(ansi reset): ($digital_editions)"
+          null
+        }
+      }
+    } else {
+      $bookbrainz_edition_id
+    }
+  )
+
+  # Incorporate any missing identifiers from BookBrainz.
+  let bookbrainz_edition_identifiers = (
+    if ($bookbrainz_edition_identifiers | is-empty) and ($bookbrainz_edition_id | is-not-empty) and (($wikidata_edition_id | is-empty) or ($open_library_edition_id | is-empty)) {
+      $bookbrainz_edition_id | bookbrainz_get_edition_identifiers
+    } else {
+      $bookbrainz_edition_identifiers
+    }
+  )
+  let wikidata_edition_id = (
+    if ($wikidata_edition_id | is-empty) and ($bookbrainz_edition_identifiers | is-not-empty) {
+      let wikidata_edition_ids = $bookbrainz_edition_identifiers | where type == "Wikidata Edition ID"
+      if ($wikidata_edition_ids | is-empty) {
+        log warning $"No Wikidata Edition IDs found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset)"
+        null
+      } else if ($wikidata_edition_ids | length) == 1 {
+        $wikidata_edition_ids.value | first
+      } else {
+        log warning $"Multiple Wikidata Edition IDs found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset): ($wikidata_edition_ids.value)"
+        null
+      }
+    } else {
+      $wikidata_edition_id
+    }
+  )
+  let open_library_edition_id = (
+    if ($open_library_edition_id | is-empty) and ($bookbrainz_edition_identifiers | is-not-empty) {
+      let open_library_edition_ids = $bookbrainz_edition_identifiers | where type == "OpenLibrary Book ID"
+      if ($open_library_edition_ids | is-empty) {
+        log warning $"No OpenLibrary Book IDs found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset)"
+        null
+      } else if ($open_library_edition_ids | length) == 1 {
+        $open_library_edition_ids.value | first
+      } else {
+        log warning $"Multiple OpenLibrary Book IDs found for the BookBrainz edition (ansi purple)($bookbrainz_edition_id)(ansi reset): ($open_library_edition_ids.value)"
+        null
+      }
+    } else {
+      $open_library_edition_id
+    }
+  )
+
+  # Query Wikidata by ISBN if there is no Wikidata edition ID.
+  let wikidata_edition_id = (
+    if ($isbn | is-not-empty) and ($wikidata_edition_id | is-empty) {
+      let editions = $isbn | wikidata_search_editions_by_isbn
+      if ($editions | is-empty) {
+        # No editions found.
+        log warning $"No Wikidata editions found for ISBN (ansi purple)($isbn)(ansi reset)"
+        null
+      } else if ($editions | length) == 1 {
+        $editions | first
+      } else {
+        log warning $"Multiple Wikidata editions found for the ISBN (ansi purple)($isbn)(ansi reset): ($editions)"
+        null
+      }
+    } else {
+      $wikidata_edition_id
+    }
+  )
+
+  # Pull BookBrainz, Comic Vine, and Open Library identifiers from Wikidata.
+  let wikidata_edition_identifiers = (
+    if ($wikidata_edition_identifiers | is-empty) and ($wikidata_edition_id | is-not-empty) and (($isbn | is-empty) or ($bookbrainz_edition_id | is-empty) or ($open_library_edition_id | is-empty)) {
+      $wikidata_edition_id | wikidata_get_edition_identifiers
+    } else {
+      $wikidata_edition_identifiers
+    }
+  )
+  let isbn = (
+    if ($isbn | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let isbns = $wikidata_edition_identifiers | get --optional "ISBN-13"
+      if ($isbns | is-empty) {
+        log warning $"No ISBN-13s found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($isbns | length) == 1 {
+        $isbns | first
+      } else {
+        log warning $"Multiple ISBN-13s found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($isbns)"
+        null
+      }
+    } else {
+      $isbn
+    }
+  )
+  let bookbrainz_edition_id = (
+    if ($bookbrainz_edition_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let bookbrainz_edition_ids = $wikidata_edition_identifiers | get --optional "BookBrainz edition ID"
+      if ($bookbrainz_edition_ids | is-empty) {
+        log warning $"No BookBrainz edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($bookbrainz_edition_ids | length) == 1 {
+        $bookbrainz_edition_ids | first
+      } else {
+        log warning $"Multiple BookBrainz edition IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($bookbrainz_edition_ids)"
+        null
+      }
+    } else {
+      $bookbrainz_edition_id
+    }
+  )
+  let open_library_edition_id = (
+    if ($open_library_edition_id | is-empty) and ($wikidata_edition_identifiers | is-not-empty) {
+      let open_library_edition_ids = $wikidata_edition_identifiers | get --optional "Open Library ID"
+      if ($open_library_edition_ids | is-empty) {
+        log warning $"No OpenLibrary Book IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset)"
+        null
+      } else if ($open_library_edition_ids | length) == 1 {
+        $open_library_edition_ids | first
+      } else {
+        log warning $"Multiple OpenLibrary Book IDs found for the Wikidata edition (ansi purple)($wikidata_edition_id)(ansi reset): ($open_library_edition_ids)"
+        null
+      }
+    } else {
+      $open_library_edition_id
+    }
+  )
+
+  # Print final identifiers
+  log info $"(ansi green)Identifiers(ansi reset)"
+  if ($isbn | is-not-empty) {
+    log info $"(ansi green)ISBN(ansi reset): (ansi yellow)($isbn)(ansi reset)"
+  } else {
+    log warning $"Missing (ansi red)ISBN(ansi reset)"
+  }
+  if ($bookbrainz_edition_id | is-not-empty) {
+    log info $"(ansi green)BookBrainz edition ID(ansi reset): (ansi yellow)($bookbrainz_edition_id)(ansi reset)"
+  } else {
+    log warning $"Missing (ansi red)BookBrainz edition ID(ansi reset)"
+  }
+  if ($wikidata_edition_id | is-not-empty) {
+    log info $"(ansi green)Wikidata edition ID(ansi reset): (ansi yellow)($wikidata_edition_id)(ansi reset)"
+  } else {
+    log warning $"Missing (ansi red)Wikidata edition ID(ansi reset)"
+  }
+  if ($open_library_edition_id | is-not-empty) {
+    log info $"(ansi green)Open Library edition ID(ansi reset): (ansi yellow)($open_library_edition_id)(ansi reset)"
+  } else {
+    log warning $"Missing (ansi red)Open Library edition ID(ansi reset)"
+  }
+  if ($hardcover_book_slug | is-not-empty) {
+    log info $"(ansi green)Hardcover book slug(ansi reset): (ansi yellow)($hardcover_book_slug)(ansi reset)"
+  } else {
+    log warning $"Missing (ansi red)Hardcover book slug(ansi reset)"
+  }
+  if ($hardcover_edition_id | is-not-empty) {
+    log info $"(ansi green)Hardcover edition ID(ansi reset): (ansi yellow)($hardcover_edition_id)(ansi reset)"
+  } else {
+    log warning $"Missing (ansi red)Hardcover edition ID(ansi reset)"
+  }
+
+  let cache_function = {|type, id, update_function, filename_suffix|
+    let filename = (
+      if ($filename_suffix | is-not-empty) {
+        $"($id)_($filename_suffix).json"
+      } else {
+        $"($id).json"
+      }
+    )
+    let cached_file = [$cache_directory $type $filename] | path join
+    try {
+      let data = open $cached_file
+      if ($data | is-empty) {
+        rm $cached_file
+        error make {
+          msg: "empty cached file"
+          labels: [
+              {text: "cached_file" span: (metadata $cached_file).span}
+          ]
+          help: $"the empty ($cached_file) has been deleted. Try re-running."
+        }
+      }
+      # The integer duration must be converted to a Nushell duration when loading a release from a JSON file.
+      # if $type == "release" {
+      #   $data | update tracks (
+      #     $data.tracks | each {|track|
+      #       $track | update duration ($track.duration | into duration)
+      #     }
+      #   ) | (
+      #     let input = $in;
+      #     if "chapters" in $input.book {
+      #       $input | update book.chapters (
+      #         $input.book.chapters | each {|chapter|
+      #           $chapter | update start ($chapter.start | into duration) | update length ($chapter.length | into duration)
+      #         }
+      #       )
+      #     } else {
+      #       $input
+      #     }
+      #   )
+      # } else {
+        $data
+      # }
+    } catch {
+      let result = do $update_function $type $id
+      mkdir ($cached_file | path dirname)
+      if ($result | is-not-empty) {
+        $result | save --force $cached_file
+      } else {
+        error make {
+          msg: "empty or null result"
+          labels: [
+              {text: "result" span: (metadata $result).span}
+          ]
+          help: "try re-running when the service is available"
+        }
+      }
+      $result
+    }
+  }
+
+  log debug "Fetching metadata"
+  # todo Add support for getting metadata from BookBrainz.
+  # BookBrainz metadata
+  # Edition
+  # translated Works -> original Works
+  # Edition series preferred over Work Series
+
+  let tag_result = (
+    let data = $hardcover_edition_id | fetch_and_parse_hardcover_edition id $cache_function;
+    {
+      result: {
+        md: $data
+        status: "good_match"
+      }
+    }
+  )
+  log debug $"The Hardcover result is:\n(ansi green)($tag_result.result | to nuon)(ansi reset)\n"
+
+  # Get the genres from Wikidata
+  let wikidata_metadata = (
+    if ($wikidata_edition_id | is-not-empty) {
+      (
+        $wikidata_edition_id
+        | fetch_wikidata_edition_and_works_metadata $cache_function
+        | parse_wikidata_edition_and_works_metadata
+        | process_wikidata_edition_and_works_metadata "en" $cache_function
+      )
+    }
+  )
+  log debug $"The Wikidata metadata is:\n(ansi green)($wikidata_metadata | to nuon)(ansi reset)\n"
+
+  let comic_metadata = $tag_result.result.md
+  let comic_metadata = (
+    $comic_metadata
+    | merge $wikidata_metadata
+    # Prefer publishers from Hardcover over Wikidata for consistency.
+    | upsert publishers $comic_metadata.publishers
+  )
+  log debug $"The merged metadata is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
+
+  let form_subdirectory = (
+    if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
+      "light-novels"
+    } else {
+      # todo I should probably create a separate library for fiction and non-fiction.
+      "books"
+    }
+  )
+
+  # Embed the updated metadata in the ebook.
+  log info "Embedding the metadata in the ebook"
+  $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
+
+  log debug "Renaming the file according to its metadata"
+  let formats = (
+    $formats | update $output_format (
+      let previous_file_name = $formats | get $output_format;
+      let new_file_name = (
+        # todo Should normalized series naming be used?
+        # I'm thinking I'll just go with Hardcover's titles.
+        $previous_file_name | path parse | update stem (
+            # Kavita will assume that the issue number is a chapter for manga libraries.
+            # Add the letter v before the issue number instead of a hashtag so that it understands it is the volume number.
+            # Also, leave off the year and volume to avoid confusing Kavita.
+            # $"($comic_metadata.series) - Volume ($comic_metadata.issue | fill --alignment right --width 3 --character '0')" | use_unicode_in_title | sanitize_file_name
+            $comic_metadata.title | use_unicode_in_title | sanitize_file_name
+        )
+      ) | path join;
+      if $new_file_name != $previous_file_name {
+        mv --force $previous_file_name $new_file_name
+      };
+      $new_file_name
+    )
+  )
+  log debug "Renamed the file according to its metadata"
+
+  # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
+  let authors = (
+    let credits = $comic_metadata | get credits;
+    # todo Get actual primary creators from BookBrainz. This is too inaccurate.
+    let writers = $credits | where role in ["Writer"] | get person;
+    if ($writers | is-empty) {
+      let authors = $credits | where role in ["Artist" "Inker" "Penciller"] | get person;
+      if ($authors | is-empty) {
+        $credits | where role == "Other" | get person
+      } else {
+        $authors
+      } | sort | uniq
+    } else {
+      $writers | sort | uniq
+    }
+  )
+  if ($authors | is-empty) {
+    if not $keep_tmp {
+      rm --force --recursive $temporary_directory
+    }
+    return {
+      file: $original_file
+      error: "No authors found in Comic Vine metadata!"
+    }
+  }
+  log debug $"The authors are (ansi purple)'($authors)'(ansi reset)"
 
   let optimized_file_hashes = (
     try {
@@ -847,28 +1138,28 @@ def main [
       $optimized_file_hashes.sha256 | append (
         if $output_format == "epub" {
           # todo I might need to fix this to work with larger files
-          let hash = $book.book | open --raw | hash sha256
+          let hash = $formats | get $output_format | open --raw | hash sha256
           if $hash not-in $optimized_file_hashes.sha256 {
             log debug "Optimizing the EPUB"
-            $book.book | polish_epub | optimize_zip | open --raw | hash sha256
+            $formats | get $output_format | polish_epub | optimize_zip | open --raw | hash sha256
           }
         }
       ) | append (
         if $output_format == "pdf" {
-          let hash = $book.book | open --raw | hash sha256
+          let hash = $formats | get $output_format | open --raw | hash sha256
           if $hash not-in $optimized_file_hashes.sha256 {
             log debug "Optimizing the PDF"
             let pdf_optimization_directory = [$temporary_directory "pdf_optimization"] | path join
             let optimized_pdf = (
-              $book.book
+              $formats | get $output_format
               | optimize_pdf $pdf_optimization_directory
             )
             if ($optimized_pdf | is-not-empty) {
-              mv --force $optimized_pdf $book.book
+              mv --force $optimized_pdf ($formats | get $output_format)
               if not ($keep_tmp) {
                 rm --force --recursive $pdf_optimization_directory
               }
-              open --raw $book.book | hash sha256
+              open --raw ($formats | get $output_format) | hash sha256
             }
           }
         }
@@ -881,72 +1172,48 @@ def main [
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
 
-    # todo Function and test case for this.
-    let authors = (
-      $book.opf
-      | open
-      | from xml
-      | get content
-      | where tag == "metadata"
-      | first
-      | get content
-      | where tag == "creator"
-      | where attributes.role == "aut"
-      | par-each {|creator| $creator | get content | first | get content}
-      | str trim --char ','
-      | str trim
-      | where {|author| not ($author | is-empty)}
-      | sort
-    )
-    log debug $"Authors: ($authors)"
-
-    let series = (
-      $book.opf
-      | open
-      | from xml
-      | get content
-      | where tag == "metadata"
-      | first
-      | get content
-      | where tag == "meta"
-      | where attributes.name == "calibre:series"
-      | get attributes.content
-      | str trim
-      | where {|series| not ($series | is-empty)}
-    )
-    let series = (
-      if ($series | length) == 1 {
-        # todo Include series year in series folder name.
-        log debug $"Series: ($series | first)"
-        # $series | first | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
-        $series | first | use_unicode_in_title | sanitize_file_name | $in + $" [($output_format)]"
-      } else if ($series | length) > 1 {
-        log info $"Multiple series found in the metadata: (ansi yellow)($series)(ansi reset). Ignoring series."
-      } else {
-
-      }
-    )
-    # Remove disambiguation for light novels.
-    # todo Do this for the title as well.
-    let series = (
-      if ($series | is-empty) {
-      } else {
-        $series | str replace --all " (Light Novel)" ""
-      }
-    )
+  # todo How to handle nested series and subseries?
+  let series_subdirectory = (
+    # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
+    # Kavita dislikes multiple formats in the same directory.
+    # if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+    if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+      # Kavita doesn't like multiple formats being in the same directory.
+      (
+        $comic_metadata.series
+        | use_unicode_in_title
+        | sanitize_file_name
+        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
+      )
+    # Kavita needs series to be in their own directories.
+    # So, if this is a oneshot, put it in its own directory.
+    } else {
+      (
+        $formats
+        | get $output_format
+        | path parse
+        | get stem
+        | use_unicode_in_title
+        | sanitize_file_name
+        | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
+      )
+    }
+  )
 
     let authors_subdirectory = $authors | str join ", "
     let target_subdirectory = (
-      if ($series | is-empty) {
-        $authors_subdirectory
+      # If it is a oneshot, put it in its own subdirectory inside a directory for the author.
+      # todo Maybe I should just put these at the top-level as I do for comics?
+      if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+        [$authors_subdirectory $series_subdirectory] | path join
       } else {
-        $series
+        $series_subdirectory
       }
     )
-    let target_directory = [$destination $target_subdirectory] | path join
+    let target_directory = [$destination $form_subdirectory $target_subdirectory] | path join
     log debug $"Target directory: ($target_directory)"
     let target_destination = (
-      let components = $book.book | path parse;
+      let components = $formats | get $output_format | path parse;
       {
         parent: $target_directory
         stem: ($components.stem | use_unicode_in_title | sanitize_file_name)
@@ -954,62 +1221,32 @@ def main [
       } | path join
     )
     log debug $"Target destination: ($target_destination)"
-    # todo Remove sidecar opf.
-    let opf_target_destination = (
-      if $output_format == "pdf" {
-        let components = $book.book | path parse;
-        {
-          parent: $target_directory
-          stem: (($components.stem | use_unicode_in_title | sanitize_file_name) + "_metadata")
-          extension: "opf"
-        } | path join
-      }
-    )
-    let cover_target_destination = (
-      if $output_format == "pdf" {
-        let components = $book.book | path parse;
-        {
-          parent: $target_directory
-          stem: (($components.stem | use_unicode_in_title | sanitize_file_name) + "_cover")
-          extension: ($book.cover | path parse | get extension)
-        } | path join
-      }
-    )
+    # let cover_target_destination = (
+    #   if $output_format == "pdf" {
+    #     let components = $formats | get $output_format | path parse;
+    #     {
+    #       parent: $target_directory
+    #       stem: (($components.stem | use_unicode_in_title | sanitize_file_name) + "_cover")
+    #       extension: ($book.cover | path parse | get extension)
+    #     } | path join
+    #   }
+    # )
     if $skip_upload {
       mkdir $target_subdirectory
-      if $output_format == "pdf" {
-        mv $book.book $book.cover $book.opf $target_subdirectory
-      } else {
-        mv $book.book $target_subdirectory
-      }
+      mv ($formats | get $output_format) $target_subdirectory
     } else {
-      log info $"Uploading (ansi yellow)($book.book)(ansi reset) to (ansi yellow)($target_destination)(ansi reset)"
+      log info $"Uploading (ansi yellow)($formats | get $output_format)(ansi reset) to (ansi yellow)($target_destination)(ansi reset)"
       if $use_rsync {
-        $book.book | rsync $target_destination "--mkpath"
+        $formats | get $output_format | rsync $target_destination "--mkpath"
       } else {
-        $book.book | scp $target_destination --mkdir
-      }
-      if $output_format == "pdf" {
-        log info $"Uploading (ansi yellow)($book.opf)(ansi reset) to (ansi yellow)($opf_target_destination)(ansi reset)"
-        if $use_rsync {
-          $book.opf | rsync $target_destination "--mkpath"
-        } else {
-          $book.opf | scp $target_destination --mkdir
-        }
-        log info $"Uploading (ansi yellow)($book.cover)(ansi reset) to (ansi yellow)($cover_target_destination)(ansi reset)"
-        if $use_rsync {
-          $book.cover | rsync $target_destination "--mkpath"
-        } else {
-          $book.cover | scp $target_destination --mkdir
-        }
+        $formats | get $output_format | scp $target_destination --mkdir
       }
     }
 
     if not $keep {
       let uploaded_paths = (
         [$target_destination]
-        | append $cover_target_destination
-        | append $opf_target_destination
+        # | append $cover_target_destination
       )
       log debug $"Uploaded paths: ($uploaded_paths)"
       if ($original_file | is_ssh_path) {

@@ -44,7 +44,8 @@ def main [
   # --issue-year: string # The publication year of the issue
   --manga: string = "YesAndRightToLeft" # Whether the file is manga "Yes", right-to-left manga "YesAndRightToLeft", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
   --metron-issue-id: string # The issue id on Metron.
-  --destination: directory = "meerkat:/var/media/manga" # The directory under which to copy files. I have comics, manga, and manhwa subdirectories.
+  --form-subdirectory: directory # Directory below the destination in which to copy files. I have subdirectories for comics, manga, and manhwa. Wikidata is used to infer this where possible. Defaults to manga.
+  --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I have comics, manga, and manhwa subdirectories.
   # --series: string # The name of the series
   # --series-year: string # The initial publication year of the series, also referred to as the volume
   --skip-ocr # Don't attempt to parse the ISBN from images using OCR
@@ -929,7 +930,7 @@ def main [
       $isbn | str replace --all "-" ""
     }
   )
-  if $isbn != null {
+  if ($isbn | is-not-empty) {
     log debug $"The ISBN is (ansi purple)($isbn)(ansi reset)"
     if $isbn !~ '^[0-9]{13}$' {
       log error $"The ISBN (ansi purple)($isbn)(ansi reset) does not contain exactly 13 integers"
@@ -1416,6 +1417,25 @@ def main [
   )
   log debug $"The merged metadata is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
 
+  let form_subdirectory = (
+    if ($form_subdirectory | is-empty) {
+      # todo manfra?
+      if (["manga" "manga volume" "manga chapter" "yonkoma"] | any {|form| $form in ($comic_metadata | get --optional forms_of_creative_work)}) {
+        "manga"
+      } else if (["manhwa" "manhwa volume" "manhwa chapter"] | any {|form| $form in ($comic_metadata | get --optional forms_of_creative_work)}) {
+        "manhwa"
+      # "graphic novel" is a bit ambiguous.
+      } else if (["comic" "comic book" "comic book album" "comic strip"] | any {|form| $form in ($comic_metadata | get --optional forms_of_creative_work)}) {
+        "comics"
+      } else {
+        "manga"
+      }
+    } else {
+      # Default to manga.
+      "manga"
+    }
+  )
+
   # If the input format is EPUB, optimize the images before generating the CBZ.
   # This avoids optimizing the same images twice.
   let optimized_file_hashes = (
@@ -1889,7 +1909,6 @@ def main [
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
 
-  # Authors
   # todo How to handle nested series and subseries?
   let series_subdirectory = (
     # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
@@ -1918,7 +1937,7 @@ def main [
     }
   )
   let target_directory = (
-    [$destination]
+    [$destination $form_subdirectory]
     | append $series_subdirectory
     | path join
   )

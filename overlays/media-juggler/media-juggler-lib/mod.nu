@@ -140,17 +140,24 @@ export const intended_public_wikidata = [
 
 export const form_of_creative_work_wikidata = [
   [name wikidata_id];
+  ["comic" Q1004]
+  ["comic book" Q1760610]
+  ["comic book album" Q2831984]
+  ["comic strip" Q838795]
+  ["graphic novel" Q725377]
   ["light novel" Q747381]
-  [manhwa Q562214]
-  ["manhwa volume" Q137923899]
+  ["manfra" Q3285662]
   [manga Q8274]
   ["manga chapter" Q53460949]
   ["manga volume" Q125632018]
+  [manhwa Q562214]
+  ["manhwa volume" Q137923899]
   [novel Q8261]
   # todo [novellette ]
   [novella Q149537]
   ["short story" Q49084]
   ["short story collection" Q1279564]
+  ["yonkoma" Q865484]
 ]
 
 # Age rating map between the ComicInfo and MetronInfo schemas
@@ -503,6 +510,26 @@ export def standardize_title []: string -> string {
       $components | str join " Volume "
     } else {
       $components | str join ", Volume "
+    }
+  } else {
+    $title
+  }
+}
+
+# Remove the light novel disambiguation from the title and standardize the title
+#
+# This removes the (Light Novel) disambiguation comment since light novels are kept in a separate library on Kavita.
+# This basically ends up following the MusicBrainz style guidelines.
+export def standardize_hardcover_title []: string -> string {
+  let title = $in
+  # We don't want to replace the "-" before the volume part with an emdash or endash.
+  let components = $title | split row --number 2 " (Light Novel), "
+  if ($components | length) > 1 {
+    # If the title of the series ends with punctuation, don't add a comma.
+    if ($components | first | split chars | last) in ["!", "?", ".", ","] {
+      $components | str join " "
+    } else {
+      $components | str join ", "
     }
   } else {
     $title
@@ -1010,6 +1037,20 @@ export def extract_file_from_archive [
     return null
   }
   [$working_directory $file] | path join
+}
+
+# Add or update a file in a zip archive
+export def add_file_to_archive [
+  file: path # The file to add or update in the archive.
+]: path -> path {
+  let archive = $in
+  log debug $"Running ^zip ($archive) ($file)"
+  let result = do {^zip $archive $file} | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^zip \"($archive)\" \"($file)\"(ansi reset)\n($result.stderr)\n"
+    return null
+  }
+  $archive
 }
 
 # Combine a list of audio files into a single M4B file with m4b-tool
@@ -2598,6 +2639,344 @@ export def hardcover_cover_art_url [
   }
 }
 
+# Get metadata for an edition on Hardcover by Hardcover edition id or another identifier.
+#
+# Requires the environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN be set to a Hardcover API key.
+export def get_hardcover_edition [
+  type: string # The identifier or field type, which is can be one of asin, isbn_10, isbn_13, id (which is the Hardcover edition ID)
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> record] {
+  let id = $in | str replace --all "-" ""
+  if ($env | get --optional MEDIA_JUGGLER_HARDCOVER_API_TOKEN | is-empty) {
+    log error "The environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN must be set to a Hardcover API key to search by ISBN."
+    return null
+  }
+  let token = (
+    if ($env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN | str starts-with "Bearer ") {
+      $env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN
+    } else {
+      "Bearer " + $env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN
+    }
+  )
+  # Reading format (1=Physical, 2=Audio, 3=Both, 4=Ebook)
+  let graphql_query = {
+    "query": $"query {
+      editions\(where: { ($type): { _eq: \"($id)\" } } ) {
+        id
+        canonical_id
+        title
+        isbn_13
+        language {
+          code2
+          code3
+          id
+          language
+        }
+        release_date
+        image {
+          id
+          height
+          width
+          ratio
+          url
+        }
+        edition_format
+        reading_format {
+          id
+          format
+        }
+        pages
+        audio_seconds
+        book_mappings {
+          id
+          external_id
+          platform_id
+        }
+        publisher { name }
+        book {
+          book_characters {
+            name
+            canonical_id
+          }
+          contributions {
+            author {
+              name
+              canonical_id
+              id
+            }
+            contribution
+          }
+          description
+          literary_type_id
+          book_category_id
+          slug
+          taggings {
+            id
+            tag {
+              id
+              tag
+              tag_category {
+                id
+              }
+              tag_category_id
+              slug
+            }
+          }
+          featured_book_series {
+            id
+            featured
+            details
+            position
+            series_id
+            series {
+              canonical_id
+              name
+              books_count
+              book_series {
+                release_year
+              }
+            }
+          }
+        }
+      }
+    }"
+  }
+
+  let update_function = {|type id|
+    let request = {
+      (
+        http post
+          --content-type "application/json"
+          --full
+          --headers {
+            "User-Agent": $user_agent
+            Authorization: $token
+          }
+          "https://api.hardcover.app/v1/graphql" $graphql_query
+      )
+    }
+
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Hardcover edition by ($type) ($id) from (ansi yellow)($hardcover_api_url)(ansi reset): ($error.debug)"
+        log error $"GraphQL query:\n(ansi yellow)($graphql_query | to json)(ansi reset)\n"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) searching for Hardcover editions with ($type) ($id) with GraphQL query ($graphql_query) at (ansi yellow)($hardcover_api_url)(ansi reset): ($response.body)"
+      return null
+    }
+    let editions = $response.body | get --optional data.editions
+    if ($editions | is-empty) {
+
+    } else if ($editions | length) > 1 {
+      log error $"Multiple Hardcover editions found for ($type) ID ($id): ($editions)"
+    } else {
+      $editions | first
+    }
+  }
+  (do $cache "hardcover-edition" $"($type)-($id)" $update_function null)
+}
+
+# Parse the data from the Hardcover API for a Harcover edition
+export def parse_hardcover_edition []: [record -> record] {
+  let hardcover_edition = $in
+  if ($hardcover_edition | is-empty) {
+    return null
+  }
+
+  let series_begin_year = (
+    let years = $hardcover_edition | get --optional book.featured_book_series.series.book_series.book.release_year;
+    if ($years | is-empty) {
+
+    } else {
+      $years | into int | sort | first
+    }
+  )
+
+  let language = (
+    let language_code = $hardcover_edition | get --optional language.code3;
+    if ($language_code | is-not-empty) {
+      if ($language_code | str length) == 2 {
+        $language_code | from_language_code # iso_639_1
+      } else if ($language_code | str length) == 3 {
+        $language_code | from_language_code # iso_639_3
+      } else {
+        # todo Support type parameter in from_language_code
+        # $language_code | from_language_code ietf_bcp_47
+      }
+    }
+  )
+
+  let ids = $hardcover_edition | get --optional book_mappings.external_id
+  let platform_id_mappings = [
+    # platform_id
+    # 3 -> Open Library
+    # 1 -> Goodreads
+    # 20 -> Google Books
+    [platform id];
+    # [goodreads_edition_id 1]
+    [open_library_edition_id 3]
+  ]
+  let ids = (
+    [
+      [type id];
+      [hardcover_book_slug $hardcover_edition.book.slug]
+      [hardcover_edition_id $hardcover_edition.canonical_id]
+    ] | append (
+      $hardcover_edition | get --optional book_mappings | reduce --fold [] {|book_mapping acc|
+        let platform_id_mapping =  $platform_id_mappings | where id == $book_mapping.platform_id
+        if ($platform_id_mapping | is-empty) {
+          $acc
+        } else if ($platform_id_mapping | length) > 1 {
+          log error $"Multiple platform id mappings for id ($book_mapping.platform_id). Ignoring."
+          $acc
+        } else {
+          $acc | append (
+            [
+              [type id];
+              [$platform_id_mapping.platform ($book_mapping.external_id | str replace "/books/" "")]
+            ]
+          )
+        }
+      }
+    )
+    # | where {|it| $it.id | is-not-empty }
+  );
+
+  let authors = $hardcover_edition | get --optional book.contributions.author.name
+  # Rewrite credits to match ComicTagger's format.
+  #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
+  let credits = (
+    $hardcover_edition.book.contributions | reduce --fold [] {|contribution credits_acc|
+      let role = (
+        if ($contribution | get --optional contribution | is-empty) {
+          "Writer"
+        } else if $contribution.contribution == "Illustrator" {
+          "Artist"
+        } else {
+          $contribution.contribution
+        }
+      )
+      $credits_acc | append (
+        $contribution.author | reduce --fold $credits_acc {|author inner_acc|
+          [
+            [person id role primary language];
+            [$author.name $author.canonical_id $role false ""]
+          ]
+        }
+      )
+    }
+    # todo Should "Cover Artist" be separate Cover and Artist roles?
+  );
+
+  let hardcover_book_category_map = {
+    0: "unknown"
+    1: "book"
+    2: "novella"
+    3: "short story"
+    4: "graphic novel"
+    5: "fan fiction"
+    6: "research paper"
+    7: "poetry"
+    8: "collection"
+    9: "web novel"
+    10: "light novel"
+  }
+  let book_category = (
+    if ($hardcover_edition | get --optional book.book_category_id | is-empty) {
+    } else {
+      $hardcover_book_category_map | get ($hardcover_edition.book.book_category_id | into string)
+    }
+  )
+
+  let hardcover_literary_type_map = {
+    0: "unknown"
+    1: "fiction"
+    2: "nonfiction"
+  }
+  let literary_type = (
+    if ($hardcover_edition | get --optional book.literary_type_id | is-empty) {
+    } else {
+      $hardcover_literary_type_map | get ($hardcover_edition.book.literary_type_id | into string)
+    }
+  )
+
+  {
+    result: {
+      md: {
+        issue: ($hardcover_edition | get --optional book.featured_book_series.position)
+        series: ($hardcover_edition | get --optional book.featured_book_series.series.name | standardize_hardcover_title | use_unicode_in_title)
+        title: (
+          if ($hardcover_edition | get --optional title | is-not-empty) {
+            # todo Drop , after punctuation
+            $hardcover_edition.title | standardize_hardcover_title | use_unicode_in_title
+          }
+        )
+        description: $hardcover_edition.book.description
+        # todo Get start year of first book in series
+        volume: $series_begin_year
+        issue_count: ($hardcover_edition | get --optional book.featured_book_series.series.books_count)
+        ids: $ids
+        isbn: ($hardcover_edition | get --optional isbn_13)
+        characters: ($hardcover_edition.book.book_characters | rename canonical_id id | select --optional name id)
+        language: $language
+        # Use the forms_of_creative_work field for compatibility with Wikidata.
+        forms_of_creative_work: [$book_category]
+        literary_type: $literary_type
+        # Default the age rating to PG.
+        # comic_info_age_rating: "PG"
+        # manga: $manga
+        genres: []
+        tags: []
+        publication_date: ($hardcover_edition | get --optional release_date)
+        # $volume_data.description
+        publishers: [($hardcover_edition | get --optional publisher.name)]
+        # $data.store_date
+        # $data.cover_date
+        credits: $credits
+        series_id: ($hardcover_edition | get --optional book.featured_book_series.series.canonical_id)
+        _cover_image: [0, "", ($hardcover_edition | get --optional image.url)]
+      }
+      status: "good_match"
+    }
+  }
+}
+
+# Get metadata for an edition on Hardcover by Hardcover edition id or another identifier.
+#
+# Requires the environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN be set to a Hardcover API key.
+export def fetch_and_parse_hardcover_edition [
+  type: string # The identifier or field type, which is can be one of asin, isbn_10, isbn_13, id (which is the Hardcover edition ID)
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> record] {
+  let id = $in | str replace --all "-" ""
+  if ($env | get --optional MEDIA_JUGGLER_HARDCOVER_API_TOKEN | is-empty) {
+    log error "The environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN must be set to a Hardcover API key to search by ISBN."
+    return null
+  }
+  let token = (
+    if ($env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN | str starts-with "Bearer ") {
+      $env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN
+    } else {
+      "Bearer " + $env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN
+    }
+  )
+
+  let edition_response = $id | get_hardcover_edition $type $cache --retries $retries --retry-delay $retry_delay
+  if ($edition_response | is-empty) {
+    return null
+  }
+  $edition_response | parse_hardcover_edition
+}
+
 # Hyphenate an ISBN with the isbn_mask program from isbntools
 export def hyphenate_isbn []: [string -> string] {
   let isbn = $in
@@ -4087,9 +4466,9 @@ export def extract_ebook_metadata [
 ] {
   let file = $in
   let file_type = $file | path parse | get extension | str downcase
-  # todo Eventually support MetronInfo.xml.
   let metadata = (
     if $file_type == "cbz" {
+      # todo Eventually support MetronInfo.xml.
       let metadata_file = $file | extract_file_from_archive "ComicInfo.xml" $working_directory
       let metadata = (
         if ($metadata_file | is-not-empty) {
@@ -4117,8 +4496,16 @@ export def extract_ebook_metadata [
       # ^exiftool -json $file | from json | first
       let metadata_file = mktemp
       log debug $"Running (ansi yellow)^ebook-meta --to-opf '($metadata_file)' ($file)(ansi reset)"
-      # todo Check command's exit code.
-      ^ebook-meta --to-opf $metadata_file $file
+      let result = do { ^ebook-meta --to-opf $metadata_file $file } | complete
+      if ($result.exit_code != 0) {
+        error make {
+          msg: "non-zero exit code while saving ebook metadata from PDF to OPF file with ebook-meta"
+          labels: [
+            {text: "result.exit_code" span: (metadata $result.exit_code).span}
+          ]
+          help: $"error extracting the OPF metadata to the file (ansi yellow)($metadata_file)(ansi reset) from the PDF file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+        }
+      }
       let metadata = (
         open $metadata_file | from xml
       )
@@ -4134,6 +4521,75 @@ export def extract_ebook_metadata [
       $metadata | from_opf_xml
     }
   }
+}
+
+# Embed metadata in an ebook
+#
+# Supports cbz, epub, and pdf file formats.
+export def embed_ebook_metadata [
+  file: path # The file in which to embed the OPF metadata
+  working_directory: directory
+  # todo Support embedding a cover.
+  # --cover: path # Cover file to embed in the ebook.
+]: [record -> path] {
+  let book_metadata = $in
+  let file_type = $file | path parse | get extension | str downcase
+
+  let metadata = (
+    if $file_type == "cbz" {
+      # todo Support MetronInfo
+      {
+        archive: $file
+        comic_info: ($book_metadata | into_comic_info_xml)
+      } | inject_comic_info
+    } else if $file_type == "epub" {
+      let opf_file = $file | find_opf_in_epub
+      if ($opf_file | is-empty) {
+        log error $"No OPF file found in (ansi yellow)($file)(ansi reset)"
+        return null
+      }
+      let metadata_file = $file | extract_file_from_archive $opf_file $working_directory
+      let metadata = (
+        if ($metadata_file | is-not-empty) {
+          open $metadata_file | from xml
+        }
+      )
+      let metadata = (
+        $metadata
+        # Drop the existing metadata section in the OPF.
+        | update content ($metadata.content | where tag != metadata)
+        | merge ($book_metadata | to_opf_xml)
+      )
+      $metadata | save --force $metadata_file
+      cd $working_directory
+      let result = ($file | add_file_to_archive ($metadata_file | path relative-to $working_directory))
+      cd -
+      if ($result | is-empty) {
+        log error $"Error adding the file (ansi yellow)($metadata_file | path relative-to $working_directory)(ansi reset) to the EPUB (ansi yellow)($file)(ansi reset) while in the directory (ansi yellow)($working_directory)(ansi reset)"
+        return null
+      }
+      rm $metadata_file
+    } else if $file_type == "pdf" {
+      # To get the identifiers from the PDF, we need to use ebook-meta instead of exiftool.
+      # ^exiftool -json $file | from json | first
+      let opf_file = mktemp --suffix .opf
+      $book_metadata | to_opf_xml | save --force $opf_file
+      # log debug $"Running (ansi yellow)^ebook-meta --to-opf '($metadata_file)' ($file)(ansi reset)"
+      log debug $"Running (ansi yellow)^ebook-meta '($file)' --from-opf '($opf_file)'(ansi reset)"
+      let result = do { ^ebook-meta $file --from-opf $opf_file } | complete
+      if ($result.exit_code != 0) {
+        error make {
+          msg: "non-zero exit code while embedding ebook metadata in PDF with ebook-meta"
+          labels: [
+            {text: "result.exit_code" span: (metadata $result.exit_code).span}
+          ]
+          help: $"error embedding the ebook metadata opf file (ansi yellow)($opf_file)(ansi reset) in the PDF file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+        }
+      }
+      rm $opf_file
+    }
+  )
+  $file
 }
 
 # Convert the internal data structure for a comic to a ComicInfo.xml
@@ -4330,14 +4786,6 @@ export def into_comic_info_xml []: [record -> record] {
   }
   # log debug $"Comic info: ($comic_info_xml | to nuon)"
   $comic_info_xml
-}
-
-# Convert metadata into the metadata object of the OPF XML format used by EPUBs
-#
-# This format can then be used to update the content.opf or package.opf file in an EPUB.
-export def into_metadata_opf_xml []: [record -> record] {
-  let opf = $in
-  # todo
 }
 
 # Search for editions on Wikidata by ISBN-13.
@@ -6119,34 +6567,6 @@ export def export_book_to_directory [
     opf: $opf
     cover: $cover
   }
-}
-
-# todo Pass around opf as metadata instead of a file path.
-export def embed_book_metadata []: [
-  record<book: path, cover: path, opf: path> -> record<book: path, cover: path, opf: path>
-] {
-  let input = $in
-
-  # let new_cover_file = mktemp
-  # ^ebook-meta --get-cover $new_cover_file $input.book
-  # let new_cover_file = $new_cover_file | rename_image_with_extension
-  # log debug $"pre ebook-meta cover file: ($new_cover_file) ($new_cover_file | get_image_dimensions)"
-  # rm $new_cover_file
-
-  let book_format = ($input.book | path parse | get extension)
-  if $book_format in ["epub" "pdf"] {
-    # log debug $"input.cover: ($input.cover) ($input.cover | get_image_dimensions)"
-    log debug $"Running (ansi yellow)^ebook-meta '($input.book)' --cover '($input.cover)' --from-opf '($input.opf)'(ansi reset)"
-    ^ebook-meta $input.book --cover $input.cover --from-opf $input.opf
-  }
-
-  # let new_cover_file = mktemp
-  # ^ebook-meta --get-cover $new_cover_file $input.book
-  # let new_cover_file = $new_cover_file | rename_image_with_extension
-  # log debug $"updated_cover_file: ($new_cover_file) ($new_cover_file | get_image_dimensions)"
-  # rm $new_cover_file
-
-  $input
 }
 
 # Convert a copy for my primary e-reader:
