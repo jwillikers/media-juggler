@@ -5161,9 +5161,59 @@ def test_artist_credit_to_string [] {
   test_artist_credit_to_string_bakemonogatari_part_01
 }
 
+def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
+  let input = (
+    open ([$test_data_dir "tsukimichi-volume-1-ebook-edition-hardcover.json"] | path join)
+  )
+  let expected = {
+    issue: 1
+    series: "Tsukimichi: Moonlit Fantasy"
+    title: "Tsukimichi: Moonlit Fantasy, Vol. 1"
+    description: "Makoto Misumi..."
+    volume: 2013
+    issue_count: 21
+    ids: [
+      [type, id];
+      [hardcover_book_slug, "tsukimichi-moonlit-fantasy-light-novel-vol-1"]
+      [hardcover_edition_id, 32336811]
+      [open_library_edition_id, "OL62344989M"]
+    ]
+    isbn: "9781961788145"
+    characters: null
+    language: "english"
+    forms_of_creative_work: ["light novel"]
+    literary_type: "fiction"
+    genres: []
+    tags: []
+    publication_date: "2024-03-30"
+    publishers: ["Hanashi Media"]
+    credits: [
+      [person, id, role, primary, language];
+      ["Kei Azumi", 1221140, Writer, false, ""]
+      ["Mitsuaki Matsumoto", 1221151, Artist, false, ""]
+      ["Mitsuaki Matsumoto", 1221151, "Cover Artist", false, ""]
+      ["Mittt Liu", 724696, Translator, false, ""]
+      ["Jasmine Thone", 1251809, Editor, false, ""]
+    ]
+    series_id: 202585
+    _cover_image: [
+      0
+      ""
+      "https://assets.hardcover.app/edition/32336811/0b805f28-8f88-411b-ae96-3ab83e5b9d69.jpg"
+    ]
+  }
+  log debug $"parsed hardcover edition: ($input | parse_hardcover_edition | to nuon)"
+  assert equal ($input | parse_hardcover_edition) $expected
+}
+
+def test_parse_hardcover_edition [] {
+  test_parse_hardcover_edition_tsukimichi_volume_1
+}
+
 def main [] {
   test_upsert_if_present
   test_upsert_if_value
+  test_parse_hardcover_edition
   test_round_to_second_using_cumulative_offset
   test_combine_chapter_parts
   test_artist_credit_to_string

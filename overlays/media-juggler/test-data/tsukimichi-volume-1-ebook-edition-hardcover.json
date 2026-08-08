@@ -1,0 +1,406 @@
+{
+  "id": 32336811,
+  "canonical_id": null,
+  "title": "Tsukimichi: Moonlit Fantasy (Light Novel), Vol. 1",
+  "isbn_13": "9781961788145",
+  "language": {
+    "code2": "en",
+    "code3": "eng",
+    "id": 1,
+    "language": "English"
+  },
+  "release_date": "2024-03-30",
+  "image": {
+    "id": 7294342,
+    "height": 2061,
+    "width": 1400,
+    "ratio": 0,
+    "url": "https://assets.hardcover.app/edition/32336811/0b805f28-8f88-411b-ae96-3ab83e5b9d69.jpg"
+  },
+  "edition_format": null,
+  "reading_format": {
+    "id": 4,
+    "format": "Ebook"
+  },
+  "pages": 221,
+  "audio_seconds": null,
+  "book_mappings": [
+    {
+      "id": 13193718,
+      "external_id": "/books/OL62344989M",
+      "platform_id": 3
+    },
+    {
+      "id": 11187324,
+      "external_id": "209478405",
+      "platform_id": 1
+    },
+    {
+      "id": 11317987,
+      "external_id": "210582155",
+      "platform_id": 1
+    },
+    {
+      "id": 11317986,
+      "external_id": "iez3EAAAQBAJ",
+      "platform_id": 20
+    }
+  ],
+  "publisher": {
+    "name": "Hanashi Media"
+  },
+  "book": {
+    "book_characters": [],
+    "contributions": [
+      {
+        "author": {
+          "name": "Kei Azumi",
+          "canonical_id": null,
+          "id": 1221140
+        },
+        "contribution": null
+      },
+      {
+        "author": {
+          "name": "Mitsuaki Matsumoto",
+          "canonical_id": null,
+          "id": 1221151
+        },
+        "contribution": "Illustrator"
+      },
+      {
+        "author": {
+          "name": "Mitsuaki Matsumoto",
+          "canonical_id": null,
+          "id": 1221151
+        },
+        "contribution": "Cover Artist"
+      },
+      {
+        "author": {
+          "name": "Mittt Liu",
+          "canonical_id": null,
+          "id": 724696
+        },
+        "contribution": "Translator"
+      },
+      {
+        "author": {
+          "name": "Jasmine Thone",
+          "canonical_id": null,
+          "id": 1251809
+        },
+        "contribution": "Editor"
+      }
+    ],
+    "description": "Makoto Misumi...",
+    "literary_type_id": 1,
+    "book_category_id": 10,
+    "slug": "tsukimichi-moonlit-fantasy-light-novel-vol-1",
+    "taggings": [
+      {
+        "id": 2713497,
+        "tag": {
+          "id": 3451,
+          "tag": "Young Adult Fiction",
+          "tag_category": {
+            "id": 1
+          },
+          "tag_category_id": 1,
+          "slug": "young-adult-fiction"
+        }
+      },
+      {
+        "id": 2713498,
+        "tag": {
+          "id": 2,
+          "tag": "Fantasy",
+          "tag_category": {
+            "id": 1
+          },
+          "tag_category_id": 1,
+          "slug": "fantasy"
+        }
+      },
+      {
+        "id": 2713499,
+        "tag": {
+          "id": 20,
+          "tag": "Comics",
+          "tag_category": {
+            "id": 1
+          },
+          "tag_category_id": 1,
+          "slug": "comics"
+        }
+      },
+      {
+        "id": 2713500,
+        "tag": {
+          "id": 4,
+          "tag": "Adventure",
+          "tag_category": {
+            "id": 1
+          },
+          "tag_category_id": 1,
+          "slug": "adventure"
+        }
+      },
+      {
+        "id": 2723814,
+        "tag": {
+          "id": 2,
+          "tag": "Fantasy",
+          "tag_category": {
+            "id": 1
+          },
+          "tag_category_id": 1,
+          "slug": "fantasy"
+        }
+      },
+      {
+        "id": 2723815,
+        "tag": {
+          "id": 2196,
+          "tag": "Isekai",
+          "tag_category": {
+            "id": 1
+          },
+          "tag_category_id": 1,
+          "slug": "isekai-285101a4-3939-4b44-b5a5-89e1017a0731"
+        }
+      },
+      {
+        "id": 4330691,
+        "tag": {
+          "id": 2196,
+          "tag": "Isekai",
+          "tag_category": {
+            "id": 1
+          },
+          "tag_category_id": 1,
+          "slug": "isekai-285101a4-3939-4b44-b5a5-89e1017a0731"
+        }
+      }
+    ],
+    "featured_book_series": {
+      "id": 857644,
+      "featured": true,
+      "details": "1",
+      "position": 1,
+      "series_id": 202585,
+      "series": {
+        "canonical_id": null,
+        "name": "Tsukimichi: Moonlit Fantasy (Light Novel)",
+        "books_count": 21,
+        "book_series": [
+          {
+            "book": {
+              "release_year": 2016
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2016
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2018
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          },
+          {
+            "book": {
+              "release_year": 2013
+            }
+          },
+          {
+            "book": {
+              "release_year": 2014
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          },
+          {
+            "book": {
+              "release_year": 2018
+            }
+          },
+          {
+            "book": {
+              "release_year": 2023
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          },
+          {
+            "book": {
+              "release_year": 2025
+            }
+          },
+          {
+            "book": {
+              "release_year": 2016
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2026
+            }
+          },
+          {
+            "book": {
+              "release_year": 2026
+            }
+          },
+          {
+            "book": {
+              "release_year": 2021
+            }
+          },
+          {
+            "book": {
+              "release_year": 2022
+            }
+          },
+          {
+            "book": {
+              "release_year": 2024
+            }
+          },
+          {
+            "book": {
+              "release_year": 2021
+            }
+          },
+          {
+            "book": {
+              "release_year": 2016
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          },
+          {
+            "book": {
+              "release_year": 2014
+            }
+          },
+          {
+            "book": {
+              "release_year": 2014
+            }
+          },
+          {
+            "book": {
+              "release_year": 2013
+            }
+          },
+          {
+            "book": {
+              "release_year": 2013
+            }
+          },
+          {
+            "book": {
+              "release_year": 2014
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          },
+          {
+            "book": {
+              "release_year": 2026
+            }
+          },
+          {
+            "book": {
+              "release_year": 2014
+            }
+          },
+          {
+            "book": {
+              "release_year": 2014
+            }
+          },
+          {
+            "book": {
+              "release_year": 2015
+            }
+          }
+        ]
+      }
+    }
+  }
+}

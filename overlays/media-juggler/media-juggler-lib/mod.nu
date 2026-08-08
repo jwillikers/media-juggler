@@ -283,6 +283,8 @@ export const opf_identifier_schemes = [
   # [[COMICVINE-VOLUME] comic_vine_volume_id]
   [[BOOKBRAINZ-EDITION] bookbrainz_edition_id]
   [[WIKIDATA-EDITION] wikidata_item_id]
+  [[OPENLIBRARY OPENLIBRARY-EDITION] open_library_edition_id]
+  [[OPENLIBRARY-WORK] open_library_work_id]
   # [ISBN isbn]
   # [STORYGRAPH storygraph_edition_id]
   # [GOOGLE google_books_id]
@@ -2643,7 +2645,7 @@ export def hardcover_cover_art_url [
 #
 # Requires the environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN be set to a Hardcover API key.
 export def get_hardcover_edition [
-  type: string # The identifier or field type, which is can be one of asin, isbn_10, isbn_13, id (which is the Hardcover edition ID)
+  id_type: string # The identifier or field type, which is can be one of asin, isbn_10, isbn_13, id (which is the Hardcover edition ID)
   cache: closure
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
@@ -2663,7 +2665,7 @@ export def get_hardcover_edition [
   # Reading format (1=Physical, 2=Audio, 3=Both, 4=Ebook)
   let graphql_query = {
     "query": $"query {
-      editions\(where: { ($type): { _eq: \"($id)\" } } ) {
+      editions\(where: { ($id_type): { _eq: \"($id)\" } } ) {
         id
         canonical_id
         title
@@ -2697,8 +2699,11 @@ export def get_hardcover_edition [
         publisher { name }
         book {
           book_characters {
-            name
-            canonical_id
+            character {
+              name
+              canonical_id
+              id
+            }
           }
           contributions {
             author {
@@ -2731,11 +2736,14 @@ export def get_hardcover_edition [
             position
             series_id
             series {
+              id
               canonical_id
               name
               books_count
               book_series {
-                release_year
+                book {
+                  release_year
+                }
               }
             }
           }
@@ -2762,30 +2770,31 @@ export def get_hardcover_edition [
       try {
         retry_http $request $retries $retry_delay
       } catch {|error|
-        log error $"Error getting Hardcover edition by ($type) ($id) from (ansi yellow)($hardcover_api_url)(ansi reset): ($error.debug)"
+        log error $"Error getting Hardcover edition by ($id_type) ($id) from (ansi yellow)($hardcover_api_url)(ansi reset): ($error.debug)"
         log error $"GraphQL query:\n(ansi yellow)($graphql_query | to json)(ansi reset)\n"
         return null
       }
     )
     if ($response.status != 200) {
-      log error $"HTTP error (ansi red)($response.status)(ansi reset) searching for Hardcover editions with ($type) ($id) with GraphQL query ($graphql_query) at (ansi yellow)($hardcover_api_url)(ansi reset): ($response.body)"
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) searching for Hardcover editions with ($id_type) ($id) with GraphQL query ($graphql_query) at (ansi yellow)($hardcover_api_url)(ansi reset): ($response.body)"
       return null
     }
     let editions = $response.body | get --optional data.editions
     if ($editions | is-empty) {
 
     } else if ($editions | length) > 1 {
-      log error $"Multiple Hardcover editions found for ($type) ID ($id): ($editions)"
+      log error $"Multiple Hardcover editions found for ($id_type) ID ($id): ($editions)"
     } else {
       $editions | first
     }
   }
-  (do $cache "hardcover-edition" $"($type)-($id)" $update_function null)
+  do $cache "hardcover-edition" $"($id_type)-($id)" $update_function null
 }
 
 # Parse the data from the Hardcover API for a Harcover edition
 export def parse_hardcover_edition []: [record -> record] {
   let hardcover_edition = $in
+  # log debug $"hardcover_edition: ($hardcover_edition)"
   if ($hardcover_edition | is-empty) {
     return null
   }
@@ -2827,7 +2836,7 @@ export def parse_hardcover_edition []: [record -> record] {
     [
       [type id];
       [hardcover_book_slug $hardcover_edition.book.slug]
-      [hardcover_edition_id $hardcover_edition.canonical_id]
+      [hardcover_edition_id $hardcover_edition.id]
     ] | append (
       $hardcover_edition | get --optional book_mappings | reduce --fold [] {|book_mapping acc|
         let platform_id_mapping =  $platform_id_mappings | where id == $book_mapping.platform_id
@@ -2837,43 +2846,48 @@ export def parse_hardcover_edition []: [record -> record] {
           log error $"Multiple platform id mappings for id ($book_mapping.platform_id). Ignoring."
           $acc
         } else {
-          $acc | append (
-            [
-              [type id];
-              [$platform_id_mapping.platform ($book_mapping.external_id | str replace "/books/" "")]
-            ]
-          )
+          let platform_id_mapping =  $platform_id_mapping | first
+          $acc | append [
+            [type id];
+            [$platform_id_mapping.platform ($book_mapping.external_id | str replace "/books/" "")]
+          ]
         }
       }
     )
     # | where {|it| $it.id | is-not-empty }
   );
 
-  let authors = $hardcover_edition | get --optional book.contributions.author.name
   # Rewrite credits to match ComicTagger's format.
   #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
   let credits = (
-    $hardcover_edition.book.contributions | reduce --fold [] {|contribution credits_acc|
+    $hardcover_edition.book.contributions | reduce --fold [] {|contribution acc|
       let role = (
         if ($contribution | get --optional contribution | is-empty) {
           "Writer"
         } else if $contribution.contribution == "Illustrator" {
           "Artist"
+        # } else if $contribution.contribution == "Cover Artist" {
+          # Cover Artist ends up becoming two credits for both Cover and Artist to match Comic Vine.
+          # "Artist"
         } else {
           $contribution.contribution
         }
       )
-      $credits_acc | append (
-        $contribution.author | reduce --fold $credits_acc {|author inner_acc|
-          [
-            [person id role primary language];
-            [$author.name $author.canonical_id $role false ""]
-          ]
-        }
-      )
+      $acc | append [
+        [person id role primary language];
+        [$contribution.author.name $contribution.author.id $role false ""]
+      ] | uniq
+      # ] | append (
+      #   if $contribution.contribution == "Cover Artist" {
+      #     [
+      #       [person id role primary language];
+      #       [$contribution.author.name $contribution.author.id "Cover" false ""]
+      #     ]
+      #   }
+      # )
     }
     # todo Should "Cover Artist" be separate Cover and Artist roles?
-  );
+  )
 
   let hardcover_book_category_map = {
     0: "unknown"
@@ -2907,44 +2921,47 @@ export def parse_hardcover_edition []: [record -> record] {
     }
   )
 
-  {
-    result: {
-      md: {
-        issue: ($hardcover_edition | get --optional book.featured_book_series.position)
-        series: ($hardcover_edition | get --optional book.featured_book_series.series.name | standardize_hardcover_title | use_unicode_in_title)
-        title: (
-          if ($hardcover_edition | get --optional title | is-not-empty) {
-            # todo Drop , after punctuation
-            $hardcover_edition.title | standardize_hardcover_title | use_unicode_in_title
-          }
-        )
-        description: $hardcover_edition.book.description
-        # todo Get start year of first book in series
-        volume: $series_begin_year
-        issue_count: ($hardcover_edition | get --optional book.featured_book_series.series.books_count)
-        ids: $ids
-        isbn: ($hardcover_edition | get --optional isbn_13)
-        characters: ($hardcover_edition.book.book_characters | rename canonical_id id | select --optional name id)
-        language: $language
-        # Use the forms_of_creative_work field for compatibility with Wikidata.
-        forms_of_creative_work: [$book_category]
-        literary_type: $literary_type
-        # Default the age rating to PG.
-        # comic_info_age_rating: "PG"
-        # manga: $manga
-        genres: []
-        tags: []
-        publication_date: ($hardcover_edition | get --optional release_date)
-        # $volume_data.description
-        publishers: [($hardcover_edition | get --optional publisher.name)]
-        # $data.store_date
-        # $data.cover_date
-        credits: $credits
-        series_id: ($hardcover_edition | get --optional book.featured_book_series.series.canonical_id)
-        _cover_image: [0, "", ($hardcover_edition | get --optional image.url)]
-      }
-      status: "good_match"
+  let characters = (
+    if ($hardcover_edition | get --optional book.book_characters.character | is-empty) {
+    } else {
+      $hardcover_edition.book.book_characters.character | select --optional name id
     }
+  )
+
+  {
+    issue: ($hardcover_edition | get --optional book.featured_book_series.position)
+    series: ($hardcover_edition | get --optional book.featured_book_series.series.name | str replace " (Light Novel)" "" | use_unicode_in_title)
+    title: (
+      if ($hardcover_edition | get --optional title | is-not-empty) {
+        # todo Drop , after punctuation
+        $hardcover_edition.title | standardize_hardcover_title | use_unicode_in_title
+      }
+    )
+    description: $hardcover_edition.book.description
+    # todo Get start year of first book in series
+    volume: $series_begin_year
+    issue_count: ($hardcover_edition | get --optional book.featured_book_series.series.books_count)
+    ids: $ids
+    isbn: ($hardcover_edition | get --optional isbn_13)
+    characters: $characters
+    language: $language
+    # Use the forms_of_creative_work field for compatibility with Wikidata.
+    forms_of_creative_work: [$book_category]
+    literary_type: $literary_type
+    # Default the age rating to PG.
+    # comic_info_age_rating: "PG"
+    # manga: $manga
+    # todo Genres and tags?
+    genres: []
+    tags: []
+    publication_date: ($hardcover_edition | get --optional release_date)
+    # $volume_data.description
+    publishers: [($hardcover_edition | get --optional publisher.name)]
+    # $data.store_date
+    # $data.cover_date
+    credits: $credits
+    series_id: ($hardcover_edition | get --optional book.featured_book_series.series_id)
+    _cover_image: [0, "", ($hardcover_edition | get --optional image.url)]
   }
 }
 
@@ -4040,41 +4057,55 @@ export def to_opf_xml [
   # [[tag, attributes, content]; []]
   let opf_metadata = []
 
-  # We don't write OPF metadata for manga, so don't worry about including the illustrator as an author.
-  let primary_authors = (
+  let opf_role_mappings = {
+    "Artist": "artist"
+    # Kavita treats the illustrator as Inker.
+    "Illustrator": "illustrator"
+    "Inker": "illustrator"
+    "Colorist": "colorist"
+    "Editor": "editor"
+    "Translator": "translator"
+    "Writer": "author"
+  }
+  let opf_metadata = $opf_metadata | append (
     let credits = $metadata | get --optional credits;
     if ($credits | is-empty) {
-
     } else {
-      let writers = $credits | where role == "Writer"
-      if ($writers | is-empty) {
-      } else {
-        let primary_writers = $writers | where primary == true
-        if ($primary_writers | is-empty) {
-          $writers | get creator | uniq
+      $credits | enumerate | reduce --fold [] {|credit acc|
+        let role = $opf_role_mappings | get --optional $credit.item.role
+        if ($role | is-empty) {
+          $acc
         } else {
-          $primary_writers | get creator | uniq
+          $acc | append [
+            [tag, attributes, content];
+            [
+              "meta"
+              {
+                refines: $"#id-creator-($credit.index)-($role)"
+                property: "role"
+                scheme: "marc:relators"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, $role]
+              ]
+            ]
+            [
+              "dc:creator"
+              {
+                # role: aut
+                # todo Add sort name?
+                # file-as: "Umino, Chica"
+                id: $"id-creator-($credit.index)-($role)"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, $credit.item.person]
+              ]
+            ]
+          ]
         }
       }
-    }
-  )
-  let opf_metadata = $opf_metadata | append (
-    $primary_authors | reduce --fold [] {|primary_author acc|
-      $acc | append [
-        [tag, attributes, content];
-        [
-          "creator"
-          {
-            role: aut
-            # todo Add sort name?
-            # file-as: "Umino, Chica"
-          }
-          [
-            [tag, attributes, content];
-            [null, null, $primary_author]
-          ]
-        ]
-      ]
     }
   )
 
@@ -4087,7 +4118,7 @@ export def to_opf_xml [
         [
           [tag, attributes, content];
           [
-            "title"
+            "dc:title"
             {}
             [
               [tag, attributes, content];
@@ -4109,7 +4140,7 @@ export def to_opf_xml [
         [
           [tag, attributes, content];
           [
-            "language"
+            "dc:language"
             {}
             [
               [tag, attributes, content];
@@ -4130,7 +4161,7 @@ export def to_opf_xml [
         [
           [tag, attributes, content];
           [
-            "description"
+            "dc:description"
             {}
             [
               [tag, attributes, content];
@@ -4151,7 +4182,7 @@ export def to_opf_xml [
         [
           [tag, attributes, content];
           [
-            "date"
+            "dc:date"
             {}
             [
               [tag, attributes, content];
@@ -4178,7 +4209,7 @@ export def to_opf_xml [
       $acc | append [
         [tag, attributes, content];
         [
-          "publisher"
+          "dc:publisher"
           {}
           [
             [tag, attributes, content];
@@ -4204,13 +4235,13 @@ export def to_opf_xml [
         $inner_acc | append [
           [tag, attributes, content];
           [
-            "identifier"
+            "dc:identifier"
             {
               scheme: $scheme
             }
             [
               [tag, attributes, content];
-              [null, null, $id.id]
+              [null, null, ($id.id | into string)]
             ]
           ]
         ]
@@ -4221,13 +4252,22 @@ export def to_opf_xml [
         [
           [tag, attributes, content];
           [
-            "identifier"
-            {scheme: ISBN}
+            "dc:identifier"
+            {scheme: "ISBN"}
             [
               [tag, attributes, content];
-              [null, null, $metadata.isbn]
+              [null, null, ($metadata.isbn | into string)]
             ]
           ]
+          # <dc:identifier id="BookId">urn:uuid:781aa24e-42eb-439f-a876-8426bdcb5805</dc:identifier>
+          # [
+          #   "dc:identifier"
+          #   {id: "BookId"}
+          #   [
+          #     [tag, attributes, content];
+          #     [null, null, ($metadata.isbn | into string)]
+          #   ]
+          # ]
         ]
       }
     )
@@ -4236,7 +4276,6 @@ export def to_opf_xml [
   # series
   # Only a single series is supported.
   # todo Sort series name?
-  # [meta, {name: "calibre:title_sort", content: "March Comes in Like a Lion, Vol. 1"}, []]
   let opf_metadata = (
     if ($metadata | get --optional series | is-empty) {
       $opf_metadata
@@ -4251,6 +4290,18 @@ export def to_opf_xml [
               content: $metadata.series
             }
             []
+          ]
+          # Epub 3.2
+          [
+            "meta"
+            {
+              property: "belongs-to-collection"
+              id: "series-id-1"
+            }
+            [
+              [tag, attributes, content];
+              [null null $metadata.series]
+            ]
           ]
         ]
       )
@@ -4271,6 +4322,18 @@ export def to_opf_xml [
             }
             []
           ]
+          # Epub 3.2
+          [
+            "meta"
+            {
+              refines: "#series-id-1"
+              property: "group-position"
+            }
+            [
+              [tag, attributes, content];
+              [null null ($metadata.issue | into string)]
+            ]
+          ]
         ]
       )
     }
@@ -4282,7 +4345,7 @@ export def to_opf_xml [
       $acc | append [
         [tag, attributes, content];
         [
-          "subject"
+          "dc:subject"
           {}
           [
             [tag, attributes, content];
@@ -4293,6 +4356,24 @@ export def to_opf_xml [
     }
   )
 
+  # modified
+  # This field is required.
+  let opf_metadata = (
+    $opf_metadata | append (
+      [
+        [tag, attributes, content];
+        [
+          "meta"
+          {
+            name: "calibre:timestamp"
+            content: (date now | date to-timezone "UTC" | format date '%+')
+          }
+          []
+        ]
+      ]
+    )
+  )
+
   let opf_metadata = (
     if ($opf_metadata | is-empty) {
       []
@@ -4301,6 +4382,7 @@ export def to_opf_xml [
     }
   )
 
+  # todo I should probably make sure to use the unique-identifier as an identifier type in the metadata.
   {
     "tag": "package"
     attributes: {
@@ -4309,8 +4391,12 @@ export def to_opf_xml [
     content: [
       [tag, attributes, content];
       [
-        metadata,
-        {},
+        "metadata"
+        {
+          "xmlns:calibre": "http://calibre.kovidgoyal.net/2009/metadata"
+          "xmlns:dc": "http://purl.org/dc/elements/1.1/"
+          "xmlns:opf": "http://www.idpf.org/2007/opf"
+        }
         $opf_metadata
       ]
     ]
@@ -4556,11 +4642,30 @@ export def embed_ebook_metadata [
       )
       let metadata = (
         $metadata
+        | update attributes (
+          # Nushell is absolutely borked when it comes to xml namespaces.
+          # We have to add back the namespace that it drops when reading the XML.
+          # https://github.com/nushell/nushell/issues/11523
+          $metadata.attributes | merge {
+            xmlns: "http://www.idpf.org/2007/opf"
+          }
+        )
         # Drop the existing metadata section in the OPF.
-        | update content ($metadata.content | where tag != metadata)
-        | merge ($book_metadata | to_opf_xml)
+        | update content (
+          (
+            $metadata.content | where tag != "metadata"
+            | prepend (
+              $book_metadata
+              | to_opf_xml
+              | get content
+              | where tag == "metadata"
+              | first
+            )
+          )
+        )
       )
-      $metadata | save --force $metadata_file
+      # log debug $"embed_ebook_metadata: metadata: ($metadata | to json)"
+      $metadata | to xml --indent 2 | "<?xml version="1.0" encoding=\"utf-8\"?>\n" + $in | save --force $metadata_file
       cd $working_directory
       let result = ($file | add_file_to_archive ($metadata_file | path relative-to $working_directory))
       cd -

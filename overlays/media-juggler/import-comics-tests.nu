@@ -1065,8 +1065,9 @@ def test_from_opf_xml [] {
 def test_to_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
   let input = {
     credits: [
-      [creator, role, primary, language];
+      [person, role, primary, language];
       ["Chica Umino", Writer, true, ""]
+      ["Chica Umino", Artist, true, ""]
     ]
     publishers: ["Denpa"]
     genres: [
@@ -1116,14 +1117,19 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
       [tag, attributes, content];
       [
         metadata,
-        {},
+        {
+          "xmlns:calibre": "http://calibre.kovidgoyal.net/2009/metadata"
+          "xmlns:dc": "http://purl.org/dc/elements/1.1/"
+          "xmlns:opf": "http://www.idpf.org/2007/opf"
+        },
         [
           [tag, attributes, content];
           [
-            creator,
+            dc:creator,
             {
-              role: aut,
+              # role: aut,
               # file-as: "Umino, Chica"
+              id: "id-creator-0-author"
             },
             [
               [tag, attributes, content];
@@ -1131,7 +1137,17 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
             ]
           ],
           [
-            date
+            dc:creator,
+            {
+              id: "id-creator-1-artist"
+            },
+            [
+              [tag, attributes, content];
+              [null, null, "Chica Umino"]
+            ]
+          ],
+          [
+            dc:date
             {}
             [
               [tag, attributes, content];
@@ -1139,7 +1155,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
             ]
           ]
           [
-            description
+            dc:description
             {}
             [
               [tag, attributes, content];
@@ -1166,13 +1182,13 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
               ]
             ]
           ],
-          [identifier, {scheme: HARDCOVER-EDITION}, [[tag, attributes, content]; [null, null, "30930924"]]]
-          [identifier, {scheme: BOOKBRAINZ-EDITION}, [[tag, attributes, content]; [null, null, "594a8ec2-6301-4c20-ae22-2c43840416b2"]]]
-          [identifier, {scheme: ISBN}, [[tag, attributes, content]; [null, null, "9781634428132"]]]
-          [identifier, {scheme: COMICVINE}, [[tag, attributes, content]; [null, null, "987377"]]]
-          [identifier, {scheme: WIKIDATA-EDITION}, [[tag, attributes, content]; [null, null, "Q139556252"]]]
+          [dc:identifier, {scheme: HARDCOVER-EDITION}, [[tag, attributes, content]; [null, null, "30930924"]]]
+          [dc:identifier, {scheme: BOOKBRAINZ-EDITION}, [[tag, attributes, content]; [null, null, "594a8ec2-6301-4c20-ae22-2c43840416b2"]]]
+          [dc:identifier, {scheme: ISBN}, [[tag, attributes, content]; [null, null, "9781634428132"]]]
+          [dc:identifier, {scheme: COMICVINE}, [[tag, attributes, content]; [null, null, "987377"]]]
+          [dc:identifier, {scheme: WIKIDATA-EDITION}, [[tag, attributes, content]; [null, null, "Q139556252"]]]
           [
-            identifier
+            dc:identifier
             {scheme: HARDCOVER}
             [
               [tag, attributes, content];
@@ -1180,7 +1196,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
             ]
           ],
           [
-            identifier
+            dc:identifier
             {scheme: HARDCOVER-SLUG}
             [
               [tag, attributes, content]; [null, null, "march-comes-in-like-a-lion-volume-1"]
@@ -1189,49 +1205,103 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
           # [identifier {scheme: HARDCOVER-ID} [[tag, attributes, content]; [null, null, "908381"]]]
           # [identifier, {scheme: COMICVINE-VOLUME}, [[tag, attributes, content]; [null, null, "150064"]]]
           [
-            language
+            dc:language
             {}
             [
               [tag, attributes, content];
               [null, null, eng]
             ]
           ]
-          [meta, {name: "calibre:series", content: "March Comes in Like a Lion"}, []]
-          [meta, {name: "calibre:series_index", content: "1"}, []]
-          # [meta, {name: "calibre:title_sort", content: "March Comes in Like a Lion, Vol. 1"}, []]
           [
-            publisher
+            dc:publisher
             {}
             [
               [tag, attributes, content];
               [null, null, Denpa]
             ]
           ]
-          [subject, {}, [[tag, attributes, content]; [null, null, coming-of-age]]]
-          [subject, {}, [[tag, attributes, content]; [null, null, romance]]]
-          [subject, {}, [[tag, attributes, content]; [null, null, "slice of life"]]]
+          [dc:subject, {}, [[tag, attributes, content]; [null, null, coming-of-age]]]
+          [dc:subject, {}, [[tag, attributes, content]; [null, null, romance]]]
+          [dc:subject, {}, [[tag, attributes, content]; [null, null, "slice of life"]]]
           [
-            title,
+            dc:title,
             {},
             [
               [tag, attributes, content];
               [null, null, "March Comes in Like a Lion, Vol. 1"]
             ]
           ],
+          [meta, {name: "calibre:series", content: "March Comes in Like a Lion"}, []]
+          [meta, {name: "calibre:series_index", content: "1"}, []]
+          [
+            "meta"
+            {
+              refines: "#series-id-1"
+              property: "group-position"
+            }
+            [
+              [tag, attributes, content];
+              [null null "1"]
+            ]
+          ]
+          [
+            "meta"
+            {
+              property: "belongs-to-collection"
+              id: "series-id-1"
+            }
+            [
+              [tag, attributes, content];
+              [null null "March Comes in Like a Lion"]
+            ]
+          ]
+          [
+            "meta"
+            {
+              refines: "#id-creator-1-artist"
+              property: "role"
+              scheme: "marc:relators"
+            }
+            [
+              [tag, attributes, content];
+              [null, null, artist]
+            ]
+          ]
+          [
+            "meta"
+            {
+              refines: "#id-creator-0-author"
+              property: "role"
+              scheme: "marc:relators"
+            }
+            [
+              [tag, attributes, content];
+              [null, null, author]
+            ]
+          ]
         ]
       ]
     ]
   }
   # log debug $"\n($input | to_opf_xml | to nuon)\n"
-  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "creator") ($expected | get content | first | get content | where tag == "creator")
-  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "description") ($expected | get content | first | get content | where tag == "description")
-  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "date") ($expected | get content | first | get content | where tag == "date")
-  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "language") ($expected | get content | first | get content | where tag == "language")
-  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "identifier") ($expected | get content | first | get content | where tag == "identifier")
-  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "meta") ($expected | get content | first | get content | where tag == "meta")
-  # assert equal ($input | to_opf_xml | get content | first | get content | where tag == "subject") ($expected | get content | first | get content | where tag == "subject")
-  # assert equal ($input | to_opf_xml | get content | first | get content) ($expected | get content | first | get content)
-  assert equal ($input | to_opf_xml) $expected
+  # assert equal ($input | to_opf_xml | get content | first | get content.tag | uniq) ($expected | get content | first | get content.tag | uniq)
+  let output = $input | to_opf_xml
+  let output = $output | update content (
+    $output.content | where tag != metadata | prepend (
+      let metadata = $output.content | where tag == metadata | first;
+      $metadata | update content ($metadata.content | where {|it| ($it | get --optional attributes.name) not-in ["calibre:timestamp" "dcterms:modified"] })
+    )
+  )
+  # log debug $"output: ($output | get content | first | get content | where tag == "meta" | to json)"
+  # assert equal ($output | get content | first | get content | where tag == "dc:creator") ($expected | get content | first | get content | where tag == "dc:creator")
+  # assert equal ($output | get content | first | get content | where tag == "dc:description") ($expected | get content | first | get content | where tag == "dc:description")
+  # assert equal ($output | get content | first | get content | where tag == "dc:date") ($expected | get content | first | get content | where tag == "dc:date")
+  # assert equal ($output | get content | first | get content | where tag == "dc:language") ($expected | get content | first | get content | where tag == "dc:language")
+  # assert equal ($output | get content | first | get content | where tag == "dc:identifier") ($expected | get content | first | get content | where tag == "dc:identifier")
+  # assert equal ($output | get content | first | get content | where tag == "meta") ($expected | get content | first | get content | where tag == "meta")
+  # assert equal ($output | get content | first | get content | where tag == "dc:subject") ($expected | get content | first | get content | where tag == "dc:subject")
+  # assert equal ($output | get content | first | get content) ($expected | get content | first | get content)
+  assert equal $output $expected
 }
 
 def test_to_opf_xml [] {

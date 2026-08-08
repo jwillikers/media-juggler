@@ -29,8 +29,8 @@ def main [
   --isbn: string # ISBN of the book
   # --identifiers: string # asin:XXXX
   --keep # Keep the original file
-  --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
-  --ereader-subdirectory: string = ".books" # The subdirectory on the e-reader in-which to copy
+  # --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
+  # --ereader-subdirectory: string = ".books" # The subdirectory on the e-reader in-which to copy
   --keep-tmp # Don't delete the temporary directory when there's an error
   --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
   --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
@@ -151,23 +151,15 @@ def main [
     mkdir $destination
   }
 
-  let username = (^id --name --user)
-  let ereader_disk_label = (
-    if $ereader == null {
-      ""
-    } else {
-      $ereader_profiles | where model == $ereader | first | get disk_label
-    }
-  )
-  let ereader_mountpoint = (["/run/media" $username $ereader_disk_label] | path join)
-  let ereader_target_directory = ([$ereader_mountpoint $ereader_subdirectory $form_subdirectory] | path join)
-  if $ereader != null and not $no_copy_to_ereader {
-    if (^findmnt --target $ereader_target_directory | complete | get exit_code) != 0 {
-      ^udisksctl mount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
-      # todo Parse the mountpoint from the output of this command
-    }
-    mkdir $ereader_target_directory
-  }
+  # let username = (^id --name --user)
+  # let ereader_disk_label = (
+  #   if $ereader == null {
+  #     ""
+  #   } else {
+  #     $ereader_profiles | where model == $ereader | first | get disk_label
+  #   }
+  # )
+  # let ereader_mountpoint = (["/run/media" $username $ereader_disk_label] | path join)
 
   # let original_file = $files | first
   let results = $files | each {|original_file|
@@ -1029,16 +1021,11 @@ def main [
   # translated Works -> original Works
   # Edition series preferred over Work Series
 
-  let tag_result = (
-    let data = $hardcover_edition_id | fetch_and_parse_hardcover_edition id $cache_function;
-    {
-      result: {
-        md: $data
-        status: "good_match"
-      }
-    }
+  let comic_metadata = (
+    $hardcover_edition_id
+    | fetch_and_parse_hardcover_edition id $cache_function
   )
-  log debug $"The Hardcover result is:\n(ansi green)($tag_result.result | to nuon)(ansi reset)\n"
+  log debug $"The metadata from Hardcover is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
 
   # Get the genres from Wikidata
   let wikidata_metadata = (
@@ -1053,7 +1040,6 @@ def main [
   )
   log debug $"The Wikidata metadata is:\n(ansi green)($wikidata_metadata | to nuon)(ansi reset)\n"
 
-  let comic_metadata = $tag_result.result.md
   let comic_metadata = (
     $comic_metadata
     | merge $wikidata_metadata
@@ -1205,9 +1191,9 @@ def main [
       # If it is a oneshot, put it in its own subdirectory inside a directory for the author.
       # todo Maybe I should just put these at the top-level as I do for comics?
       if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
-        [$authors_subdirectory $series_subdirectory] | path join
-      } else {
         $series_subdirectory
+      } else {
+        [$authors_subdirectory $series_subdirectory] | path join
       }
     )
     let target_directory = [$destination $form_subdirectory $target_subdirectory] | path join
@@ -1289,12 +1275,14 @@ def main [
     #         error: $err.msg
     #     }
     # }
-
-  if $ereader != null and not $no_copy_to_ereader {
-    if (^findmnt --target $ereader_target_directory | complete | get exit_code) == 0 {
-      ^udisksctl unmount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
-    }
-  }
+  # let ereader_target_directory = ([$ereader_mountpoint $ereader_subdirectory $form_subdirectory] | path join)
+  # if $ereader != null and not $no_copy_to_ereader {
+  #   if (^findmnt --target $ereader_target_directory | complete | get exit_code) != 0 {
+  #     ^udisksctl mount --block-device ("/dev/disk/by-label/" | path join $ereader_disk_label) --no-user-interaction
+  #     # todo Parse the mountpoint from the output of this command
+  #   }
+  #   mkdir $ereader_target_directory
+  # }
 
   $results | to json | print
 
