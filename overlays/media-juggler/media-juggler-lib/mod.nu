@@ -3842,6 +3842,9 @@ export def from_pdf_metadata []: [
 }
 
 # Parse metadata from an EPUB's content.opf XML file
+#
+# Note that currently, namespace information is dropped by Nushell.
+# https://github.com/nushell/nushell/issues/11523
 export def from_opf_xml [
   identifier_schemes: table = $opf_identifier_schemes
 ]: [
@@ -3852,10 +3855,18 @@ export def from_opf_xml [
     if $opf.tag == "package" {
       $opf.content | where tag == "metadata" | first
     } else {
-    # todo Verify metadata tag is here
       $opf
     }
   )
+  if ($opf | get --optional tag) != "metadata" {
+    error make {
+      msg: "missing metadata tag in OPF metadata"
+      labels: [
+        {text: "opf" span: (metadata $opf).span}
+      ]
+      help: "add the missing metadata element to the OPF metadata"
+    }
+  }
   let metadata_content = $opf | get content
   let credits = (
     let creators = $metadata_content | where tag == creator;
@@ -4215,11 +4226,23 @@ export def to_opf_xml [
       # for each type, add each scheme
       let schemes = $identifier_schemes | where type == $id.type
       if ($schemes | is-empty) {
-        log error $"Missing OPF schemes for type (ansi yellow)($id.type)(ansi reset)"
-        # todo make error if type is missing
+        error make {
+          msg: "missing OPF schemes for type"
+          labels: [
+            {text: "id.type" span: (metadata $id.type).span}
+            {text: "identifier_schemes" span: (metadata $identifier_schemes).span}
+          ]
+          help: $"add the missing OPF scheme for the type (ansi yellow)($id.type)(ansi reset) to the identifier_schemes table"
+        }
       } else if ($schemes | length) > 1 {
-        log error $"Multiple OPF schemes for type (ansi yellow)($id.type)(ansi reset): ($schemes)"
-        # todo make error if type is missing
+        error make {
+          msg: "multiple OPF schemes for type"
+          labels: [
+            {text: "id.type" span: (metadata $id.type).span}
+            {text: "identifier_schemes" span: (metadata $identifier_schemes).span}
+          ]
+          help: $"remove the duplicate OPF schemes for the type (ansi yellow)($id.type)(ansi reset) to the identifier_schemes table"
+        }
       }
       $schemes | first | get schemes | reduce --fold $acc {|scheme inner_acc|
         let attributes = {scheme: $scheme}
