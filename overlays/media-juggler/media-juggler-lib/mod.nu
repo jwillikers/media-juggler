@@ -3867,7 +3867,23 @@ export def from_opf_xml [
       help: "add the missing metadata element to the OPF metadata"
     }
   }
+
   let metadata_content = $opf | get content
+
+  # If and when Nushell actually includes namespaces, fail here.
+  # The code will need to be updated to use the namespaced tags.
+  # https://github.com/nushell/nushell/issues/11523
+  if ($metadata_content | where tag == "dc:title" | is-not-empty) {
+    error make {
+      msg: "namespaces are now available in the 'from xml' Nushell command"
+      labels: [
+        {text: "metadata_content" span: (metadata $metadata_content).span}
+      ]
+      help: "update the tags to include the 'dc:' namespace in the from_opf_xml function"
+    }
+  }
+
+  # https://www.w3.org/TR/epub-33/#sec-opf-dccreator
   let credits = (
     let creators = $metadata_content | where tag == creator;
     if ($creators | is-not-empty) {
@@ -4221,6 +4237,7 @@ export def to_opf_xml [
     }
   )
 
+  # https://www.w3.org/TR/epub-33/#sec-opf-dcidentifier
   let opf_metadata = $opf_metadata | append (
     $metadata.ids | reduce --fold [] {|id acc|
       # for each type, add each scheme
@@ -4414,6 +4431,7 @@ export def to_opf_xml [
     "Translator": "translator"
     "Writer": "author"
   }
+  # https://www.w3.org/TR/epub-33/#sec-opf-dccreator
   let opf_metadata = $opf_metadata | append (
     let credits = $metadata | get --optional credits;
     if ($credits | is-empty) {
@@ -4741,6 +4759,15 @@ export def embed_ebook_metadata [
           open $metadata_file | from xml
         }
       )
+      if ($metadata.attributes | get --optional xmlns | is-not-empty) {
+        error make {
+          msg: "namespaces are now available in the 'from xml' Nushell command"
+          labels: [
+            {text: "metadata.attributes" span: (metadata $metadata.attributes).span}
+          ]
+          help: "remove the code that adds the xmlns attribute in the embed_ebook_metadata function"
+        }
+      }
       let opf_metadata = $book_metadata | to_opf_xml
       let metadata = (
         $metadata
