@@ -4713,39 +4713,62 @@ export def to_opf_xml [
             }
           }
         }
+      # todo If we ever have ID, we should group by that instead.
+      } | group-by --to-table person | get items | each {|it|
+        {
+          person: ($it.person | first)
+          roles: ($it.role | uniq)
+          primary: ($it.primary | any {|i| $i})
+          language: ($it.language | first)
+          # id: ($it.id | first)
+        }
       } | enumerate | reduce --fold [] {|credit acc|
-        let role = $opf_role_mappings | get --optional $credit.item.role
-        if ($role | is-empty) {
-          $acc
+        # log debug $"credit: ($credit)"
+        if ($credit.item.roles | any {|role| ($opf_role_mappings | get --optional $role | is-not-empty)}) {
+          $acc | append (
+            [
+              [tag, attributes, content];
+              [
+                "dc:creator"
+                {
+                  # role: aut
+                  # todo Add sort name?
+                  # file-as: "Umino, Chica"
+                  id: $"id-creator-($credit.index)"
+                }
+                [
+                  [tag, attributes, content];
+                  [null, null, $credit.item.person]
+                ]
+              ]
+            ]
+          ) | append (
+            $credit.item.roles
+            | reduce --fold [] {|role role_acc|
+              let r = $opf_role_mappings | get --optional $role
+              if ($r | is-empty) {
+                $role_acc
+              } else {
+                $role_acc | append [
+                  [tag, attributes, content];
+                  [
+                    "meta"
+                    {
+                      refines: $"#id-creator-($credit.index)"
+                      property: "role"
+                      scheme: "marc:relators"
+                    }
+                    [
+                      [tag, attributes, content];
+                      [null, null, $r]
+                    ]
+                  ]
+                ]
+              }
+            }
+          )
         } else {
-          $acc | append [
-            [tag, attributes, content];
-            [
-              "dc:creator"
-              {
-                # role: aut
-                # todo Add sort name?
-                # file-as: "Umino, Chica"
-                id: $"id-creator-($credit.index)-($role)"
-              }
-              [
-                [tag, attributes, content];
-                [null, null, $credit.item.person]
-              ]
-            ]
-            [
-              "meta"
-              {
-                refines: $"#id-creator-($credit.index)-($role)"
-                property: "role"
-                scheme: "marc:relators"
-              }
-              [
-                [tag, attributes, content];
-                [null, null, $role]
-              ]
-            ]
-          ]
+          $acc
         }
       }
     }

@@ -1218,7 +1218,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
             {
               # role: aut,
               # file-as: "Umino, Chica"
-              id: "id-creator-0-author"
+              id: "id-creator-0"
             },
             [
               [tag, attributes, content];
@@ -1228,7 +1228,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
           [
             "meta"
             {
-              refines: "#id-creator-0-author"
+              refines: "#id-creator-0"
               property: "role"
               scheme: "marc:relators"
             }
@@ -1238,19 +1238,9 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
             ]
           ]
           [
-            dc:creator,
-            {
-              id: "id-creator-1-artist"
-            },
-            [
-              [tag, attributes, content];
-              [null, null, "Chica Umino"]
-            ]
-          ],
-          [
             "meta"
             {
-              refines: "#id-creator-1-artist"
+              refines: "#id-creator-0"
               property: "role"
               scheme: "marc:relators"
             }
