@@ -4470,7 +4470,8 @@ export def to_opf_xml [
           [
             "dc:identifier"
             {
-              # "opf:scheme": "ISBN"
+              # Kavita requires the opf:scheme key in order to properly parse the ISBN.
+              "opf:scheme": "ISBN"
               id: "isbn-identifier"
             }
             [

@@ -1171,7 +1171,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
           [dc:identifier, {} [[tag, attributes, content]; [null, null, "url:https://comicvine.gamespot.com/issue/4000-987377"]]]
           [dc:identifier, {} [[tag, attributes, content]; [null, null, "url:https://hardcover.app/books/march-comes-in-like-a-lion-volume-1/editions/30930924"]]]
           [dc:identifier, {} [[tag, attributes, content]; [null, null, "url:https://www.wikidata.org/wiki/Q139556252"]]]
-          [dc:identifier, {id: "isbn-identifier"}, [[tag, attributes, content]; [null, null, "urn:isbn:9781634428132"]]]
+          [dc:identifier, {"opf:scheme": "ISBN" id: "isbn-identifier"}, [[tag, attributes, content]; [null, null, "urn:isbn:9781634428132"]]]
           [dc:identifier, {id: "bookbrainz-edition-identifier"}, [[tag, attributes, content]; [null, null, "urn:uuid:594a8ec2-6301-4c20-ae22-2c43840416b2"]]]
           [dc:identifier, {id: "bookid"}, [[tag, attributes, content]; [null, null, "urn:uuid:a1b0d67e-2e81-4df5-9e67-a64cbe366809"]]]
           # [identifier {scheme: HARDCOVER-ID} [[tag, attributes, content]; [null, null, "908381"]]]
