@@ -1043,7 +1043,15 @@ def main [
   # Use genres from Wikidata.
   let comic_metadata = $comic_metadata | merge {
     genres: ($wikidata_metadata | get --optional genres)
-  }
+  } | merge (
+    if ($comic_metadata | get --optional forms_of_creative_work | is-empty) {
+      {}
+    } else {
+      {
+        forms_of_creative_work: ($wikidata_metadata | get --optional forms_of_creative_work)
+      }
+    }
+  )
   let comic_metadata = (
     let ids = ($existing_metadata | get --optional ids);
     if ($ids | is-empty) {
