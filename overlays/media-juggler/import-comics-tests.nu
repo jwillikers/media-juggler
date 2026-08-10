@@ -1066,6 +1066,8 @@ def test_from_opf_xml [] {
 def test_to_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
   let input = {
     credits: [
+      # todo Need to test more creator roles here.
+      # Plus, should I start using the ID field here and using sort-by with that?
       [person, role, primary, language];
       ["Chica Umino", Writer, true, ""]
       ["Chica Umino", Artist, true, ""]
