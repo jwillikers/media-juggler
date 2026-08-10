@@ -4070,11 +4070,19 @@ export def from_opf_xml [
             type: $identifier_schemes_and_type.type
             id: (
               # if ($identifier_schemes_and_type.type == "comic_vine_issue_id") {
-              #   "4000-" + ($matching_ids | get content | first | get content | first)
+              #   if ($id | str starts-with "4000-") {
+              #     $id
+              #   } else {
+              #     "4000-" + $id
+              #   }
               # } else if ($identifier_schemes_and_type.type == "comic_vine_volume_id") {
-              #   "4050-" + ($matching_ids | get content | first | get content | first)
+              #   if ($id | str starts-with "4050-") {
+              #     $id
+              #   } else {
+              #     "4050-" + $id
+              #   }
               # } else {
-              $id
+                $id
               # }
             )
           }
@@ -4510,6 +4518,49 @@ export def to_opf_xml [
         }
       }
     )
+  )
+
+  # Kavita supports url: fields as weblinks
+  let opf_metadata = $opf_metadata | append (
+    $metadata.ids | reduce --fold [] {|id acc|
+      let url = (
+        if $id.type in ["epub_uuid" "hardcover_book_slug"] {
+          ""
+        } else if $id.type == "hardcover_edition_id" {
+          if "hardcover_book_slug" in ($metadata | get --optional ids.type) {
+            $id.id | identifier_into_url $id.type --hardcover-book-slug ($metadata.ids | where type == "hardcover_book_slug" | get id | first)
+          } else {
+            $id.id | identifier_into_url $id.type
+          }
+        } else if $id.type == "comic_vine_issue_id" {
+          let i = (
+            if ($id.id | str starts-with "4000-") {
+              $id.id
+            } else {
+              "4000-" + $id.id
+            }
+          )
+          $i | identifier_into_url $id.type
+        } else {
+          $id.id | identifier_into_url $id.type
+        }
+      )
+      if ($url | is-empty) {
+        $acc
+      } else {
+        $acc | append [
+          [tag, attributes, content];
+          [
+            "dc:identifier"
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, $"url:($url)"]
+            ]
+          ]
+        ]
+      }
+    }
   )
 
   # series
