@@ -1049,6 +1049,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
       [comic_vine_issue_id, "987377"],
       [bookbrainz_edition_id, "594a8ec2-6301-4c20-ae22-2c43840416b2"],
       [wikidata_item_id, "Q139556252"]
+      [epub_uuid, "2494c4ca-6fb6-459f-baca-26de4d2df70e"]
     ],
     series: "March Comes in Like a Lion",
     issue: "1",
@@ -1097,6 +1098,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
     publication_date: (2023-05-01T05:00:00+00:00 | into datetime)
     ids: [
       [type, id];
+      [epub_uuid "a1b0d67e-2e81-4df5-9e67-a64cbe366809"]
       [hardcover_book_slug, "march-comes-in-like-a-lion-volume-1"],
       [hardcover_edition_id, "30930924"],
       [comic_vine_issue_id, "987377"],
@@ -1160,13 +1162,14 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
               ]
             ]
           ],
-          [dc:identifier, {"opf:scheme": HARDCOVER-EDITION}, [[tag, attributes, content]; [null, null, "30930924"]]]
-          [dc:identifier, {"opf:scheme": BOOKBRAINZ-EDITION}, [[tag, attributes, content]; [null, null, "594a8ec2-6301-4c20-ae22-2c43840416b2"]]]
-          [dc:identifier, {id: "bookid", "opf:scheme": ISBN}, [[tag, attributes, content]; [null, null, "9781634428132"]]]
-          [dc:identifier, {"opf:scheme": COMICVINE}, [[tag, attributes, content]; [null, null, "987377"]]]
-          [dc:identifier, {"opf:scheme": WIKIDATA-EDITION}, [[tag, attributes, content]; [null, null, "Q139556252"]]]
-          [dc:identifier {"opf:scheme": HARDCOVER} [[tag, attributes, content]; [null, null, "march-comes-in-like-a-lion-volume-1"]]]
-          [dc:identifier {"opf:scheme": HARDCOVER-SLUG} [[tag, attributes, content]; [null, null, "march-comes-in-like-a-lion-volume-1"]]]
+          [dc:identifier, {id: "hardcover-edition-identifier" "opf:scheme": HARDCOVER-EDITION}, [[tag, attributes, content]; [null, null, "30930924"]]]
+          [dc:identifier, {id: "comicvine-identifier" "opf:scheme": COMICVINE}, [[tag, attributes, content]; [null, null, "987377"]]]
+          [dc:identifier, {id: "wikidata-edition-identifier" "opf:scheme": WIKIDATA-EDITION}, [[tag, attributes, content]; [null, null, "Q139556252"]]]
+          [dc:identifier {id: "hardcover-slug-identifier" "opf:scheme": HARDCOVER-SLUG} [[tag, attributes, content]; [null, null, "march-comes-in-like-a-lion-volume-1"]]]
+          [dc:identifier {id: "hardcover-identifier" "opf:scheme": HARDCOVER} [[tag, attributes, content]; [null, null, "march-comes-in-like-a-lion-volume-1"]]]
+          [dc:identifier, {id: "isbn-identifier", "opf:scheme": ISBN}, [[tag, attributes, content]; [null, null, "urn:isbn:9781634428132"]]]
+          [dc:identifier, {id: "bookbrainz-edition-identifier" "opf:scheme": BOOKBRAINZ-EDITION}, [[tag, attributes, content]; [null, null, "urn:uuid:594a8ec2-6301-4c20-ae22-2c43840416b2"]]]
+          [dc:identifier, {id: "bookid"}, [[tag, attributes, content]; [null, null, "urn:uuid:a1b0d67e-2e81-4df5-9e67-a64cbe366809"]]]
           # [identifier {scheme: HARDCOVER-ID} [[tag, attributes, content]; [null, null, "908381"]]]
           # [identifier, {scheme: COMICVINE-VOLUME}, [[tag, attributes, content]; [null, null, "150064"]]]
           [dc:language {} [[tag, attributes, content]; [null, null, eng]]]
@@ -1188,6 +1191,12 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
               [null null "1"]
             ]
           ]
+          [meta, {refines: "#isbn-identifier" property: "identifier-type" scheme: "onix:codelist5"}, [[tag, attributes, content]; [null, null, "15"]]]
+          [meta, {refines: "#bookbrainz-edition-identifier", property: "identifier-type"}, [[tag, attributes, content]; [null, null, "BOOKBRAINZ-EDITION"]]]
+          [meta, {refines: "#comicvine-identifier", property: "identifier-type"}, [[tag, attributes, content]; [null, null, "COMICVINE"]]]
+          [meta, {refines: "#hardcover-identifier", property: "identifier-type"}, [[tag, attributes, content]; [null, null, "HARDCOVER"]]]
+          [meta, {refines: "#hardcover-edition-identifier", property: "identifier-type"}, [[tag, attributes, content]; [null, null, "HARDCOVER-EDITION"]]]
+          [meta, {refines: "#hardcover-slug-identifier", property: "identifier-type"}, [[tag, attributes, content]; [null, null, "HARDCOVER-SLUG"]]]
           [
             "meta"
             {
@@ -1199,6 +1208,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
               [null null "March Comes in Like a Lion"]
             ]
           ]
+          [meta, {refines: "#wikidata-edition-identifier", property: "identifier-type"}, [[tag, attributes, content]; [null, null, "WIKIDATA-EDITION"]]]
           [
             dc:creator,
             {
@@ -1266,14 +1276,20 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
     )
   )
   # log debug $"output: ($output | get content | first | get content | where tag == "meta" | to json)"
-  # assert equal ($output | get content | first | get content | where tag == "dc:creator") ($expected | get content | first | get content | where tag == "dc:creator")
-  # assert equal ($output | get content | first | get content | where tag == "dc:description") ($expected | get content | first | get content | where tag == "dc:description")
-  # assert equal ($output | get content | first | get content | where tag == "dc:date") ($expected | get content | first | get content | where tag == "dc:date")
-  # assert equal ($output | get content | first | get content | where tag == "dc:language") ($expected | get content | first | get content | where tag == "dc:language")
-  # assert equal ($output | get content | first | get content | where tag == "dc:identifier") ($expected | get content | first | get content | where tag == "dc:identifier")
-  # assert equal ($output | get content | first | get content | where tag == "meta") ($expected | get content | first | get content | where tag == "meta")
-  # assert equal ($output | get content | first | get content | where tag == "dc:subject") ($expected | get content | first | get content | where tag == "dc:subject")
-  # assert equal ($output | get content | first | get content) ($expected | get content | first | get content)
+  assert equal ($output | get content | first | get content | where tag == "dc:creator") ($expected | get content | first | get content | where tag == "dc:creator")
+  assert equal ($output | get content | first | get content | where tag == "dc:description") ($expected | get content | first | get content | where tag == "dc:description")
+  assert equal ($output | get content | first | get content | where tag == "dc:date") ($expected | get content | first | get content | where tag == "dc:date")
+  assert equal ($output | get content | first | get content | where tag == "dc:language") ($expected | get content | first | get content | where tag == "dc:language")
+  $output | get content | first | get content | where tag == "dc:identifier" | zip ($expected | get content | first | get content | where tag == "dc:identifier") | each {|it|
+    assert equal $it.0 $it.1
+  }
+  assert equal ($output | get content | first | get content | where tag == "dc:identifier") ($expected | get content | first | get content | where tag == "dc:identifier")
+  $output | get content | first | get content | where tag == "meta" | zip ($expected | get content | first | get content | where tag == "meta") | each {|it|
+    assert equal $it.0 $it.1
+  }
+  assert equal ($output | get content | first | get content | where tag == "meta") ($expected | get content | first | get content | where tag == "meta")
+  assert equal ($output | get content | first | get content | where tag == "dc:subject") ($expected | get content | first | get content | where tag == "dc:subject")
+  assert equal ($output | get content | first | get content) ($expected | get content | first | get content)
   assert equal $output $expected
 }
 

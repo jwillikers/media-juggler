@@ -276,14 +276,14 @@ export const comic_vine_roles_map = [
 export const opf_identifier_schemes = [
   [schemes type];
   # [[GOODREADS] goodreads_version_id]
-  [[HARDCOVER HARDCOVER-SLUG] hardcover_book_slug]
+  [[HARDCOVER-SLUG HARDCOVER] hardcover_book_slug]
   # [[HARDCOVER-ID] hardcover_book_id]
   [[HARDCOVER-EDITION] hardcover_edition_id]
   [[COMICVINE] comic_vine_issue_id]
   # [[COMICVINE-VOLUME] comic_vine_volume_id]
   [[BOOKBRAINZ-EDITION] bookbrainz_edition_id]
   [[WIKIDATA-EDITION] wikidata_item_id]
-  [[OPENLIBRARY OPENLIBRARY-EDITION] open_library_edition_id]
+  [[OPENLIBRARY-EDITION OPENLIBRARY] open_library_edition_id]
   [[OPENLIBRARY-WORK] open_library_work_id]
   # [ISBN isbn]
   # [STORYGRAPH storygraph_edition_id]
@@ -3851,6 +3851,11 @@ export def from_opf_xml [
   record -> record
 ] {
   let opf = $in
+  let unique_identifier_id = (
+    if $opf.tag == "package" {
+      $opf.attributes | get --optional unique-identifier
+    }
+  )
   let opf = (
     if $opf.tag == "package" {
       $opf.content | where tag == "metadata" | first
@@ -3955,8 +3960,7 @@ export def from_opf_xml [
       } else if ($language_code | str length) == 3 {
         $language_code | from_language_code # iso_639_3
       } else {
-        # todo Support type parameter in from_language_code
-        # $language_code | from_language_code ietf_bcp_47
+        $language_code | from_language_code
       }
     }
   )
@@ -3995,11 +3999,66 @@ export def from_opf_xml [
   let ids = (
     let ids = $metadata_content | where tag == identifier;
     if ($ids | is-not-empty) {
+      let unique_identifiers = $ids | where {|it|
+        ($it.attributes | get --optional id) == $unique_identifier_id
+      }
       $identifier_schemes | reduce --fold [] {|identifier_schemes_and_type acc|
-        let matching_ids = $ids | where {|it| ($it.attributes | get --optional scheme | is-not-empty) and ($it.attributes.scheme | str upcase) in $identifier_schemes_and_type.schemes }
+        let matching_ids = $ids | where {|it|
+          (
+            (
+              ($it.attributes | get --optional scheme | is-not-empty)
+              and ($it.attributes.scheme | str upcase) in $identifier_schemes_and_type.schemes
+            )
+            or (
+              ($it.attributes | get --optional "opf:scheme" | is-not-empty)
+              and ($it.attributes | get "opf:scheme" | str upcase) in $identifier_schemes_and_type.schemes
+            )
+            or (
+              ($it.attributes | get --optional id | is-not-empty)
+              and (
+                $metadata_content
+                # A where doesn't work here since the closure can't access $it.
+                | reduce --fold [] {|meta_it inner_acc|
+                  if (
+                    $meta_it.tag == "meta"
+                    and ($meta_it.attributes | get --optional refines) == $"#($it.attributes.id)"
+                    and ($meta_it.attributes | get --optional property) == "identifier-type"
+                    and (
+                      (
+                        ($meta_it.attributes | get --optional "scheme" | is-not-empty)
+                        and ($meta_it.attributes | get --optional scheme | str upcase) in $identifier_schemes_and_type.schemes
+                      )
+                      or (
+                        ($meta_it.attributes | get --optional content.0.content | is-not-empty)
+                        and ($meta_it.attributes | get --optional content.0.content | str upcase) in $identifier_schemes_and_type.schemes
+                      )
+                    )
+                  ) {
+                    $inner_acc | append ($meta_it)
+                  } else {
+                    $inner_acc
+                  }
+                } | is-not-empty
+              )
+            )
+          )
+        }
         if ($matching_ids | is-empty) {
           $acc
         } else {
+          let id = $matching_ids | get content | first | get content | first
+          let id = (
+            if $id =~ '^(?:urn:uuid:)?[a-f0-9]{8}(?:-[a-f0-9]{4}){4}[a-f0-9]{8}$' {
+              (
+                $id
+                | parse --regex '^(?:urn:uuid:)?(?P<uuid>[a-f0-9]{8}(?:-[a-f0-9]{4}){4}[a-f0-9]{8})$'
+                | get uuid
+                | first
+              )
+            } else {
+              $id
+            }
+          )
           # Ignore multiple ids of the same type.
           # todo Warn if there are multiple, distinct IDs for the same scheme.
           $acc | append {
@@ -4010,12 +4069,44 @@ export def from_opf_xml [
               # } else if ($identifier_schemes_and_type.type == "comic_vine_volume_id") {
               #   "4050-" + ($matching_ids | get content | first | get content | first)
               # } else {
-              $matching_ids | get content | first | get content | first
+              $id
               # }
             )
           }
         }
-      }
+      } | append (
+        if ($unique_identifiers | is-not-empty) {
+          if ($unique_identifiers | length) > 1 {
+            error make {
+              msg: "multiple unique identifiers"
+              labels: [{text: "unique_identifiers" span: (metadata $unique_identifiers).span}]
+              help: $"remove duplicate unique identifiers where the type attribute is (ansi yellow)($unique_identifier_id)(ansi reset)"
+            }
+          } else {
+            let id = $unique_identifiers | get content | first | get content | first
+            if $id =~ '^(?:urn:uuid:)?[a-f0-9]{8}(?:-[a-f0-9]{4}){4}[a-f0-9]{8}$' {
+              {
+                type: "epub_uuid"
+                id: (
+                  $id
+                  | parse --regex '^(?:urn:uuid:)?(?P<epub_uuid>[a-f0-9]{8}(?:-[a-f0-9]{4}){4}[a-f0-9]{8})$'
+                  | get epub_uuid
+                  | first
+                )
+              }
+            } else {
+              error make {
+                msg: "unknown unique identifier type"
+                labels: [
+                  {text: "unique_identifiers" span: (metadata $unique_identifiers).span}
+                  {text: "id" span: (metadata $id).span}
+                ]
+                help: $"add support for the unknown id (ansi yellow)($id)(ansi reset)"
+              }
+            }
+          }
+        }
+      ) | uniq
     }
   )
 
@@ -4024,31 +4115,64 @@ export def from_opf_xml [
   let isbn = (
     let ids = $metadata_content | where tag == identifier;
     if ($ids | is-not-empty) {
-      let isbns = $ids | where {|it| ($it.attributes | get --optional scheme) == "ISBN"}
-      if ($isbns | is-not-empty) {
-        $isbns | get content | first | get content | flatten | uniq | first
-      } else {
+      let isbns = $ids | where {|it|
+        (
+          (
+            ($it.attributes | get --optional scheme | is-not-empty)
+            and $it.attributes.scheme =~ "(?i)isbn"
+          )
+          or (
+            ($it.attributes | get --optional "opf:scheme" | is-not-empty)
+            and ($it.attributes | get "opf:scheme") =~ "(?i)isbn"
+          )
+          or (
+            ($it.attributes | get --optional id | is-not-empty)
+            and (
+              $metadata_content
+              # A where doesn't work here since the closure can't access $it.
+              | reduce --fold [] {|meta_it acc|
+                if (
+                  $meta_it.tag == "meta"
+                  and ($meta_it.attributes | get --optional refines) == $"#($it.attributes.id)"
+                  and ($meta_it.attributes | get --optional property) == "identifier-type"
+                  # https://ns.editeur.org/onix/en/5
+                  and ($meta_it.attributes | get --optional scheme) == "onix:codelist5"
+                  and ($meta_it.content | first | get --optional content ) == "15"
+                ) {
+                  $acc | append ($meta_it)
+                } else {
+                  $acc
+                }
+              } | is-not-empty
+            )
+          )
+          or ($it | get --optional content.0.content) =~ '^urn:isbn:[0-9]{13}$'
+        )
+      }
+      if ($isbns | length) > 1 {
+        error make {
+          msg: "multiple isbns found in OPF metadata"
+          labels: [{text: "isbns" span: (metadata $isbns).span}]
+          help: $"remove duplicate ISBNs (ansi yellow)($isbns)(ansi reset) from the OPF metadata"
+        }
+      } else if ($isbns | length) == 1 {
         # <dc:identifier id="pub-identifier">urn:isbn:9781506704197</dc:identifier>
         # <meta property="identifier-type" refines="#pub-identifier" scheme="onix:codelist5">15</meta>
         # log debug $"ids.content: ($ids.content | to json)"
-        let isbns = $ids | where {|it|
-          # log debug $"it: ($it | to json)"
-          # log debug $"it.content.0.content: ($it | get --optional content.0.content | to json)"
-          ($it | get --optional content.0.content) =~ '^urn:isbn:[0-9]{13}$'
-        }
-        # log debug $"isbns: ($isbns | to json)"
-        if ($isbns | is-not-empty) {
-          (
-            $isbns
-            | get content
-            | first
-            | get content
-            | flatten
-            | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$'
-            | get isbn
-            | uniq
-            | first
-          )
+        let isbn = (
+          $isbns
+          | get content
+          | first
+          | get content
+          | flatten
+          | uniq
+          | first
+          | str replace --all "-" ""
+        )
+        if ($isbn =~ '^urn:isbn:[0-9]{13}$') {
+          $isbn | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$' | get isbn
+        } else {
+          $isbn
         }
       }
     }
@@ -4198,51 +4322,73 @@ export def to_opf_xml [
   )
 
   # unique-identifier field order of preference:
+  # This must match the ID specified in the ncx/toc.ncx file.
+  # book_id which equates to the unique publisher id originally embedded in an ebook.
   # ISBN
   # Hardcover
   # Wikidata
   # BookBrainz
   let unique_identifier = (
-    if ($metadata | get --optional isbn | is-empty) {
-      let hardcover_edition_ids = $metadata.ids | where type == hardcover_edition_id
-      if ($hardcover_edition_ids | length) == 1 {
-        "hardcover_edition_id"
+    let epub_uuids = $metadata.ids | where type == epub_uuid;
+    if ($epub_uuids | length) == 1 {
+      "bookid"
+    } else {
+      if ($epub_uuids | length) > 1 {
+        log error $"Multiple EPUB UUIDs exist: ($epub_uuids)"
       } else {
-        if ($hardcover_edition_ids | length) > 1 {
-          log error $"Multiple hardcover edition ids exist: ($hardcover_edition_ids)"
-        } else {
-          let wikidata_edition_ids = $metadata.ids | where type == wikidata_edition_id
-          if ($wikidata_edition_ids | length) == 1 {
-            "wikidata_edition_id"
+        if ($metadata | get --optional isbn | is-empty) {
+          let hardcover_edition_ids = $metadata.ids | where type == hardcover_edition_id
+          if ($hardcover_edition_ids | length) == 1 {
+            "hardcover-edition"
           } else {
-            if ($wikidata_edition_ids | length) > 1 {
-              log error $"Multiple wikidata edition ids exist: ($wikidata_edition_ids)"
+            if ($hardcover_edition_ids | length) > 1 {
+              log error $"Multiple hardcover edition ids exist: ($hardcover_edition_ids)"
             } else {
-              let bookbrainz_edition_ids = $metadata.ids | where type == bookbrainz_edition_id
-              if ($bookbrainz_edition_ids | length) == 1 {
-                "bookbrainz_edition_id"
+              let wikidata_edition_ids = $metadata.ids | where type == wikidata_edition_id
+              if ($wikidata_edition_ids | length) == 1 {
+                "wikidata-edition"
               } else {
-                if ($bookbrainz_edition_ids | length) > 1 {
-                  log error $"Multiple BookBrainz edition ids exist: ($bookbrainz_edition_ids)"
+                if ($wikidata_edition_ids | length) > 1 {
+                  log error $"Multiple wikidata edition ids exist: ($wikidata_edition_ids)"
                 } else {
-                  log error "No unique book identifier available!"
+                  let bookbrainz_edition_ids = $metadata.ids | where type == bookbrainz_edition_id
+                  if ($bookbrainz_edition_ids | length) == 1 {
+                    "bookbrainz-edition"
+                  } else {
+                    if ($bookbrainz_edition_ids | length) > 1 {
+                      log error $"Multiple BookBrainz edition ids exist: ($bookbrainz_edition_ids)"
+                    } else {
+                      log error "No unique book identifier available!"
+                    }
+                  }
                 }
               }
             }
           }
+        } else {
+          "isbn"
         }
       }
-    } else {
-      "isbn"
     }
   )
 
   # https://www.w3.org/TR/epub-33/#sec-opf-dcidentifier
+  # Don't allow multiple identifiers of the same type.
+  if ($metadata.ids | get --optional type | uniq --repeated | is-not-empty) {
+    error make {
+      msg: "multiple identifiers for a single type are not allowed"
+      labels: [{text: "metadata.ids" span: (metadata $metadata.ids).span}]
+      help: $"remove duplicate identifiers of the types (ansi yellow)($metadata.ids | get --optional type | uniq --repeated)(ansi reset)"
+    }
+  }
   let opf_metadata = $opf_metadata | append (
     $metadata.ids | reduce --fold [] {|id acc|
       # for each type, add each scheme
       let schemes = $identifier_schemes | where type == $id.type
-      if ($schemes | is-empty) {
+      # log debug $"schemes: ($schemes)"
+      if ($id.type == "epub_uuid") {
+        $acc
+      } else if ($schemes | is-empty) {
         error make {
           msg: "missing OPF schemes for type"
           labels: [
@@ -4260,50 +4406,103 @@ export def to_opf_xml [
           ]
           help: $"remove the duplicate OPF schemes for the type (ansi yellow)($id.type)(ansi reset) to the identifier_schemes table"
         }
-      }
-      $schemes | first | get schemes | reduce --fold $acc {|scheme inner_acc|
-        let attributes = {"opf:scheme": $scheme}
-        let attributes = (
-          if $id.type == $unique_identifier {
-            $attributes | merge {id: "bookid"}
-          } else {
-            $attributes
-          }
-        )
-        $inner_acc | append [
-          [tag, attributes, content];
-          [
-            "dc:identifier"
-            $attributes
+      } else {
+        $schemes | first | get schemes | reduce --fold $acc {|scheme inner_acc|
+          $inner_acc | append [
+            [tag, attributes, content];
             [
-              [tag, attributes, content];
-              [null, null, ($id.id | into string)]
+              "dc:identifier"
+              {
+                # Include the "opf:scheme" field for compatibility.
+                "opf:scheme": $scheme
+                "id": $"($scheme | str downcase)-identifier"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, (
+                  if $id.type in ["bookbrainz_edition_id" "musicbrainz_release_id"] {
+                    $"urn:uuid:($id.id)"
+                  } else {
+                    ($id.id | into string)
+                  }
+                )]
+              ]
+            ]
+            [
+              "meta"
+              {
+                refines: $"#($scheme | str downcase)-identifier"
+                property: "identifier-type"
+                # scheme: "($scheme | str downcase)"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, $scheme]
+              ]
             ]
           ]
-        ]
+        }
       }
     } | append (
       if ($metadata | get --optional isbn | is-empty) {
       } else {
-        let attributes = {"opf:scheme": "ISBN"}
-        let attributes = (
-          if $unique_identifier == "isbn" {
-            $attributes | merge {id: "bookid"}
-          } else {
-            $attributes
-          }
-        )
         [
           [tag, attributes, content];
           [
             "dc:identifier"
-            $attributes
+            {
+              "opf:scheme": "ISBN"
+              id: "isbn-identifier"
+            }
             [
               [tag, attributes, content];
-              [null, null, ($metadata.isbn | into string)]
+              [null, null, $"urn:isbn:($metadata.isbn)"]
+            ]
+          ]
+          # https://ns.editeur.org/onix/en/5
+          # ISBN-13
+          [
+            "meta"
+            {
+              refines: "#isbn-identifier"
+              property: "identifier-type"
+              scheme: "onix:codelist5"
+            }
+            [
+              [tag, attributes, content];
+              [null, null, "15"]
             ]
           ]
         ]
+      }
+    ) | append (
+      if ($metadata | get --optional ids | where type == "epub_uuid" | is-empty) {
+      } else {
+        let epub_uuids = $metadata | get --optional ids | where type == "epub_uuid"
+        if ($epub_uuids | is-empty) {
+        } else if ($epub_uuids | length) > 1 {
+          error make {
+            msg: "multiple EPUB UUIDs"
+            labels: [
+              {text: "epub_uuids" span: (metadata $epub_uuids).span}
+            ]
+            help: $"remove the duplicate EPUB UUIDs (ansi yellow)($epub_uuids)(ansi reset) from the OPF metadata"
+          }
+        } else {
+          [
+            [tag, attributes, content];
+            [
+              "dc:identifier"
+              {
+                id: "bookid"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, $"urn:uuid:($epub_uuids.id | first)"]
+              ]
+            ]
+          ]
+        }
       }
     )
   )
@@ -4501,7 +4700,7 @@ export def to_opf_xml [
     if ($unique_identifier | is-empty) {
       $attributes
     } else {
-      $attributes | merge {"unique-identifier": "bookid"}
+      $attributes | merge {"unique-identifier": $unique_identifier}
     }
   )
   {
