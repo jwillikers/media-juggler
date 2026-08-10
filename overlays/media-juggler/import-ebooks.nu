@@ -1040,6 +1040,35 @@ def main [
   )
   log debug $"The Wikidata metadata is:\n(ansi green)($wikidata_metadata | to nuon)(ansi reset)\n"
 
+  let ids = (
+    []
+    | append (
+      if ($bookbrainz_edition_id | is-not-empty) {
+        [[type id]; [bookbrainz_edition_id $bookbrainz_edition_id]]
+      }
+    )
+    | append (
+      if ($hardcover_book_slug | is-not-empty) {
+        [[type id]; [hardcover_book_slug $hardcover_book_slug]]
+      }
+    )
+    | append (
+      if ($hardcover_edition_id | is-not-empty) {
+        [[type id]; [hardcover_edition_id $hardcover_edition_id]]
+      }
+    )
+    | append (
+      if ($open_library_edition_id | is-not-empty) {
+        [[type id]; [open_library_edition_id $open_library_edition_id]]
+      }
+    )
+    | append (
+      if ($wikidata_edition_id | is-not-empty) {
+        [[type id]; [wikidata_item_id $wikidata_edition_id]]
+      }
+    )
+  )
+
   # Use genres from Wikidata.
   let comic_metadata = $comic_metadata | merge {
     genres: ($wikidata_metadata | get --optional genres)
@@ -1053,15 +1082,15 @@ def main [
     }
   ) | merge (
     if ($comic_metadata | get --optional ids | is-empty) and ($wikidata_metadata | get --optional ids | is-empty) {
-      {}
+      {ids: $ids}
     } else if ($comic_metadata | get --optional ids | is-empty) {
-      {ids: ($wikidata_metadata.ids)}
+      {ids: ($ids | append $wikidata_metadata.ids | uniq)}
     } else if ($wikidata_metadata | get --optional ids | is-empty) {
-      {ids: ($comic_metadata.ids)}
+      {ids: ($ids | append $comic_metadata.ids | uniq)}
     } else {
       {
         ids: (
-          $wikidata_metadata.ids | append $comic_metadata.ids | uniq
+          $ids | append $wikidata_metadata.ids | append $comic_metadata.ids | uniq
         )
       }
     }
