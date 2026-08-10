@@ -1040,11 +1040,32 @@ def main [
   )
   log debug $"The Wikidata metadata is:\n(ansi green)($wikidata_metadata | to nuon)(ansi reset)\n"
 
+  # Use genres from Wikidata.
+  let comic_metadata = $comic_metadata | merge {
+    genres: ($wikidata_metadata | get --optional genres)
+  }
   let comic_metadata = (
-    $comic_metadata
-    | merge $wikidata_metadata
-    # Prefer publishers from Hardcover over Wikidata for consistency.
-    | upsert publishers $comic_metadata.publishers
+    let ids = ($existing_metadata | get --optional ids);
+    if ($ids | is-empty) {
+      $comic_metadata
+    } else {
+      let epub_uuids = $ids | where type == "epub_uuid"
+      if ($epub_uuids | is-empty) {
+        $comic_metadata
+      } else if ($epub_uuids | length) > 1 {
+        error make {
+          msg: "multiple EPUB uuids"
+          labels: [
+              {text: "epub_uuids" span: (metadata $epub_uuids).span}
+          ]
+          help: $"remove extra EPUB uuids ($epub_uuids)"
+        }
+      } else {
+        $comic_metadata | update ids (
+          $comic_metadata.ids | append ($epub_uuids | first)
+        )
+      }
+    }
   )
   log debug $"The merged metadata is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
 
@@ -1157,6 +1178,12 @@ def main [
     $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
+
+  # Verify the EPUB file with epubcheck
+  if $output_format == "epub" and not ($formats | get $output_format | epubcheck) {
+    log error $"Error running epubcheck on the EPUB file (ansi yellow)($formats | get $output_format)(ansi reset)"
+    exit 1
+  }
 
   # todo How to handle nested series and subseries?
   let series_subdirectory = (

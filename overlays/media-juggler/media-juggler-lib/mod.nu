@@ -4800,6 +4800,40 @@ export def to_opf_xml [
   }
 }
 
+# Use epubcheck to check if an EPUB is valid
+export def epubcheck []: [path -> bool] {
+  let epub = $in
+  let result = do { ^epubcheck --failonwarnings --json - $epub } | complete
+  if ($result.exit_code != 0) {
+    let messages = $result.stdout | from json | get messages
+    if ($messages | is-empty) {
+      # This shouldn't happen, but throw an error if it does anyway.
+      error make {
+        msg: "non-zero exit code while validating EPUB with epubcheck"
+        labels: [
+          {text: "result.exit_code" span: (metadata $result.exit_code).span}
+        ]
+        help: $"error validating the EPUB file (ansi yellow)($epub)(ansi reset):\nstderr: ($result.stderr)\nstdout: ($result.stdout)\n"
+      }
+    } else {
+      # The 'opf:scheme' attribute is required for Kavita, so ignore related error messages.
+      if ($messages | all {|it| $it.ID == "RSC-005" and $it.message == 'Error while parsing file: attribute "opf:scheme" not allowed here; expected attribute "id"' }) {
+        true
+      } else {
+        error make {
+          msg: "non-zero exit code while validating EPUB with epubcheck"
+          labels: [
+            {text: "result.exit_code" span: (metadata $result.exit_code).span}
+          ]
+          help: $"error validating the EPUB file (ansi yellow)($epub)(ansi reset):\nstderr: ($result.stderr)\nmessages: ($messages | where {|it| not (ID == 'RSC-005' and $it.message == 'Error while parsing file: attribute "opf:scheme" not allowed here; expected attribute "id"')})\n"
+        }
+      }
+    }
+  } else {
+    true
+  }
+}
+
 # Count the number of image files in a ZIP archive
 export def number_of_images_in_archive []: [path -> int] {
   let archive = $in
