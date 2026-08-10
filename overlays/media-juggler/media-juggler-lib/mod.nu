@@ -4262,7 +4262,7 @@ export def to_opf_xml [
         }
       }
       $schemes | first | get schemes | reduce --fold $acc {|scheme inner_acc|
-        let attributes = {scheme: $scheme}
+        let attributes = {"opf:scheme": $scheme}
         let attributes = (
           if $id.type == $unique_identifier {
             $attributes | merge {id: "bookid"}
@@ -4285,7 +4285,7 @@ export def to_opf_xml [
     } | append (
       if ($metadata | get --optional isbn | is-empty) {
       } else {
-        let attributes = {scheme: "ISBN"}
+        let attributes = {"opf:scheme": "ISBN"}
         let attributes = (
           if $unique_identifier == "isbn" {
             $attributes | merge {id: "bookid"}
