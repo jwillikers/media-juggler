@@ -2841,7 +2841,7 @@ export def parse_hardcover_edition []: [record -> record] {
     [
       [type id];
       [hardcover_book_slug $hardcover_edition.book.slug]
-      [hardcover_edition_id $hardcover_edition.id]
+      [hardcover_edition_id ($hardcover_edition.id | into string)]
     ] | append (
       $hardcover_edition | get --optional book_mappings | reduce --fold [] {|book_mapping acc|
         let platform_id_mapping =  $platform_id_mappings | where id == $book_mapping.platform_id
@@ -2880,7 +2880,7 @@ export def parse_hardcover_edition []: [record -> record] {
       )
       $acc | append [
         [person id role primary language];
-        [$contribution.author.name $contribution.author.id $role false ""]
+        [$contribution.author.name ($contribution.author.id | into string) $role false ""]
       ] | uniq
       # ] | append (
       #   if $contribution.contribution == "Cover Artist" {
@@ -2929,7 +2929,12 @@ export def parse_hardcover_edition []: [record -> record] {
   let characters = (
     if ($hardcover_edition | get --optional book.book_characters.character | is-empty) {
     } else {
-      $hardcover_edition.book.book_characters.character | select --optional name id
+      $hardcover_edition.book.book_characters.character | select --optional name id | each {|character|
+        {
+          id: ($character.id | into string)
+          name: $character.name
+        }
+      }
     }
   )
 
@@ -2965,6 +2970,7 @@ export def parse_hardcover_edition []: [record -> record] {
     # $data.store_date
     # $data.cover_date
     credits: $credits
+    # todo Make sure this is a string?
     series_id: ($hardcover_edition | get --optional book.featured_book_series.series_id)
     _cover_image: [0, "", ($hardcover_edition | get --optional image.url)]
   }
