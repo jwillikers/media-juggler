@@ -1110,7 +1110,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
   let expected = {
     tag: "package"
     attributes: {
-      # unique-identifier: calibre_id
+      "unique-identifier": "bookid"
       version: "3.0"
     },
     content: [
@@ -1184,7 +1184,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
           ],
           [dc:identifier, {scheme: HARDCOVER-EDITION}, [[tag, attributes, content]; [null, null, "30930924"]]]
           [dc:identifier, {scheme: BOOKBRAINZ-EDITION}, [[tag, attributes, content]; [null, null, "594a8ec2-6301-4c20-ae22-2c43840416b2"]]]
-          [dc:identifier, {scheme: ISBN}, [[tag, attributes, content]; [null, null, "9781634428132"]]]
+          [dc:identifier, {id: "bookid", scheme: ISBN}, [[tag, attributes, content]; [null, null, "9781634428132"]]]
           [dc:identifier, {scheme: COMICVINE}, [[tag, attributes, content]; [null, null, "987377"]]]
           [dc:identifier, {scheme: WIKIDATA-EDITION}, [[tag, attributes, content]; [null, null, "Q139556252"]]]
           [

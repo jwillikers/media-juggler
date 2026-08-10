@@ -4220,6 +4220,46 @@ export def to_opf_xml [
     }
   )
 
+  # unique-identifier field order of preference:
+  # ISBN
+  # Hardcover
+  # Wikidata
+  # BookBrainz
+  let unique_identifier = (
+    if ($metadata | get --optional isbn | is-empty) {
+      let hardcover_edition_ids = $metadata.ids | where type == hardcover_edition_id
+      if ($hardcover_edition_ids | length) == 1 {
+        "hardcover_edition_id"
+      } else {
+        if ($hardcover_edition_ids | length) > 1 {
+          log error $"Multiple hardcover edition ids exist: ($hardcover_edition_ids)"
+        } else {
+          let wikidata_edition_ids = $metadata.ids | where type == wikidata_edition_id
+          if ($wikidata_edition_ids | length) == 1 {
+            "wikidata_edition_id"
+          } else {
+            if ($wikidata_edition_ids | length) > 1 {
+              log error $"Multiple wikidata edition ids exist: ($wikidata_edition_ids)"
+            } else {
+              let bookbrainz_edition_ids = $metadata.ids | where type == bookbrainz_edition_id
+              if ($bookbrainz_edition_ids | length) == 1 {
+                "bookbrainz_edition_id"
+              } else {
+                if ($bookbrainz_edition_ids | length) > 1 {
+                  log error $"Multiple BookBrainz edition ids exist: ($bookbrainz_edition_ids)"
+                } else {
+                  log error "No unique book identifier available!"
+                }
+              }
+            }
+          }
+        }
+      }
+    } else {
+      "isbn"
+    }
+  )
+
   let opf_metadata = $opf_metadata | append (
     $metadata.ids | reduce --fold [] {|id acc|
       # for each type, add each scheme
@@ -4232,13 +4272,19 @@ export def to_opf_xml [
         # todo make error if type is missing
       }
       $schemes | first | get schemes | reduce --fold $acc {|scheme inner_acc|
+        let attributes = {scheme: $scheme}
+        let attributes = (
+          if $id.type == $unique_identifier {
+            $attributes | merge {id: "bookid"}
+          } else {
+            $attributes
+          }
+        )
         $inner_acc | append [
           [tag, attributes, content];
           [
             "dc:identifier"
-            {
-              scheme: $scheme
-            }
+            $attributes
             [
               [tag, attributes, content];
               [null, null, ($id.id | into string)]
@@ -4249,25 +4295,24 @@ export def to_opf_xml [
     } | append (
       if ($metadata | get --optional isbn | is-empty) {
       } else {
+        let attributes = {scheme: "ISBN"}
+        let attributes = (
+          if $unique_identifier == "isbn" {
+            $attributes | merge {id: "bookid"}
+          } else {
+            $attributes
+          }
+        )
         [
           [tag, attributes, content];
           [
             "dc:identifier"
-            {scheme: "ISBN"}
+            $attributes
             [
               [tag, attributes, content];
               [null, null, ($metadata.isbn | into string)]
             ]
           ]
-          # <dc:identifier id="BookId">urn:uuid:781aa24e-42eb-439f-a876-8426bdcb5805</dc:identifier>
-          # [
-          #   "dc:identifier"
-          #   {id: "BookId"}
-          #   [
-          #     [tag, attributes, content];
-          #     [null, null, ($metadata.isbn | into string)]
-          #   ]
-          # ]
         ]
       }
     )
@@ -4383,11 +4428,17 @@ export def to_opf_xml [
   )
 
   # todo I should probably make sure to use the unique-identifier as an identifier type in the metadata.
+  let attributes = {version: "3.0"}
+  let attributes = (
+    if ($unique_identifier | is-empty) {
+      $attributes
+    } else {
+      $attributes | merge {"unique-identifier": "bookid"}
+    }
+  )
   {
     "tag": "package"
-    attributes: {
-      version: "3.0"
-    },
+    attributes: $attributes,
     content: [
       [tag, attributes, content];
       [
@@ -4640,6 +4691,7 @@ export def embed_ebook_metadata [
           open $metadata_file | from xml
         }
       )
+      let opf_metadata = $book_metadata | to_opf_xml
       let metadata = (
         $metadata
         | update attributes (
@@ -4648,15 +4700,21 @@ export def embed_ebook_metadata [
           # https://github.com/nushell/nushell/issues/11523
           $metadata.attributes | merge {
             xmlns: "http://www.idpf.org/2007/opf"
-          }
+          } | merge (
+            # Include the unique-identifier attribute at the top-level.
+            if ($opf_metadata | get --optional attributes.unique-identifier | is-empty) {
+              {}
+            } else {
+              {"unique-identifier": $opf_metadata.attributes.unique-identifier}
+            }
+          )
         )
         # Drop the existing metadata section in the OPF.
         | update content (
           (
             $metadata.content | where tag != "metadata"
             | prepend (
-              $book_metadata
-              | to_opf_xml
+              $opf_metadata
               | get content
               | where tag == "metadata"
               | first
