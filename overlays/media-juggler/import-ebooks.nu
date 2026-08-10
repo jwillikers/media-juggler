@@ -1045,10 +1045,24 @@ def main [
     genres: ($wikidata_metadata | get --optional genres)
   } | merge (
     if ($comic_metadata | get --optional forms_of_creative_work | is-empty) {
-      {}
-    } else {
       {
         forms_of_creative_work: ($wikidata_metadata | get --optional forms_of_creative_work)
+      }
+    } else {
+      {}
+    }
+  ) | merge (
+    if ($comic_metadata | get --optional ids | is-empty) and ($wikidata_metadata | get --optional ids | is-empty) {
+      {}
+    } else if ($comic_metadata | get --optional ids | is-empty) {
+      {ids: ($wikidata_metadata.ids)}
+    } else if ($wikidata_metadata | get --optional ids | is-empty) {
+      {ids: ($comic_metadata.ids)}
+    } else {
+      {
+        ids: (
+          $wikidata_metadata.ids | append $comic_metadata.ids | uniq
+        )
       }
     }
   )
