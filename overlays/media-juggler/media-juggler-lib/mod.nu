@@ -4427,7 +4427,7 @@ export def to_opf_xml [
               "dc:identifier"
               {
                 # Include the "opf:scheme" field for compatibility.
-                "opf:scheme": $scheme
+                # "opf:scheme": $scheme
                 "id": $"($scheme | str downcase)-identifier"
               }
               [
@@ -4464,7 +4464,7 @@ export def to_opf_xml [
           [
             "dc:identifier"
             {
-              "opf:scheme": "ISBN"
+              # "opf:scheme": "ISBN"
               id: "isbn-identifier"
             }
             [
