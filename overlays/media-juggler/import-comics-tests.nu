@@ -1286,10 +1286,17 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
   # log debug $"\n($input | to_opf_xml | to nuon)\n"
   # assert equal ($input | to_opf_xml | get content | first | get content.tag | uniq) ($expected | get content | first | get content.tag | uniq)
   let output = $input | to_opf_xml
+  # log debug $"\n($output.content | where tag == metadata | first | get content | where tag == meta | to nuon)\n"
+  let timestamps = (
+    $output.content | where tag == metadata | first | get content | where {|it| $it.tag == "meta" and ($it | get --optional attributes.property) == "dcterms:modified"}
+  )
+  assert equal ($timestamps | length) 1
+  let timestamp = $timestamps | first | get content.content | first
+  assert ($timestamp =~ "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
   let output = $output | update content (
     $output.content | where tag != metadata | prepend (
       let metadata = $output.content | where tag == metadata | first;
-      $metadata | update content ($metadata.content | where {|it| ($it | get --optional attributes.name) not-in ["calibre:timestamp" "dcterms:modified"] })
+      $metadata | update content ($metadata.content | where {|it| not ($it.tag == "meta" and ($it | get --optional attributes.property) == "dcterms:modified") })
     )
   )
   # log debug $"output: ($output | get content | first | get content | where tag == "meta" | to json)"

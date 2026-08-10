@@ -4409,11 +4409,11 @@ export def to_opf_xml [
         [tag, attributes, content];
         [
           "meta"
-          {
-            name: "calibre:timestamp"
-            content: (date now | date to-timezone "UTC" | format date '%+')
-          }
-          []
+          {property: "dcterms:modified"}
+          [
+            [tag, attributes, content];
+            [null null (date now | date to-timezone "UTC" | format date '%FT%H:%M:%SZ')]
+          ]
         ]
       ]
     )
