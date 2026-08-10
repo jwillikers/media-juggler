@@ -1446,6 +1446,11 @@ export def optimize_images_in_zip []: path -> path {
   let temporary_archive = $archive | path parse | update parent $temporary_directory | path join
   rm --force $temporary_archive
   cd $extraction_path
+  # Add the mimetype file to the archive first so that epubcheck is happy.
+  if ("mimetype" | path exists) {
+    log debug $"Running (ansi yellow)^zip --quiet --recurse-paths ($temporary_archive) mimetype(ansi reset)"
+    ^zip --quiet --recurse-paths $temporary_archive mimetype
+  }
   log debug $"Running (ansi yellow)^zip --quiet --recurse-paths ($temporary_archive) .(ansi reset)"
   ^zip --quiet --recurse-paths $temporary_archive .
   cd -
