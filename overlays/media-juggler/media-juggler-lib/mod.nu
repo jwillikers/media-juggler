@@ -4045,6 +4045,8 @@ export def from_opf_xml [
 }
 
 # Output metadata in the format used by an EPUB's content.opf XML file
+#
+# https://www.w3.org/TR/epub/
 export def to_opf_xml [
   language_codes_map: table = $iso_language_codes_map
   identifier_schemes: table = $opf_identifier_schemes
@@ -4056,58 +4058,6 @@ export def to_opf_xml [
   # todo I should probably just work with the metadata content field instead.
   # [[tag, attributes, content]; []]
   let opf_metadata = []
-
-  let opf_role_mappings = {
-    "Artist": "artist"
-    # Kavita treats the illustrator as Inker.
-    "Illustrator": "illustrator"
-    "Inker": "illustrator"
-    "Colorist": "colorist"
-    "Editor": "editor"
-    "Translator": "translator"
-    "Writer": "author"
-  }
-  let opf_metadata = $opf_metadata | append (
-    let credits = $metadata | get --optional credits;
-    if ($credits | is-empty) {
-    } else {
-      $credits | enumerate | reduce --fold [] {|credit acc|
-        let role = $opf_role_mappings | get --optional $credit.item.role
-        if ($role | is-empty) {
-          $acc
-        } else {
-          $acc | append [
-            [tag, attributes, content];
-            [
-              "meta"
-              {
-                refines: $"#id-creator-($credit.index)-($role)"
-                property: "role"
-                scheme: "marc:relators"
-              }
-              [
-                [tag, attributes, content];
-                [null, null, $role]
-              ]
-            ]
-            [
-              "dc:creator"
-              {
-                # role: aut
-                # todo Add sort name?
-                # file-as: "Umino, Chica"
-                id: $"id-creator-($credit.index)-($role)"
-              }
-              [
-                [tag, attributes, content];
-                [null, null, $credit.item.person]
-              ]
-            ]
-          ]
-        }
-      }
-    }
-  )
 
   # title
   let opf_metadata = (
@@ -4337,6 +4287,7 @@ export def to_opf_xml [
             []
           ]
           # Epub 3.2
+          # https://www.w3.org/TR/epub-33/#sec-collection-type
           [
             "meta"
             {
@@ -4419,6 +4370,7 @@ export def to_opf_xml [
     )
   )
 
+  # Sort the fields to be as deterministic as possible.
   let opf_metadata = (
     if ($opf_metadata | is-empty) {
       []
@@ -4427,7 +4379,82 @@ export def to_opf_xml [
     }
   )
 
-  # todo I should probably make sure to use the unique-identifier as an identifier type in the metadata.
+  # The order of creators is important.
+  # https://id.loc.gov/vocabulary/relators.html
+  let opf_role_mappings = {
+    "Artist": "artist"
+    # Kavita treats the illustrator as Inker.
+    "Illustrator": "illustrator"
+    "Inker": "illustrator"
+    "Colorist": "colorist"
+    "Editor": "editor"
+    "Translator": "translator"
+    "Writer": "author"
+  }
+  let opf_metadata = $opf_metadata | append (
+    let credits = $metadata | get --optional credits;
+    if ($credits | is-empty) {
+    } else {
+      $credits | sort-by --custom {|a b|
+        # Place writers first, followed by artists and illustrators.
+        # Place editors last.
+        if ($a.role == "Writer") and ($b.role == "Writer") {
+          $a.primary
+        } else if "Writer" in [$a.role $b.role] {
+          $a.role == "Writer"
+        } else {
+          if ($a.role in ["Artist" "Illustrator"]) and ($b.role in ["Artist" "Illustrator"]) {
+            $a.primary
+          } else if $a.role in ["Artist" "Illustrator"] or $b.role in ["Artist" "Illustrator"] {
+            $a.role in ["Artist" "Illustrator"]
+          } else {
+            if ($a.role == "Editor") and ($b.role == "Editor") {
+              $a.primary
+            } else if "Editor" in [$a.role $b.role] {
+              $b.role == "Editor"
+            } else {
+              false
+            }
+          }
+        }
+      } | enumerate | reduce --fold [] {|credit acc|
+        let role = $opf_role_mappings | get --optional $credit.item.role
+        if ($role | is-empty) {
+          $acc
+        } else {
+          $acc | append [
+            [tag, attributes, content];
+            [
+              "dc:creator"
+              {
+                # role: aut
+                # todo Add sort name?
+                # file-as: "Umino, Chica"
+                id: $"id-creator-($credit.index)-($role)"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, $credit.item.person]
+              ]
+            ]
+            [
+              "meta"
+              {
+                refines: $"#id-creator-($credit.index)-($role)"
+                property: "role"
+                scheme: "marc:relators"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, $role]
+              ]
+            ]
+          ]
+        }
+      }
+    }
+  )
+
   let attributes = {version: "3.0"}
   let attributes = (
     if ($unique_identifier | is-empty) {

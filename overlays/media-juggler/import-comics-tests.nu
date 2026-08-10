@@ -1125,28 +1125,6 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
         [
           [tag, attributes, content];
           [
-            dc:creator,
-            {
-              # role: aut,
-              # file-as: "Umino, Chica"
-              id: "id-creator-0-author"
-            },
-            [
-              [tag, attributes, content];
-              [null, null, "Chica Umino"]
-            ]
-          ],
-          [
-            dc:creator,
-            {
-              id: "id-creator-1-artist"
-            },
-            [
-              [tag, attributes, content];
-              [null, null, "Chica Umino"]
-            ]
-          ],
-          [
             dc:date
             {}
             [
@@ -1187,50 +1165,16 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
           [dc:identifier, {id: "bookid", scheme: ISBN}, [[tag, attributes, content]; [null, null, "9781634428132"]]]
           [dc:identifier, {scheme: COMICVINE}, [[tag, attributes, content]; [null, null, "987377"]]]
           [dc:identifier, {scheme: WIKIDATA-EDITION}, [[tag, attributes, content]; [null, null, "Q139556252"]]]
-          [
-            dc:identifier
-            {scheme: HARDCOVER}
-            [
-              [tag, attributes, content];
-              [null, null, "march-comes-in-like-a-lion-volume-1"]
-            ]
-          ],
-          [
-            dc:identifier
-            {scheme: HARDCOVER-SLUG}
-            [
-              [tag, attributes, content]; [null, null, "march-comes-in-like-a-lion-volume-1"]
-            ]
-          ]
+          [dc:identifier {scheme: HARDCOVER} [[tag, attributes, content]; [null, null, "march-comes-in-like-a-lion-volume-1"]]]
+          [dc:identifier {scheme: HARDCOVER-SLUG} [[tag, attributes, content]; [null, null, "march-comes-in-like-a-lion-volume-1"]]]
           # [identifier {scheme: HARDCOVER-ID} [[tag, attributes, content]; [null, null, "908381"]]]
           # [identifier, {scheme: COMICVINE-VOLUME}, [[tag, attributes, content]; [null, null, "150064"]]]
-          [
-            dc:language
-            {}
-            [
-              [tag, attributes, content];
-              [null, null, eng]
-            ]
-          ]
-          [
-            dc:publisher
-            {}
-            [
-              [tag, attributes, content];
-              [null, null, Denpa]
-            ]
-          ]
+          [dc:language {} [[tag, attributes, content]; [null, null, eng]]]
+          [dc:publisher {} [[tag, attributes, content]; [null, null, Denpa]]]
           [dc:subject, {}, [[tag, attributes, content]; [null, null, coming-of-age]]]
           [dc:subject, {}, [[tag, attributes, content]; [null, null, romance]]]
           [dc:subject, {}, [[tag, attributes, content]; [null, null, "slice of life"]]]
-          [
-            dc:title,
-            {},
-            [
-              [tag, attributes, content];
-              [null, null, "March Comes in Like a Lion, Vol. 1"]
-            ]
-          ],
+          [dc:title, {}, [[tag, attributes, content]; [null, null, "March Comes in Like a Lion, Vol. 1"]]]
           [meta, {name: "calibre:series", content: "March Comes in Like a Lion"}, []]
           [meta, {name: "calibre:series_index", content: "1"}, []]
           [
@@ -1256,17 +1200,17 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
             ]
           ]
           [
-            "meta"
+            dc:creator,
             {
-              refines: "#id-creator-1-artist"
-              property: "role"
-              scheme: "marc:relators"
-            }
+              # role: aut,
+              # file-as: "Umino, Chica"
+              id: "id-creator-0-author"
+            },
             [
               [tag, attributes, content];
-              [null, null, artist]
+              [null, null, "Chica Umino"]
             ]
-          ]
+          ],
           [
             "meta"
             {
@@ -1277,6 +1221,28 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
             [
               [tag, attributes, content];
               [null, null, author]
+            ]
+          ]
+          [
+            dc:creator,
+            {
+              id: "id-creator-1-artist"
+            },
+            [
+              [tag, attributes, content];
+              [null, null, "Chica Umino"]
+            ]
+          ],
+          [
+            "meta"
+            {
+              refines: "#id-creator-1-artist"
+              property: "role"
+              scheme: "marc:relators"
+            }
+            [
+              [tag, attributes, content];
+              [null, null, artist]
             ]
           ]
         ]
