@@ -70,6 +70,7 @@ export const genre_allowlist = [
   [comedy [] [Q40831 Q15286013 Q11298158]]
   ["comedy drama" [dramedy] [Q859369 Q15712927 Q104536976]]
   ["coming-of-age" ["coming of age" "coming of age story"] [Q2975633 Q135684998]]
+  ["contemporary fantasy" ["modern fantasy" "indigenous fantasy"] [Q1128592]]
   [cooking [] [Q139412567 Q139412557 Q11080558]]
   ["dark fantasy" ["fantasy horror"] [Q794912 Q111254005]]
   ["drama" [] [Q21010853 Q15637299 Q104536999]]
