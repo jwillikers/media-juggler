@@ -5175,7 +5175,7 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
     ids: [
       [type, id];
       [hardcover_book_slug, "tsukimichi-moonlit-fantasy-light-novel-vol-1"]
-      [hardcover_edition_id, 32336811]
+      [hardcover_edition_id, "32336811"]
       [open_library_edition_id, "OL62344989M"]
     ]
     isbn: "9781961788145"
@@ -5189,11 +5189,11 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
     publishers: ["Hanashi Media"]
     credits: [
       [person, id, role, primary, language];
-      ["Kei Azumi", 1221140, Writer, false, ""]
-      ["Mitsuaki Matsumoto", 1221151, Artist, false, ""]
-      ["Mitsuaki Matsumoto", 1221151, "Cover Artist", false, ""]
-      ["Mittt Liu", 724696, Translator, false, ""]
-      ["Jasmine Thone", 1251809, Editor, false, ""]
+      ["Kei Azumi", "1221140", Writer, false, ""]
+      ["Mitsuaki Matsumoto", "1221151", Artist, false, ""]
+      ["Mitsuaki Matsumoto", "1221151", "Cover Artist", false, ""]
+      ["Mittt Liu", "724696", Translator, false, ""]
+      ["Jasmine Thone", "1251809", Editor, false, ""]
     ]
     series_id: 202585
     _cover_image: [
