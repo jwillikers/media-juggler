@@ -34,6 +34,7 @@ def main [
   --keep-tmp # Don't delete the temporary directory when there's an error
   --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
   --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
+  --replace-cover # Replace the cover image in an ebook with the image from Hardcover.
   --skip-upload # Don't upload files to the server
   --title: string # The title of the book
   --use-rsync
@@ -100,6 +101,8 @@ def main [
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-ebooks"] | path join
   let optimized_files_cache_file = [$cache_directory optimized.json] | path join
   mkdir $cache_directory
+  let cover_art_directory = [$cache_directory "covers"] | path join
+  mkdir $cover_art_directory
 
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-ebooks-config.json"] | path join
   let config: record = (
@@ -1142,7 +1145,24 @@ def main [
   log info "Embedding the metadata in the ebook"
   $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
 
-  # todo Embed cover in PDFs when the quality appears better?
+  if ($replace_cover) {
+    let cover_image_url = $comic_metadata | get --optional _cover_image.2
+    if not ($cover_image_url) {
+      log error $"Unable to replace cover as there is no cover art set for the Hardcover edition ($hardcover_edition_id)."
+      exit 1
+    }
+    let cover_image = $cover_image_url | download_file $cover_art_directory
+    # todo Embed cover image in EPUB manually and only use ebook-meta for PDFs.
+    # todo Compare quality of existing cover and downloaded cover and warn or abort as necessary.
+    log info "Replacing cover image in the ebook"
+    log debug $"Running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'"
+    let result = do {^ebook-meta --cover $cover_image ($formats | get $output_format)} | complete
+    if $result.exit_code != 0 {
+      log error $"Error running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      exit 1
+    }
+    log info "Replaced the cover image in the ebook"
+  }
 
   log debug "Renaming the file according to its metadata"
   let formats = (

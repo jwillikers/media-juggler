@@ -8405,6 +8405,34 @@ export def fetch_release_front_cover [
   $destination
 }
 
+# Download a file given a URL
+export def download_file [
+  download_directory: directory
+  --retries: int = 3
+  --retry-delay: duration = 3sec
+]: string -> path {
+  let url = $in
+  let request = {
+    http get --full --headers [User-Agent $user_agent] $"($url)"
+  }
+  let response = retry_http $request $retries $retry_delay
+  let filename = $url | url parse | get path | path basename
+  let destination = $download_directory | path join $filename
+  # If the path exists, skip the download.
+  if ($destination | path exists) {
+    return $destination
+  }
+  let download_request = {
+    http get --headers [User-Agent $user_agent] $url
+  }
+  let destination = retry_download $download_request $destination $retries $retry_delay
+  if ($destination | is-empty) {
+    log error $"Error downloading file from ($url) to ($destination)"
+    return null
+  }
+  $destination
+}
+
 # Fetch a release group from MusicBrainz by ID
 export def fetch_musicbrainz_release_group [
   --retries: int = 3
