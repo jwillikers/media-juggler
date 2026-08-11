@@ -1059,8 +1059,57 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
   assert equal ($input | from_opf_xml) $expected
 }
 
+def test_from_opf_xml_march_comes_in_like_a_lion_volume_1_epub_3_2_pdf [] {
+  let input = open ([$test_data_dir "march-comes-in-like-a-lion-volume-1-pdf-metadata-epub-3.2.opf"] | path join) | from xml
+  let expected = {
+    credits: [
+      [creator, role, primary, language];
+      ["Chica Umino", Writer, true, ""]
+    ]
+    publishers: ["Denpa"]
+    genres: [
+      coming-of-age
+      romance
+      "slice of life"
+    ]
+    language: "english"
+    title: "March Comes in Like a Lion, Vol. 1",
+    description: "Rei Kiriyama...
+
+Note: This volume was released digitally (05/03/2023) before paperback (06/06/2023).
+
+## Chapter Titles
+* Chapter 1: Rei Kiriyama
+* Chapter 2: A Riverside Town
+* Chapter 3: Akari
+* Chapter 4: The Other Side of the Bridge
+* Chapter 5: Harunobu
+* Chapter 6: Beyond the Night Sky
+* Chapter 7: Hina
+* Chapter 8: VS.
+* Chapter 9: Contract
+* Chapter 10: Over the Cuckoo's Nest"
+    publication_date: (2023-05-01T05:00:00+00:00 | into datetime)
+    ids: [
+      [type, id];
+      [hardcover_book_slug, "march-comes-in-like-a-lion-volume-1"],
+      [hardcover_edition_id, "30930924"],
+      [comic_vine_issue_id, "987377"],
+      [bookbrainz_edition_id, "594a8ec2-6301-4c20-ae22-2c43840416b2"],
+      [wikidata_item_id, "Q139556252"]
+      [epub_uuid, "2494c4ca-6fb6-459f-baca-26de4d2df70e"]
+    ],
+    series: "March Comes in Like a Lion",
+    issue: "1",
+    isbn: "9781634428132"
+  }
+  # log debug $"\n($input | from_opf_xml | to nuon)\n"
+  assert equal ($input | from_opf_xml) $expected
+}
+
 def test_from_opf_xml [] {
   test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf
+  test_from_opf_xml_march_comes_in_like_a_lion_volume_1_epub_3_2_pdf
 }
 
 def test_to_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {

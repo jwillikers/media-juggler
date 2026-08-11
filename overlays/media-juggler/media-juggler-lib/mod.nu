@@ -3931,22 +3931,72 @@ export def from_opf_xml [
   let series = (
     let meta = $metadata_content | where tag == meta;
     if ($meta | is-not-empty) {
-      let series = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series"}
-      if ($series | is-not-empty) {
-        # todo Warn if there are multiple series
-        $series | first | get attributes.content
+      # EPUB 3.2 series tag
+      if ($meta | any {|it| ($it | get --optional attributes.property) == "belongs-to-collection"}) {
+        let belongs_to_collection_items = $meta | where {|it| ($it | get --optional attributes.property) == "belongs-to-collection"}
+        $belongs_to_collection_items | reduce --fold [] {|it acc|
+          let id = $it.attributes | get --optional id
+          if ($id | is-empty) {
+            $acc | append [[name position]; [($it.content.0.content) null]]
+          } else {
+            let refines_group_position_for_id_items = $meta | where {|it| ($it | get --optional attributes.refines) == $"#($id)" and ($it | get --optional attributes.property) == "group-position"}
+            if ($refines_group_position_for_id_items | is-empty) {
+              $acc | append [[name position]; [($it.content.0.content) null]]
+            } else {
+              if (($refines_group_position_for_id_items | length) > 1) {
+                log warning $"Multiple group-position attributes for id ($id): ($refines_group_position_for_id_items). Ignoring all but the first."
+              }
+              $acc | append [
+                [name position];
+                [
+                  ($it.content.0.content)
+                  ($refines_group_position_for_id_items | first | get content | first | get content)
+                ]
+              ]
+            }
+          }
+        }
+      } else {
+        # Fallback to Calibre series tag
+        let series = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series"}
+        let series_name = (
+          if ($series | is-not-empty) {
+            $series | first | get attributes.content
+          }
+        )
+        let series_indices = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series_index"}
+        let series_position = (
+          if ($series_indices | is-not-empty) {
+            $series_indices | first | get attributes.content
+          }
+        )
+        if ($series_name | is-not-empty) {
+          if ($series_position | is-empty) {
+            [
+              [name position];
+              [$series_name null]
+            ]
+          } else {
+            [
+              [name position];
+              [$series_name $series_position]
+            ]
+          }
+        }
       }
     }
   )
 
-  let issue = (
-    let meta = $metadata_content | where tag == meta;
-    if ($meta | is-not-empty) {
-      let series_indices = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series_index"}
-      if ($series_indices | is-not-empty) {
-        # todo Warn if there are multiple series indices
-        $series_indices | first | get attributes.content
-      }
+  # The metadata structure for series only supports one series right now.
+  let single_series = (
+    if ($series | length) > 1 {
+      # Maintain the order as parsed, but place the series with a position at the end.
+      let series = $series | sort-by --custom {|a b| ($a | get --optional position | is-not-empty) and ($b | get --optional position | is-empty)}
+      log warning $"Multiple series parsed from OPF metadata: ($series). Ignoring all but the first one."
+      # This ensures when there are multiple series, one with a position is preferred over the series without positions.
+      $series | first
+    } else {
+      $series | first
     }
   )
 
@@ -4209,8 +4259,8 @@ export def from_opf_xml [
     | upsert_if_value "description" $description
     | upsert_if_value "publication_date" $publication_date
     | upsert_if_value "ids" $ids
-    | upsert_if_value "series" $series
-    | upsert_if_value "issue" $issue
+    | upsert_if_value "series" ($single_series | get --optional name)
+    | upsert_if_value "issue" ($single_series | get --optional position)
     | upsert_if_value "isbn" $isbn
   )
 }
