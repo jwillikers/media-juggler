@@ -6,6 +6,7 @@
   chromaprint,
   diff-pdf,
   efficient-compression-tool,
+  epubcheck,
   exiftool,
   ffmpeg,
   file,
@@ -151,6 +152,7 @@ else
             calibre
             diff-pdf
             efficient-compression-tool
+            epubcheck
             file
             image_optim
             isbntools

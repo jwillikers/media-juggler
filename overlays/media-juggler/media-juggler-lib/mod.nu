@@ -70,6 +70,7 @@ export const genre_allowlist = [
   [comedy [] [Q40831 Q15286013 Q11298158]]
   ["comedy drama" [dramedy] [Q859369 Q15712927 Q104536976]]
   ["coming-of-age" ["coming of age" "coming of age story"] [Q2975633 Q135684998]]
+  ["contemporary fantasy" ["modern fantasy" "indigenous fantasy"] [Q1128592]]
   [cooking [] [Q139412567 Q139412557 Q11080558]]
   ["dark fantasy" ["fantasy horror"] [Q794912 Q111254005]]
   ["drama" [] [Q21010853 Q15637299 Q104536999]]
@@ -140,17 +141,24 @@ export const intended_public_wikidata = [
 
 export const form_of_creative_work_wikidata = [
   [name wikidata_id];
+  ["comic" Q1004]
+  ["comic book" Q1760610]
+  ["comic book album" Q2831984]
+  ["comic strip" Q838795]
+  ["graphic novel" Q725377]
   ["light novel" Q747381]
-  [manhwa Q562214]
-  ["manhwa volume" Q137923899]
+  ["manfra" Q3285662]
   [manga Q8274]
   ["manga chapter" Q53460949]
   ["manga volume" Q125632018]
+  [manhwa Q562214]
+  ["manhwa volume" Q137923899]
   [novel Q8261]
   # todo [novellette ]
   [novella Q149537]
   ["short story" Q49084]
   ["short story collection" Q1279564]
+  ["yonkoma" Q865484]
 ]
 
 # Age rating map between the ComicInfo and MetronInfo schemas
@@ -183,6 +191,118 @@ export const genre_to_age_rating_comic_info_map = [
   [[erotic] "M" "Mature"]
   [[hentai] "X18+" "Adult"]
 ]
+
+# https://en.wikipedia.org/wiki/IETF_language_tag
+# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
+export const iso_language_codes_map = [
+  [language iso_639_1 iso_639_3 ietf_bcp_47 default_language wikidata_id];
+  ["english" "en" "eng" "en" true Q1860]
+  ["american english" "en" "eng" "en-US" false Q7976]
+  ["british english" "en" "eng" "en-GB" false Q7979]
+  ["chinese" "zh" "zho" "zh" true Q7850]
+  ["german" "de" "deu" "de" false Q188]
+  ["japanese" "ja" "jpn" "ja" true Q5287]
+  ["japanese hiragana" "ja" "jpn" "ja-hira" false Q53979341]
+  ["japanese katakana" "ja" "jpn" "ja-kana" false Q53979342]
+  ["japanese kana" "ja" "jpn" "ja-hrkt" false Q53979345]
+  ["japanese kanji" "ja" "jpn" "ja-hani" false Q53979504]
+  ["japanese romanized" "ja" "jpn" "ja-Latn" false Q53979348]
+  ["korean" "ko" "kor" "ko" true Q9176]
+  ["spanish" "es" "spa" "es" true Q1321]
+]
+
+export const comic_info_fields = [
+  [tag delimiter];
+  [Title null]
+  [LocalizedSeries null]
+  [Series null]
+  [SeriesGroup ","]
+  [StoryArc ","]
+  [StoryArcNumber ","]
+  [AlternativeSeries null]
+  [AlternativeCount null]
+  [SeriesSort null]
+  [Count null]
+  [Number null]
+  [Volume null]
+  [Summary null]
+  [Notes null]
+  [Year null]
+  [Month null]
+  [Day null]
+  [Locations ","]
+  [Characters ","]
+  [Teams ","]
+  [MainCharacterOrTeam null]
+  [ScanInformation null]
+  [Writer ","]
+  [Penciller ","]
+  [Inker ","]
+  [Colorist ","]
+  [Letterer ","]
+  [CoverArtist ","]
+  [Editor ","]
+  [Translator ","]
+  [Publisher null]
+  [Imprint null]
+  [Genre ","]
+  [Tags ","]
+  [Web " "]
+  [PageCount null]
+  [LanguageISO null]
+  [GTIN null]
+  [Format null]
+  [Manga null]
+  [AgeRating null]
+]
+
+export const comic_vine_roles_map = [
+  [comic_vine_roles comic_info_roles];
+  [[Writer] [Writer]]
+  [[Penciller] [Penciller]]
+  [[Inker] [Inker]]
+  [[Colorist] [Colorist]]
+  [[Letterer] [Letterer]]
+  # I think ComicTagger does Penciller and Inker by default for Artist.
+  # I also include Colorist since usually, there's color of some sort in most comics and manga, even if it's only on the cover for manga.
+  [[Artist] [Penciller Inker Colorist]]
+  # [[Designer] []]
+  # CoverArtist requires both the Cover and the Artist roles.
+  [[Cover Artist] [CoverArtist]]
+  [[Editor] [Editor]]
+  [[Translator] [Translator]]
+  # [[Production] []]
+]
+
+export const opf_identifier_schemes = [
+  [schemes type];
+  # [[GOODREADS] goodreads_version_id]
+  [[HARDCOVER-SLUG HARDCOVER] hardcover_book_slug]
+  # [[HARDCOVER-ID] hardcover_book_id]
+  [[HARDCOVER-EDITION] hardcover_edition_id]
+  [[COMICVINE] comic_vine_issue_id]
+  # [[COMICVINE-VOLUME] comic_vine_volume_id]
+  [[BOOKBRAINZ-EDITION] bookbrainz_edition_id]
+  [[WIKIDATA-EDITION] wikidata_item_id]
+  [[OPENLIBRARY-EDITION OPENLIBRARY] open_library_edition_id]
+  [[OPENLIBRARY-WORK] open_library_work_id]
+  # [ISBN isbn]
+  # [STORYGRAPH storygraph_edition_id]
+  # [GOOGLE google_books_id]
+]
+
+# https://id.loc.gov/vocabulary/relators.html
+export const opf_roles_map = {
+  "Artist": "artist"
+  # Kavita treats the illustrator as Inker.
+  "Illustrator": "illustrator"
+  "Inker": "illustrator"
+  "Colorist": "colorist"
+  "Editor": "editor"
+  "Translator": "translator"
+  "Writer": "author"
+}
+
 
 # Surround special characters in a string with square brackets
 #
@@ -406,6 +526,26 @@ export def standardize_title []: string -> string {
       $components | str join " Volume "
     } else {
       $components | str join ", Volume "
+    }
+  } else {
+    $title
+  }
+}
+
+# Remove the light novel disambiguation from the title and standardize the title
+#
+# This removes the (Light Novel) disambiguation comment since light novels are kept in a separate library on Kavita.
+# This basically ends up following the MusicBrainz style guidelines.
+export def standardize_hardcover_title []: string -> string {
+  let title = $in
+  # We don't want to replace the "-" before the volume part with an emdash or endash.
+  let components = $title | split row --number 2 " (Light Novel), "
+  if ($components | length) > 1 {
+    # If the title of the series ends with punctuation, don't add a comma.
+    if ($components | first | split chars | last) in ["!", "?", ".", ","] {
+      $components | str join " "
+    } else {
+      $components | str join ", "
     }
   } else {
     $title
@@ -915,6 +1055,20 @@ export def extract_file_from_archive [
   [$working_directory $file] | path join
 }
 
+# Add or update a file in a zip archive
+export def add_file_to_archive [
+  file: path # The file to add or update in the archive.
+]: path -> path {
+  let archive = $in
+  log debug $"Running ^zip ($archive) ($file)"
+  let result = do {^zip $archive $file} | complete
+  if ($result.exit_code != 0) {
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^zip \"($archive)\" \"($file)\"(ansi reset)\n($result.stderr)\n"
+    return null
+  }
+  $archive
+}
+
 # Combine a list of audio files into a single M4B file with m4b-tool
 export def merge_into_m4b [
   output_directory: directory
@@ -1218,12 +1372,12 @@ export def image_optim []: path -> path {
 # In a simple test, compression using oxipng followed by ect and image_optim followed by ect resulted in a file of the same size.
 export def optimize_png []: path -> path {
   let png = $in
-  log debug $"Running command: (ansi yellow)^optipng -o7 ($png)(ansi reset)"
+  log debug $"Running command: (ansi yellow)^media-juggler-png-optimizer.nu '($png)'(ansi reset)"
   let result = do {
-    ^media-juggler-png-optimizer $png
+    ^media-juggler-png-optimizer.nu $png
   } | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^media-juggler-png-optimizer ($png)(ansi reset)\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)^media-juggler-png-optimizer.nu '($png)'(ansi reset)\n($result.stderr)\n"
     return $png
   }
   $png
@@ -1306,6 +1460,11 @@ export def optimize_images_in_zip []: path -> path {
   let temporary_archive = $archive | path parse | update parent $temporary_directory | path join
   rm --force $temporary_archive
   cd $extraction_path
+  # Add the mimetype file to the archive first so that epubcheck is happy.
+  if ("mimetype" | path exists) {
+    log debug $"Running (ansi yellow)^zip --quiet --recurse-paths ($temporary_archive) mimetype(ansi reset)"
+    ^zip --quiet --recurse-paths $temporary_archive mimetype
+  }
   log debug $"Running (ansi yellow)^zip --quiet --recurse-paths ($temporary_archive) .(ansi reset)"
   ^zip --quiet --recurse-paths $temporary_archive .
   cd -
@@ -2501,6 +2660,365 @@ export def hardcover_cover_art_url [
   }
 }
 
+# Get metadata for an edition on Hardcover by Hardcover edition id or another identifier.
+#
+# Requires the environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN be set to a Hardcover API key.
+export def get_hardcover_edition [
+  id_type: string # The identifier or field type, which is can be one of asin, isbn_10, isbn_13, id (which is the Hardcover edition ID)
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> record] {
+  let id = $in | str replace --all "-" ""
+  if ($env | get --optional MEDIA_JUGGLER_HARDCOVER_API_TOKEN | is-empty) {
+    log error "The environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN must be set to a Hardcover API key to search by ISBN."
+    return null
+  }
+  let token = (
+    if ($env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN | str starts-with "Bearer ") {
+      $env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN
+    } else {
+      "Bearer " + $env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN
+    }
+  )
+  # Reading format (1=Physical, 2=Audio, 3=Both, 4=Ebook)
+  let graphql_query = {
+    "query": $"query {
+      editions\(where: { ($id_type): { _eq: \"($id)\" } } ) {
+        id
+        canonical_id
+        title
+        isbn_13
+        language {
+          code2
+          code3
+          id
+          language
+        }
+        release_date
+        image {
+          id
+          height
+          width
+          ratio
+          url
+        }
+        edition_format
+        reading_format {
+          id
+          format
+        }
+        pages
+        audio_seconds
+        book_mappings {
+          id
+          external_id
+          platform_id
+        }
+        publisher { name }
+        book {
+          book_characters {
+            character {
+              name
+              canonical_id
+              id
+            }
+          }
+          contributions {
+            author {
+              name
+              canonical_id
+              id
+            }
+            contribution
+          }
+          description
+          literary_type_id
+          book_category_id
+          slug
+          taggings {
+            id
+            tag {
+              id
+              tag
+              tag_category {
+                id
+              }
+              tag_category_id
+              slug
+            }
+          }
+          featured_book_series {
+            id
+            featured
+            details
+            position
+            series_id
+            series {
+              id
+              canonical_id
+              name
+              books_count
+              book_series {
+                book {
+                  release_year
+                }
+              }
+            }
+          }
+        }
+      }
+    }"
+  }
+
+  let update_function = {|type id|
+    let request = {
+      (
+        http post
+          --content-type "application/json"
+          --full
+          --headers {
+            "User-Agent": $user_agent
+            Authorization: $token
+          }
+          "https://api.hardcover.app/v1/graphql" $graphql_query
+      )
+    }
+
+    let response = (
+      try {
+        retry_http $request $retries $retry_delay
+      } catch {|error|
+        log error $"Error getting Hardcover edition by ($id_type) ($id) from (ansi yellow)($hardcover_api_url)(ansi reset): ($error.debug)"
+        log error $"GraphQL query:\n(ansi yellow)($graphql_query | to json)(ansi reset)\n"
+        return null
+      }
+    )
+    if ($response.status != 200) {
+      log error $"HTTP error (ansi red)($response.status)(ansi reset) searching for Hardcover editions with ($id_type) ($id) with GraphQL query ($graphql_query) at (ansi yellow)($hardcover_api_url)(ansi reset): ($response.body)"
+      return null
+    }
+    let editions = $response.body | get --optional data.editions
+    if ($editions | is-empty) {
+
+    } else if ($editions | length) > 1 {
+      log error $"Multiple Hardcover editions found for ($id_type) ID ($id): ($editions)"
+    } else {
+      $editions | first
+    }
+  }
+  do $cache "hardcover-edition" $"($id_type)-($id)" $update_function null
+}
+
+# Parse the data from the Hardcover API for a Harcover edition
+export def parse_hardcover_edition []: [record -> record] {
+  let hardcover_edition = $in
+  # log debug $"hardcover_edition: ($hardcover_edition)"
+  if ($hardcover_edition | is-empty) {
+    return null
+  }
+
+  let series_begin_year = (
+    let years = $hardcover_edition | get --optional book.featured_book_series.series.book_series.book.release_year;
+    if ($years | is-empty) {
+
+    } else {
+      $years | into int | sort | first
+    }
+  )
+
+  let language = (
+    let language_code = $hardcover_edition | get --optional language.code3;
+    if ($language_code | is-not-empty) {
+      if ($language_code | str length) == 2 {
+        $language_code | from_language_code # iso_639_1
+      } else if ($language_code | str length) == 3 {
+        $language_code | from_language_code # iso_639_3
+      } else {
+        # todo Support type parameter in from_language_code
+        # $language_code | from_language_code ietf_bcp_47
+      }
+    }
+  )
+
+  let ids = $hardcover_edition | get --optional book_mappings.external_id
+  let platform_id_mappings = [
+    # platform_id
+    # 3 -> Open Library
+    # 1 -> Goodreads
+    # 20 -> Google Books
+    [platform id];
+    # [goodreads_edition_id 1]
+    [open_library_edition_id 3]
+  ]
+  let ids = (
+    [
+      [type id];
+      [hardcover_book_slug $hardcover_edition.book.slug]
+      [hardcover_edition_id ($hardcover_edition.id | into string)]
+    ] | append (
+      $hardcover_edition | get --optional book_mappings | reduce --fold [] {|book_mapping acc|
+        let platform_id_mapping =  $platform_id_mappings | where id == $book_mapping.platform_id
+        if ($platform_id_mapping | is-empty) {
+          $acc
+        } else if ($platform_id_mapping | length) > 1 {
+          log error $"Multiple platform id mappings for id ($book_mapping.platform_id). Ignoring."
+          $acc
+        } else {
+          let platform_id_mapping =  $platform_id_mapping | first
+          $acc | append [
+            [type id];
+            [$platform_id_mapping.platform ($book_mapping.external_id | str replace "/books/" "")]
+          ]
+        }
+      }
+    )
+    # | where {|it| $it.id | is-not-empty }
+  );
+
+  # Rewrite credits to match ComicTagger's format.
+  #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
+  let credits = (
+    $hardcover_edition.book.contributions | reduce --fold [] {|contribution acc|
+      let role = (
+        if ($contribution | get --optional contribution | is-empty) {
+          "Writer"
+        } else if $contribution.contribution == "Illustrator" {
+          "Artist"
+        # } else if $contribution.contribution == "Cover Artist" {
+          # Cover Artist ends up becoming two credits for both Cover and Artist to match Comic Vine.
+          # "Artist"
+        } else {
+          $contribution.contribution
+        }
+      )
+      $acc | append [
+        [person id role primary language];
+        [$contribution.author.name ($contribution.author.id | into string) $role false ""]
+      ] | uniq
+      # ] | append (
+      #   if $contribution.contribution == "Cover Artist" {
+      #     [
+      #       [person id role primary language];
+      #       [$contribution.author.name $contribution.author.id "Cover" false ""]
+      #     ]
+      #   }
+      # )
+    }
+    # todo Should "Cover Artist" be separate Cover and Artist roles?
+  )
+
+  let hardcover_book_category_map = {
+    0: "unknown"
+    1: "book"
+    2: "novella"
+    3: "short story"
+    4: "graphic novel"
+    5: "fan fiction"
+    6: "research paper"
+    7: "poetry"
+    8: "collection"
+    9: "web novel"
+    10: "light novel"
+  }
+  let book_category = (
+    if ($hardcover_edition | get --optional book.book_category_id | is-empty) {
+    } else {
+      $hardcover_book_category_map | get ($hardcover_edition.book.book_category_id | into string)
+    }
+  )
+
+  let hardcover_literary_type_map = {
+    0: "unknown"
+    1: "fiction"
+    2: "nonfiction"
+  }
+  let literary_type = (
+    if ($hardcover_edition | get --optional book.literary_type_id | is-empty) {
+    } else {
+      $hardcover_literary_type_map | get ($hardcover_edition.book.literary_type_id | into string)
+    }
+  )
+
+  let characters = (
+    if ($hardcover_edition | get --optional book.book_characters.character | is-empty) {
+    } else {
+      $hardcover_edition.book.book_characters.character | select --optional name id | each {|character|
+        {
+          id: ($character.id | into string)
+          name: $character.name
+        }
+      }
+    }
+  )
+
+  {
+    issue: ($hardcover_edition | get --optional book.featured_book_series.position)
+    series: ($hardcover_edition | get --optional book.featured_book_series.series.name | str replace " (Light Novel)" "" | use_unicode_in_title)
+    title: (
+      if ($hardcover_edition | get --optional title | is-not-empty) {
+        # todo Drop , after punctuation
+        $hardcover_edition.title | standardize_hardcover_title | use_unicode_in_title
+      }
+    )
+    description: $hardcover_edition.book.description
+    # todo Get start year of first book in series
+    volume: $series_begin_year
+    issue_count: ($hardcover_edition | get --optional book.featured_book_series.series.books_count)
+    ids: $ids
+    isbn: ($hardcover_edition | get --optional isbn_13)
+    characters: $characters
+    language: $language
+    # Use the forms_of_creative_work field for compatibility with Wikidata.
+    forms_of_creative_work: [$book_category]
+    literary_type: $literary_type
+    # Default the age rating to PG.
+    # comic_info_age_rating: "PG"
+    # manga: $manga
+    # todo Genres and tags?
+    genres: []
+    tags: []
+    publication_date: ($hardcover_edition | get --optional release_date)
+    # $volume_data.description
+    publishers: [($hardcover_edition | get --optional publisher.name)]
+    # $data.store_date
+    # $data.cover_date
+    credits: $credits
+    # todo Make sure this is a string?
+    series_id: ($hardcover_edition | get --optional book.featured_book_series.series_id)
+    _cover_image: [0, "", ($hardcover_edition | get --optional image.url)]
+  }
+}
+
+# Get metadata for an edition on Hardcover by Hardcover edition id or another identifier.
+#
+# Requires the environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN be set to a Hardcover API key.
+export def fetch_and_parse_hardcover_edition [
+  type: string # The identifier or field type, which is can be one of asin, isbn_10, isbn_13, id (which is the Hardcover edition ID)
+  cache: closure
+  --retries: int = 3 # The number of retries to perform when a request fails
+  --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
+]: [string -> record] {
+  let id = $in | str replace --all "-" ""
+  if ($env | get --optional MEDIA_JUGGLER_HARDCOVER_API_TOKEN | is-empty) {
+    log error "The environment variable MEDIA_JUGGLER_HARDCOVER_API_TOKEN must be set to a Hardcover API key to search by ISBN."
+    return null
+  }
+  let token = (
+    if ($env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN | str starts-with "Bearer ") {
+      $env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN
+    } else {
+      "Bearer " + $env.MEDIA_JUGGLER_HARDCOVER_API_TOKEN
+    }
+  )
+
+  let edition_response = $id | get_hardcover_edition $type $cache --retries $retries --retry-delay $retry_delay
+  if ($edition_response | is-empty) {
+    return null
+  }
+  $edition_response | parse_hardcover_edition
+}
+
 # Hyphenate an ISBN with the isbn_mask program from isbntools
 export def hyphenate_isbn []: [string -> string] {
   let isbn = $in
@@ -2751,69 +3269,6 @@ export def identifier_from_url [
     }
   }
 }
-
-export const comic_info_fields = [
-  [tag delimiter];
-  [Title null]
-  [LocalizedSeries null]
-  [Series null]
-  [SeriesGroup ","]
-  [StoryArc ","]
-  [StoryArcNumber ","]
-  [AlternativeSeries null]
-  [AlternativeCount null]
-  [SeriesSort null]
-  [Count null]
-  [Number null]
-  [Volume null]
-  [Summary null]
-  [Notes null]
-  [Year null]
-  [Month null]
-  [Day null]
-  [Locations ","]
-  [Characters ","]
-  [Teams ","]
-  [MainCharacterOrTeam null]
-  [ScanInformation null]
-  [Writer ","]
-  [Penciller ","]
-  [Inker ","]
-  [Colorist ","]
-  [Letterer ","]
-  [CoverArtist ","]
-  [Editor ","]
-  [Translator ","]
-  [Publisher null]
-  [Imprint null]
-  [Genre ","]
-  [Tags ","]
-  [Web " "]
-  [PageCount null]
-  [LanguageISO null]
-  [GTIN null]
-  [Format null]
-  [Manga null]
-  [AgeRating null]
-]
-
-export const comic_vine_roles_map = [
-  [comic_vine_roles comic_info_roles];
-  [[Writer] [Writer]]
-  [[Penciller] [Penciller]]
-  [[Inker] [Inker]]
-  [[Colorist] [Colorist]]
-  [[Letterer] [Letterer]]
-  # I think ComicTagger does Penciller and Inker by default for Artist.
-  # I also include Colorist since usually, there's color of some sort in most comics and manga, even if it's only on the cover for manga.
-  [[Artist] [Penciller Inker Colorist]]
-  # [[Designer] []]
-  # CoverArtist requires both the Cover and the Artist roles.
-  [[Cover Artist] [CoverArtist]]
-  [[Editor] [Editor]]
-  [[Translator] [Translator]]
-  # [[Production] []]
-]
 
 # Filter and rename genres or tags according to the allow list
 export def sanitize_genres_or_tags [
@@ -3412,40 +3867,151 @@ export def from_pdf_metadata []: [
 }
 
 # Parse metadata from an EPUB's content.opf XML file
-export def from_opf_xml []: [
+#
+# Note that currently, namespace information is dropped by Nushell.
+# https://github.com/nushell/nushell/issues/11523
+export def from_opf_xml [
+  identifier_schemes: table = $opf_identifier_schemes
+  roles_map: table = [
+    [opf_roles role];
+    # Kavita treats the illustrator as Inker.
+    [["artist" "art" "illustrator" "ill"] "Artist"]
+    [["author" "aut"] "Writer"]
+    [["colorist" "clr"] "Colorist"]
+    [["editor" "edt"] "Editor"]
+    [["publisher" "pbl"] "Publisher"]
+    [["translator" "trl"] "Translator"]
+  ]
+]: [
   record -> record
 ] {
   let opf = $in
+  let unique_identifier_id = (
+    if $opf.tag == "package" {
+      $opf.attributes | get --optional unique-identifier
+    }
+  )
   let opf = (
     if $opf.tag == "package" {
       $opf.content | where tag == "metadata" | first
     } else {
-    # todo Verify metadata tag is here
       $opf
     }
   )
+  if ($opf | get --optional tag) != "metadata" {
+    error make {
+      msg: "missing metadata tag in OPF metadata"
+      labels: [
+        {text: "opf" span: (metadata $opf).span}
+      ]
+      help: "add the missing metadata element to the OPF metadata"
+    }
+  }
+
   let metadata_content = $opf | get content
+
+  # If and when Nushell actually includes namespaces, fail here.
+  # The code will need to be updated to use the namespaced tags.
+  # https://github.com/nushell/nushell/issues/11523
+  if ($metadata_content | where tag == "dc:title" | is-not-empty) {
+    error make {
+      msg: "namespaces are now available in the 'from xml' Nushell command"
+      labels: [
+        {text: "metadata_content" span: (metadata $metadata_content).span}
+      ]
+      help: "update the tags to include the 'dc:' namespace in the from_opf_xml function"
+    }
+  }
+
+  # https://www.w3.org/TR/epub-33/#sec-opf-dccreator
   let credits = (
     let creators = $metadata_content | where tag == creator;
     if ($creators | is-not-empty) {
-      let authors = $creators | where {|it| ($it.attributes | get --optional role) == "aut"}
-      if ($authors | is-not-empty) {
-        $authors | get content | first | get content | flatten | uniq | each {|author|
-          {
-            creator: $author
-            role: "Writer"
-            primary: true
-            language: ""
+      let meta = $metadata_content | where tag == meta
+      # The order of the creators is important.
+      $creators | reduce --fold [] {|it acc|
+        # Check for refines first, then fallback to role attribute.
+        let id = $it | get --optional attributes.id
+        let meta_refines_role_items = (
+          if ($id | is-empty) {
+
+          } else {
+            if ($meta | is-not-empty) {
+              $meta | where {|i| ($i | get --optional attributes.refines) == $"#($id)" and ($i | get --optional attributes.property) == "role" and ($i | get --optional attributes.scheme) == "marc:relators" and ($i | get --optional content.0.content | is-not-empty)}
+            }
           }
-        } | sort-by creator
-      } else {
-        # Fallback to using any creators as the author
-        $creators | get content | first | get content | flatten | uniq | each {|creator|
-          {
-            creator: $creator
-            role: "Writer"
-            primary: true
-            language: ""
+        )
+        if ($id | is-empty) and ($meta_refines_role_items | is-empty) {
+          let opf_role = $it | get --optional attributes.role
+          let role = (
+            if ($opf_role | is-empty) {
+              "Writer"
+            } else {
+              let roles = $roles_map | where {|i| $opf_role in $i.opf_roles}
+              if ($roles | is-empty) {
+                error make {
+                  msg: "role from OPF metadata missing in roles_map"
+                  labels: [
+                    {text: "opf_role" span: (metadata $opf_role).span}
+                    {text: "roles_map" span: (metadata $roles_map).span}
+                  ]
+                  help: $"add the missing role (ansi yellow)($opf_role)(ansi reset) to the roles_map table"
+                }
+              } else if ($roles | length) > 1 {
+                error make {
+                  msg: "duplicate roles for role in roles_map"
+                  labels: [
+                    {text: "role" span: (metadata $opf_role).span}
+                    {text: "roles_map" span: (metadata $roles_map).span}
+                  ]
+                  help: $"remove the duplicate role (ansi yellow)($opf_role)(ansi reset) from the roles_map table"
+                }
+              } else {
+                $roles.role | first
+              }
+            }
+          )
+          $acc | append [
+            [creator role primary language];
+            [
+              ($it.content.0.content)
+              $role
+              ($role == "Writer")
+              ""
+            ]
+          ]
+        } else {
+          $meta_refines_role_items | reduce --fold $acc {|role_it role_acc|
+            let roles = $roles_map | where {|i| $role_it.content.0.content in $i.opf_roles}
+            if ($roles | is-empty) {
+              error make {
+                msg: "role from OPF metadata missing in roles_map"
+                labels: [
+                  {text: "role" span: (metadata $role_it.content.0.content).span}
+                  {text: "roles_map" span: (metadata $roles_map).span}
+                ]
+                help: $"add the missing role (ansi yellow)($role_it.content.0.content)(ansi reset) to the roles_map table"
+              }
+            } else if ($roles | length) > 1 {
+              error make {
+                msg: "duplicate roles for role in roles_map"
+                labels: [
+                  {text: "role" span: (metadata $role_it.content.0.content).span}
+                  {text: "roles_map" span: (metadata $roles_map).span}
+                ]
+                help: $"remove the duplicate role (ansi yellow)($role_it.content.0.content)(ansi reset) from the roles_map table"
+              }
+            } else {
+              $role_acc | append [
+                [creator role primary language];
+                [
+                  ($it.content.0.content)
+                  ($roles.role | first)
+                  (($roles.role | first) == "Writer")
+                  ""
+                ]
+              ]
+            }
           }
         }
       }
@@ -3455,22 +4021,72 @@ export def from_opf_xml []: [
   let series = (
     let meta = $metadata_content | where tag == meta;
     if ($meta | is-not-empty) {
-      let series = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series"}
-      if ($series | is-not-empty) {
-        # todo Warn if there are multiple series
-        $series | first | get attributes.content
+      # EPUB 3.2 series tag
+      if ($meta | any {|it| ($it | get --optional attributes.property) == "belongs-to-collection"}) {
+        let belongs_to_collection_items = $meta | where {|it| ($it | get --optional attributes.property) == "belongs-to-collection"}
+        $belongs_to_collection_items | reduce --fold [] {|it acc|
+          let id = $it.attributes | get --optional id
+          if ($id | is-empty) {
+            $acc | append [[name position]; [($it.content.0.content) null]]
+          } else {
+            let refines_group_position_for_id_items = $meta | where {|it| ($it | get --optional attributes.refines) == $"#($id)" and ($it | get --optional attributes.property) == "group-position"}
+            if ($refines_group_position_for_id_items | is-empty) {
+              $acc | append [[name position]; [($it.content.0.content) null]]
+            } else {
+              if (($refines_group_position_for_id_items | length) > 1) {
+                log warning $"Multiple group-position attributes for id ($id): ($refines_group_position_for_id_items). Ignoring all but the first."
+              }
+              $acc | append [
+                [name position];
+                [
+                  ($it.content.0.content)
+                  ($refines_group_position_for_id_items | first | get content | first | get content)
+                ]
+              ]
+            }
+          }
+        }
+      } else {
+        # Fallback to Calibre series tag
+        let series = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series"}
+        let series_name = (
+          if ($series | is-not-empty) {
+            $series | first | get attributes.content
+          }
+        )
+        let series_indices = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series_index"}
+        let series_position = (
+          if ($series_indices | is-not-empty) {
+            $series_indices | first | get attributes.content
+          }
+        )
+        if ($series_name | is-not-empty) {
+          if ($series_position | is-empty) {
+            [
+              [name position];
+              [$series_name null]
+            ]
+          } else {
+            [
+              [name position];
+              [$series_name $series_position]
+            ]
+          }
+        }
       }
     }
   )
 
-  let issue = (
-    let meta = $metadata_content | where tag == meta;
-    if ($meta | is-not-empty) {
-      let series_indices = $meta | where {|it| ($it.attributes | get --optional name) == "calibre:series_index"}
-      if ($series_indices | is-not-empty) {
-        # todo Warn if there are multiple series indices
-        $series_indices | first | get attributes.content
-      }
+  # The metadata structure for series only supports one series right now.
+  let single_series = (
+    if ($series | length) > 1 {
+      # Maintain the order as parsed, but place the series with a position at the end.
+      let series = $series | sort-by --custom {|a b| ($a | get --optional position | is-not-empty) and ($b | get --optional position | is-empty)}
+      log warning $"Multiple series parsed from OPF metadata: ($series). Ignoring all but the first one."
+      # This ensures when there are multiple series, one with a position is preferred over the series without positions.
+      $series | first
+    } else {
+      $series | first
     }
   )
 
@@ -3496,8 +4112,7 @@ export def from_opf_xml []: [
       } else if ($language_code | str length) == 3 {
         $language_code | from_language_code # iso_639_3
       } else {
-        # todo Support type parameter in from_language_code
-        # $language_code | from_language_code ietf_bcp_47
+        $language_code | from_language_code
       }
     }
   )
@@ -3533,45 +4148,126 @@ export def from_opf_xml []: [
     }
   )
 
-  let identifier_schemes = [
-    [schemes type];
-    # [[GOODREADS] goodreads_version_id]
-    [[HARDCOVER HARDCOVER-SLUG] hardcover_book_slug]
-    # [[HARDCOVER-ID] hardcover_book_id]
-    [[HARDCOVER-EDITION] hardcover_edition_id]
-    [[COMICVINE] comic_vine_issue_id]
-    # [[COMICVINE-VOLUME] comic_vine_volume_id]
-    [[BOOKBRAINZ-EDITION] bookbrainz_edition_id]
-    [[WIKIDATA-EDITION] wikidata_item_id]
-    # [ISBN isbn]
-    # [STORYGRAPH storygraph_edition_id]
-    # [GOOGLE google_books_id]
-  ]
-
   let ids = (
     let ids = $metadata_content | where tag == identifier;
     if ($ids | is-not-empty) {
+      let unique_identifiers = $ids | where {|it|
+        ($it.attributes | get --optional id) == $unique_identifier_id
+      }
       $identifier_schemes | reduce --fold [] {|identifier_schemes_and_type acc|
-        let matching_ids = $ids | where {|it| ($it.attributes | get --optional scheme | is-not-empty) and ($it.attributes.scheme | str upcase) in $identifier_schemes_and_type.schemes }
+        let matching_ids = $ids | where {|it|
+          (
+            (
+              ($it.attributes | get --optional scheme | is-not-empty)
+              and ($it.attributes.scheme | str upcase) in $identifier_schemes_and_type.schemes
+            )
+            or (
+              ($it.attributes | get --optional "opf:scheme" | is-not-empty)
+              and ($it.attributes | get "opf:scheme" | str upcase) in $identifier_schemes_and_type.schemes
+            )
+            or (
+              ($it.attributes | get --optional id | is-not-empty)
+              and (
+                $metadata_content
+                # A where doesn't work here since the closure can't access $it.
+                | reduce --fold [] {|meta_it inner_acc|
+                  if (
+                    $meta_it.tag == "meta"
+                    and ($meta_it.attributes | get --optional refines) == $"#($it.attributes.id)"
+                    and ($meta_it.attributes | get --optional property) == "identifier-type"
+                    and (
+                      (
+                        ($meta_it.attributes | get --optional "scheme" | is-not-empty)
+                        and ($meta_it.attributes | get --optional scheme | str upcase) in $identifier_schemes_and_type.schemes
+                      )
+                      or (
+                        ($meta_it | get --optional content.0.content | is-not-empty)
+                        and ($meta_it | get --optional content.0.content | str upcase) in $identifier_schemes_and_type.schemes
+                      )
+                    )
+                  ) {
+                    $inner_acc | append $meta_it
+                  } else {
+                    $inner_acc
+                  }
+                }
+                | is-not-empty
+              )
+            )
+          )
+        }
         if ($matching_ids | is-empty) {
           $acc
         } else {
+          let id = $matching_ids | get content | first | get content | first
+          let id = (
+            if $id =~ '^(?:urn:uuid:)?[a-f0-9]{8}(?:-[a-f0-9]{4}){4}[a-f0-9]{8}$' {
+              (
+                $id
+                | parse --regex '^(?:urn:uuid:)?(?P<uuid>[a-f0-9]{8}(?:-[a-f0-9]{4}){4}[a-f0-9]{8})$'
+                | get uuid
+                | first
+              )
+            } else {
+              $id
+            }
+          )
           # Ignore multiple ids of the same type.
           # todo Warn if there are multiple, distinct IDs for the same scheme.
           $acc | append {
             type: $identifier_schemes_and_type.type
             id: (
               # if ($identifier_schemes_and_type.type == "comic_vine_issue_id") {
-              #   "4000-" + ($matching_ids | get content | first | get content | first)
+              #   if ($id | str starts-with "4000-") {
+              #     $id
+              #   } else {
+              #     "4000-" + $id
+              #   }
               # } else if ($identifier_schemes_and_type.type == "comic_vine_volume_id") {
-              #   "4050-" + ($matching_ids | get content | first | get content | first)
+              #   if ($id | str starts-with "4050-") {
+              #     $id
+              #   } else {
+              #     "4050-" + $id
+              #   }
               # } else {
-              $matching_ids | get content | first | get content | first
+                $id
               # }
             )
           }
         }
-      }
+      } | append (
+        if ($unique_identifiers | is-not-empty) {
+          if ($unique_identifiers | length) > 1 {
+            error make {
+              msg: "multiple unique identifiers"
+              labels: [{text: "unique_identifiers" span: (metadata $unique_identifiers).span}]
+              help: $"remove duplicate unique identifiers where the type attribute is (ansi yellow)($unique_identifier_id)(ansi reset)"
+            }
+          } else {
+            let id = $unique_identifiers | get content | first | get content | first
+            if $id =~ '^(?:urn:uuid:)?[a-f0-9]{8}(?:-[a-f0-9]{4}){4}[a-f0-9]{8}$' {
+              {
+                type: "epub_uuid"
+                id: (
+                  $id
+                  | parse --regex '^(?:urn:uuid:)?(?P<epub_uuid>[a-f0-9]{8}(?:-[a-f0-9]{4}){4}[a-f0-9]{8})$'
+                  | get epub_uuid
+                  | first
+                )
+              }
+            } else {
+              error make {
+                msg: "unknown unique identifier type"
+                labels: [
+                  {text: "unique_identifiers" span: (metadata $unique_identifiers).span}
+                  {text: "id" span: (metadata $id).span}
+                ]
+                help: $"add support for the unknown id (ansi yellow)($id)(ansi reset)"
+              }
+            }
+          }
+        }
+      ) | uniq
     }
   )
 
@@ -3580,31 +4276,64 @@ export def from_opf_xml []: [
   let isbn = (
     let ids = $metadata_content | where tag == identifier;
     if ($ids | is-not-empty) {
-      let isbns = $ids | where {|it| ($it.attributes | get --optional scheme) == "ISBN"}
-      if ($isbns | is-not-empty) {
-        $isbns | get content | first | get content | flatten | uniq | first
-      } else {
+      let isbns = $ids | where {|it|
+        (
+          (
+            ($it.attributes | get --optional scheme | is-not-empty)
+            and $it.attributes.scheme =~ "(?i)isbn"
+          )
+          or (
+            ($it.attributes | get --optional "opf:scheme" | is-not-empty)
+            and ($it.attributes | get "opf:scheme") =~ "(?i)isbn"
+          )
+          or (
+            ($it.attributes | get --optional id | is-not-empty)
+            and (
+              $metadata_content
+              # A where doesn't work here since the closure can't access $it.
+              | reduce --fold [] {|meta_it acc|
+                if (
+                  $meta_it.tag == "meta"
+                  and ($meta_it.attributes | get --optional refines) == $"#($it.attributes.id)"
+                  and ($meta_it.attributes | get --optional property) == "identifier-type"
+                  # https://ns.editeur.org/onix/en/5
+                  and ($meta_it.attributes | get --optional scheme) == "onix:codelist5"
+                  and ($meta_it.content | first | get --optional content ) == "15"
+                ) {
+                  $acc | append ($meta_it)
+                } else {
+                  $acc
+                }
+              } | is-not-empty
+            )
+          )
+          or ($it | get --optional content.0.content) =~ '^urn:isbn:[0-9]{13}$'
+        )
+      }
+      if ($isbns | length) > 1 {
+        error make {
+          msg: "multiple isbns found in OPF metadata"
+          labels: [{text: "isbns" span: (metadata $isbns).span}]
+          help: $"remove duplicate ISBNs (ansi yellow)($isbns)(ansi reset) from the OPF metadata"
+        }
+      } else if ($isbns | length) == 1 {
         # <dc:identifier id="pub-identifier">urn:isbn:9781506704197</dc:identifier>
         # <meta property="identifier-type" refines="#pub-identifier" scheme="onix:codelist5">15</meta>
         # log debug $"ids.content: ($ids.content | to json)"
-        let isbns = $ids | where {|it|
-          # log debug $"it: ($it | to json)"
-          # log debug $"it.content.0.content: ($it | get --optional content.0.content | to json)"
-          ($it | get --optional content.0.content) =~ '^urn:isbn:[0-9]{13}$'
-        }
-        # log debug $"isbns: ($isbns | to json)"
-        if ($isbns | is-not-empty) {
-          (
-            $isbns
-            | get content
-            | first
-            | get content
-            | flatten
-            | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$'
-            | get isbn
-            | uniq
-            | first
-          )
+        let isbn = (
+          $isbns
+          | get content
+          | first
+          | get content
+          | flatten
+          | uniq
+          | first
+          | str replace --all "-" ""
+        )
+        if ($isbn =~ '^urn:isbn:[0-9]{13}$') {
+          $isbn | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$' | get isbn | first
+        } else {
+          $isbn
         }
       }
     }
@@ -3621,10 +4350,627 @@ export def from_opf_xml []: [
     | upsert_if_value "description" $description
     | upsert_if_value "publication_date" $publication_date
     | upsert_if_value "ids" $ids
-    | upsert_if_value "series" $series
-    | upsert_if_value "issue" $issue
+    | upsert_if_value "series" ($single_series | get --optional name)
+    | upsert_if_value "issue" ($single_series | get --optional position)
     | upsert_if_value "isbn" $isbn
   )
+}
+
+# Output metadata in the format used by an EPUB's content.opf XML file
+#
+# https://www.w3.org/TR/epub/
+export def to_opf_xml [
+  language_codes_map: table = $iso_language_codes_map
+  identifier_schemes: table = $opf_identifier_schemes
+  roles_map: record = $opf_roles_map
+]: [
+  record -> record
+] {
+  let metadata = $in
+
+  # todo I should probably just work with the metadata content field instead.
+  # [[tag, attributes, content]; []]
+  let opf_metadata = []
+
+  # title
+  let opf_metadata = (
+    if ($metadata | get --optional title | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "dc:title"
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, $metadata.title]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+
+  # language
+  # todo Handle language missing from map.
+  let opf_metadata = (
+    if ($metadata | get --optional language | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "dc:language"
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, ($metadata.language | into_language_code iso_639_3 $language_codes_map)]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+
+  # description
+  let opf_metadata = (
+    if ($metadata | get --optional description | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "dc:description"
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, $metadata.description]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+
+  # date
+  let opf_metadata = (
+    if ($metadata | get --optional publication_date | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "dc:date"
+            {}
+            [
+              [tag, attributes, content];
+              # "2023-05-01T05:00:00+00:00"
+              [null, null, ($metadata.publication_date | date to-timezone "UTC" | format date '%FT%H:%M:%S%Z')]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+
+  # publisher
+  # Prefer imprint when present.
+  let publishers = (
+    if ($metadata | get --optional imprints | is-not-empty) {
+      $metadata.imprints
+    } else {
+      $metadata.publishers
+    }
+  )
+  let opf_metadata = $opf_metadata | append (
+    $publishers | reduce --fold [] {|publisher acc|
+      $acc | append [
+        [tag, attributes, content];
+        [
+          "dc:publisher"
+          {}
+          [
+            [tag, attributes, content];
+            [null, null, $publisher]
+          ]
+        ]
+      ]
+    }
+  )
+
+  # unique-identifier field order of preference:
+  # This must match the ID specified in the ncx/toc.ncx file.
+  # book_id which equates to the unique publisher id originally embedded in an ebook.
+  # ISBN
+  # Hardcover
+  # Wikidata
+  # BookBrainz
+  let unique_identifier = (
+    let epub_uuids = $metadata.ids | where type == epub_uuid;
+    if ($epub_uuids | length) == 1 {
+      "bookid"
+    } else {
+      if ($epub_uuids | length) > 1 {
+        log error $"Multiple EPUB UUIDs exist: ($epub_uuids)"
+      } else {
+        if ($metadata | get --optional isbn | is-empty) {
+          let hardcover_edition_ids = $metadata.ids | where type == hardcover_edition_id
+          if ($hardcover_edition_ids | length) == 1 {
+            "hardcover-edition"
+          } else {
+            if ($hardcover_edition_ids | length) > 1 {
+              log error $"Multiple hardcover edition ids exist: ($hardcover_edition_ids)"
+            } else {
+              let wikidata_edition_ids = $metadata.ids | where type == wikidata_edition_id
+              if ($wikidata_edition_ids | length) == 1 {
+                "wikidata-edition"
+              } else {
+                if ($wikidata_edition_ids | length) > 1 {
+                  log error $"Multiple wikidata edition ids exist: ($wikidata_edition_ids)"
+                } else {
+                  let bookbrainz_edition_ids = $metadata.ids | where type == bookbrainz_edition_id
+                  if ($bookbrainz_edition_ids | length) == 1 {
+                    "bookbrainz-edition"
+                  } else {
+                    if ($bookbrainz_edition_ids | length) > 1 {
+                      log error $"Multiple BookBrainz edition ids exist: ($bookbrainz_edition_ids)"
+                    } else {
+                      log error "No unique book identifier available!"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          "isbn"
+        }
+      }
+    }
+  )
+
+  # https://www.w3.org/TR/epub-33/#sec-opf-dcidentifier
+  # Don't allow multiple identifiers of the same type.
+  if ($metadata.ids | get --optional type | uniq --repeated | is-not-empty) {
+    error make {
+      msg: "multiple identifiers for a single type are not allowed"
+      labels: [{text: "metadata.ids" span: (metadata $metadata.ids).span}]
+      help: $"remove duplicate identifiers of the types (ansi yellow)($metadata.ids | get --optional type | uniq --repeated)(ansi reset)"
+    }
+  }
+  let opf_metadata = $opf_metadata | append (
+    $metadata.ids | reduce --fold [] {|id acc|
+      # for each type, add each scheme
+      let schemes = $identifier_schemes | where type == $id.type
+      # log debug $"schemes: ($schemes)"
+      if ($id.type == "epub_uuid") {
+        $acc
+      } else if ($schemes | is-empty) {
+        error make {
+          msg: "missing OPF schemes for type"
+          labels: [
+            {text: "id.type" span: (metadata $id.type).span}
+            {text: "identifier_schemes" span: (metadata $identifier_schemes).span}
+          ]
+          help: $"add the missing OPF scheme for the type (ansi yellow)($id.type)(ansi reset) to the identifier_schemes table"
+        }
+      } else if ($schemes | length) > 1 {
+        error make {
+          msg: "multiple OPF schemes for type"
+          labels: [
+            {text: "id.type" span: (metadata $id.type).span}
+            {text: "identifier_schemes" span: (metadata $identifier_schemes).span}
+          ]
+          help: $"remove the duplicate OPF schemes for the type (ansi yellow)($id.type)(ansi reset) to the identifier_schemes table"
+        }
+      } else {
+        $schemes | first | get schemes | reduce --fold $acc {|scheme inner_acc|
+          $inner_acc | append [
+            [tag, attributes, content];
+            [
+              "dc:identifier"
+              {
+                # Include the "opf:scheme" field for compatibility.
+                # "opf:scheme": $scheme
+                "id": $"($scheme | str downcase)-identifier"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, (
+                  if $id.type in ["bookbrainz_edition_id" "musicbrainz_release_id"] {
+                    $"urn:uuid:($id.id)"
+                  } else {
+                    ($id.id | into string)
+                  }
+                )]
+              ]
+            ]
+            [
+              "meta"
+              {
+                refines: $"#($scheme | str downcase)-identifier"
+                property: "identifier-type"
+                # scheme: "($scheme | str downcase)"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, $scheme]
+              ]
+            ]
+          ]
+        }
+      }
+    } | append (
+      if ($metadata | get --optional isbn | is-empty) {
+      } else {
+        [
+          [tag, attributes, content];
+          [
+            "dc:identifier"
+            {
+              # Kavita requires the opf:scheme key in order to properly parse the ISBN.
+              "opf:scheme": "ISBN"
+              id: "isbn-identifier"
+            }
+            [
+              [tag, attributes, content];
+              [null, null, $"urn:isbn:($metadata.isbn)"]
+            ]
+          ]
+          # https://ns.editeur.org/onix/en/5
+          # ISBN-13
+          [
+            "meta"
+            {
+              refines: "#isbn-identifier"
+              property: "identifier-type"
+              scheme: "onix:codelist5"
+            }
+            [
+              [tag, attributes, content];
+              [null, null, "15"]
+            ]
+          ]
+        ]
+      }
+    ) | append (
+      if ($metadata | get --optional ids | where type == "epub_uuid" | is-empty) {
+      } else {
+        let epub_uuids = $metadata | get --optional ids | where type == "epub_uuid"
+        if ($epub_uuids | is-empty) {
+        } else if ($epub_uuids | length) > 1 {
+          error make {
+            msg: "multiple EPUB UUIDs"
+            labels: [
+              {text: "epub_uuids" span: (metadata $epub_uuids).span}
+            ]
+            help: $"remove the duplicate EPUB UUIDs (ansi yellow)($epub_uuids)(ansi reset) from the OPF metadata"
+          }
+        } else {
+          [
+            [tag, attributes, content];
+            [
+              "dc:identifier"
+              {
+                id: "bookid"
+              }
+              [
+                [tag, attributes, content];
+                [null, null, $"urn:uuid:($epub_uuids.id | first)"]
+              ]
+            ]
+          ]
+        }
+      }
+    )
+  )
+
+  # Kavita supports url: fields as weblinks
+  let opf_metadata = $opf_metadata | append (
+    $metadata.ids | reduce --fold [] {|id acc|
+      let url = (
+        if $id.type in ["epub_uuid" "hardcover_book_slug"] {
+          ""
+        } else if $id.type == "hardcover_edition_id" {
+          if "hardcover_book_slug" in ($metadata | get --optional ids.type) {
+            $id.id | identifier_into_url $id.type --hardcover-book-slug ($metadata.ids | where type == "hardcover_book_slug" | get id | first)
+          } else {
+            $id.id | identifier_into_url $id.type
+          }
+        } else if $id.type == "comic_vine_issue_id" {
+          let i = (
+            if ($id.id | str starts-with "4000-") {
+              $id.id
+            } else {
+              "4000-" + $id.id
+            }
+          )
+          $i | identifier_into_url $id.type
+        } else {
+          $id.id | identifier_into_url $id.type
+        }
+      )
+      if ($url | is-empty) {
+        $acc
+      } else {
+        $acc | append [
+          [tag, attributes, content];
+          [
+            "dc:identifier"
+            {}
+            [
+              [tag, attributes, content];
+              [null, null, $"url:($url)"]
+            ]
+          ]
+        ]
+      }
+    }
+  )
+
+  # series
+  # Only a single series is supported.
+  # todo Sort series name?
+  let opf_metadata = (
+    if ($metadata | get --optional series | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "meta"
+            {
+              name: "calibre:series"
+              content: $metadata.series
+            }
+            []
+          ]
+          # Epub 3.2
+          # https://www.w3.org/TR/epub-33/#sec-collection-type
+          [
+            "meta"
+            {
+              property: "belongs-to-collection"
+              id: "series-id-1"
+            }
+            [
+              [tag, attributes, content];
+              [null null $metadata.series]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+  let opf_metadata = (
+    if ($metadata | get --optional issue | is-empty) {
+      $opf_metadata
+    } else {
+      $opf_metadata | append (
+        [
+          [tag, attributes, content];
+          [
+            "meta"
+            {
+              name: "calibre:series_index"
+              content: ($metadata.issue | into string)
+            }
+            []
+          ]
+          # Epub 3.2
+          [
+            "meta"
+            {
+              refines: "#series-id-1"
+              property: "group-position"
+            }
+            [
+              [tag, attributes, content];
+              [null null ($metadata.issue | into string)]
+            ]
+          ]
+        ]
+      )
+    }
+  )
+
+  # genres
+  let opf_metadata = $opf_metadata | append (
+    $metadata | get --optional genres | reduce --fold [] {|genre acc|
+      $acc | append [
+        [tag, attributes, content];
+        [
+          "dc:subject"
+          {}
+          [
+            [tag, attributes, content];
+            [null, null, $genre]
+          ]
+        ]
+      ]
+    }
+  )
+
+  # modified
+  # This field is required.
+  let opf_metadata = (
+    $opf_metadata | append (
+      [
+        [tag, attributes, content];
+        [
+          "meta"
+          {property: "dcterms:modified"}
+          [
+            [tag, attributes, content];
+            [null null (date now | date to-timezone "UTC" | format date '%FT%H:%M:%SZ')]
+          ]
+        ]
+      ]
+    )
+  )
+
+  # Sort the fields to be as deterministic as possible.
+  let opf_metadata = (
+    if ($opf_metadata | is-empty) {
+      []
+    } else {
+      $opf_metadata | sort-by tag content.content
+    }
+  )
+
+  # The order of creators is important.
+  # https://www.w3.org/TR/epub-33/#sec-opf-dccreator
+  let opf_metadata = $opf_metadata | append (
+    let credits = $metadata | get --optional credits;
+    if ($credits | is-empty) {
+    } else {
+      $credits | sort-by --custom {|a b|
+        # Place writers first, followed by artists and illustrators.
+        # Place editors last.
+        if ($a.role == "Writer") and ($b.role == "Writer") {
+          $a.primary
+        } else if "Writer" in [$a.role $b.role] {
+          $a.role == "Writer"
+        } else {
+          if ($a.role in ["Artist" "Illustrator"]) and ($b.role in ["Artist" "Illustrator"]) {
+            $a.primary
+          } else if $a.role in ["Artist" "Illustrator"] or $b.role in ["Artist" "Illustrator"] {
+            $a.role in ["Artist" "Illustrator"]
+          } else {
+            if ($a.role == "Editor") and ($b.role == "Editor") {
+              $a.primary
+            } else if "Editor" in [$a.role $b.role] {
+              $b.role == "Editor"
+            } else {
+              false
+            }
+          }
+        }
+      # todo If we ever have ID, we should group by that instead.
+      } | group-by --to-table person | get items | each {|it|
+        {
+          person: ($it.person | first)
+          roles: ($it.role | uniq)
+          primary: ($it.primary | any {|i| $i})
+          language: ($it.language | first)
+          # id: ($it.id | first)
+        }
+      } | enumerate | reduce --fold [] {|credit acc|
+        # log debug $"credit: ($credit)"
+        if ($credit.item.roles | any {|role| ($roles_map | get --optional $role | is-not-empty)}) {
+          $acc | append (
+            [
+              [tag, attributes, content];
+              [
+                "dc:creator"
+                {
+                  # role: aut
+                  # todo Add sort name?
+                  # file-as: "Umino, Chica"
+                  id: $"id-creator-($credit.index)"
+                }
+                [
+                  [tag, attributes, content];
+                  [null, null, $credit.item.person]
+                ]
+              ]
+            ]
+          ) | append (
+            $credit.item.roles
+            | reduce --fold [] {|role role_acc|
+              let r = $roles_map | get --optional $role
+              if ($r | is-empty) {
+                $role_acc
+              } else {
+                $role_acc | append [
+                  [tag, attributes, content];
+                  [
+                    "meta"
+                    {
+                      refines: $"#id-creator-($credit.index)"
+                      property: "role"
+                      scheme: "marc:relators"
+                    }
+                    [
+                      [tag, attributes, content];
+                      [null, null, $r]
+                    ]
+                  ]
+                ]
+              }
+            }
+          )
+        } else {
+          $acc
+        }
+      }
+    }
+  )
+
+  let attributes = {version: "3.0"}
+  let attributes = (
+    if ($unique_identifier | is-empty) {
+      $attributes
+    } else {
+      $attributes | merge {"unique-identifier": $unique_identifier}
+    }
+  )
+  {
+    "tag": "package"
+    attributes: $attributes,
+    content: [
+      [tag, attributes, content];
+      [
+        "metadata"
+        {
+          "xmlns:calibre": "http://calibre.kovidgoyal.net/2009/metadata"
+          "xmlns:dc": "http://purl.org/dc/elements/1.1/"
+          "xmlns:opf": "http://www.idpf.org/2007/opf"
+        }
+        $opf_metadata
+      ]
+    ]
+  }
+}
+
+# Use epubcheck to check if an EPUB is valid
+export def epubcheck []: [path -> bool] {
+  let epub = $in
+  let result = do { ^epubcheck --failonwarnings --json - $epub } | complete
+  if ($result.exit_code != 0) {
+    let messages = $result.stdout | from json | get messages
+    if ($messages | is-empty) {
+      # This shouldn't happen, but throw an error if it does anyway.
+      error make {
+        msg: "non-zero exit code while validating EPUB with epubcheck"
+        labels: [
+          {text: "result.exit_code" span: (metadata $result.exit_code).span}
+        ]
+        help: $"error validating the EPUB file (ansi yellow)($epub)(ansi reset):\nstderr: ($result.stderr)\nstdout: ($result.stdout)\n"
+      }
+    } else {
+      # The 'opf:scheme' attribute is required for Kavita, so ignore related error messages.
+      if ($messages | all {|it| $it.ID == "RSC-005" and $it.message == 'Error while parsing file: attribute "opf:scheme" not allowed here; expected attribute "id"' }) {
+        true
+      } else {
+        error make {
+          msg: "non-zero exit code while validating EPUB with epubcheck"
+          labels: [
+            {text: "result.exit_code" span: (metadata $result.exit_code).span}
+          ]
+          help: $"error validating the EPUB file (ansi yellow)($epub)(ansi reset):\nstderr: ($result.stderr)\nmessages: ($messages | where {|it| not (ID == 'RSC-005' and $it.message == 'Error while parsing file: attribute "opf:scheme" not allowed here; expected attribute "id"')})\n"
+        }
+      }
+    }
+  } else {
+    true
+  }
 }
 
 # Count the number of image files in a ZIP archive
@@ -3635,25 +4981,6 @@ export def number_of_images_in_archive []: [path -> int] {
 
 # export const comic_metadata_template = {
 # }
-
-# https://en.wikipedia.org/wiki/IETF_language_tag
-# https://en.wikipedia.org/wiki/List_of_ISO_639-3_codes
-export const iso_language_codes_map = [
-  [language iso_639_1 iso_639_3 ietf_bcp_47 default_language wikidata_id];
-  ["english" "en" "eng" "en" true Q1860]
-  ["american english" "en" "eng" "en-US" false Q7976]
-  ["british english" "en" "eng" "en-GB" false Q7979]
-  ["chinese" "zh" "zho" "zh" true Q7850]
-  ["german" "de" "deu" "de" false Q188]
-  ["japanese" "ja" "jpn" "ja" true Q5287]
-  ["japanese hiragana" "ja" "jpn" "ja-hira" false Q53979341]
-  ["japanese katakana" "ja" "jpn" "ja-kana" false Q53979342]
-  ["japanese kana" "ja" "jpn" "ja-hrkt" false Q53979345]
-  ["japanese kanji" "ja" "jpn" "ja-hani" false Q53979504]
-  ["japanese romanized" "ja" "jpn" "ja-Latn" false Q53979348]
-  ["korean" "ko" "kor" "ko" true Q9176]
-  ["spanish" "es" "spa" "es" true Q1321]
-]
 
 # Convert a language to it's corresponding IETF BCP 47 or ISO 639-3 language code
 #
@@ -3795,9 +5122,9 @@ export def extract_ebook_metadata [
 ] {
   let file = $in
   let file_type = $file | path parse | get extension | str downcase
-  # todo Eventually support MetronInfo.xml.
   let metadata = (
     if $file_type == "cbz" {
+      # todo Eventually support MetronInfo.xml.
       let metadata_file = $file | extract_file_from_archive "ComicInfo.xml" $working_directory
       let metadata = (
         if ($metadata_file | is-not-empty) {
@@ -3825,8 +5152,16 @@ export def extract_ebook_metadata [
       # ^exiftool -json $file | from json | first
       let metadata_file = mktemp
       log debug $"Running (ansi yellow)^ebook-meta --to-opf '($metadata_file)' ($file)(ansi reset)"
-      # todo Check command's exit code.
-      ^ebook-meta --to-opf $metadata_file $file
+      let result = do { ^ebook-meta --to-opf $metadata_file $file } | complete
+      if ($result.exit_code != 0) {
+        error make {
+          msg: "non-zero exit code while saving ebook metadata from PDF to OPF file with ebook-meta"
+          labels: [
+            {text: "result.exit_code" span: (metadata $result.exit_code).span}
+          ]
+          help: $"error extracting the OPF metadata to the file (ansi yellow)($metadata_file)(ansi reset) from the PDF file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+        }
+      }
       let metadata = (
         open $metadata_file | from xml
       )
@@ -3842,6 +5177,110 @@ export def extract_ebook_metadata [
       $metadata | from_opf_xml
     }
   }
+}
+
+# Embed metadata in an ebook
+#
+# Supports cbz, epub, and pdf file formats.
+export def embed_ebook_metadata [
+  file: path # The file in which to embed the OPF metadata
+  working_directory: directory
+  # todo Support embedding a cover.
+  # --cover: path # Cover file to embed in the ebook.
+]: [record -> path] {
+  let book_metadata = $in
+  let file_type = $file | path parse | get extension | str downcase
+
+  let metadata = (
+    if $file_type == "cbz" {
+      # todo Support MetronInfo
+      {
+        archive: $file
+        comic_info: ($book_metadata | into_comic_info_xml)
+      } | inject_comic_info
+    } else if $file_type == "epub" {
+      let opf_file = $file | find_opf_in_epub
+      if ($opf_file | is-empty) {
+        log error $"No OPF file found in (ansi yellow)($file)(ansi reset)"
+        return null
+      }
+      let metadata_file = $file | extract_file_from_archive $opf_file $working_directory
+      let metadata = (
+        if ($metadata_file | is-not-empty) {
+          open $metadata_file | from xml
+        }
+      )
+      if ($metadata.attributes | get --optional xmlns | is-not-empty) {
+        error make {
+          msg: "namespaces are now available in the 'from xml' Nushell command"
+          labels: [
+            {text: "metadata.attributes" span: (metadata $metadata.attributes).span}
+          ]
+          help: "remove the code that adds the xmlns attribute in the embed_ebook_metadata function"
+        }
+      }
+      let opf_metadata = $book_metadata | to_opf_xml
+      let metadata = (
+        $metadata
+        | update attributes (
+          # Nushell is absolutely borked when it comes to xml namespaces.
+          # We have to add back the namespace that it drops when reading the XML.
+          # https://github.com/nushell/nushell/issues/11523
+          $metadata.attributes | merge {
+            xmlns: "http://www.idpf.org/2007/opf"
+          } | merge (
+            # Include the unique-identifier attribute at the top-level.
+            if ($opf_metadata | get --optional attributes.unique-identifier | is-empty) {
+              {}
+            } else {
+              {"unique-identifier": $opf_metadata.attributes.unique-identifier}
+            }
+          )
+        )
+        # Drop the existing metadata section in the OPF.
+        | update content (
+          (
+            $metadata.content | where tag != "metadata"
+            | prepend (
+              $opf_metadata
+              | get content
+              | where tag == "metadata"
+              | first
+            )
+          )
+        )
+      )
+      # log debug $"embed_ebook_metadata: metadata: ($metadata | to json)"
+      $metadata | to xml --indent 2 | "<?xml version="1.0" encoding=\"utf-8\"?>\n" + $in | save --force $metadata_file
+      cd $working_directory
+      let result = ($file | add_file_to_archive ($metadata_file | path relative-to $working_directory))
+      cd -
+      if ($result | is-empty) {
+        log error $"Error adding the file (ansi yellow)($metadata_file | path relative-to $working_directory)(ansi reset) to the EPUB (ansi yellow)($file)(ansi reset) while in the directory (ansi yellow)($working_directory)(ansi reset)"
+        return null
+      }
+      rm $metadata_file
+    } else if $file_type == "pdf" {
+      # To get the identifiers from the PDF, we need to use ebook-meta instead of exiftool.
+      # ^exiftool -json $file | from json | first
+      let opf_file = mktemp --suffix .opf
+      $book_metadata | to_opf_xml | save --force $opf_file
+      # log debug $"Running (ansi yellow)^ebook-meta --to-opf '($metadata_file)' ($file)(ansi reset)"
+      log debug $"Running (ansi yellow)^ebook-meta '($file)' --from-opf '($opf_file)'(ansi reset)"
+      let result = do { ^ebook-meta $file --from-opf $opf_file } | complete
+      if ($result.exit_code != 0) {
+        error make {
+          msg: "non-zero exit code while embedding ebook metadata in PDF with ebook-meta"
+          labels: [
+            {text: "result.exit_code" span: (metadata $result.exit_code).span}
+          ]
+          help: $"error embedding the ebook metadata opf file (ansi yellow)($opf_file)(ansi reset) in the PDF file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+        }
+      }
+      rm $opf_file
+    }
+  )
+  $file
 }
 
 # Convert the internal data structure for a comic to a ComicInfo.xml
@@ -4038,14 +5477,6 @@ export def into_comic_info_xml []: [record -> record] {
   }
   # log debug $"Comic info: ($comic_info_xml | to nuon)"
   $comic_info_xml
-}
-
-# Convert metadata into the metadata object of the OPF XML format used by EPUBs
-#
-# This format can then be used to update the content.opf or package.opf file in an EPUB.
-export def into_metadata_opf_xml []: [record -> record] {
-  let opf = $in
-  # todo
 }
 
 # Search for editions on Wikidata by ISBN-13.
@@ -5360,7 +6791,7 @@ export def bookbrainz_get_edition_identifiers [
 export def fetch-ebook-metadata [
   ...args: string
   # Remove Comicvine because it can cause trouble, although it does have entries for some Light Novels apparently.
-  --allowed-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
+  --allowed-plugins: list<string> = ["Hardcover" "Wikidata"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
   # --allowed-plugins: list<string> = [Google "Amazon.com"] # Allowed metadata plugins, i.e. [Comicvine, Google, Google Images, Amazon.com, Edelweiss, Open Library, Big Book Search]
   --authors: list<string> # A list of authors to use
   --cover: path # Path to which to download the cover
@@ -5827,34 +7258,6 @@ export def export_book_to_directory [
     opf: $opf
     cover: $cover
   }
-}
-
-# todo Pass around opf as metadata instead of a file path.
-export def embed_book_metadata []: [
-  record<book: path, cover: path, opf: path> -> record<book: path, cover: path, opf: path>
-] {
-  let input = $in
-
-  # let new_cover_file = mktemp
-  # ^ebook-meta --get-cover $new_cover_file $input.book
-  # let new_cover_file = $new_cover_file | rename_image_with_extension
-  # log debug $"pre ebook-meta cover file: ($new_cover_file) ($new_cover_file | get_image_dimensions)"
-  # rm $new_cover_file
-
-  let book_format = ($input.book | path parse | get extension)
-  if $book_format in ["epub" "pdf"] {
-    # log debug $"input.cover: ($input.cover) ($input.cover | get_image_dimensions)"
-    log debug $"Running (ansi yellow)^ebook-meta '($input.book)' --cover '($input.cover)' --from-opf '($input.opf)'(ansi reset)"
-    ^ebook-meta $input.book --cover $input.cover --from-opf $input.opf
-  }
-
-  # let new_cover_file = mktemp
-  # ^ebook-meta --get-cover $new_cover_file $input.book
-  # let new_cover_file = $new_cover_file | rename_image_with_extension
-  # log debug $"updated_cover_file: ($new_cover_file) ($new_cover_file | get_image_dimensions)"
-  # rm $new_cover_file
-
-  $input
 }
 
 # Convert a copy for my primary e-reader:
@@ -7610,7 +9013,7 @@ export def parse_ffprobe_audio_bit_rate []: [record<streams: table, format: reco
     }
   )
   # Convert to kilobits-per-second (kbit/s) from bits-per-second (bps).
-  ($bit_rate | into int) // 1000
+  ((($bit_rate | into int) / 1000) | math round --precision 0) | into int
 }
 
 # Get the bit rate of an audio file in kbit/s from the output of the file command.

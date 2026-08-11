@@ -1,0 +1,61 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="calibre_id" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:title>March Comes in Like a Lion, Vol. 1</dc:title>
+    <dc:creator id="id-creator-0">Chica Umino</dc:creator>
+    <meta refines="#id-creator-0" property="role" scheme="marc:relators">author</meta>
+    <meta refines="#id-creator-0" property="role" scheme="marc:relators">artist</meta>
+    <dc:creator id="id-creator-1">Jocelyne Allen</dc:creator>
+    <meta refines="#id-creator-1" property="role" scheme="marc:relators">translator</meta>
+    <dc:contributor opf:role="bkp" opf:file-as="calibre">calibre (8.14.0) [https://calibre-ebook.com]</dc:contributor>
+    <dc:identifier id="calibre_id" opf:scheme="calibre">2494c4ca-6fb6-459f-baca-26de4d2df70e</dc:identifier>
+    <dc:date>2023-05-01T05:00:00+00:00</dc:date>
+    <dc:language>eng</dc:language>
+    <dc:description>Rei Kiriyama...
+
+Note: This volume was released digitally (05/03/2023) before paperback (06/06/2023).
+
+## Chapter Titles
+* Chapter 1: Rei Kiriyama
+* Chapter 2: A Riverside Town
+* Chapter 3: Akari
+* Chapter 4: The Other Side of the Bridge
+* Chapter 5: Harunobu
+* Chapter 6: Beyond the Night Sky
+* Chapter 7: Hina
+* Chapter 8: VS.
+* Chapter 9: Contract
+* Chapter 10: Over the Cuckoo's Nest</dc:description>
+    <dc:publisher>Denpa</dc:publisher>
+    <dc:identifier id="hardcover-identifier">march-comes-in-like-a-lion-volume-1</dc:identifier>
+    <meta refines="#hardcover-identifier" property="identifier-type">HARDCOVER</meta>
+    <dc:identifier id="hardcover-slug-identifier">march-comes-in-like-a-lion-volume-1</dc:identifier>
+    <meta refines="#hardcover-slug-identifier" property="identifier-type">HARDCOVER-SLUG</meta>
+    <dc:identifier opf:scheme="HARDCOVER-ID">908381</dc:identifier>
+    <dc:identifier opf:scheme="HARDCOVER-EDITION">30930924</dc:identifier>
+    <dc:identifier id="comicvine-issue-identifier">987377</dc:identifier>
+    <meta refines="#comicvine-issue-identifier" property="identifier-type" scheme="COMICVINE" />
+    <dc:identifier opf:scheme="COMICVINE-VOLUME">150064</dc:identifier>
+    <dc:identifier opf:scheme="ISBN" id="isbn-identifier">urn:isbn:9781634428132</dc:identifier>
+    <meta refines="#isbn-identifier" property="identifier-type" scheme="onix:codelist5">15</meta>
+    <dc:identifier id="bookbrainz-edition-identifier">urn:uuid:594a8ec2-6301-4c20-ae22-2c43840416b2</dc:identifier>
+    <meta refines="#bookbrainz-edition-identifier" property="identifier-type">BOOKBRAINZ-EDITION</meta>
+    <dc:identifier id="wikidata-edition-identifier">Q139556252</dc:identifier>
+    <meta refines="#wikidata-edition-identifier" property="identifier-type">WIKIDATA-EDITION</meta>
+    <dc:subject>Strong Character Development</dc:subject>
+    <dc:subject>Loveable Characters</dc:subject>
+    <dc:subject>Character Driven</dc:subject>
+    <dc:subject>Weak Character Development</dc:subject>
+    <dc:subject>Not Diverse Characters</dc:subject>
+    <dc:subject>Comics</dc:subject>
+    <dc:subject>Coming-of-age</dc:subject>
+    <dc:subject>Romance</dc:subject>
+    <dc:subject>Slice of Life</dc:subject>
+    <meta property="belongs-to-collection" id="series-id-1">March Comes in Like a Lion</meta>
+    <meta refines="#series-id-1" property="group-position">1</meta>
+  </metadata>
+  <manifest/>
+  <spine/>
+  <guide/>
+</package>
