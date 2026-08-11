@@ -1069,6 +1069,15 @@ def main [
     )
   )
 
+  if ($comic_metadata | get --optional forms_of_creative_work | is-empty) or ($comic_metadata.forms_of_creative_work | first) == "unknown" {
+    log error $"Book category is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the book category for the book, remove the cached response, and retry.."
+    exit 1
+  }
+  if ($comic_metadata | get --optional literary_type | is-empty) or ($comic_metadata.literary_type | first) == "unknown" {
+    log error $"Literary type is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type for the book, remove the cached response, and retry."
+    exit 1
+  }
+
   # Use genres from Wikidata.
   let comic_metadata = $comic_metadata | merge {
     genres: ($wikidata_metadata | get --optional genres)
@@ -1132,6 +1141,8 @@ def main [
   # Embed the updated metadata in the ebook.
   log info "Embedding the metadata in the ebook"
   $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
+
+  # todo Embed cover in PDFs when the quality appears better?
 
   log debug "Renaming the file according to its metadata"
   let formats = (
