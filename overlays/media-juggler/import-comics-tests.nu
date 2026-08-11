@@ -1065,6 +1065,8 @@ def test_from_opf_xml_march_comes_in_like_a_lion_volume_1_epub_3_2_pdf [] {
     credits: [
       [creator, role, primary, language];
       ["Chica Umino", Writer, true, ""]
+      ["Chica Umino", Artist, false, ""]
+      ["Jocelyne Allen", Translator, false, ""]
     ]
     publishers: ["Denpa"]
     genres: [
@@ -1115,11 +1117,11 @@ def test_from_opf_xml [] {
 def test_to_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
   let input = {
     credits: [
-      # todo Need to test more creator roles here.
-      # Plus, should I start using the ID field here and using sort-by with that?
+      # todo Should I start using the ID field here and using sort-by with that?
       [person, role, primary, language];
       ["Chica Umino", Writer, true, ""]
       ["Chica Umino", Artist, true, ""]
+      ["Jocelyne Allen", Translator, false, ""]
     ]
     publishers: ["Denpa"]
     genres: [
@@ -1298,6 +1300,28 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
             [
               [tag, attributes, content];
               [null, null, artist]
+            ]
+          ]
+          [
+            dc:creator,
+            {
+              id: "id-creator-1"
+            },
+            [
+              [tag, attributes, content];
+              [null, null, "Jocelyne Allen"]
+            ]
+          ],
+          [
+            "meta"
+            {
+              refines: "#id-creator-1"
+              property: "role"
+              scheme: "marc:relators"
+            }
+            [
+              [tag, attributes, content];
+              [null, null, translator]
             ]
           ]
         ]

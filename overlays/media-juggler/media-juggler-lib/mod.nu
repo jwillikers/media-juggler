@@ -291,6 +291,19 @@ export const opf_identifier_schemes = [
   # [GOOGLE google_books_id]
 ]
 
+# https://id.loc.gov/vocabulary/relators.html
+export const opf_roles_map = {
+  "Artist": "artist"
+  # Kavita treats the illustrator as Inker.
+  "Illustrator": "illustrator"
+  "Inker": "illustrator"
+  "Colorist": "colorist"
+  "Editor": "editor"
+  "Translator": "translator"
+  "Writer": "author"
+}
+
+
 # Surround special characters in a string with square brackets
 #
 # Use this on strings before adding glob characters.
@@ -3859,6 +3872,16 @@ export def from_pdf_metadata []: [
 # https://github.com/nushell/nushell/issues/11523
 export def from_opf_xml [
   identifier_schemes: table = $opf_identifier_schemes
+  roles_map: table = [
+    [opf_roles role];
+    # Kavita treats the illustrator as Inker.
+    [["artist" "art" "illustrator" "ill"] "Artist"]
+    [["author" "aut"] "Writer"]
+    [["colorist" "clr"] "Colorist"]
+    [["editor" "edt"] "Editor"]
+    [["publisher" "pbl"] "Publisher"]
+    [["translator" "trl"] "Translator"]
+  ]
 ]: [
   record -> record
 ] {
@@ -3904,24 +3927,91 @@ export def from_opf_xml [
   let credits = (
     let creators = $metadata_content | where tag == creator;
     if ($creators | is-not-empty) {
-      let authors = $creators | where {|it| ($it.attributes | get --optional role) == "aut"}
-      if ($authors | is-not-empty) {
-        $authors | get content | first | get content | flatten | uniq | each {|author|
-          {
-            creator: $author
-            role: "Writer"
-            primary: true
-            language: ""
+      let meta = $metadata_content | where tag == meta
+      # The order of the creators is important.
+      $creators | reduce --fold [] {|it acc|
+        # Check for refines first, then fallback to role attribute.
+        let id = $it | get --optional attributes.id
+        let meta_refines_role_items = (
+          if ($id | is-empty) {
+
+          } else {
+            if ($meta | is-not-empty) {
+              $meta | where {|i| ($i | get --optional attributes.refines) == $"#($id)" and ($i | get --optional attributes.property) == "role" and ($i | get --optional attributes.scheme) == "marc:relators" and ($i | get --optional content.0.content | is-not-empty)}
+            }
           }
-        } | sort-by creator
-      } else {
-        # Fallback to using any creators as the author
-        $creators | get content | first | get content | flatten | uniq | each {|creator|
-          {
-            creator: $creator
-            role: "Writer"
-            primary: true
-            language: ""
+        )
+        if ($id | is-empty) and ($meta_refines_role_items | is-empty) {
+          let opf_role = $it | get --optional attributes.role
+          let role = (
+            if ($opf_role | is-empty) {
+              "Writer"
+            } else {
+              let roles = $roles_map | where {|i| $opf_role in $i.opf_roles}
+              if ($roles | is-empty) {
+                error make {
+                  msg: "role from OPF metadata missing in roles_map"
+                  labels: [
+                    {text: "opf_role" span: (metadata $opf_role).span}
+                    {text: "roles_map" span: (metadata $roles_map).span}
+                  ]
+                  help: $"add the missing role (ansi yellow)($opf_role)(ansi reset) to the roles_map table"
+                }
+              } else if ($roles | length) > 1 {
+                error make {
+                  msg: "duplicate roles for role in roles_map"
+                  labels: [
+                    {text: "role" span: (metadata $opf_role).span}
+                    {text: "roles_map" span: (metadata $roles_map).span}
+                  ]
+                  help: $"remove the duplicate role (ansi yellow)($opf_role)(ansi reset) from the roles_map table"
+                }
+              } else {
+                $roles.role | first
+              }
+            }
+          )
+          $acc | append [
+            [creator role primary language];
+            [
+              ($it.content.0.content)
+              $role
+              ($role == "Writer")
+              ""
+            ]
+          ]
+        } else {
+          $meta_refines_role_items | reduce --fold $acc {|role_it role_acc|
+            let roles = $roles_map | where {|i| $role_it.content.0.content in $i.opf_roles}
+            if ($roles | is-empty) {
+              error make {
+                msg: "role from OPF metadata missing in roles_map"
+                labels: [
+                  {text: "role" span: (metadata $role_it.content.0.content).span}
+                  {text: "roles_map" span: (metadata $roles_map).span}
+                ]
+                help: $"add the missing role (ansi yellow)($role_it.content.0.content)(ansi reset) to the roles_map table"
+              }
+            } else if ($roles | length) > 1 {
+              error make {
+                msg: "duplicate roles for role in roles_map"
+                labels: [
+                  {text: "role" span: (metadata $role_it.content.0.content).span}
+                  {text: "roles_map" span: (metadata $roles_map).span}
+                ]
+                help: $"remove the duplicate role (ansi yellow)($role_it.content.0.content)(ansi reset) from the roles_map table"
+              }
+            } else {
+              $role_acc | append [
+                [creator role primary language];
+                [
+                  ($it.content.0.content)
+                  ($roles.role | first)
+                  (($roles.role | first) == "Writer")
+                  ""
+                ]
+              ]
+            }
           }
         }
       }
@@ -4091,16 +4181,17 @@ export def from_opf_xml [
                         and ($meta_it.attributes | get --optional scheme | str upcase) in $identifier_schemes_and_type.schemes
                       )
                       or (
-                        ($meta_it.attributes | get --optional content.0.content | is-not-empty)
-                        and ($meta_it.attributes | get --optional content.0.content | str upcase) in $identifier_schemes_and_type.schemes
+                        ($meta_it | get --optional content.0.content | is-not-empty)
+                        and ($meta_it | get --optional content.0.content | str upcase) in $identifier_schemes_and_type.schemes
                       )
                     )
                   ) {
-                    $inner_acc | append ($meta_it)
+                    $inner_acc | append $meta_it
                   } else {
                     $inner_acc
                   }
-                } | is-not-empty
+                }
+                | is-not-empty
               )
             )
           )
@@ -4240,7 +4331,7 @@ export def from_opf_xml [
           | str replace --all "-" ""
         )
         if ($isbn =~ '^urn:isbn:[0-9]{13}$') {
-          $isbn | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$' | get isbn
+          $isbn | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$' | get isbn | first
         } else {
           $isbn
         }
@@ -4271,6 +4362,7 @@ export def from_opf_xml [
 export def to_opf_xml [
   language_codes_map: table = $iso_language_codes_map
   identifier_schemes: table = $opf_identifier_schemes
+  roles_map: record = $opf_roles_map
 ]: [
   record -> record
 ] {
@@ -4733,17 +4825,6 @@ export def to_opf_xml [
   )
 
   # The order of creators is important.
-  # https://id.loc.gov/vocabulary/relators.html
-  let opf_role_mappings = {
-    "Artist": "artist"
-    # Kavita treats the illustrator as Inker.
-    "Illustrator": "illustrator"
-    "Inker": "illustrator"
-    "Colorist": "colorist"
-    "Editor": "editor"
-    "Translator": "translator"
-    "Writer": "author"
-  }
   # https://www.w3.org/TR/epub-33/#sec-opf-dccreator
   let opf_metadata = $opf_metadata | append (
     let credits = $metadata | get --optional credits;
@@ -4782,7 +4863,7 @@ export def to_opf_xml [
         }
       } | enumerate | reduce --fold [] {|credit acc|
         # log debug $"credit: ($credit)"
-        if ($credit.item.roles | any {|role| ($opf_role_mappings | get --optional $role | is-not-empty)}) {
+        if ($credit.item.roles | any {|role| ($roles_map | get --optional $role | is-not-empty)}) {
           $acc | append (
             [
               [tag, attributes, content];
@@ -4803,7 +4884,7 @@ export def to_opf_xml [
           ) | append (
             $credit.item.roles
             | reduce --fold [] {|role role_acc|
-              let r = $opf_role_mappings | get --optional $role
+              let r = $roles_map | get --optional $role
               if ($r | is-empty) {
                 $role_acc
               } else {
