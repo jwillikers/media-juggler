@@ -2911,8 +2911,7 @@ export def parse_hardcover_edition [
         } else if $contribution.contribution == "Illustrator" {
           "Artist"
         # } else if $contribution.contribution == "Cover Artist" {
-          # Cover Artist ends up becoming two credits for both Cover and Artist to match Comic Vine.
-          # "Artist"
+        #   "Cover Artist"
         } else {
           $contribution.contribution
         }
@@ -2920,7 +2919,16 @@ export def parse_hardcover_edition [
       $acc | append [
         [person id role primary language];
         [$contribution.author.name ($contribution.author.id | into string) $role false ""]
-      ] | uniq
+      ] | append (
+        # todo Always just keep "Cover Artist" as one role instead of multiple Cover and Artist roles.
+        if $role == "Cover Artist" {
+          [
+            [person id role primary language];
+            [$contribution.author.name ($contribution.author.id | into string) "Cover" false ""]
+            [$contribution.author.name ($contribution.author.id | into string) "Artist" false ""]
+          ]
+        }
+      ) | uniq
       # ] | append (
       #   if $contribution.contribution == "Cover Artist" {
       #     [
@@ -5499,6 +5507,15 @@ export def into_comic_info_xml []: [record -> record] {
       } else {
         $id.id | identifier_into_url $id.type
       }
+    } else if $id.type == "comic_vine_issue_id" {
+      let i = (
+        if ($id.id | str starts-with "4000-") {
+          $id.id
+        } else {
+          "4000-" + $id.id
+        }
+      )
+      $i | identifier_into_url $id.type
     } else {
       $id.id | identifier_into_url $id.type
     }
@@ -5577,7 +5594,14 @@ export def into_comic_info_xml []: [record -> record] {
     }
     | upsert_comic_info {tag: "AgeRating", value: ($data | get --optional comic_info_age_rating)}
     | upsert_comic_info {tag: "Count", value: ($data | get --optional issue_count)}
-    | upsert_comic_info {tag: "PageCount", value: ($data | get --optional page_count | into string)}
+    | upsert_comic_info {
+      tag: "PageCount"
+      value: (
+        if ($data | get --optional page_count | is-not-empty) {
+          $data.page_count | into string
+        }
+      )
+    }
     | upsert_comic_info {tag: "Title", value: ($data | get --optional chapter_title)}
     | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publishers | str join ",")}
     | upsert_comic_info {

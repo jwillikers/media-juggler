@@ -5192,6 +5192,7 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
       ["Kei Azumi", "1221140", Writer, false, ""]
       ["Mitsuaki Matsumoto", "1221151", Artist, false, ""]
       ["Mitsuaki Matsumoto", "1221151", "Cover Artist", false, ""]
+      ["Mitsuaki Matsumoto", "1221151", Cover, false, ""]
       ["Mittt Liu", "724696", Translator, false, ""]
       ["Jasmine Thone", "1251809", Editor, false, ""]
     ]
