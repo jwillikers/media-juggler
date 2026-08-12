@@ -1025,8 +1025,7 @@ def main [
   # Edition series preferred over Work Series
 
   let comic_metadata = (
-    $hardcover_edition_id
-    | fetch_and_parse_hardcover_edition id $cache_function
+    $hardcover_edition_id | fetch_and_parse_hardcover_edition id $cache_function
   )
   log debug $"The metadata from Hardcover is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
 
@@ -1092,7 +1091,7 @@ def main [
       error: $"There is no cover artist set for the light novel Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the cover artist for the edition, remove the cached response, and retry."
     }
   }
-  if ($comic_metadata | get --optional literary_type | is-empty) or ($comic_metadata.literary_type | first) == "unknown" {
+  if ($comic_metadata | get --optional literary_type | is-empty) or $comic_metadata.literary_type == "unknown" {
     log error $"Literary type is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type for the book, remove the cached response, and retry."
     if not $keep_tmp {
       rm --force --recursive $temporary_directory
@@ -1100,6 +1099,16 @@ def main [
     return {
       file: $original_file
       error: $"Literary type is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type for the book, remove the cached response, and retry."
+    }
+  }
+  if ($comic_metadata.forms_of_creative_work | first) == "light novel" and $comic_metadata.literary_type == "nonfiction" {
+    log error $"Literary type is not set to fiction for the light novel Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type to fiction for the book, remove the cached response, and retry."
+    if not $keep_tmp {
+      rm --force --recursive $temporary_directory
+    }
+    return {
+      file: $original_file
+      error: $"Literary type is not set to fiction for the light novel Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type to fiction for the book, remove the cached response, and retry."
     }
   }
   if ($comic_metadata | get --optional _cover_image.2 | is-empty) {
@@ -1201,9 +1210,13 @@ def main [
   )
 
   # Use genres from Wikidata.
-  let comic_metadata = $comic_metadata | merge {
-    genres: ($wikidata_metadata | get --optional genres)
-  } | merge (
+  let comic_metadata = $comic_metadata | merge (
+    if ($wikidata_metadata | get --optional genres | is-empty) {
+      {}
+    } else {
+      {genres: ($wikidata_metadata | get --optional genres)}
+    }
+  ) | merge (
     if ($comic_metadata | get --optional forms_of_creative_work | is-empty) {
       {
         forms_of_creative_work: ($wikidata_metadata | get --optional forms_of_creative_work)

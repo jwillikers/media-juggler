@@ -188,6 +188,7 @@ export const intended_public_to_age_rating_comic_info_map = [
 
 export const genre_to_age_rating_comic_info_map = [
   [genres comic_info_age_rating metron_info_age_rating];
+  [[ecchi] "Teen" "Teen"]
   [[erotic] "M" "Mature"]
   [[hentai] "X18+" "Adult"]
 ]
@@ -532,14 +533,30 @@ export def standardize_title []: string -> string {
   }
 }
 
-# Remove the light novel disambiguation from the title and standardize the title
+# Remove the light novel, manga, and manhwa disambiguation from the title and standardize the title
 #
-# This removes the (Light Novel) disambiguation comment since light novels are kept in a separate library on Kavita.
+# This removes the (Light Novel), (Manga), and (Manhwa) disambiguation comments since these are kept in separate libraries on Kavita.
 # This basically ends up following the MusicBrainz style guidelines.
+#
+# todo Add test cases for this function.
 export def standardize_hardcover_title []: string -> string {
   let title = $in
   # We don't want to replace the "-" before the volume part with an emdash or endash.
   let components = $title | split row --number 2 " (Light Novel), "
+  let components = (
+    if ($components | length) == 1 {
+      $title | split row --number 2 " (Manga), "
+    } else {
+      $components
+    }
+  )
+  let components = (
+    if ($components | length) == 1 {
+      $title | split row --number 2 " (Manhwa), "
+    } else {
+      $components
+    }
+  )
   if ($components | length) > 1 {
     # If the title of the series ends with punctuation, don't add a comma.
     if ($components | first | split chars | last) in ["!", "?", ".", ","] {
@@ -2736,18 +2753,7 @@ export def get_hardcover_edition [
           literary_type_id
           book_category_id
           slug
-          taggings {
-            id
-            tag {
-              id
-              tag
-              tag_category {
-                id
-              }
-              tag_category_id
-              slug
-            }
-          }
+          cached_tags
           featured_book_series {
             id
             featured
@@ -2770,6 +2776,19 @@ export def get_hardcover_edition [
       }
     }"
   }
+
+          # taggings {
+          #   id
+          #   tag {
+          #     id
+          #     tag
+          #     tag_category {
+          #       id
+          #     }
+          #     tag_category_id
+          #     slug
+          #   }
+          # }
 
   let update_function = {|type id|
     let request = {
@@ -2811,7 +2830,13 @@ export def get_hardcover_edition [
 }
 
 # Parse the data from the Hardcover API for a Harcover edition
-export def parse_hardcover_edition []: [record -> record] {
+export def parse_hardcover_edition [
+  the_genre_allowlist: table = $genre_allowlist
+  the_tag_allowlist: table = $tag_allowlist
+  genres_to_age_rating_map: table<genres: list<string>, comic_info_age_rating: string, metron_info_age_rating: string> = $genre_to_age_rating_comic_info_map
+  intended_public_map: table<name: string, wikidata_id: string> = $intended_public_wikidata
+  intended_publics_to_age_rating_map: table<intended_publics: list<string>, comic_info_age_rating: string, metron_info_age_rating: string> = $intended_public_to_age_rating_comic_info_map
+]: [record -> record] {
   let hardcover_edition = $in
   # log debug $"hardcover_edition: ($hardcover_edition)"
   if ($hardcover_edition | is-empty) {
@@ -2952,39 +2977,170 @@ export def parse_hardcover_edition []: [record -> record] {
     }
   )
 
-  {
-    issue: ($hardcover_edition | get --optional book.featured_book_series.position)
-    series: ($hardcover_edition | get --optional book.featured_book_series.series.name | str replace " (Light Novel)" "" | use_unicode_in_title)
-    title: (
-      if ($hardcover_edition | get --optional title | is-not-empty) {
-        # todo Drop , after punctuation
-        $hardcover_edition.title | standardize_hardcover_title | use_unicode_in_title
+  let genres = (
+    let cached_tags = $hardcover_edition | get --optional book.cached_tags;
+    if ($cached_tags | is-empty) {
+      []
+    } else {
+      let genres = $cached_tags | get --optional Genre
+      if ($genres | is-empty) {
+        []
+      } else {
+        $genres.tag | sanitize_genres_or_tags $the_genre_allowlist
       }
-    )
-    description: $hardcover_edition.book.description
-    # todo Get start year of first book in series
-    volume: $series_begin_year
-    issue_count: ($hardcover_edition | get --optional book.featured_book_series.series.books_count)
-    ids: $ids
-    isbn: ($hardcover_edition | get --optional isbn_13)
-    characters: $characters
-    language: $language
-    # Use the forms_of_creative_work field for compatibility with Wikidata.
-    forms_of_creative_work: [$book_category]
-    literary_type: $literary_type
-    # Default the age rating to PG.
-    # comic_info_age_rating: "PG"
-    # manga: $manga
-    # todo Genres and tags?
-    genres: []
-    tags: []
-    publication_date: ($hardcover_edition | get --optional release_date)
-    publishers: [($hardcover_edition | get --optional publisher.name)]
-    credits: $credits
-    # todo Make sure this is a string?
-    series_id: ($hardcover_edition | get --optional book.featured_book_series.series_id)
-    _cover_image: [0, "", ($hardcover_edition | get --optional image.url) ($hardcover_edition | get --optional image.width) ($hardcover_edition | get --optional image.height)]
-  }
+    }
+  )
+  let tags = (
+    let cached_tags = $hardcover_edition | get --optional book.cached_tags;
+    if ($cached_tags | is-empty) {
+      []
+    } else {
+      let tags = $cached_tags | get --optional Tag
+      if ($tags | is-empty) {
+        []
+      } else {
+        # Tags have such a broad range that sanitizing them might prove difficult.
+        # I need a way to ensure I don't lose any tags on accident.
+        # It's probably best to remove unknown tags that are likely to cause a bunch of clutter.
+        $tags.tag | sanitize_genres_or_tags $the_tag_allowlist
+        # $tags.tag | str downcase
+      }
+    }
+  )
+  # todo Maybe I should try to get the intended public from the taggings instead of cached_tags?
+  let intended_publics = (
+    if ($tags | is-empty) {
+      []
+    } else {
+      $tags | reduce --fold [] {|tag acc|
+        if ($tag | str downcase) in ($intended_public_map.name | append $intended_public_map.aliases) {
+          $acc | append $intended_public_map.name
+        } else {
+          $acc
+        }
+      }
+    }
+  )
+  let comic_info_age_rating = (
+    let genre_age_rating = $genres_to_age_rating_map | where {|genre_to_age_rating|
+      $genre_to_age_rating.genres | any {|genre| $genre in $genres}
+    };
+    let intended_public_age_rating = $intended_publics_to_age_rating_map | where {|intended_public_to_age_rating|
+      $intended_public_to_age_rating.intended_publics | any {|intended_public| $intended_public in $intended_publics}
+    };
+    let age_ratings = $genre_age_rating | append $intended_public_age_rating;
+    let age_ratings = $age_ratings | each {|age_rating|
+      let age_range_begin = $age_rating_map | where {|comic_info_age_rating|
+        $comic_info_age_rating.comic_info == $age_rating.comic_info_age_rating
+      } | get --optional age_range_begin | first
+      $age_rating | insert age_range_begin $age_range_begin
+    };
+    if ($age_ratings | is-not-empty) {
+      $age_ratings | sort-by --reverse age_range_begin | first | get comic_info_age_rating
+    }
+  )
+
+  let unfiltered_genres = (
+    let cached_tags = $hardcover_edition | get --optional book.cached_tags;
+    if ($cached_tags | is-not-empty) {
+      let genres = $cached_tags | get --optional Genre
+      if ($genres | is-not-empty) {
+        $genres.tag | str downcase
+      } else {
+        []
+      }
+    } else {
+      []
+    }
+  )
+
+  # Surmise whether it is manga or not based on the Manga genre or tag and the disambiguation comment in the title or series name.
+  # This is left as null for non-comics.
+  let manga = (
+    if $book_category == "graphic novel" {
+      (
+        "manga" in $unfiltered_genres
+        or "manga" in $tags
+        or " (Manga), " in $hardcover_edition.title
+        or (
+          $hardcover_edition
+          | get --optional book.featured_book_series.series.name
+          | (
+            let input = $in;
+            ($input | is-not-empty) and ($input | str ends-with " (Manga)")
+          )
+        )
+      )
+    } else {
+      null
+    }
+  )
+  # Attempt to deduce the form of creative work as manga volume or manhwa volume when the book category is "graphic novel"
+  let form_of_creative_work = (
+    if $book_category == "graphic novel" {
+      if $manga {
+        "manga volume"
+      } else if (
+          "manhwa" in $unfiltered_genres
+          or "manhwa" in $tags
+          or " (Manhwa), " in $hardcover_edition.title
+          or (
+            $hardcover_edition
+            | get --optional book.featured_book_series.series.name
+            | (
+              let input = $in;
+              ($input | is-not-empty) and ($input | str ends-with " (Manhwa)")
+            )
+          )
+        ) {
+        "manhwa volume"
+      } else {
+        "graphic novel"
+      }
+    } else {
+      $book_category
+    }
+  )
+
+  (
+    {
+      issue: ($hardcover_edition | get --optional book.featured_book_series.position)
+      series: (
+        $hardcover_edition
+        | get --optional book.featured_book_series.series.name
+        | str replace " (Light Novel)" ""
+        | str replace " (Manga)" ""
+        | str replace " (Manhwa)" ""
+        | use_unicode_in_title
+      )
+      title: (
+        if ($hardcover_edition | get --optional title | is-not-empty) {
+          # todo Drop , after punctuation
+          $hardcover_edition.title | standardize_hardcover_title | use_unicode_in_title
+        }
+      )
+      description: $hardcover_edition.book.description
+      volume: $series_begin_year
+      issue_count: ($hardcover_edition | get --optional book.featured_book_series.series.books_count)
+      ids: $ids
+      isbn: ($hardcover_edition | get --optional isbn_13)
+      characters: $characters
+      language: $language
+      # Use the forms_of_creative_work field for compatibility with Wikidata.
+      forms_of_creative_work: [$form_of_creative_work]
+      literary_type: $literary_type
+      genres: $genres
+      tags: $tags
+      publication_date: ($hardcover_edition | get --optional release_date)
+      publishers: [($hardcover_edition | get --optional publisher.name)]
+      credits: $credits
+      # todo Make sure this is a string?
+      series_id: ($hardcover_edition | get --optional book.featured_book_series.series_id)
+      _cover_image: [0, "", ($hardcover_edition | get --optional image.url) ($hardcover_edition | get --optional image.width) ($hardcover_edition | get --optional image.height)]
+    }
+    | upsert_if_value comic_info_age_rating $comic_info_age_rating
+    | upsert_if_value manga $manga
+  )
 }
 
 # Get metadata for an edition on Hardcover by Hardcover edition id or another identifier.
@@ -4076,7 +4232,8 @@ export def from_opf_xml [
 
   # The metadata structure for series only supports one series right now.
   let single_series = (
-    if ($series | length) > 1 {
+    if ($series | is-empty) {
+    } else if ($series | length) > 1 {
       # Maintain the order as parsed, but place the series with a position at the end.
       let series = $series | sort-by --custom {|a b| ($a | get --optional position | is-not-empty) and ($b | get --optional position | is-empty)}
       log warning $"Multiple series parsed from OPF metadata: ($series). Ignoring all but the first one."
@@ -5917,7 +6074,6 @@ export def parse_wikidata_edition_and_works_metadata [
     } | sort
   )
 
-  # todo age rating
   let intended_publics = (
     # P2360: intended public
     let wikidata_intended_publics = $works.statements | get --optional P2360 | where {|item| $item | is-not-empty};

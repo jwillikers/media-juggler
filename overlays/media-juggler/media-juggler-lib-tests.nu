@@ -5183,7 +5183,7 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
     language: "english"
     forms_of_creative_work: ["light novel"]
     literary_type: "fiction"
-    genres: []
+    genres: ["adventure" "fantasy" "isekai"]
     tags: []
     publication_date: "2024-03-30"
     publishers: ["Hanashi Media"]
