@@ -2979,14 +2979,11 @@ export def parse_hardcover_edition []: [record -> record] {
     genres: []
     tags: []
     publication_date: ($hardcover_edition | get --optional release_date)
-    # $volume_data.description
     publishers: [($hardcover_edition | get --optional publisher.name)]
-    # $data.store_date
-    # $data.cover_date
     credits: $credits
     # todo Make sure this is a string?
     series_id: ($hardcover_edition | get --optional book.featured_book_series.series_id)
-    _cover_image: [0, "", ($hardcover_edition | get --optional image.url)]
+    _cover_image: [0, "", ($hardcover_edition | get --optional image.url) ($hardcover_edition | get --optional image.width) ($hardcover_edition | get --optional image.height)]
   }
 }
 

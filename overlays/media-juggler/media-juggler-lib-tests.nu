@@ -5200,6 +5200,8 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
       0
       ""
       "https://assets.hardcover.app/edition/32336811/0b805f28-8f88-411b-ae96-3ab83e5b9d69.jpg"
+      1400
+      2061
     ]
   }
   log debug $"parsed hardcover edition: ($input | parse_hardcover_edition | to nuon)"
