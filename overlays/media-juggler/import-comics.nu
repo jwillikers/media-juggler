@@ -1429,78 +1429,78 @@ def main [
     [condition message];
     [
       {|| $comic_metadata | get --optional credits | is-empty}
-      (
+      {|| (
         if $primary_metadata_source == "hardcover" {
           $"There are no contributors for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the contributors for the edition, remove the cached response, and retry."
         } else {
           $"There are no contributors for the Comic Vine issue (ansi yellow)(('https://comicvine.gamespot.com/issue/4000-' + $comic_vine_issue_id) | ansi link --text $comic_vine_issue_id)(ansi reset). Set the contributors for the issue, remove the cached response, and retry."
         }
-      )
+      )}
     ]
     [
       {|| $comic_metadata.credits | all {|credit| $credit.role != "Writer"}}
-      (
+      {|| (
         if $primary_metadata_source == "hardcover" {
           $"There are no authors set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the authors for the edition, remove the cached response, and retry."
         } else {
           $"There are no writers for the Comic Vine issue (ansi yellow)(('https://comicvine.gamespot.com/issue/4000-' + $comic_vine_issue_id) | ansi link --text $comic_vine_issue_id)(ansi reset). Add the writers to the issue, remove the cached response, and retry."
         }
-      )
+      )}
     ]
     [
       {|| $primary_metadata_source == "hardcover" and ($comic_metadata | get --optional forms_of_creative_work | is-empty) or ($comic_metadata.forms_of_creative_work | first) == "unknown"}
-      $"Book category is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the book category for the book, remove the cached response, and retry."
+      {|| $"Book category is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the book category for the book, remove the cached response, and retry."}
     ]
     [
       {|| $primary_metadata_source == "hardcover" and ($comic_metadata | get --optional forms_of_creative_work.0) not-in ["graphic novel" "manga volume" "manhwa volume"]}
-      $"Book category is set not set to 'Graphic Novel' for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Correct the book category for the book or move the edition to the correct book, remove the cached response, and retry."
+      {|| $"Book category is set not set to 'Graphic Novel' for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Correct the book category for the book or move the edition to the correct book, remove the cached response, and retry."}
     ]
     [
       {|| $primary_metadata_source == "hardcover" and ($comic_metadata.credits | all {|credit| $credit.role != "Artist"})}
-      $"There is no illustrator set for the graphic novel Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the illustrator for the edition, remove the cached response, and retry."
+      {|| $"There is no illustrator set for the graphic novel Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the illustrator for the edition, remove the cached response, and retry."}
     ]
     [
       {|| $primary_metadata_source == "comic_vine" and ($comic_metadata.credits | all {|credit| $credit.role not-in ["Artist" "Colorist" "Inker" "Penciller"]})}
-      $"There is no 'Artist', 'Colorist', 'Inker', or 'Penciller' set for the Comic Vine issue (ansi yellow)(('https://comicvine.gamespot.com/issue/4000-' + $comic_vine_issue_id) | ansi link --text $comic_vine_issue_id)(ansi reset). Set the illustrator for the edition, remove the cached response, and retry."
+      {|| $"There is no 'Artist', 'Colorist', 'Inker', or 'Penciller' set for the Comic Vine issue (ansi yellow)(('https://comicvine.gamespot.com/issue/4000-' + $comic_vine_issue_id) | ansi link --text $comic_vine_issue_id)(ansi reset). Set the illustrator for the edition, remove the cached response, and retry."}
     ]
     # todo Should Comic Vine issue metadata also be required to have a cover artist?
     [
       {|| $primary_metadata_source == "hardcover" and ($comic_metadata.credits | all {|credit| $credit.role != "Cover Artist"})}
-      $"There is no cover artist set for the graphic novel Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the cover artist for the edition, remove the cached response, and retry."
+      {|| $"There is no cover artist set for the graphic novel Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the cover artist for the edition, remove the cached response, and retry."}
     ]
     [
       {|| $primary_metadata_source == "hardcover" and ($comic_metadata | get --optional literary_type | is-empty) or $comic_metadata.literary_type != "fiction"}
-      $"Literary type is not set to 'fiction' for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type to 'fiction' for the book, remove the cached response, and retry."
+      {|| $"Literary type is not set to 'fiction' for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type to 'fiction' for the book, remove the cached response, and retry."}
     ]
     [
       {|| $primary_metadata_source == "hardcover" and ($comic_metadata | get --optional _cover_image.2 | is-empty)}
-      $"There is no cover image set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the cover for the edition, remove the cached response, and retry."
+      {|| $"There is no cover image set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the cover for the edition, remove the cached response, and retry."}
     ]
     [
       {|| $primary_metadata_source == "hardcover" and ($comic_metadata | get --optional publication_date | is-empty)}
-      $"There is no release date set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the release date for the edition, remove the cached response, and retry."
+      {|| $"There is no release date set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the release date for the edition, remove the cached response, and retry."}
     ]
     [
       {|| $primary_metadata_source == "hardcover" and ($comic_metadata | get --optional language | is-empty)}
-      $"There is no language set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the language for the edition, remove the cached response, and retry."
+      {|| $"There is no language set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the language for the edition, remove the cached response, and retry."}
     ]
     [
       {|| ($comic_metadata | get --optional publishers | is-empty)}
-      (
+      {|| (
         if $primary_metadata_source == "hardcover" {
           $"There is no publisher set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the publisher for the edition, remove the cached response, and retry."
         } else {
           # I'm not sure if it is actually possible to not have a publisher set in Comic Vine.
           $"There is no publisher set for the Comic Vine issue (ansi yellow)(('https://comicvine.gamespot.com/issue/4000-' + $comic_vine_issue_id) | ansi link --text $comic_vine_issue_id)(ansi reset). Set the publisher for the issue, remove the cached response, and retry."
         }
-      )
+      )}
     ]
   ]
   let error_message = (
     $checks | reduce --fold "" {|check acc|
       if ($acc | is-empty) {
         if (do $check.condition) {
-          $check.message
+          do $check.message
         } else {
           $acc
         }
@@ -1832,7 +1832,7 @@ def main [
   # todo Remove this variable.
   let comic_vine_id = (
     if ($comic_vine_issue_id | is-empty) {
-      $comic_metadata.issue_id
+      $comic_metadata | get --optional issue_id
     } else {
       $comic_vine_issue_id
     }
@@ -1977,8 +1977,18 @@ def main [
             $"--date=($year)"
           }
         )
+        | append (
+          if ($comic_vine_id | is-not-empty) {
+            $"--identifier=comicvine:($comic_vine_id)"
+          }
+        )
+        | append (
+          if ($comic_metadata | get --optional series_id | is-not-empty) {
+            $"--identifier=comicvine:($comic_metadata.series_id)"
+          }
+        )
       );
-      log debug $"Running (ansi yellow)^ebook-meta ($formats.pdf) ($args | str join ' ') --authors ($authors | str join "&") --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
+      log debug $"Running (ansi yellow)^ebook-meta ($formats.pdf) ($args | str join ' ') --authors ($authors | str join "&")'(ansi reset)";
       (
         ^ebook-meta
           $formats.pdf
@@ -1988,8 +1998,6 @@ def main [
           # Remove the title sort field.
           # --title-sort ""
           --authors ($authors | str join "&")
-          --identifier $"comicvine:($comic_vine_id)"
-          --identifier $"comicvine-volume:($comic_metadata.series_id)"
       );
       # Now, delete the title so Kavita doesn't think it is a chapter title.
       # ebook-meta isn't capable of deleting the title...

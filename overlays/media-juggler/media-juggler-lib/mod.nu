@@ -5580,7 +5580,14 @@ export def into_comic_info_xml []: [record -> record] {
     | upsert_comic_info {tag: "PageCount", value: ($data | get --optional page_count | into string)}
     | upsert_comic_info {tag: "Title", value: ($data | get --optional chapter_title)}
     | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publishers | str join ",")}
-    | upsert_comic_info {tag: "Imprint", value: ($data | get --optional imprints | str join ",")}
+    | upsert_comic_info {
+      tag: "Imprint"
+      value: (
+        if ($data | get --optional imprints | is-not-empty) {
+          $data.imprints | str join ","
+        }
+      )
+    }
     | upsert_comic_info {tag: "Summary", value: ($data | get --optional description)}
     | upsert_comic_info {tag: "Notes", value: $notes}
     | upsert_comic_info {
