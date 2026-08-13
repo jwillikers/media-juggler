@@ -1408,7 +1408,15 @@ def main [
     exit 1
   }
 
-  # todo How to handle nested series and subseries?
+  # Kavita ignores the folder structure for book libraries?.
+  # So as far as Kavita is concerned, everything can be in a flat folder structure.
+  # However, this isn't practical because books with the same name will conflict and be overwritten.
+  # Since Kavita does fallback to the filename for some information, including a bunch of disambiguation cruft is probably a bad idea.
+  # General books often don't belong to any series, so using a top-level series directory as is done for comics isn't going to cut it.
+  # Instead, we'll use author subdirectories and nest series within those directories along with any standalone books.
+  # For general books,  best solution seems to be one that
+  # So following a folder structure based on author probably makes the most sense.
+  # However, this would require including
   let series_subdirectory = (
     # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
     # Kavita dislikes multiple formats in the same directory.
@@ -1424,26 +1432,39 @@ def main [
     # Kavita needs series to be in their own directories.
     # So, if this is a oneshot, put it in its own directory.
     } else {
-      (
-        $formats
-        | get $output_format
-        | path parse
-        | get stem
-        | use_unicode_in_title
-        | sanitize_file_name
-        | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
-      )
+      # todo See if we actually need to do this for ebooks for Kavita or can we just drop books directly next to each other?
+      if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
+        (
+          $formats
+          | get $output_format
+          | path parse
+          | get stem
+          | use_unicode_in_title
+          | sanitize_file_name
+          | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
+        )
+      }
     }
   )
 
-    let authors_subdirectory = $authors | str join ", "
+    let authors_subdirectory = (
+      if ($comic_metadata | get --optional primary_series_author | is-empty) {
+        $authors | str join ", "
+      } else {
+        $comic_metadata.primary_series_author
+      }
+    )
     let target_subdirectory = (
-      # If it is a oneshot, put it in its own subdirectory inside a directory for the author.
-      # todo Maybe I should just put these at the top-level as I do for comics?
-      if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+      if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
+        # Light novels are only rarely one-offs, so we organize them just like comics.
         $series_subdirectory
       } else {
-        [$authors_subdirectory $series_subdirectory] | path join
+        # Regular books are stored under Author and Author / Series
+        if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+          [$authors_subdirectory $series_subdirectory] | path join
+        } else {
+          $authors_subdirectory
+        }
       }
     )
     let target_directory = [$destination $form_subdirectory $target_subdirectory] | path join
