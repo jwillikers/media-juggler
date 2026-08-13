@@ -298,8 +298,11 @@ export const opf_roles_map = {
   # Kavita treats the illustrator as Inker.
   "Illustrator": "illustrator"
   "Inker": "illustrator"
+  "Introduction": "writer of introduction"
   "Colorist": "colorist"
+  "Commentator": "commentator for written text"
   "Editor": "editor"
+  "Preface": "writer of preface"
   "Translator": "translator"
   "Writer": "author"
 }
@@ -4090,9 +4093,12 @@ export def from_opf_xml [
     [["artist" "art" "illustrator" "ill"] "Artist"]
     [["author" "aut"] "Writer"]
     [["colorist" "clr"] "Colorist"]
+    [["commentator for written text" "cwt"] "Commentator"]
     [["editor" "edt"] "Editor"]
     [["publisher" "pbl"] "Publisher"]
     [["translator" "trl"] "Translator"]
+    [["writer of introduction" "win"] "Introduction"]
+    [["writer of preface" "wpr"] "Preface"]
   ]
 ]: [
   record -> record
