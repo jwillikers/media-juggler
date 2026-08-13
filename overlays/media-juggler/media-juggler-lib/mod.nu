@@ -5126,7 +5126,7 @@ export def epubcheck []: [path -> bool] {
           labels: [
             {text: "result.exit_code" span: (metadata $result.exit_code).span}
           ]
-          help: $"error validating the EPUB file (ansi yellow)($epub)(ansi reset):\nstderr: ($result.stderr)\nmessages: ($messages | where {|it| not (ID == 'RSC-005' and $it.message == 'Error while parsing file: attribute "opf:scheme" not allowed here; expected attribute "id"')})\n"
+          help: $"error validating the EPUB file (ansi yellow)($epub)(ansi reset):\nstderr: ($result.stderr)\nmessages: ($messages | where {|it| not ($it.ID == 'RSC-005' and $it.message == 'Error while parsing file: attribute "opf:scheme" not allowed here; expected attribute "id"')})\n"
         }
       }
     }
