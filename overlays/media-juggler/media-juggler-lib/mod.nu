@@ -3152,10 +3152,18 @@ export def parse_hardcover_edition [
       series: (
         $hardcover_edition
         | get --optional book.featured_book_series.series.name
-        | str replace " (Light Novel)" ""
-        | str replace " (Manga)" ""
-        | str replace " (Manhwa)" ""
-        | use_unicode_in_title
+        | (
+          let input = $in;
+          if ($input | is-not-empty) {
+            (
+              $input
+              | str replace " (Light Novel)" ""
+              | str replace " (Manga)" ""
+              | str replace " (Manhwa)" ""
+              | use_unicode_in_title
+            )
+          }
+        )
       )
       title: (
         if ($hardcover_edition | get --optional title | is-not-empty) {
