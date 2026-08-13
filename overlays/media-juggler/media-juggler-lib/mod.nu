@@ -2848,7 +2848,7 @@ export def parse_hardcover_edition [
     if ($years | is-empty) {
 
     } else {
-      $years | into int | sort | first
+      $years | where {|it| $it | is-not-empty} | into int | sort | first
     }
   )
 
