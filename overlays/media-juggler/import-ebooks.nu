@@ -1274,6 +1274,12 @@ def main [
     }
   )
 
+  # Get the original OPF file for debugging purposes.
+  # let opf_file = $formats | get $output_format | find_opf_in_epub
+  # let opf_file = $formats | get $output_format | extract_file_from_archive $opf_file $temporary_directory
+  # log debug $"epub_opf:\n\n($opf_file | open | from xml | to json)"
+  # exit 1
+
   # Embed the updated metadata in the ebook.
   log info "Embedding the metadata in the ebook"
   $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory

@@ -5465,9 +5465,41 @@ export def embed_ebook_metadata [
           | save --force $nav_xhtml
         )
       }
+      # Some EPUBs are malformed and contain a toc.ncx file which doesn't use the same id as the one belonging to the unique-identifier attribute in the OPF.
+      # <meta name="dtb:uid" content="978..."/>
+      let toc_ncx = $file | find_file_in_epub toc.ncx
+      let toc_ncx = (
+        if ($toc_ncx | is-not-empty) {
+          $file | extract_file_from_archive $toc_ncx $working_directory
+        }
+      )
+      if ($toc_ncx | is-not-empty) {
+        let unique_identifier_id = $opf_metadata.attributes.unique-identifier
+        let metadata_content = $opf_metadata.content | where tag == "metadata" | first | get content
+        let ids = $metadata_content | where tag == "dc:identifier"
+        let unique_identifier = (
+          $ids | where {|it|
+            ($it.attributes | get --optional id) == $unique_identifier_id
+          }
+          | get content
+          | first
+          | get content
+          | first
+        )
+        # We don't want to use namespace information, so we just do a string replace here.
+        (
+          open $toc_ncx
+          # Note that this might need tweaked if it doesn't exactly match.
+          | str replace --regex '<meta name="dtb:uid" +content=".*" */>' $"<meta name=\"dtb:uid\" content=\"($unique_identifier)\" />"
+          | save --force $toc_ncx
+        )
+      }
       cd $working_directory
       if ($nav_xhtml | is-not-empty) {
         $file | add_file_to_archive ($nav_xhtml | path relative-to $working_directory)
+      }
+      if ($toc_ncx | is-not-empty) {
+        $file | add_file_to_archive ($toc_ncx | path relative-to $working_directory)
       }
       let result = (
         $file
