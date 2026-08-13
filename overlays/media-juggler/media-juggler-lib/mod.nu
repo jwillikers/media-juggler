@@ -67,7 +67,7 @@ export const genre_allowlist = [
   [adventure ["adventure fiction"] [Q21802675 Q15712918 Q104536877]]
   [apocalyptic ["apocalyptic fiction"] [Q3919251]]
   ["biography" [] [Q36279]]
-  [comedy [] [Q40831 Q15286013 Q11298158]]
+  [comedy ["comedy fiction" "comedic fiction" "comic fiction" "humorous fiction"] [Q121389176 Q40831 Q15286013 Q11298158]]
   ["comedy drama" [dramedy] [Q859369 Q15712927 Q104536976]]
   ["coming-of-age" ["coming of age" "coming of age story"] [Q2975633 Q135684998]]
   ["contemporary fantasy" ["modern fantasy" "indigenous fantasy"] [Q1128592]]
