@@ -5397,7 +5397,8 @@ export def embed_ebook_metadata [
             } else {
               {"unique-identifier": $opf_metadata.attributes.unique-identifier}
             }
-          )
+          # Drop disallowed lang attribute
+          ) | reject --optional lang
         )
         # Drop the existing metadata section in the OPF.
         | update content (
