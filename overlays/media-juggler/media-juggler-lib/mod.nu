@@ -5273,33 +5273,37 @@ export def find_opf_in_epub []: [
   $opf_files | path join | first
 }
 
-# Find the package OPF file in an EPUB.
-export def find_xhtml_file_in_epub [
-  file: path # The file to find.
+# Find a specific file in the content of an EPUB.
+#
+# Only looks in the OPS and OEBPS directories and their subdirectories.
+export def find_file_in_epub [
+  file: string # The name of the file to find.
 ]: [
   path -> path
 ] {
   let epub = $in
-  let xhtml_directories = ["OPS" "OEBPS"]
-  let xhtml_files_in_epub = $epub | list_files_in_archive_with_extensions ["xhtml"]
-  if ($xhtml_files_in_epub | is-empty) {
-    log debug $"No XHTML files found in (ansi yellow)($epub)(ansi reset)"
+  let content_directories = ["OPS" "OEBPS"]
+  let file_components = $file | path parse
+  let extension = $file_components | get extension
+  let files_with_extension_in_epub = $epub | list_files_in_archive_with_extensions [$extension]
+  if ($files_with_extension_in_epub | is-empty) {
+    log debug $"No ($extension) files found in (ansi yellow)($epub)(ansi reset)"
     return null
   }
-  let xhtml_files = $xhtml_files_in_epub | path parse | where parent in $xhtml_directories
-  if ($xhtml_files | is-empty) {
-    log debug $"No XHTML file found in (ansi yellow)($epub)(ansi reset)"
+  let content_files_with_extension = $files_with_extension_in_epub | path parse | where {|$it| ($it.parent | is-not-empty) and ($it.parent | path split | is-not-empty) and ($it.parent | path split | first) in $content_directories}
+  if ($content_files_with_extension | is-empty) {
+    log debug $"No ($extension) files found in directories ($content_directories) in the EPUB (ansi yellow)($epub)(ansi reset)"
     return null
   }
-  let matching_xhtml_files = $xhtml_files | where {|it| $it == $file}
-  if ($matching_xhtml_files | is-empty) {
-    log debug $"No XHTML file found matching the (ansi yellow)($file)(ansi reset) in (ansi yellow)($epub)(ansi reset). XHTML files: ($xhtml_files)"
+  let matching_files = $content_files_with_extension | where {|it| $it.stem == $file_components.stem}
+  if ($matching_files | is-empty) {
+    log debug $"No file found matching the (ansi yellow)($file)(ansi reset) in (ansi yellow)($epub)(ansi reset). Files matching extension: ($content_files_with_extension)"
     return null
   }
-  if ($matching_xhtml_files | length) > 1 {
-    log warning $"Multiple XHTML files found in (ansi yellow)($epub)(ansi reset): (ansi yellow)($xhtml_files | path join | str join ' ')(ansi reset). Using only the first."
+  if ($matching_files | length) > 1 {
+    log warning $"Multiple matching files found in (ansi yellow)($epub)(ansi reset): (ansi yellow)($matching_files | path join | str join ' ')(ansi reset). Using only the first."
   }
-  $xhtml_files | path join | first
+  $matching_files | path join | first
 }
 
 # Extract the metadata from an eBook.
@@ -5447,7 +5451,7 @@ export def embed_ebook_metadata [
       # Remove kobo.js script reference in the OEBPS/nav.xhtml file.
       # <!-- kobo-style -->
       # <script xmlns="http://www.w3.org/1999/xhtml" type="text/javascript" src="../js/kobo.js"/>
-      let nav_xhtml = $file | find_xhtml_file_in_epub OEBPS/nav.xhtml
+      let nav_xhtml = $file | find_file_in_epub nav.xhtml
       let nav_xhtml = (
         if ($nav_xhtml | is-not-empty) {
           $file | extract_file_from_archive $nav_xhtml $working_directory
