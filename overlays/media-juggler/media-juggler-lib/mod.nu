@@ -1234,13 +1234,15 @@ export def inject_metron_info []: [
   $input.archive
 }
 
-# Convert an Adobe Digital Editions ACSM to an EPUB
-# todo Technically, I think this can also produce a PDF.
-export def acsm_to_epub [
+# Convert an Adobe Digital Editions ACSM file, an LCPL, or an LCPDF to an EPUB or PDF file.
+#
+# todo Check exit status of Calibre commands here.
+export def acsm_lcp_to_ebook [
   working_directory: directory # The scratch-space directory to use
 ]: [path -> path] {
   let input_file = $in
   log info "Closing running instance of Calibre"
+
   ^calibre --shutdown-running-calibre
 
   log info $"Importing the eBook file (ansi yellow)($input_file)(ansi reset) into Calibre. This may take a bit..."
@@ -1256,7 +1258,11 @@ export def acsm_to_epub [
   )
   log info $"Successfully imported into Calibre as id (ansi purple_bold)($book_id)(ansi reset)"
 
-  log debug $"Exporting the EPUB from Calibre to (ansi yellow)($working_directory)/($book_id).epub(ansi reset)"
+  let epub = {parent: $working_directory stem: $book_id extension: "epub"} | path join
+  let pdf = {parent: $working_directory stem: $book_id extension: "pdf"} | path join
+  rm --force $epub $pdf
+
+  log debug $"Exporting the ebook from Calibre to (ansi yellow)($working_directory)/($book_id)(ansi reset)"
   (
     ^calibredb export
       --dont-asciiize
@@ -1270,9 +1276,40 @@ export def acsm_to_epub [
       -- $book_id
       # err> /dev/null
   )
+  let output_file = (
+    if ($epub | path exists) and ($pdf | path exists) {
+      error make {
+        msg: "book exported by Calibre resulted in both an EPUB and a PDF file"
+        labels: [
+            {text: "epub" span: (metadata $epub).span}
+            {text: "pdf" span: (metadata $pdf).span}
+        ]
+        help: $"clear the book from Calibre and import one format at a time"
+      }
+    } else if ($epub | path exists) {
+      $epub
+    } else if ($pdf | path exists) {
+      $pdf
+    } else {
+      error make {
+        msg: "book exported by Calibre is neither an EPUB nor a PDF file"
+        labels: [
+            {text: "epub" span: (metadata $epub).span}
+            {text: "pdf" span: (metadata $pdf).span}
+        ]
+        help: $"neither the ($epub) nor ($pdf) file exist after being exported from Calibre. Perhaps the book failed to import?"
+      }
+    }
+  )
+  log debug $"The ebook was exported from Calibre to (ansi yellow)($output_file)(ansi reset)"
 
-  log debug $"Removing EPUB format for book '($book_id)' in Calibre"
-  ^calibredb remove_format $book_id EPUB
+  if ($output_file | path parse | get extension) == "epub" {
+    log debug $"Removing EPUB format for book '($book_id)' in Calibre"
+    ^calibredb remove_format $book_id EPUB
+  } else if ($output_file | path parse | get extension) == "pdf" {
+    log debug $"Removing the PDF format for book '($book_id)' in Calibre"
+    ^calibredb remove_format $book_id PDF
+  }
   let available_formats = (
     ^calibredb list
       --fields "formats"
@@ -1283,8 +1320,7 @@ export def acsm_to_epub [
     log debug $"Removing book '($book_id)' in Calibre"
     ^calibredb remove $book_id
   }
-
-  ({ parent: $working_directory, stem: $book_id, extension: "epub" } | path join)
+  $output_file
 }
 
 # Optimize image using efficient-compression-tool
@@ -4417,6 +4453,8 @@ export def from_opf_xml [
                   | first
                 )
               }
+            } else if ($id | str replace --all "-" "" | str length) == 13 and ($id | str replace --all "-" "" | validate_isbn) {
+              # Ignore an obvious ISBN as that will be parsed separately.
             } else {
               error make {
                 msg: "unknown unique identifier type"
@@ -4663,21 +4701,21 @@ export def to_opf_xml [
         if ($metadata | get --optional isbn | is-empty) {
           let hardcover_edition_ids = $metadata.ids | where type == hardcover_edition_id
           if ($hardcover_edition_ids | length) == 1 {
-            "hardcover-edition"
+            "hardcover-edition-identifier"
           } else {
             if ($hardcover_edition_ids | length) > 1 {
               log error $"Multiple hardcover edition ids exist: ($hardcover_edition_ids)"
             } else {
               let wikidata_edition_ids = $metadata.ids | where type == wikidata_edition_id
               if ($wikidata_edition_ids | length) == 1 {
-                "wikidata-edition"
+                "wikidata-edition-identifier"
               } else {
                 if ($wikidata_edition_ids | length) > 1 {
                   log error $"Multiple wikidata edition ids exist: ($wikidata_edition_ids)"
                 } else {
                   let bookbrainz_edition_ids = $metadata.ids | where type == bookbrainz_edition_id
                   if ($bookbrainz_edition_ids | length) == 1 {
-                    "bookbrainz-edition"
+                    "bookbrainz-edition-identifier"
                   } else {
                     if ($bookbrainz_edition_ids | length) > 1 {
                       log error $"Multiple BookBrainz edition ids exist: ($bookbrainz_edition_ids)"
@@ -4690,7 +4728,7 @@ export def to_opf_xml [
             }
           }
         } else {
-          "isbn"
+          "isbn-identifier"
         }
       }
     }

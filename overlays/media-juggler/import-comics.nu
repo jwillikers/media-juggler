@@ -26,12 +26,9 @@ use media-juggler-lib *
 # The name will look like "<series> (<series-year>) #<issue> (<issue-year>).cbz".
 #
 def main [
-  ...files: string # The paths to ACSM, EPUB, and CBZ files to convert, tag, and upload. Supports SSH paths.
+  ...files: string # The paths to ACSM, LCPL, EPUB, and CBZ files to convert, tag, and upload. Supports SSH paths.
   --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
   --default-language: string = "american english"
-  --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
-  # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library" "Kobo Metadata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
-  # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
   --ignore-mismatched-isbn-in-pages
   --isbn: string
@@ -39,15 +36,10 @@ def main [
   # --interactive # Ask for input from the user
   --keep # Don't delete or modify the original input files
   --keep-tmp # Don't delete the temporary directory when there's an error
-  --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
-  # --issue: string # The issue number
-  # --issue-year: string # The publication year of the issue
   --manga: string = "YesAndRightToLeft" # Whether the file is manga "Yes", right-to-left manga "YesAndRightToLeft", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
   --metron-issue-id: string # The issue id on Metron.
   --form-subdirectory: directory # Directory below the destination in which to copy files. I have subdirectories for comics, manga, and manhwa. Wikidata is used to infer this where possible. Defaults to manga.
   --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I have comics, manga, and manhwa subdirectories.
-  # --series: string # The name of the series
-  # --series-year: string # The initial publication year of the series, also referred to as the volume
   --skip-ocr # Don't attempt to parse the ISBN from images using OCR
   --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
@@ -457,21 +449,15 @@ def main [
   let original_comic_files = [$original_file] | append $original_comic_info | append $original_cover | append $original_opf
   log debug $"The original files for the comic are (ansi yellow)($original_comic_files)(ansi reset)"
 
-  let output_format = (
-    if $original_input_format == "pdf" {
-      "pdf"
-    } else {
-      "cbz"
-    }
-  )
-
   let formats = (
-    if $original_input_format == "acsm" {
-      log debug "Converting the ACSM file to an EPUB"
-      { epub: ($file | acsm_to_epub (pwd)) }
-    } else if $original_input_format == "epub" {
-      log debug "Importing the EPUB file"
-      { epub: ($file | acsm_to_epub (pwd)) }
+    if $original_input_format in ["acsm" "epub" "lcpl" "lcpdf"] {
+      log debug "Importing the ACSM, EPUB, LCPL, or LCPDF file"
+      let output_file = $file | acsm_lcp_to_ebook (pwd)
+      if ($output_file | path parse | get extension) == "epub" {
+        {epub: $output_file }
+      } else if ($output_file | path parse | get extension) == "pdf" {
+        {pdf: $output_file }
+      }
     } else if $original_input_format in ["cbz" "zip"] {
       { cbz: $file }
     } else if $original_input_format == "pdf" {
@@ -487,10 +473,20 @@ def main [
     }
   )
 
+  let output_format = (
+    if ($formats | get --optional pdf | is-not-empty) {
+      "pdf"
+    } else {
+      "cbz"
+    }
+  )
+
+  # The input format after initial conversion in Calibre.
   let input_format = (
-    # todo ACSM files can also be PDFs
-    if $original_input_format == "acsm" {
+    if ($formats | get --optional epub | is-not-empty) {
       "epub"
+    } else if ($formats | get --optional pdf | is-not-empty) {
+      "pdf"
     } else if $original_input_format == "zip" {
       "cbz"
     } else {
@@ -584,7 +580,7 @@ def main [
 
   # First, try to locate the release based on its hash if no Wikidata id is specified.
   let wikidata_edition_id = (
-    if $original_input_format != "acsm" and ($wikidata_edition_id | is-empty) {
+    if $original_input_format not-in ["acsm" "lcpl" "lcpdf"] and ($wikidata_edition_id | is-empty) {
       # BLAKE3 and SHA3-512 checksums are currently supported.
       ["blake3" "sha3-512"] | reduce --fold "" {|checksum_type acc|
         if ($acc | is-empty) {

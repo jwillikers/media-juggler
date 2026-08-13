@@ -5,7 +5,7 @@ use media-juggler-lib *
 
 # Import my EBooks to my collection.
 #
-# Input files can be in the ACSM, EPUB, and PDF formats.
+# Input files can be in the ACSM, LCPL, EPUB, and PDF formats.
 #
 # This script performs several steps to process the ebook file.
 #
@@ -32,7 +32,6 @@ def main [
   # --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
   # --ereader-subdirectory: string = ".books" # The subdirectory on the e-reader in-which to copy
   --keep-tmp # Don't delete the temporary directory when there's an error
-  --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
   --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
   --replace-cover # Replace the cover image in an ebook with the image from Hardcover.
   --skip-upload # Don't upload files to the server
@@ -322,37 +321,40 @@ def main [
   let original_book_files = [($original_file | split_ssh_path | get path)] | append $original_cover | append $original_opf
   log debug $"The original files for the book are (ansi yellow)($original_book_files)(ansi reset)"
 
-  let input_format = (
-    if $original_input_format == "acsm" {
-      "epub"
+  let formats = (
+    if $original_input_format in ["acsm" "epub" "lcpl" "lcpdf"] {
+      log debug "Importing the ACSM, EPUB, LCPL, or LCPDF file"
+      let output_file = $file | acsm_lcp_to_ebook (pwd)
+      if ($output_file | path parse | get extension) == "epub" {
+        {epub: $output_file }
+      } else if ($output_file | path parse | get extension) == "pdf" {
+        {pdf: $output_file }
+      }
+    } else if $original_input_format == "pdf" {
+      { pdf: $file }
     } else {
-      $original_input_format
+      rm --force --recursive $temporary_directory
+      return {
+        file: $original_file
+        error: $"Unsupported input file type (ansi red_bold)($original_input_format)(ansi reset)"
+      }
     }
   )
 
   let output_format = (
-    if $input_format == "pdf" {
+    if ($formats | get --optional pdf | is-not-empty) {
       "pdf"
     } else {
       "epub"
     }
   )
 
-  let formats = (
-    if $input_format == "acsm" {
-      let epub = ($file | acsm_to_epub (pwd))
-      { book: $epub }
-    } else if $input_format == "epub" {
-      log debug "Importing the EPUB file"
-      { epub: ($file | acsm_to_epub (pwd)) }
-    } else if $input_format == "pdf" {
-      { book: $file }
-    } else {
-      rm --force --recursive $temporary_directory
-      return {
-        file: $original_file
-        error: $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
-      }
+  # The input format after initial conversion in Calibre.
+  let input_format = (
+    if ($formats | get --optional epub | is-not-empty) {
+      "epub"
+    } else if ($formats | get --optional pdf | is-not-empty) {
+      "pdf"
     }
   )
 
@@ -422,7 +424,7 @@ def main [
 
   # First, try to locate the release based on its hash if no Wikidata id is specified.
   let wikidata_edition_id = (
-    if $original_input_format != "acsm" and ($wikidata_edition_id | is-empty) {
+    if $original_input_format not-in ["acsm" "lcpl" "lcpdf"] and ($wikidata_edition_id | is-empty) {
       # BLAKE3 and SHA3-512 checksums are currently supported.
       ["blake3" "sha3-512"] | reduce --fold "" {|checksum_type acc|
         if ($acc | is-empty) {
