@@ -34,6 +34,7 @@ def main [
   --keep-tmp # Don't delete the temporary directory when there's an error
   --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
   --replace-cover # Replace the cover image in an ebook with the image from Hardcover.
+  --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
   --title: string # The title of the book
   --use-rsync
@@ -1282,29 +1283,6 @@ def main [
   # log debug $"epub_opf:\n\n($opf_file | open | from xml | to json)"
   # exit 1
 
-  # Embed the updated metadata in the ebook.
-  log info "Embedding the metadata in the ebook"
-  $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
-
-  if ($replace_cover) {
-    let cover_image_url = $comic_metadata | get --optional _cover_image.2
-    if not ($cover_image_url) {
-      log error $"Unable to replace cover as there is no cover art set for the Hardcover edition ($hardcover_edition_id)."
-      exit 1
-    }
-    let cover_image = $cover_image_url | download_file $cover_art_directory
-    # todo Embed cover image in EPUB manually and only use ebook-meta for PDFs.
-    # todo Compare quality of existing cover and downloaded cover and warn or abort as necessary.
-    log info "Replacing cover image in the ebook"
-    log debug $"Running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'"
-    let result = do {^ebook-meta --cover $cover_image ($formats | get $output_format)} | complete
-    if $result.exit_code != 0 {
-      log error $"Error running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
-      exit 1
-    }
-    log info "Replaced the cover image in the ebook"
-  }
-
   log debug "Renaming the file according to its metadata"
   let formats = (
     $formats | update $output_format (
@@ -1355,6 +1333,7 @@ def main [
   }
   log debug $"The authors are (ansi purple)'($authors)'(ansi reset)"
 
+  # We have to optimize the files before embedding the metadata since PDF optimization will remove the metadata.
   let optimized_file_hashes = (
     try {
       open $optimized_files_cache_file
@@ -1364,39 +1343,96 @@ def main [
   )
 
   let updated_optimized_file_hashes = (
-    $optimized_file_hashes | update sha256 (
-      $optimized_file_hashes.sha256 | append (
-        if $output_format == "epub" {
-          # todo I might need to fix this to work with larger files
-          let hash = $formats | get $output_format | open --raw | hash sha256
-          if $hash not-in $optimized_file_hashes.sha256 {
-            log debug "Optimizing the EPUB"
-            $formats | get $output_format | polish_epub | optimize_zip | open --raw | hash sha256
-          }
-        }
-      ) | append (
-        if $output_format == "pdf" {
-          let hash = $formats | get $output_format | open --raw | hash sha256
-          if $hash not-in $optimized_file_hashes.sha256 {
-            log debug "Optimizing the PDF"
-            let pdf_optimization_directory = [$temporary_directory "pdf_optimization"] | path join
-            let optimized_pdf = (
-              $formats | get $output_format
-              | optimize_pdf $pdf_optimization_directory
-            )
-            if ($optimized_pdf | is-not-empty) {
-              mv --force $optimized_pdf ($formats | get $output_format)
-              if not ($keep_tmp) {
-                rm --force --recursive $pdf_optimization_directory
-              }
-              open --raw ($formats | get $output_format) | hash sha256
+    if $skip_optimization {
+      $optimized_file_hashes
+    } else {
+      $optimized_file_hashes | update sha256 (
+        $optimized_file_hashes.sha256 | append (
+          if $output_format == "epub" {
+            # todo I might need to fix this to work with larger files
+            let hash = $formats | get $output_format | open --raw | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              log debug "Optimizing the EPUB"
+              $formats | get $output_format | polish_epub | optimize_zip | open --raw | hash sha256
             }
           }
-        }
-      ) | uniq | sort
-    )
+        ) | append (
+          if $output_format == "pdf" {
+            let hash = $formats | get $output_format | open --raw | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              log debug "Optimizing the PDF"
+              let pdf_optimization_directory = [$temporary_directory "pdf_optimization"] | path join
+              let optimized_pdf = (
+                $formats | get $output_format
+                | optimize_pdf $pdf_optimization_directory
+              )
+              if ($optimized_pdf | is-not-empty) {
+                mv --force $optimized_pdf ($formats | get $output_format)
+                if not ($keep_tmp) {
+                  rm --force --recursive $pdf_optimization_directory
+                }
+                open --raw ($formats | get $output_format) | hash sha256
+              }
+            }
+          }
+        ) | uniq | sort
+      )
+    }
   )
 
+  if $updated_optimized_file_hashes != $optimized_file_hashes {
+    $updated_optimized_file_hashes | save --force $optimized_files_cache_file
+  }
+  let optimized_file_hashes = $updated_optimized_file_hashes
+
+  # Embed the updated metadata in the ebook.
+  log info "Embedding the metadata in the ebook"
+  $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
+
+  if ($replace_cover) {
+    let cover_image_url = $comic_metadata | get --optional _cover_image.2
+    if not ($cover_image_url) {
+      log error $"Unable to replace cover as there is no cover art set for the Hardcover edition ($hardcover_edition_id)."
+      exit 1
+    }
+    let cover_image = $cover_image_url | download_file $cover_art_directory
+    # todo Embed cover image in EPUB manually and only use ebook-meta for PDFs.
+    # todo Compare quality of existing cover and downloaded cover and warn or abort as necessary.
+    log info "Replacing cover image in the ebook"
+    log debug $"Running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'"
+    let result = do {^ebook-meta --cover $cover_image ($formats | get $output_format)} | complete
+    if $result.exit_code != 0 {
+      log error $"Error running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      exit 1
+    }
+    log info "Replaced the cover image in the ebook"
+  }
+
+  # Update the optimized file hashes for the files with updated metadata.
+  let updated_optimized_file_hashes = (
+    if ($skip_optimization) {
+      $optimized_file_hashes
+    } else {
+      $optimized_file_hashes | update sha256 (
+        $optimized_file_hashes.sha256 | append (
+          if "epub" in $formats {
+            let hash = open --raw $formats.epub | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              $hash
+            }
+          }
+        ) | append (
+          if "pdf" in $formats {
+            # Just update the hash of the file with the updated metadata here.
+            let hash = open --raw $formats.pdf | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              $hash
+            }
+          }
+        ) | uniq | sort
+      )
+    }
+  )
   if $updated_optimized_file_hashes != $optimized_file_hashes {
     $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
@@ -1407,6 +1443,9 @@ def main [
     log error $"Error running epubcheck on the EPUB file (ansi yellow)($formats | get $output_format)(ansi reset)"
     exit 1
   }
+
+  # todo rm
+  exit 1
 
   # Kavita ignores the folder structure for book libraries?.
   # So as far as Kavita is concerned, everything can be in a flat folder structure.
