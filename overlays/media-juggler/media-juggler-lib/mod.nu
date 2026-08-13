@@ -5553,7 +5553,7 @@ export def embed_ebook_metadata [
       # To get the identifiers from the PDF, we need to use ebook-meta instead of exiftool.
       # ^exiftool -json $file | from json | first
       let opf_file = mktemp --suffix .opf
-      $book_metadata | to_opf_xml | save --force $opf_file
+      $book_metadata | to_opf_xml | to xml | save --force $opf_file
       # log debug $"Running (ansi yellow)^ebook-meta --to-opf '($metadata_file)' ($file)(ansi reset)"
       log debug $"Running (ansi yellow)^ebook-meta '($file)' --from-opf '($opf_file)'(ansi reset)"
       let result = do { ^ebook-meta $file --from-opf $opf_file } | complete
