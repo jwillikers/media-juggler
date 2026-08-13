@@ -4468,7 +4468,12 @@ export def from_opf_xml [
                   | first
                 )
               }
-            } else if ($id | str replace --all "-" "" | str length) == 13 and ($id | str replace --all "-" "" | validate_isbn) {
+            } else if (
+              (
+                ($id | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | str length) == 13
+                and ($id | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | validate_isbn)
+              )
+            ) {
               # Ignore an obvious ISBN as that will be parsed separately.
             } else {
               error make {
@@ -4523,8 +4528,38 @@ export def from_opf_xml [
             )
           )
           or ($it | get --optional content.0.content) =~ '^urn:isbn:[0-9]{13}$'
+          or (
+            ($it | get --optional content.0.content | is-not-empty)
+            and ($it.content.0.content | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | str length) == 13
+            and ($it.content.0.content | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | validate_isbn)
+          )
         )
       }
+        # <dc:identifier id="pub-identifier">urn:isbn:9781506704197</dc:identifier>
+        # <meta property="identifier-type" refines="#pub-identifier" scheme="onix:codelist5">15</meta>
+        # log debug $"ids.content: ($ids.content | to json)"
+      let isbns = (
+        $isbns
+        | get content
+        | first
+        | get content
+        | flatten
+        | uniq
+        | str replace --all "-" ""
+        | each {|isbn|
+          if ($isbn =~ '^urn:isbn:[0-9]{13}$') {
+            $isbn | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$' | get isbn | first
+          } else if (
+            ($isbn | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | str length) == 13
+            and ($isbn | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | validate_isbn)
+          ) {
+            $isbn | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" ""
+          } else {
+            $isbn
+          }
+        }
+      )
+      # todo Make sure that isbns isn't empty?
       if ($isbns | length) > 1 {
         error make {
           msg: "multiple isbns found in OPF metadata"
@@ -4532,24 +4567,7 @@ export def from_opf_xml [
           help: $"remove duplicate ISBNs (ansi yellow)($isbns)(ansi reset) from the OPF metadata"
         }
       } else if ($isbns | length) == 1 {
-        # <dc:identifier id="pub-identifier">urn:isbn:9781506704197</dc:identifier>
-        # <meta property="identifier-type" refines="#pub-identifier" scheme="onix:codelist5">15</meta>
-        # log debug $"ids.content: ($ids.content | to json)"
-        let isbn = (
-          $isbns
-          | get content
-          | first
-          | get content
-          | flatten
-          | uniq
-          | first
-          | str replace --all "-" ""
-        )
-        if ($isbn =~ '^urn:isbn:[0-9]{13}$') {
-          $isbn | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$' | get isbn | first
-        } else {
-          $isbn
-        }
+        $isbns | first
       }
     }
   )
@@ -5194,9 +5212,6 @@ export def number_of_images_in_archive []: [path -> int] {
   $archive | list_files_in_archive_with_extensions $image_extensions | length
 }
 
-# export const comic_metadata_template = {
-# }
-
 # Convert a language to it's corresponding IETF BCP 47 or ISO 639-3 language code
 #
 # https://en.wikipedia.org/wiki/IETF_language_tag
@@ -5309,19 +5324,45 @@ export def find_opf_in_epub []: [
   path -> path
 ] {
   let epub = $in
-  let opf_directories = ["OPS" "OEBPS"]
+  # Apparently the OPF can just reside at the top-level too...
+  # let opf_directories = ["OPS" "OEBPS"]
   let opf_files_in_epub = $epub | list_files_in_archive_with_extensions ["opf"]
   if ($opf_files_in_epub | is-empty) {
     log error $"No OPF files found in (ansi yellow)($epub)(ansi reset)"
     return null
   }
-  let opf_files = $opf_files_in_epub | path parse | where parent in $opf_directories
-  if ($opf_files | is-empty) {
-    log warning $"No OPF file found in (ansi yellow)($epub)(ansi reset)"
-    return null
-  }
+  let opf_files = $opf_files_in_epub | path parse
+  # let opf_files = $opf_files_in_epub | path parse | where parent in $opf_directories
+  # if ($opf_files | is-empty) {
+  #   log warning $"No OPF file found in (ansi yellow)($epub)(ansi reset)"
+  #   return null
+  # }
   if ($opf_files | length) > 1 {
     log warning $"Multiple OPF files found in (ansi yellow)($epub)(ansi reset): (ansi yellow)($opf_files | path join | str join ' ')(ansi reset). Using only the first."
+  }
+  $opf_files | path join | first
+}
+
+# Find the NCX file in an EPUB.
+export def find_ncx_in_epub []: [
+  path -> path
+] {
+  let epub = $in
+  # Apparently the OPF can just reside at the top-level too...
+  # let opf_directories = ["OPS" "OEBPS"]
+  let opf_files_in_epub = $epub | list_files_in_archive_with_extensions ["ncx"]
+  if ($opf_files_in_epub | is-empty) {
+    log error $"No NCX files found in (ansi yellow)($epub)(ansi reset)"
+    return null
+  }
+  let opf_files = $opf_files_in_epub | path parse
+  # let opf_files = $opf_files_in_epub | path parse | where parent in $opf_directories
+  # if ($opf_files | is-empty) {
+  #   log warning $"No OPF file found in (ansi yellow)($epub)(ansi reset)"
+  #   return null
+  # }
+  if ($opf_files | length) > 1 {
+    log warning $"Multiple NCX files found in (ansi yellow)($epub)(ansi reset): (ansi yellow)($opf_files | path join | str join ' ')(ansi reset). Using only the first."
   }
   $opf_files | path join | first
 }
@@ -5520,7 +5561,7 @@ export def embed_ebook_metadata [
       }
       # Some EPUBs are malformed and contain a toc.ncx file which doesn't use the same id as the one belonging to the unique-identifier attribute in the OPF.
       # <meta name="dtb:uid" content="978..."/>
-      let toc_ncx = $file | find_file_in_epub toc.ncx
+      let toc_ncx = $file | find_ncx_in_epub
       let toc_ncx = (
         if ($toc_ncx | is-not-empty) {
           $file | extract_file_from_archive $toc_ncx $working_directory
@@ -5544,6 +5585,7 @@ export def embed_ebook_metadata [
           open $toc_ncx
           # Note that this might need tweaked if it doesn't exactly match.
           | str replace --regex '<meta name="dtb:uid" +content=".*" */>' $"<meta name=\"dtb:uid\" content=\"($unique_identifier)\" />"
+          | str replace --regex '<meta content=".*" +name="dtb:uid" */>' $"<meta name=\"dtb:uid\" content=\"($unique_identifier)\" />"
           | save --force $toc_ncx
         )
       }
@@ -5567,21 +5609,154 @@ export def embed_ebook_metadata [
     } else if $file_type == "pdf" {
       # To get the identifiers from the PDF, we need to use ebook-meta instead of exiftool.
       # ^exiftool -json $file | from json | first
-      let opf_file = mktemp --suffix .opf
-      $book_metadata | to_opf_xml | to xml | save --force $opf_file
+      # ebook-meta doesn't work when I try to give it an OPF file as input.
+      # let opf_file = mktemp --suffix .opf
+      # $book_metadata | to_opf_xml | to xml | save --force $opf_file
       # log debug $"Running (ansi yellow)^ebook-meta --to-opf '($metadata_file)' ($file)(ansi reset)"
-      log debug $"Running (ansi yellow)^ebook-meta '($file)' --from-opf '($opf_file)'(ansi reset)"
-      let result = do { ^ebook-meta $file --from-opf $opf_file } | complete
-      if ($result.exit_code != 0) {
-        error make {
-          msg: "non-zero exit code while embedding ebook metadata in PDF with ebook-meta"
-          labels: [
-            {text: "result.exit_code" span: (metadata $result.exit_code).span}
-          ]
-          help: $"error embedding the ebook metadata opf file (ansi yellow)($opf_file)(ansi reset) in the PDF file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+      # log debug $"Running (ansi yellow)^ebook-meta '($file)' --from-opf '($opf_file)'(ansi reset)"
+      # let result = do { ^ebook-meta $file --from-opf $opf_file } | complete
+      # if ($result.exit_code != 0) {
+      #   error make {
+      #     msg: "non-zero exit code while embedding ebook metadata in PDF with ebook-meta"
+      #     labels: [
+      #       {text: "result.exit_code" span: (metadata $result.exit_code).span}
+      #     ]
+      #     help: $"error embedding the ebook metadata opf file (ansi yellow)($opf_file)(ansi reset) in the PDF file (ansi yellow)($file)(ansi reset): ($result.stderr)"
+      #   }
+      # }
+      # rm $opf_file
+
+      # todo Make a dedicated function for this.
+      let args = (
+        []
+        | append (
+          if ($book_metadata | get --optional isbn | is-not-empty) {
+            $"--isbn=($book_metadata.isbn)"
+          }
+        )
+        | append (
+          if ($book_metadata | get --optional series | is-not-empty) and ($book_metadata | get --optional issue_count | is-not-empty) and $book_metadata.issue_count > 1 {
+            [
+              $"--series=($book_metadata.series | use_unicode_in_title)"
+            ] | append (
+              if ($book_metadata | get --optional issue | is-not-empty) {
+                [
+                  $"--index=($book_metadata.issue)"
+                ]
+              }
+            )
+          }
+        )
+        | append (
+          # Prefer imprints over publishers.
+          # todo Not sure if Kavita supports multiple publishers in the PDF metadata.
+          if ($book_metadata | get --optional imprints | is-not-empty) {
+            $"--publisher=($book_metadata.imprints | str join ',')"
+          } else if ($book_metadata | get --optional publishers | is-not-empty) {
+            $"--publisher=($book_metadata.publishers | str join ',')"
+          }
+        )
+        | append (
+          if ($book_metadata | get --optional language | is-not-empty) {
+            $"--language=($book_metadata.language | into_language_code ietf_bcp_47)"
+          # todo Default language
+          # } else {
+          #   $"--language=($default_language | into_language_code ietf_bcp_47)"
+          }
+        )
+        | append (
+          if ($book_metadata | get --optional description | is-not-empty) {
+            $"--comments=($book_metadata.description)"
+          }
+        )
+        | append (
+          if ($book_metadata | get --optional genres | is-not-empty) {
+            $"--tags=($book_metadata.genres | str join ',')"
+          }
+        )
+        | append (
+          $book_metadata | get --optional ids | reduce --fold [] {|id acc|
+            # for each type, add each scheme
+            let schemes = $opf_identifier_schemes | where type == $id.type
+            # log debug $"schemes: ($schemes)"
+            if ($id.type == "epub_uuid") {
+              $acc
+            } else if ($schemes | is-empty) {
+              error make {
+                msg: "missing OPF schemes for type"
+                labels: [
+                  {text: "id.type" span: (metadata $id.type).span}
+                  {text: "opf_identifier_schemes" span: (metadata $opf_identifier_schemes).span}
+                ]
+                help: $"add the missing OPF scheme for the type (ansi yellow)($id.type)(ansi reset) to the identifier_schemes table"
+              }
+            } else if ($schemes | length) > 1 {
+              error make {
+                msg: "multiple OPF schemes for type"
+                labels: [
+                  {text: "id.type" span: (metadata $id.type).span}
+                  {text: "opf_identifier_schemes" span: (metadata $opf_identifier_schemes).span}
+                ]
+                help: $"remove the duplicate OPF schemes for the type (ansi yellow)($id.type)(ansi reset) to the identifier_schemes table"
+              }
+            } else {
+              $schemes | first | get schemes | reduce --fold $acc {|scheme inner_acc|
+                $inner_acc | append [
+                  $"--identifier=($scheme | str downcase):($id.id)"
+                ]
+              }
+            }
+          }
+        )
+        | append (
+          let year = (
+            if ($book_metadata | get --optional year | is-not-empty) {
+              $book_metadata.year
+            }
+          );
+          let month = (
+            if ($book_metadata | get --optional month | is-not-empty) {
+              $book_metadata.month
+            }
+          );
+          let day = (
+            if ($book_metadata | get --optional day | is-not-empty) {
+              $book_metadata.day
+            }
+          );
+          if ($book_metadata | get --optional publication_date | is-not-empty) {
+            $"--date=($book_metadata.publication_date | format date "%Y-%m-%d")"
+          } else if ($year | is-not-empty) and ($month | is-not-empty) and ($day | is-not-empty) {
+            $"--date=($year)-($month)-($day)"
+          } else if ($year | is-not-empty) {
+            $"--date=($year)"
+          }
+        )
+      );
+      let authors = (
+        let credits = $book_metadata | get credits;
+        # todo Get actual primary creators from BookBrainz. This is too inaccurate.
+        let writers = $credits | where role in ["Writer"] | get person;
+        if ($writers | is-empty) {
+          let authors = $credits | where role in ["Artist" "Inker" "Penciller"] | get person;
+          if ($authors | is-empty) {
+            $credits | where role == "Other" | get person
+          } else {
+            $authors
+          } | sort | uniq
+        } else {
+          $writers | sort | uniq
         }
-      }
-      rm $opf_file
+      );
+      log debug $"Running (ansi yellow)^ebook-meta ($file) ($args | str join ' ') --title ($book_metadata | get title | standardize_title) --authors ($authors | str join "&")'(ansi reset)";
+      (
+        ^ebook-meta
+          $file
+          ...$args
+          # Keep the title in PDFs for now, since Kavita doesn't really change it's behavior whether one is included or not.
+          --title ($book_metadata | get title | standardize_title)
+          --authors ($authors | str join "&")
+      );
     }
   )
   $file

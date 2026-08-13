@@ -36,6 +36,8 @@ def main [
   --replace-cover # Replace the cover image in an ebook with the image from Hardcover.
   --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
+  --skip-epubcheck # Don't lint an EPUB with epubcheck
+  --skip-cover-quality-check # Don't lint an EPUB with epubcheck
   --title: string # The title of the book
   --use-rsync
   --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
@@ -1125,18 +1127,20 @@ def main [
     }
   }
   if $comic_metadata._cover_image.3 < 1000 or $comic_metadata._cover_image.4 < 1000 {
-    if $replace_cover {
-      log error $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Aborting to avoid using a low quality cover in the ebook as the --replace-cover was passed. Upload a high quality cover for the edition, remove the cached response, and retry."
-      if not $keep_tmp {
-        rm --force --recursive $temporary_directory
+    if not $skip_cover_quality_check {
+      if $replace_cover {
+        log error $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Aborting to avoid using a low quality cover in the ebook as the --replace-cover was passed. Upload a high quality cover for the edition, remove the cached response, and retry."
+        if not $keep_tmp {
+          rm --force --recursive $temporary_directory
+        }
+        return {
+          file: $original_file
+          error: $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Upload a high quality cover for the edition, remove the cached response, and retry."
+        }
+      } else {
+        log warning $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Upload a high quality cover for the edition, remove the cached response, and retry."
+        sleep 30sec
       }
-      return {
-        file: $original_file
-        error: $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Upload a high quality cover for the edition, remove the cached response, and retry."
-      }
-    } else {
-      log warning $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Upload a high quality cover for the edition, remove the cached response, and retry."
-      sleep 30sec
     }
   }
   if ($comic_metadata | get --optional publication_date | is-empty) {
@@ -1439,13 +1443,10 @@ def main [
   let optimized_file_hashes = $updated_optimized_file_hashes
 
   # Verify the EPUB file with epubcheck
-  if $output_format == "epub" and not ($formats | get $output_format | epubcheck) {
+  if not $skip_epubcheck and $output_format == "epub" and not ($formats | get $output_format | epubcheck) {
     log error $"Error running epubcheck on the EPUB file (ansi yellow)($formats | get $output_format)(ansi reset)"
     exit 1
   }
-
-  # todo rm
-  exit 1
 
   # Kavita ignores the folder structure for book libraries?.
   # So as far as Kavita is concerned, everything can be in a flat folder structure.
