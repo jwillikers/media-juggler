@@ -2749,6 +2749,14 @@ export def get_hardcover_edition [
           language
         }
         release_date
+        contributions {
+          author {
+            name
+            canonical_id
+            id
+          }
+          contribution
+        }
         image {
           id
           height
@@ -2777,19 +2785,12 @@ export def get_hardcover_edition [
               id
             }
           }
-          contributions {
-            author {
-              name
-              canonical_id
-              id
-            }
-            contribution
-          }
           description
           literary_type_id
           book_category_id
           slug
           cached_tags
+          release_year
           featured_book_series {
             id
             featured
@@ -2800,6 +2801,10 @@ export def get_hardcover_edition [
               id
               canonical_id
               name
+              author {
+                id
+                name
+              }
               books_count
               book_series {
                 book {
@@ -2882,7 +2887,8 @@ export def parse_hardcover_edition [
   let series_begin_year = (
     let years = $hardcover_edition | get --optional book.featured_book_series.series.book_series.book.release_year;
     if ($years | is-empty) {
-
+      # Assume the book is not in a series and fallback to using the release year of the book.
+      $hardcover_edition | get --optional book.release_year
     } else {
       $years | where {|it| $it | is-not-empty} | into int | sort | first
     }
@@ -2940,7 +2946,7 @@ export def parse_hardcover_edition [
   # Rewrite credits to match ComicTagger's format.
   #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
   let credits = (
-    $hardcover_edition.book.contributions | reduce --fold [] {|contribution acc|
+    $hardcover_edition.contributions | reduce --fold [] {|contribution acc|
       let role = (
         if ($contribution | get --optional contribution | is-empty) {
           "Writer"
@@ -3190,6 +3196,7 @@ export def parse_hardcover_edition [
       series_id: ($hardcover_edition | get --optional book.featured_book_series.series_id)
       _cover_image: [0, "", ($hardcover_edition | get --optional image.url) ($hardcover_edition | get --optional image.width) ($hardcover_edition | get --optional image.height)]
     }
+    | upsert_if_value primary_series_author ($hardcover_edition | get --optional book.featured_book_series.series.author.name)
     | upsert_if_value comic_info_age_rating $comic_info_age_rating
     | upsert_if_value manga $manga
   )
