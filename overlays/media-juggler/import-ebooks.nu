@@ -1289,7 +1289,7 @@ def main [
   log info "Embedding the metadata in the ebook"
   $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
 
-  if ($replace_cover) {
+  if $replace_cover {
     let cover_image_url = $comic_metadata | get --optional _cover_image.2
     if not ($cover_image_url) {
       log error $"Unable to replace cover as there is no cover art set for the Hardcover edition ($hardcover_edition_id)."

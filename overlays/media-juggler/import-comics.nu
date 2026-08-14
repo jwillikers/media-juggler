@@ -40,6 +40,7 @@ def main [
   --metron-issue-id: string # The issue id on Metron.
   --form-subdirectory: directory # Directory below the destination in which to copy files. I have subdirectories for comics, manga, and manhwa. Wikidata is used to infer this where possible. Defaults to manga.
   --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I have comics, manga, and manhwa subdirectories.
+  --replace-cover # Replace the cover image of a PDF.
   --skip-ocr # Don't attempt to parse the ISBN from images using OCR
   --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
@@ -121,8 +122,10 @@ def main [
   }
 
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-comics"] | path join
-  let optimized_files_cache_file = [$cache_directory optimized.json] | path join
   mkdir $cache_directory
+  let optimized_files_cache_file = [$cache_directory optimized.json] | path join
+  let cover_art_directory = [$cache_directory "covers"] | path join
+  mkdir $cover_art_directory
 
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-comics-config.json"] | path join
   let config: record = (
@@ -1579,15 +1582,7 @@ def main [
     }
   )
 
-  # Embed the ComicInfo.xml file in the CBZ.
-  if "cbz" in ($formats | columns) {
-    {
-      archive: $formats.cbz
-      comic_info: ($comic_metadata | into_comic_info_xml)
-    } | inject_comic_info
-  }
-
-  log debug "Renaming the CBZ according to the updated metadata from ComicTagger"
+  log debug "Renaming the ebook"
   let formats = (
     $formats | update $output_format (
       let previous_file_name = $formats | get $output_format;
@@ -1640,7 +1635,7 @@ def main [
 
   # We keep the name of the series in the title to keep things organized.
   # Displaying only "Vol. 4" as the title can be confusing.
-  log debug "Including the series as part of the title and making it consistent"
+  log debug "Including the series as part of the title and make it consistent"
   let title = $comic_metadata | get --optional title
   let title = (
     if ($title | is-empty) {
@@ -1680,15 +1675,6 @@ def main [
     }
   )
   log info $"The title is now (ansi yellow)($title)(ansi reset)"
-
-  # todo Remove this variable.
-  let comic_vine_id = (
-    if ($comic_vine_issue_id | is-empty) {
-      $comic_metadata | get --optional issue_id
-    } else {
-      $comic_vine_issue_id
-    }
-  )
 
   # PDFs must be optimized before embedding metadata, as the embedded metadata will be scrubbed.
   let updated_optimized_file_hashes = (
@@ -1733,196 +1719,47 @@ def main [
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
 
-  # Update the metadata in the PDF file.
-  let formats = (
-    if "pdf" in $formats {
-      let args = (
-        []
-        | append (
-          if ($isbn | is-not-empty) {
-            $"--isbn=($isbn)"
-          } else if ($comic_metadata | get --optional isbn | is-not-empty) {
-            $"--isbn=($comic_metadata.isbn)"
-          }
-        )
-        | append (
-          if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-            [$"--series=($comic_metadata.series | use_unicode_in_title)" $"--index=($comic_metadata.issue)"]
-          }
-        )
-        | append (
-          # Prefer publisher over imprint
-          # todo Not sure if Kavita supports multiple publishers in the PDF metadata.
-          if ($publishers | is-not-empty) {
-            $"--publisher=($publishers | str join ',')"
-          } else if ($comic_metadata | get --optional publishers | is-not-empty) {
-            $"--publisher=($comic_metadata.publishers | str join ',')"
-          } else if ($imprints | is-not-empty) {
-            $"--publisher=($imprints | str join ',')"
-          } else if ($comic_metadata | get --optional imprints | is-not-empty) {
-            $"--publisher=($comic_metadata.imprints | str join ',')"
-          }
-        )
-        | append (
-          if ($comic_metadata | get --optional language | is-not-empty) {
-            $"--language=($comic_metadata.language | into_language_code ietf_bcp_47)"
-          } else {
-            $"--language=($default_language | into_language_code ietf_bcp_47)"
-          }
-        )
-        | append (
-          if ($comic_metadata | get --optional description | is-not-empty) {
-            $"--comments=($comic_metadata.description)"
-          }
-        )
-        | append (
-          if ($comic_metadata | get --optional genres | is-not-empty) {
-            $"--tags=($comic_metadata.genres | str join ',')"
-          }
-        )
-        | append (
-          if ($bookbrainz_edition_id | is-not-empty) {
-            $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
-          }
-        )
-        | append (
-          if ($hardcover_edition_id | is-not-empty) {
-            $"--identifier=hardcover-edition:($hardcover_edition_id)"
-          }
-        )
-        | append (
-          if ($hardcover_book_slug | is-not-empty) {
-            $"--identifier=hardcover:($hardcover_book_slug)"
-          }
-        )
-        | append (
-          if ($wikidata_edition_id | is-not-empty) {
-            $"--identifier=wikidata-edition:($wikidata_edition_id)"
-          }
-        )
-        | append (
-          if ($wikidata_work_id | is-not-empty) {
-            $"--identifier=wikidata-work:($wikidata_work_id)"
-          }
-        )
-        | append (
-          let year = (
-            if ($comic_metadata | get --optional year | is-not-empty) {
-              $comic_metadata.year
-            }
-          );
-          let month = (
-            if ($comic_metadata | get --optional month | is-not-empty) {
-              $comic_metadata.month
-            }
-          );
-          let day = (
-            if ($comic_metadata | get --optional day | is-not-empty) {
-              $comic_metadata.day
-            }
-          );
-          if ($comic_metadata | get --optional publication_date | is-not-empty) {
-            $"--date=($comic_metadata.publication_date | format date "%Y-%m-%d")"
-          } else if ($year | is-not-empty) and ($month | is-not-empty) and ($day | is-not-empty) {
-            $"--date=($year)-($month)-($day)"
-          } else if ($year | is-not-empty) {
-            $"--date=($year)"
-          }
-        )
-        | append (
-          if ($comic_vine_id | is-not-empty) {
-            $"--identifier=comicvine:($comic_vine_id)"
-          }
-        )
-        | append (
-          if ($comic_metadata | get --optional series_id | is-not-empty) {
-            $"--identifier=comicvine:($comic_metadata.series_id)"
-          }
-        )
-      );
-      log debug $"Running (ansi yellow)^ebook-meta ($formats.pdf) ($args | str join ' ') --authors ($authors | str join "&")'(ansi reset)";
-      (
-        ^ebook-meta
-          $formats.pdf
-          ...$args
-          # Keep the title in PDFs for now, since Kavita doesn't really change it's behavior whether one is included or not.
-          --title ($title | standardize_title)
-          # Remove the title sort field.
-          # --title-sort ""
-          --authors ($authors | str join "&")
-      );
-      # Now, delete the title so Kavita doesn't think it is a chapter title.
-      # ebook-meta isn't capable of deleting the title...
-      # ^exiftool -Title="" $input.book
-      # Obtain a cover image which will be saved alongside the PDF
-      # Since ComicVine has low limits on image file size, it's not the place to get high quality covers.
-      # Prefer using the cover from the PDF and then fallback to using the one from ComicVine if that fails.
-      # Eventually, Hardcover should be used for covers instead of ComicVine.
-      let cover = (
-        # Attempt to extract the existing cover from the PDF
-        let cover = (
-          {
-            parent: $temporary_directory
-            stem: "cover"
-          } | path join
-        );
-        let result = (^ebook-meta --get-cover $cover $formats.pdf | complete);
-        if $result.exit_code == 0 {
-          $cover | rename_image_with_extension
-        } else {
-          # Get cover from Hardcover, which supports much better resolution than Comic Vine.
-          let hardcover_cover_url = (
-            if ($hardcover_edition_id | is-not-empty) {
-              $hardcover_edition_id | hardcover_cover_art_url
-            } else {
-              null
-            }
-          )
-          let cover = (
-            {
-              parent: $temporary_directory
-              stem: "cover"
-              extension: ($hardcover_cover_url | path parse | get extension)
-            } | path join
-          );
-          if ($hardcover_cover_url | is-not-empty) {
-            log debug $"Downloading Hardcover cover image: ($hardcover_cover_url)";
-            try {
-              http get --headers [User-Agent $user_agent] --raw $hardcover_cover_url | save --force $cover;
-              log debug $"Downloaded cover (ansi yellow)($cover)(ansi reset)";
-              $cover
-            } catch {|error|
-              log error $"Failed to downloaded cover from (ansi yellow)($hardcover_cover_url)(ansi reset): ($error)";
-              null
-            }
-          } else {
-            # Get cover from Comic Vine
-            log debug $"Comic Vine cover image: ($comic_metadata._cover_image | to nuon)";
-            let cover_url = $comic_metadata._cover_image | last;
-            try {
-              http get --headers [User-Agent $user_agent] --raw $cover_url | save --force $cover;
-              log debug $"Downloaded cover (ansi yellow)($cover)(ansi reset)";
-              $cover
-            } catch {|error|
-              log error $"Failed to downloaded cover from (ansi yellow)($cover_url)(ansi reset): ($error)";
-              null
-            }
-          }
-        }
-      );
-      if ($cover | is-not-empty) and not $skip_optimization {
-        $cover | optimize_image;
-      }
-      $formats
-      # | update pdf $formats.pdf
-      # | insert comic_info $comic_info
-      # | insert metron_info $metron_info
-      | upsert_if_value cover $cover
-    } else {
-      $formats
+  log info "Embedding the metadata"
+  $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
+
+  # Replace the cover in the PDF file.
+
+  # This is the code to extract the cover from an ebook with ebook-meta.
+  # let cover = (
+  #   # Attempt to extract the existing cover from the PDF
+  #   let cover = (
+  #     {
+  #       parent: $temporary_directory
+  #       stem: "cover"
+  #     } | path join
+  #   );
+  #   let result = (^ebook-meta --get-cover $cover $formats.pdf | complete);
+  #   if $result.exit_code == 0 {
+  #     $cover | rename_image_with_extension
+  #   }
+  # );
+
+  if $replace_cover and $output_format == "pdf" {
+    let cover_image_url = $comic_metadata | get --optional _cover_image.2
+    if not ($cover_image_url) {
+      log error $"Unable to replace cover as there is no cover art set for the Hardcover edition ($hardcover_edition_id)."
+      exit 1
     }
-  )
-  log debug "Finished renaming files";
+    let cover_image = $cover_image_url | download_file $cover_art_directory
+    if not $skip_optimization {
+      $cover_image | optimize_image
+    }
+    # todo Embed cover image in EPUB manually and only use ebook-meta for PDFs.
+    # todo Compare quality of existing cover and downloaded cover and warn or abort as necessary.
+    log info "Replacing cover image in the ebook"
+    log debug $"Running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'"
+    let result = do {^ebook-meta --cover $cover_image ($formats | get $output_format)} | complete
+    if $result.exit_code != 0 {
+      log error $"Error running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      exit 1
+    }
+    log info "Replaced the cover image in the ebook"
+  }
 
   let updated_optimized_file_hashes = (
     if ($skip_optimization) {
