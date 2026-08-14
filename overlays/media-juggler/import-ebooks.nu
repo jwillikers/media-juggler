@@ -1467,14 +1467,8 @@ def main [
   # Since Kavita does fallback to the filename for some information, including a bunch of disambiguation cruft is probably a bad idea.
   # General books often don't belong to any series, so using a top-level series directory as is done for comics isn't going to cut it.
   # Instead, we'll use author subdirectories and nest series within those directories along with any standalone books.
-  # For general books,  best solution seems to be one that
-  # So following a folder structure based on author probably makes the most sense.
-  # However, this would require including
   let series_subdirectory = (
-    # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
-    # Kavita dislikes multiple formats in the same directory.
-    # if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-    if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+    if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
       # Kavita doesn't like multiple formats being in the same directory.
       (
         $comic_metadata.series
@@ -1482,10 +1476,9 @@ def main [
         | sanitize_file_name
         | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
       )
-    # Kavita needs series to be in their own directories.
-    # So, if this is a oneshot, put it in its own directory.
     } else {
-      # todo See if we actually need to do this for ebooks for Kavita or can we just drop books directly next to each other?
+      # Kavita can't have files outside of directories at the top-level.
+      # So, if this is a one-shot light novel, put it in its own directory.
       if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
         (
           $formats
@@ -1510,10 +1503,11 @@ def main [
     let target_subdirectory = (
       if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
         # Light novels are only rarely one-offs, so we organize them just like comics.
+        # That is, under a series subdirectory at the top-level.
         $series_subdirectory
       } else {
         # Regular books are stored under Author and Author / Series
-        if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+        if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
           [$authors_subdirectory $series_subdirectory] | path join
         } else {
           $authors_subdirectory

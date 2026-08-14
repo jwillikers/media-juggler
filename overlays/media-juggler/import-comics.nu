@@ -1800,7 +1800,7 @@ def main [
   let title = $comic_metadata | get --optional title
   let title = (
     if ($title | is-empty) {
-      if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+      if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
         if ($comic_metadata.issue_count == 1) {
           $comic_metadata.series | use_unicode_in_title
         } else {
