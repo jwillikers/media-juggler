@@ -282,7 +282,7 @@ export const opf_identifier_schemes = [
   # [[HARDCOVER-ID] hardcover_book_id]
   [[HARDCOVER-EDITION] hardcover_edition_id]
   [[COMICVINE] comic_vine_issue_id]
-  # [[COMICVINE-VOLUME] comic_vine_volume_id]
+  [[COMICVINE-VOLUME] comic_vine_volume_id]
   [[BOOKBRAINZ-EDITION] bookbrainz_edition_id]
   [[WIKIDATA-EDITION] wikidata_item_id]
   [[OPENLIBRARY-EDITION OPENLIBRARY] open_library_edition_id]
@@ -978,12 +978,6 @@ export def isbn_from_pages [
   } else {
     []
   }
-}
-
-# Parse fetched metadata from Comic Vine for an issue
-# todo
-export def parse_comic_vine_issue_metadata []: record -> table {
-  let metadata = $in | get md
 }
 
 export def upsert_comic_info [
@@ -3250,6 +3244,111 @@ export def fetch_and_parse_hardcover_edition [
   $edition_response | parse_hardcover_edition
 }
 
+# Parse data from Comic Vine
+#
+# todo Test.
+export def parse_comic_vine_issue_and_volume []: [
+  record<issue: record, volume: record> -> record
+] {
+  let responses = $in
+  let issue = $responses.issue
+  let volume = $responses.volume
+  let publication_date = (
+    if ($issue | get --optional store_date | is-empty) {
+    } else {
+      $issue.store_date | into datetime
+    }
+  );
+  let year = (
+    if ($publication_date | is-empty) {
+    } else {
+      $publication_date | format date "%Y"
+    }
+  );
+  let month = (
+    if ($publication_date | is-empty) {
+    } else {
+      $publication_date | format date "%m"
+    }
+  );
+  let day = (
+    if ($publication_date | is-empty) {
+    } else {
+      $publication_date | format date "%d"
+    }
+  );
+  # Rewrite credits to match ComicTagger's format.
+  #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
+  let credits = (
+    $issue.person_credits | reduce --fold [] {|person credits_acc|
+      $credits_acc | append (
+        $person.role
+        | split row ","
+        | str trim
+        | str capitalize
+        | each {|role|
+          {
+            person: $person.name
+            id: $person.id
+            role: $role
+            primary: false
+            language: ""
+          }
+        }
+      )
+    }
+  )
+
+  let ids = (
+    [
+      [type id];
+      [comic_vine_issue_id (
+        # if ($issue.issue_id | str starts-with "4000-") {
+        #   $issue.issue_id
+        # } else {
+          "4000-" + $issue.issue_id
+        # }
+      )]
+      [comic_vine_volume_id (
+        # if ($issue.volume.id | into string | str starts-with "4050-") {
+        #   $issue.volume.id
+        # } else {
+          "4050-" + $issue.volume.id
+        # }
+      )]
+    ]
+  )
+
+  {
+    issue_id: $issue.id
+    issue: $issue.issue_number
+    series: ($issue.volume.name | use_unicode_in_title)
+    title: (
+      if ($issue | get --optional name | is-not-empty) {
+        $issue.name | use_unicode_in_title
+      }
+    )
+    description: $issue.description
+    volume: $volume.start_year
+    issue_count: $volume.count_of_issues
+    ids: []
+    characters: ($issue.character_credits | select --optional name id)
+    genres: []
+    tags: []
+    publication_date: $publication_date
+    year: $year
+    month: $month
+    day: $day
+    # $volume_data.description
+    publishers: [$volume.publisher.name]
+    # $data.store_date
+    # $data.cover_date
+    credits: $credits
+    series_id: $issue.volume.id
+    _cover_image: [0, "", $issue.image.original_url]
+  }
+}
+
 # Check book metadata for errors
 export def validate_book_metadata [
   metadata_source: string # Source of the metadata, either "hardcover", "comic vine"
@@ -3504,6 +3603,11 @@ export const book_identifiers = {
     match_expression: '^4000-[0-9]+$'
     url: "https://comicvine.gamespot.com/issue/{{ comic_vine_issue_id }}"
     url_parse_expression: '^http[s]{0,1}://comicvine.gamespot.com/[a-zA-Z0-9_-]+/(?<comic_vine_issue_id>4000-[0-9]+)/{0,1}$'
+  }
+  comic_vine_volume_id: {
+    match_expression: '^4050-[0-9]+$'
+    url: "https://comicvine.gamespot.com/issue/{{ comic_vine_volume_id }}"
+    url_parse_expression: '^http[s]{0,1}://comicvine.gamespot.com/[a-zA-Z0-9_-]+/(?<comic_vine_volume_id>4050-[0-9]+)/{0,1}$'
   }
   hardcover_book_slug: {
     # More characters than this are probably allowed.
@@ -5178,6 +5282,15 @@ export def to_opf_xml [
             }
           )
           $i | identifier_into_url $id.type
+        } else if $id.type == "comic_vine_volume_id" {
+          let i = (
+            if ($id.id | str starts-with "4050-") {
+              $id.id
+            } else {
+              "4050-" + $id.id
+            }
+          )
+          $i | identifier_into_url $id.type
         } else {
           $id.id | identifier_into_url $id.type
         }
@@ -6084,6 +6197,15 @@ export def into_comic_info_xml []: [record -> record] {
           $id.id
         } else {
           "4000-" + $id.id
+        }
+      )
+      $i | identifier_into_url $id.type
+    } else if $id.type == "comic_vine_volume_id" {
+      let i = (
+        if ($id.id | str starts-with "4050-") {
+          $id.id
+        } else {
+          "4050-" + $id.id
         }
       )
       $i | identifier_into_url $id.type
@@ -7309,7 +7431,7 @@ export def get_comic_vine_issue [
   cache: closure
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
-]: [string -> list<string>] {
+]: [string -> record] {
   let comic_vine_id = $in
   let comic_vine_id = (
     if ($comic_vine_id | str starts-with "4000-") {
@@ -7360,7 +7482,7 @@ export def get_comic_vine_volume [
   cache: closure
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 5sec # The interval between successive attempts when there is a failure
-]: [string -> list<string>] {
+]: [string -> record] {
   let comic_vine_id = $in
   let comic_vine_id = (
     if ($comic_vine_id | str starts-with "4050-") {

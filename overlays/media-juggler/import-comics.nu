@@ -1282,67 +1282,15 @@ def main [
     if ($comic_vine_issue_id | is-not-empty) {
       # todo Move the Comic Vine parsing logic to its own function and add test cases.
       # Get Comic Vine metadata through the ComicVine API directly.
-      let data = $comic_vine_issue_id | get_comic_vine_issue $cache_function;
+      let issue_response = $comic_vine_issue_id | get_comic_vine_issue $cache_function
       # todo Cache things to avoid rate-limiting.
       # Avoid rate-limiting
       sleep 1sec;
-      let volume_data = $data.volume.id | into string | get_comic_vine_volume $cache_function;;
-      let publication_date = (
-        if ($data | get --optional store_date | is-empty) {
-        } else {
-          $data.store_date | into datetime
-        }
-      );
-      let year = (
-        if ($publication_date | is-empty) {
-        } else {
-          $publication_date | format date "%Y"
-        }
-      );
-      let month = (
-        if ($publication_date | is-empty) {
-        } else {
-          $publication_date | format date "%m"
-        }
-      );
-      let day = (
-        if ($publication_date | is-empty) {
-        } else {
-          $publication_date | format date "%d"
-        }
-      );
-      # Rewrite credits to match ComicTagger's format.
-      #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
-      let credits = (
-        $data.person_credits | reduce --fold [] {|person credits_acc|
-          $credits_acc | append (
-            $person.role
-            | split row ","
-            | str trim
-            | str capitalize
-            | each {|role|
-              {
-                person: $person.name
-                id: $person.id
-                role: $role
-                primary: false
-                language: ""
-              }
-            }
-          )
-        }
-      );
+      let volume_response = $issue_response.volume.id | into string | get_comic_vine_volume $cache_function
       let ids = (
         [
           [type id];
           [bookbrainz_edition_id $bookbrainz_edition_id]
-          [comic_vine_issue_id (
-            if ($comic_vine_issue_id | str starts-with "4000-") {
-              $comic_vine_issue_id
-            } else {
-              "4000-" + $comic_vine_issue_id
-            }
-          )]
           [metron_issue_id $metron_issue_id]
           [hardcover_book_slug $hardcover_book_slug]
           [hardcover_edition_id $hardcover_edition_id]
@@ -1350,38 +1298,18 @@ def main [
           [wikidata_item_id $wikidata_edition_id]
         ]
         | where {|it| $it.id | is-not-empty }
-      );
-      {
-        issue_id: $data.id
-        issue: $data.issue_number
-        series: ($data.volume.name | use_unicode_in_title)
-        title: (
-          if ($data | get --optional name | is-not-empty) {
-            $data.name | use_unicode_in_title
-          }
-        )
-        description: $data.description
-        volume: $volume_data.start_year
-        issue_count: $volume_data.count_of_issues
-        ids: $ids
-        isbn: $isbn
-        characters: ($data.character_credits | select --optional name id)
-        language: $default_language
-        manga: $manga
-        genres: []
-        tags: []
-        publication_date: $publication_date
-        year: $year
-        month: $month
-        day: $day
-        # $volume_data.description
-        publishers: [$volume_data.publisher.name]
-        # $data.store_date
-        # $data.cover_date
-        credits: $credits
-        series_id: $data.volume.id
-        _cover_image: [0, "", $data.image.original_url]
-      }
+      )
+      (
+        {
+          issue: $issue_response
+          volume: $volume_response
+        }
+        | parse_comic_vine_issue_and_volume
+        | merge deep {ids: $ids}
+        | merge {isbn: $isbn}
+        | merge {language: $default_language}
+        | merge {manga: $manga}
+      )
     }
   )
 
