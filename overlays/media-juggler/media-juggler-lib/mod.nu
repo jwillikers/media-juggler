@@ -294,15 +294,31 @@ export const opf_identifier_schemes = [
 
 # https://id.loc.gov/vocabulary/relators.html
 export const opf_roles_map = {
+  "Adapter": "adapter"
   "Artist": "artist"
-  # Kavita treats the illustrator as Inker.
-  "Illustrator": "illustrator"
-  "Inker": "illustrator"
-  "Introduction": "writer of introduction"
+  "Book Designer": "book designer"
+  "Book Jacket Designer": "book jacket designer"
+  "Book Producer": "book producer"
+  "Cartographer": "cartographer"
   "Colorist": "colorist"
   "Commentator": "commentator for written text"
+  "Composer": "composer"
+  "Consultant": "consultant"
+  "Cover Designer": "cover designer"
+  "Creator": "creator"
+  "Designer": "designer"
+  "Distributor": "distributor"
   "Editor": "editor"
+  "Foreword": "writer of foreword"
+  # Kavita treats the illustrator as Inker.
+  "Illustrator": "illustrator"
+  "Inker": "inker"
+  "Introduction": "writer of introduction"
+  "Narrator": "narrator"
+  "Penciller": "penciller"
+  "Photographer": "photographer"
   "Preface": "writer of preface"
+  "Proofreader": "proofreader"
   "Translator": "translator"
   "Writer": "author"
 }
@@ -4090,13 +4106,32 @@ export def from_opf_xml [
   roles_map: table = [
     [opf_roles role];
     # Kavita treats the illustrator as Inker.
+    [["adapter" "adp"] "Adapter"]
     [["artist" "art" "illustrator" "ill"] "Artist"]
     [["author" "aut"] "Writer"]
+    [["book designer" "bkd"] "Book Designer"]
+    [["book jacket designer" "bjd"] "Book Jacket Designer"]
+    [["book producer" "bkp"] "Book Producer"]
+    [["cartographer" "ctg"] "Cartographer"]
     [["colorist" "clr"] "Colorist"]
     [["commentator for written text" "cwt"] "Commentator"]
+    [["composer" "cmp"] "Composer"]
+    [["consultant" "csl"] "Consultant"]
+    [["cover designer" "cov"] "Cover Designer"]
+    [["distributor" "dst"] "Distributor"]
+    [["creator" "cre"] "Creator"]
+    [["designer" "dsr"] "Designer"]
     [["editor" "edt"] "Editor"]
+    [["inker" "ink"] "Inker"]
+    [["letter" "ltr"] "Letterer"]
+    [["narrator" "nrt"] "Narrator"]
+    [["originator" "org"] "Originator"]
+    [["photographer" "pht"] "Photographer"]
+    [["penciller" "pnc"] "Penciller"]
+    [["proofreader" "pfr"] "Proofreader"]
     [["publisher" "pbl"] "Publisher"]
     [["translator" "trl"] "Translator"]
+    [["writer of foreword" "wfw"] "Foreword"]
     [["writer of introduction" "win"] "Introduction"]
     [["writer of preface" "wpr"] "Preface"]
   ]
