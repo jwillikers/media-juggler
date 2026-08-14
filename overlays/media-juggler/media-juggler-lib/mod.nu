@@ -4897,8 +4897,8 @@ export def from_opf_xml [
       }
       # <dc:identifier id="pub-identifier">urn:isbn:9781506704197</dc:identifier>
       # <meta property="identifier-type" refines="#pub-identifier" scheme="onix:codelist5">15</meta>
-      log debug $"ids.content: ($ids.content | to json)"
-      log debug $"isbns: ($isbns)"
+      # log debug $"ids.content: ($ids.content | to json)"
+      # log debug $"isbns: ($isbns)"
       let isbns = (
         if ($isbns | is-not-empty) {
           (

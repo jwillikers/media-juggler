@@ -1044,10 +1044,11 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
     publication_date: (2023-05-01T05:00:00+00:00 | into datetime)
     ids: [
       [type, id];
-      [hardcover_book_slug, "march-comes-in-like-a-lion-volume-1"],
-      [hardcover_edition_id, "30930924"],
-      [comic_vine_issue_id, "987377"],
-      [bookbrainz_edition_id, "594a8ec2-6301-4c20-ae22-2c43840416b2"],
+      [hardcover_book_slug, "march-comes-in-like-a-lion-volume-1"]
+      [hardcover_edition_id, "30930924"]
+      [comic_vine_issue_id, "987377"]
+      [comic_vine_volume_id, "150064"]
+      [bookbrainz_edition_id, "594a8ec2-6301-4c20-ae22-2c43840416b2"]
       [wikidata_item_id, "Q139556252"]
       [epub_uuid, "2494c4ca-6fb6-459f-baca-26de4d2df70e"]
     ],
@@ -1094,10 +1095,11 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
     publication_date: (2023-05-01T05:00:00+00:00 | into datetime)
     ids: [
       [type, id];
-      [hardcover_book_slug, "march-comes-in-like-a-lion-volume-1"],
-      [hardcover_edition_id, "30930924"],
-      [comic_vine_issue_id, "987377"],
-      [bookbrainz_edition_id, "594a8ec2-6301-4c20-ae22-2c43840416b2"],
+      [hardcover_book_slug, "march-comes-in-like-a-lion-volume-1"]
+      [hardcover_edition_id, "30930924"]
+      [comic_vine_issue_id, "987377"]
+      [comic_vine_volume_id, "150064"]
+      [bookbrainz_edition_id, "594a8ec2-6301-4c20-ae22-2c43840416b2"]
       [wikidata_item_id, "Q139556252"]
       [epub_uuid, "2494c4ca-6fb6-459f-baca-26de4d2df70e"]
     ],
