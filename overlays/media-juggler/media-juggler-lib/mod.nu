@@ -711,7 +711,9 @@ export def "ssh glob" [
 ]: path -> table {
   let input = $in
   let ssh_path = $input | split_ssh_path
-  ^ssh $ssh_path.server nu --commands $"\'glob ($glob_args | str join ' ') \"($ssh_path.path | str replace --all '\' '\\\\')\" | to json\'" | from json
+  let result = ^ssh $ssh_path.server nu --commands $"\'glob ($glob_args | str join ' ') \"($ssh_path.path | str replace --all '\' '\\\\')\" | to json\'" | from json
+  # log debug $"ssh glob result: ($result)"
+  $result
 }
 
 # List files over SSH
@@ -3366,7 +3368,7 @@ export def validate_book_metadata [
       help: "pass either 'comic vine' or 'hardcover' as the metadata_source argument to validate_book_metadata"
     }
   }
-  if $metadata_source not-in ["comic" "book"] {
+  if $type not-in ["comic" "book"] {
     error make {
       msg: "validate_book_metadata: invalid type is not 'comic' or 'book'"
       labels: [
@@ -3395,7 +3397,7 @@ export def validate_book_metadata [
           help: "remove the duplicate Comic Vine issue id from the book_metadata.ids table"
         }
       } else {
-        $comic_vine_issue_ids | first
+        $comic_vine_issue_ids.id | first
       }
     } else if $metadata_source == "hardcover" {
       let hardcover_edition_ids = $book_metadata.ids | where type == "hardcover_edition_id"
@@ -3416,7 +3418,7 @@ export def validate_book_metadata [
           help: "remove the duplicate Hardcover edition id from the book_metadata.ids table"
         }
       } else {
-        $hardcover_edition_ids | first
+        $hardcover_edition_ids.id | first
       }
     }
   )
@@ -3440,7 +3442,7 @@ export def validate_book_metadata [
           help: "remove the duplicate Hardcover book slug from the book_metadata.ids table"
         }
       } else {
-        $hardcover_book_slugs | first
+        $hardcover_book_slugs.id | first
       }
     }
   )
@@ -5826,10 +5828,11 @@ export def extract_ebook_metadata [
       $metadata
     }
   )
+  # log debug $"metadata: ($metadata)"
   if ($metadata | is-not-empty) {
-    if "comic_info" in $metadata {
+    if "ComicInfo" in ($metadata | get --optional tag) {
       $metadata | from_comic_info_xml
-    } else if ($metadata | get --optional tag) == "package" {
+    } else if "package" in ($metadata | get --optional tag) {
       $metadata | from_opf_xml
     }
   }

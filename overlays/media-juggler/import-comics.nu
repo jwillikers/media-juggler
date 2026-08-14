@@ -1648,8 +1648,11 @@ def main [
       (
         (
           $target_directory
-          | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') $" \(.*\) [($output_format)]"
+          | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') ' ('
           | escape_special_glob_characters
+          | (
+            $in + '*' + ((') [' + $output_format + ']') | escape_special_glob_characters)
+          )
           | str replace '[:]' ':'
         )
         | ssh glob "--no-symlink"
@@ -1658,29 +1661,40 @@ def main [
         }
       )
     } else {
-      let covers = (
-        glob (
+      glob (
+        (
           $target_directory
-          | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') $" \(.*\) [($output_format)]"
+          | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') ' ('
           | escape_special_glob_characters
+          | (
+            $in + '*' + ((') [' + $output_format + ']') | escape_special_glob_characters)
+          )
         )
       )
     }
   )
-  if ($matching_series_subdirectories | length) > 1 {
+  if (
+    (
+      ($matching_series_subdirectories | length) == 1
+      and ($matching_series_subdirectories | first) != $target_directory
+    )
+    or ($matching_series_subdirectories | length) > 1
+  ) {
     if $confirm_series_year {
-      log warning $"Found multiple series subdirectories: ($matching_series_subdirectories)"
+      log warning $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
     } else {
-      log error $"Found multiple series subdirectories: ($matching_series_subdirectories)"
+      log error $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
       if not $keep_tmp {
         rm --force --recursive $temporary_directory
       }
       return {
         file: $original_file
-        error: $"Found multiple series subdirectories: ($matching_series_subdirectories)"
+        error: $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
       }
     }
   }
+  # todo rm
+  exit 1
 
   # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
   let authors = (
