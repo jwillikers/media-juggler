@@ -10,6 +10,48 @@
     "language": "English"
   },
   "release_date": "2024-03-30",
+  "contributions": [
+    {
+      "author": {
+        "name": "Kei Azumi",
+        "canonical_id": null,
+        "id": 1221140
+      },
+      "contribution": null
+    },
+    {
+      "author": {
+        "name": "Mitsuaki Matsumoto",
+        "canonical_id": null,
+        "id": 1221151
+      },
+      "contribution": "Illustrator"
+    },
+    {
+      "author": {
+        "name": "Mitsuaki Matsumoto",
+        "canonical_id": null,
+        "id": 1221151
+      },
+      "contribution": "Cover Artist"
+    },
+    {
+      "author": {
+        "name": "Mittt Liu",
+        "canonical_id": null,
+        "id": 724696
+      },
+      "contribution": "Translator"
+    },
+    {
+      "author": {
+        "name": "Jasmine Thone",
+        "canonical_id": null,
+        "id": 1251809
+      },
+      "contribution": "Editor"
+    }
+  ],
   "image": {
     "id": 7294342,
     "height": 2061,
@@ -51,48 +93,6 @@
   },
   "book": {
     "book_characters": [],
-    "contributions": [
-      {
-        "author": {
-          "name": "Kei Azumi",
-          "canonical_id": null,
-          "id": 1221140
-        },
-        "contribution": null
-      },
-      {
-        "author": {
-          "name": "Mitsuaki Matsumoto",
-          "canonical_id": null,
-          "id": 1221151
-        },
-        "contribution": "Illustrator"
-      },
-      {
-        "author": {
-          "name": "Mitsuaki Matsumoto",
-          "canonical_id": null,
-          "id": 1221151
-        },
-        "contribution": "Cover Artist"
-      },
-      {
-        "author": {
-          "name": "Mittt Liu",
-          "canonical_id": null,
-          "id": 724696
-        },
-        "contribution": "Translator"
-      },
-      {
-        "author": {
-          "name": "Jasmine Thone",
-          "canonical_id": null,
-          "id": 1251809
-        },
-        "contribution": "Editor"
-      }
-    ],
     "description": "Makoto Misumi...",
     "literary_type_id": 1,
     "book_category_id": 10,
@@ -144,6 +144,7 @@
       ],
       "Content Warning": []
     },
+    "release_year": 2013,
     "featured_book_series": {
       "id": 857644,
       "featured": true,
@@ -151,8 +152,13 @@
       "position": 1,
       "series_id": 202585,
       "series": {
+        "id": 202585,
         "canonical_id": null,
         "name": "Tsukimichi: Moonlit Fantasy (Light Novel)",
+        "author": {
+          "id": 1221140,
+          "name": "Kei Azumi"
+        },
         "books_count": 21,
         "book_series": [
           {

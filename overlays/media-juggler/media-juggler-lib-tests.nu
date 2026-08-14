@@ -5197,6 +5197,7 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
       ["Jasmine Thone", "1251809", Editor, false, ""]
     ]
     series_id: 202585
+    primary_series_author: "Kei Azumi"
     _cover_image: [
       0
       ""
@@ -5205,7 +5206,7 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
       2061
     ]
   }
-  log debug $"parsed hardcover edition: ($input | parse_hardcover_edition | to nuon)"
+  # log debug $"parsed hardcover edition: ($input | parse_hardcover_edition | to nuon)"
   assert equal ($input | parse_hardcover_edition) $expected
 }
 
