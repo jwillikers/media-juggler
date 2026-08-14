@@ -10,6 +10,7 @@
   # todo kfx-input = pkgs.callPackage ./kfx-input/package.nix { };
   # todo Barnes & Noble plugin: https://www.mobileread.com/forums/showthread.php?t=132508
   kobo-metadata = pkgs.callPackage ./kobo-metadata/package.nix { };
+  lcpl = pkgs.callPackage ./lcpl/package.nix { };
   modify_epub = pkgs.callPackage ./modify_epub/package.nix { };
   # todo? https://github.com/un-pogaz/ePub-Extended-Metadata
   # todo? https://github.com/akupiec/calibre_plugin_audiobook-metadata

@@ -27,6 +27,9 @@ self:
         ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
           pkgs.calibre-plugins.kobo-metadata + "/lib/calibre/calibre-plugins/KoboMetadata.zip"
         }
+        ${pkgs.calibre}/bin/calibre-customize --add-plugin=${
+          pkgs.calibre-plugins.lcpl + "/lib/calibre/calibre-plugins/calibre-plugin.zip"
+        }
         ${pkgs.calibre}/bin/calibre-customize --add-plugin='${
           pkgs.calibre-plugins.modify_epub + "/lib/calibre/calibre-plugins/Modify ePub.zip"
         }'

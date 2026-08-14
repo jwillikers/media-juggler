@@ -26,12 +26,10 @@ use media-juggler-lib *
 # The name will look like "<series> (<series-year>) #<issue> (<issue-year>).cbz".
 #
 def main [
-  ...files: string # The paths to ACSM, EPUB, and CBZ files to convert, tag, and upload. Supports SSH paths.
+  ...files: string # The paths to ACSM, LCPL, EPUB, and CBZ files to convert, tag, and upload. Supports SSH paths.
   --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
+  --confirm-series-year # Confirm that the series year is correct in the case of multiple series subdirectories with different years.
   --default-language: string = "american english"
-  --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Open Library" "Wikidata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
-  # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library" "Kobo Metadata"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
-  # --default-allowed-metadata-plugins: list<string> = ["Hardcover" "Barnes & Noble" Google "Amazon.com" "Open Library"] # Calibre metadata plugins to allow by default. Try removing Kobo from this list if it hangs.
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
   --ignore-mismatched-isbn-in-pages
   --isbn: string
@@ -39,19 +37,14 @@ def main [
   # --interactive # Ask for input from the user
   --keep # Don't delete or modify the original input files
   --keep-tmp # Don't delete the temporary directory when there's an error
-  --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
-  # --issue: string # The issue number
-  # --issue-year: string # The publication year of the issue
   --manga: string = "YesAndRightToLeft" # Whether the file is manga "Yes", right-to-left manga "YesAndRightToLeft", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
   --metron-issue-id: string # The issue id on Metron.
   --form-subdirectory: directory # Directory below the destination in which to copy files. I have subdirectories for comics, manga, and manhwa. Wikidata is used to infer this where possible. Defaults to manga.
   --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I have comics, manga, and manhwa subdirectories.
-  # --series: string # The name of the series
-  # --series-year: string # The initial publication year of the series, also referred to as the volume
+  --replace-cover # Replace the cover image of a PDF.
   --skip-ocr # Don't attempt to parse the ISBN from images using OCR
   --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
-  --title: string # The title of the comic or manga issue
   --use-rsync # Use rsync instead of scp to retrieve and copy files from a remote machine.
   --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
   --hardcover-edition-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
@@ -129,8 +122,10 @@ def main [
   }
 
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-comics"] | path join
-  let optimized_files_cache_file = [$cache_directory optimized.json] | path join
   mkdir $cache_directory
+  let optimized_files_cache_file = [$cache_directory optimized.json] | path join
+  let cover_art_directory = [$cache_directory "covers"] | path join
+  mkdir $cover_art_directory
 
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-comics-config.json"] | path join
   let config: record = (
@@ -457,21 +452,15 @@ def main [
   let original_comic_files = [$original_file] | append $original_comic_info | append $original_cover | append $original_opf
   log debug $"The original files for the comic are (ansi yellow)($original_comic_files)(ansi reset)"
 
-  let output_format = (
-    if $original_input_format == "pdf" {
-      "pdf"
-    } else {
-      "cbz"
-    }
-  )
-
   let formats = (
-    if $original_input_format == "acsm" {
-      log debug "Converting the ACSM file to an EPUB"
-      { epub: ($file | acsm_to_epub (pwd)) }
-    } else if $original_input_format == "epub" {
-      log debug "Importing the EPUB file"
-      { epub: ($file | acsm_to_epub (pwd)) }
+    if $original_input_format in ["acsm" "epub" "lcpl" "lcpdf"] {
+      log debug "Importing the ACSM, EPUB, LCPL, or LCPDF file"
+      let output_file = $file | acsm_lcp_to_ebook (pwd)
+      if ($output_file | path parse | get extension) == "epub" {
+        {epub: $output_file }
+      } else if ($output_file | path parse | get extension) == "pdf" {
+        {pdf: $output_file }
+      }
     } else if $original_input_format in ["cbz" "zip"] {
       { cbz: $file }
     } else if $original_input_format == "pdf" {
@@ -487,10 +476,20 @@ def main [
     }
   )
 
+  let output_format = (
+    if ($formats | get --optional pdf | is-not-empty) {
+      "pdf"
+    } else {
+      "cbz"
+    }
+  )
+
+  # The input format after initial conversion in Calibre.
   let input_format = (
-    # todo ACSM files can also be PDFs
-    if $original_input_format == "acsm" {
+    if ($formats | get --optional epub | is-not-empty) {
       "epub"
+    } else if ($formats | get --optional pdf | is-not-empty) {
+      "pdf"
     } else if $original_input_format == "zip" {
       "cbz"
     } else {
@@ -584,7 +583,7 @@ def main [
 
   # First, try to locate the release based on its hash if no Wikidata id is specified.
   let wikidata_edition_id = (
-    if $original_input_format != "acsm" and ($wikidata_edition_id | is-empty) {
+    if $original_input_format not-in ["acsm" "lcpl" "lcpdf"] and ($wikidata_edition_id | is-empty) {
       # BLAKE3 and SHA3-512 checksums are currently supported.
       ["blake3" "sha3-512"] | reduce --fold "" {|checksum_type acc|
         if ($acc | is-empty) {
@@ -1282,118 +1281,103 @@ def main [
     }
   }
 
-  log debug "Fetching metadata"
-  let tag_result = (
-    # Get Comic Vine metadata through the ComicVine API directly.
-    let data = $comic_vine_issue_id | get_comic_vine_issue $cache_function;
-    # todo Cache things to avoid rate-limiting.
-    # Avoid rate-limiting
-    sleep 1sec;
-    let volume_data = $data.volume.id | into string | get_comic_vine_volume $cache_function;;
-    let publication_date = (
-      if ($data | get --optional store_date | is-empty) {
-      } else {
-        $data.store_date | into datetime
-      }
-    );
-    let year = (
-      if ($publication_date | is-empty) {
-      } else {
-        $publication_date | format date "%Y"
-      }
-    );
-    let month = (
-      if ($publication_date | is-empty) {
-      } else {
-        $publication_date | format date "%m"
-      }
-    );
-    let day = (
-      if ($publication_date | is-empty) {
-      } else {
-        $publication_date | format date "%d"
-      }
-    );
-    # Rewrite credits to match ComicTagger's format.
-    #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
-    let credits = (
-      $data.person_credits | reduce --fold [] {|person credits_acc|
-        $credits_acc | append (
-          $person.role
-          | split row ","
-          | str trim
-          | str capitalize
-          | each {|role|
-            {
-              person: $person.name
-              id: $person.id
-              role: $role
-              primary: false
-              language: ""
-            }
-          }
-        )
-      }
-    );
-    let ids = (
-      [
-        [type id];
-        [bookbrainz_edition_id $bookbrainz_edition_id]
-        [comic_vine_issue_id (
-          if ($comic_vine_issue_id | str starts-with "4000-") {
-            $comic_vine_issue_id
-          } else {
-            "4000-" + $comic_vine_issue_id
-          }
-        )]
-        [metron_issue_id $metron_issue_id]
-        [hardcover_book_slug $hardcover_book_slug]
-        [hardcover_edition_id $hardcover_edition_id]
-        [open_library_edition_id $open_library_edition_id]
-        [wikidata_item_id $wikidata_edition_id]
-      ]
-      | where {|it| $it.id | is-not-empty }
-    );
-    {
-      result: {
-        md: {
-          issue_id: $data.id
-          issue: $data.issue_number
-          series: ($data.volume.name | use_unicode_in_title)
-          title: (
-            if ($data | get --optional name | is-not-empty) {
-              $data.name | use_unicode_in_title
-            }
-          )
-          description: $data.description
-          volume: $volume_data.start_year
-          issue_count: $volume_data.count_of_issues
-          ids: $ids
-          isbn: $isbn
-          characters: ($data.character_credits | select --optional name id)
-          language: $default_language
-          # Default the age rating to PG.
-          comic_info_age_rating: "PG"
-          manga: $manga
-          genres: []
-          tags: []
-          publication_date: $publication_date
-          year: $year
-          month: $month
-          day: $day
-          # $volume_data.description
-          publishers: [$volume_data.publisher.name]
-          # $data.store_date
-          # $data.cover_date
-          credits: $credits
-          series_id: $data.volume.id
-          _cover_image: [0, "", $data.image.original_url]
+  let comic_vine_metadata = (
+    if ($comic_vine_issue_id | is-not-empty) {
+      # todo Move the Comic Vine parsing logic to its own function and add test cases.
+      # Get Comic Vine metadata through the ComicVine API directly.
+      let issue_response = $comic_vine_issue_id | get_comic_vine_issue $cache_function
+      # todo Cache things to avoid rate-limiting.
+      # Avoid rate-limiting
+      sleep 1sec;
+      let volume_response = $issue_response.volume.id | into string | get_comic_vine_volume $cache_function
+      let ids = (
+        [
+          [type id];
+          [bookbrainz_edition_id $bookbrainz_edition_id]
+          [metron_issue_id $metron_issue_id]
+          [hardcover_book_slug $hardcover_book_slug]
+          [hardcover_edition_id $hardcover_edition_id]
+          [open_library_edition_id $open_library_edition_id]
+          [wikidata_item_id $wikidata_edition_id]
+        ]
+        | where {|it| $it.id | is-not-empty }
+      )
+      (
+        {
+          issue: $issue_response
+          volume: $volume_response
         }
-        status: "good_match"
+        | parse_comic_vine_issue_and_volume
+        | merge deep {ids: $ids}
+        | merge {isbn: $isbn}
+        | merge {language: $default_language}
+        | merge {manga: $manga}
+      )
+    }
+  )
+
+  log debug "Fetching metadata"
+  let primary_metadata_source = (
+    if ($hardcover_edition_id | is-not-empty) {
+      "hardcover"
+    } else if ($comic_vine_issue_id | is-not-empty) {
+      "comic_vine"
+    } else {
+      log error "Unable to fetch metadata since neither a Hardcover edition id nor a Comic Vine issue id are available."
+      if not $keep_tmp {
+        rm --force --recursive $temporary_directory
+      }
+      return {
+        file: $original_file
+        error: "Unable to fetch metadata since neither a Hardcover edition id nor a Comic Vine issue id are available."
       }
     }
   )
-  log debug $"The Comic Vine API result is:\n(ansi green)($tag_result.result | to nuon)(ansi reset)\n"
+  let comic_metadata = (
+    if $primary_metadata_source == "hardcover" {
+      $hardcover_edition_id | fetch_and_parse_hardcover_edition id $cache_function
+    } else if $primary_metadata_source == "comic_vine" {
+      $comic_vine_metadata
+    } else {
+      log error $"Invalid primary metadata source (ansi yellow)($primary_metadata_source)(ansi reset) must be 'hardcover' or 'comic_vine."
+      if not $keep_tmp {
+        rm --force --recursive $temporary_directory
+      }
+      return {
+        file: $original_file
+        error: $"Invalid primary metadata source (ansi yellow)($primary_metadata_source)(ansi reset) must be 'hardcover' or 'comic_vine."
+      }
+    }
+  )
+  log debug $"The fetched metadata is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
+
+  # Check for missing and invalid metadata
+  let validation_check = $comic_metadata | validate_book_metadata $primary_metadata_source comic
+  if not $validation_check.valid {
+    log error $"Invalid metadata from ($primary_metadata_source)"
+    log debug $"Deleting cached API response for edition"
+    if $primary_metadata_source == "hardcover" {
+      rm ([$cache_directory "hardcover-edition" $"id-($hardcover_edition_id).json"] | path join)
+    } else if $primary_metadata_source == "comic vine" {
+      # todo Delete the cached Comic Vine volume response?
+      rm ([$cache_directory "comic-vine-issue" $"id-($comic_vine_issue_id).json"] | path join)
+    }
+    $validation_check.errors | each {|error_message|
+      log error $error_message
+    }
+    if not $keep_tmp {
+      rm --force --recursive $temporary_directory
+    }
+    return {
+      file: $original_file
+      # todo Support multiple error messages.
+      error: ($validation_check.errors | str join "\n")
+    }
+  }
+  if $primary_metadata_source == "hardcover" and ($comic_metadata._cover_image.3 < 1000 or $comic_metadata._cover_image.4 < 1000) {
+    log warning $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Upload a high quality cover for the edition, remove the cached response, and retry."
+    sleep 30sec
+  }
 
   let wikidata_metadata = (
     if ($wikidata_edition_id | is-not-empty) {
@@ -1407,13 +1391,117 @@ def main [
   )
   log debug $"The Wikidata metadata is:\n(ansi green)($wikidata_metadata | to nuon)(ansi reset)\n"
 
-  let comic_metadata = $tag_result.result.md
-  let comic_metadata = (
-    $comic_metadata
-    | merge $wikidata_metadata
-    # Prefer publishers from Comic Vine over Wikidata.
-    # This is for consistency and to avoid comma's in the Publisher names causing problems, like Kodansha USA Publishing, LLC.
-    | upsert publishers $comic_metadata.publishers
+  let ids = (
+    []
+    | append (
+      if ($bookbrainz_edition_id | is-not-empty) {
+        [[type id]; [bookbrainz_edition_id $bookbrainz_edition_id]]
+      }
+    )
+    | append (
+      if ($comic_vine_issue_id | is-not-empty) {
+        [[type id]; [comic_vine_issue_id $comic_vine_issue_id]]
+      }
+    )
+    | append (
+      if ($hardcover_book_slug | is-not-empty) {
+        [[type id]; [hardcover_book_slug $hardcover_book_slug]]
+      }
+    )
+    | append (
+      if ($hardcover_edition_id | is-not-empty) {
+        [[type id]; [hardcover_edition_id $hardcover_edition_id]]
+      }
+    )
+    | append (
+      if ($open_library_edition_id | is-not-empty) {
+        [[type id]; [open_library_edition_id $open_library_edition_id]]
+      }
+    )
+    | append (
+      if ($wikidata_edition_id | is-not-empty) {
+        [[type id]; [wikidata_item_id $wikidata_edition_id]]
+      }
+    )
+  )
+
+  # Extend metadata with data from Wikidata.
+  # todo Attempt to get the letters from Wikidata when using Hardcover, since Hardcover doesn't support letterers.
+  let comic_metadata = $comic_metadata | merge (
+    if ($wikidata_metadata | get --optional genres | is-empty) {
+      {}
+    } else {
+      {
+        genres: (
+          # Genres from Wikidata are preferred since they are more likely to be correct.
+          # We could add these to genres from Hardcover, but Hardcover genres are are less reliable, at least right now.
+          ($wikidata_metadata | get --optional genres)
+          # | append ($comic_metadata | get --optional genres | uniq)
+        )
+      }
+    }
+  ) | merge (
+    # When using Hardcover and Comic Vine metadata is available, get the letterers from Comic Vine.
+    if (
+      $primary_metadata_source == "hardcover"
+      and ($comic_vine_metadata | get --optional credits | is-not-empty)
+      and ($comic_vine_metadata.credits | any {|credit| $credit.role == "Letterer"})
+    ) {
+      {
+        credits: (
+          $comic_metadata.credits
+          | append (
+            $comic_vine_metadata.credits
+            | where {|credit| $credit.role == "Letterer"}
+          )
+        )
+      }
+    } else {
+      {}
+    }
+  ) | merge (
+    # Prefer release date from Wikidata instead of Comic Vine as Comic Vine is incompetent when it comes to release dates.
+    # Comic Vine can't handle release dates on the first day of the month.
+    # Comic Vine typically only has print edition release dates when there are both digital and print formats available.
+    if $primary_metadata_source == "comic_vine" and ($wikidata_metadata | get --optional publication_date | is-not-empty) {
+      {publication_date: $wikidata_metadata.publication_date}
+    } else {
+      {}
+    }
+  ) | merge (
+    # Prefer form from Wikidata since it can be much more specific than just "graphic novel" from Hardcover.
+    if ($wikidata_metadata | get --optional forms_of_creative_work | is-empty) {
+      {}
+    } else {
+      {
+        forms_of_creative_work: ($wikidata_metadata | get --optional forms_of_creative_work)
+      }
+    }
+  ) | merge (
+    if ($comic_metadata | get --optional comic_info_age_rating | is-empty) {
+      if ($wikidata_metadata | get --optional comic_info_age_rating | is-empty) {
+        # Default the age rating to PG.
+        {comic_info_age_rating: "PG"}
+      } else {
+        {comic_info_age_rating: $wikidata_metadata.comic_info_age_rating}
+      }
+    } else {
+      {}
+    }
+  ) | merge (
+    if ($comic_metadata | get --optional ids | is-empty) and ($wikidata_metadata | get --optional ids | is-empty) {
+      {ids: $ids}
+    } else if ($comic_metadata | get --optional ids | is-empty) {
+      {ids: ($ids | append $wikidata_metadata.ids | uniq)}
+    } else if ($wikidata_metadata | get --optional ids | is-empty) {
+      {ids: ($ids | append $comic_metadata.ids | uniq)}
+    } else {
+      {
+        ids: (
+          $ids | append $wikidata_metadata.ids | append $comic_metadata.ids | uniq
+        )
+      }
+    }
   )
   log debug $"The merged metadata is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
 
@@ -1424,8 +1512,8 @@ def main [
         "manga"
       } else if (["manhwa" "manhwa volume" "manhwa chapter"] | any {|form| $form in ($comic_metadata | get --optional forms_of_creative_work)}) {
         "manhwa"
-      # "graphic novel" is a bit ambiguous.
-      } else if (["comic" "comic book" "comic book album" "comic strip"] | any {|form| $form in ($comic_metadata | get --optional forms_of_creative_work)}) {
+      # "graphic novel" is a bit ambiguous, but we try to determine whether it is manga or manhwa as best as possible.
+      } else if (["comic" "comic book" "comic book album" "comic strip" "graphic novel"] | any {|form| $form in ($comic_metadata | get --optional forms_of_creative_work)}) {
         "comics"
       } else {
         "manga"
@@ -1494,15 +1582,7 @@ def main [
     }
   )
 
-  # Embed the ComicInfo.xml file in the CBZ.
-  if "cbz" in ($formats | columns) {
-    {
-      archive: $formats.cbz
-      comic_info: ($comic_metadata | into_comic_info_xml)
-    } | inject_comic_info
-  }
-
-  log debug "Renaming the CBZ according to the updated metadata from ComicTagger"
+  log debug "Renaming the ebook"
   let formats = (
     $formats | update $output_format (
       let previous_file_name = $formats | get $output_format;
@@ -1524,7 +1604,97 @@ def main [
       $new_file_name
     )
   )
-  log debug "Renamed the file according to the metadata from Comic Vine"
+  log debug "Renamed the file according to the metadata"
+
+  # todo How to handle nested series and subseries?
+  let series_subdirectory = (
+    # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
+    # Kavita dislikes multiple formats in the same directory.
+    # if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+    if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+      # Kavita doesn't like multiple formats being in the same directory.
+      (
+        $comic_metadata.series
+        | use_unicode_in_title
+        | sanitize_file_name
+        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
+      )
+    # Kavita needs series to be in their own directories.
+    # So, if this is a oneshot, put it in its own directory.
+    } else {
+      (
+        $formats
+        | get $output_format
+        | path parse
+        | get stem
+        | use_unicode_in_title
+        | sanitize_file_name
+        | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
+      )
+    }
+  )
+  let target_directory = (
+    [$destination $form_subdirectory]
+    | append $series_subdirectory
+    | path join
+  )
+  log debug $"Target directory: ($target_directory)"
+
+  # Check that if there is an existing series directory with a different year.
+  # This is to catch variations in the year occurring for the same series.
+  let matching_series_subdirectories = (
+    if ($target_directory | is_ssh_path) {
+      let server = $target_directory | split_ssh_path | get server
+      (
+        (
+          $target_directory
+          | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') ' ('
+          | escape_special_glob_characters
+          | (
+            $in + '*' + ((') [' + $output_format + ']') | escape_special_glob_characters)
+          )
+          | str replace '[:]' ':'
+        )
+        | ssh glob "--no-symlink"
+        | each {|series_subdirectory|
+          $"($server):($series_subdirectory)"
+        }
+      )
+    } else {
+      glob (
+        (
+          $target_directory
+          | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') ' ('
+          | escape_special_glob_characters
+          | (
+            $in + '*' + ((') [' + $output_format + ']') | escape_special_glob_characters)
+          )
+        )
+      )
+    }
+  )
+  if (
+    (
+      ($matching_series_subdirectories | length) == 1
+      and ($matching_series_subdirectories | first) != $target_directory
+    )
+    or ($matching_series_subdirectories | length) > 1
+  ) {
+    if $confirm_series_year {
+      log warning $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+    } else {
+      log error $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+      if not $keep_tmp {
+        rm --force --recursive $temporary_directory
+      }
+      return {
+        file: $original_file
+        error: $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+      }
+    }
+  }
+  # todo rm
+  exit 1
 
   # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
   let authors = (
@@ -1553,58 +1723,6 @@ def main [
   }
   log debug $"The authors are (ansi purple)'($authors)'(ansi reset)"
 
-  # We keep the name of the series in the title to keep things organized.
-  # Displaying only "Vol. 4" as the title can be confusing.
-  log debug "Including the series as part of the title and making it consistent"
-  let title = $comic_metadata | get --optional title
-  let title = (
-    if ($title | is-empty) {
-      if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
-        if ($comic_metadata.issue_count == 1) {
-          $comic_metadata.series | use_unicode_in_title
-        } else {
-          (($comic_metadata.series | use_unicode_in_title) + " - Volume " + $comic_metadata.issue) | standardize_title
-        }
-      } else {
-        # No title provided and can't determine the title!
-        if not $keep_tmp {
-          rm --force --recursive $temporary_directory
-        }
-        return {
-          file: $original_file
-          error: "No title provided and unable to determine appropriate title from the series metadata"
-        }
-      }
-    } else {
-      if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: " {
-        # Volume followed by subtitle
-        let subtitle = $comic_metadata.title | parse --regex "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: (?<subtitle>.*)"
-        if ($subtitle | is-not-empty) {
-          # todo What if we get multiple regex matches?
-          $"($comic_metadata.series) - Volume ($comic_metadata.issue): ($subtitle.subtitle | first)" | standardize_title | use_unicode_in_title
-        } else {
-          $"($comic_metadata.series) - Volume ($comic_metadata.issue)" | standardize_title | use_unicode_in_title
-        }
-      } else if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) " {
-        # No subtitle
-        $"($comic_metadata.series) - Volume ($comic_metadata.issue)" | standardize_title | use_unicode_in_title
-      } else {
-        # Subtitle is the tile
-        $"($comic_metadata.series) - Volume ($comic_metadata.issue): ($comic_metadata.title)" | standardize_title | use_unicode_in_title
-      }
-    }
-  )
-  log info $"The title is now (ansi yellow)($title)(ansi reset)"
-
-  # todo Remove this variable.
-  let comic_vine_id = (
-    if ($comic_vine_issue_id | is-empty) {
-      $comic_metadata.issue_id
-    } else {
-      $comic_vine_issue_id
-    }
-  )
-
   # PDFs must be optimized before embedding metadata, as the embedded metadata will be scrubbed.
   let updated_optimized_file_hashes = (
     if ($skip_optimization) {
@@ -1631,7 +1749,7 @@ def main [
                 if ($residual_optimization_files | is-empty) {
                   rm --force --recursive $pdf_optimization_directory
                 } else {
-                  let saved_optimization_directory = mktemp --directory --tmpdir-path (pwd) (($title | use_unicode_in_title | sanitize_file_name) + "_pdf_optimization_files.XXXXXXXXXX")
+                  let saved_optimization_directory = mktemp --directory --tmpdir-path (pwd) (($comic_metadata.title | use_unicode_in_title | sanitize_file_name) + "_pdf_optimization_files.XXXXXXXXXX")
                   cp --recursive $pdf_optimization_directory $saved_optimization_directory
                   log info $"Saved failed PDF optimization attempts in (ansi yellow)($saved_optimization_directory)(ansi reset)"
                 }
@@ -1648,188 +1766,47 @@ def main [
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
 
-  # Update the metadata in the PDF file.
-  let formats = (
-    if "pdf" in $formats {
-      let args = (
-        []
-        | append (
-          if ($isbn | is-not-empty) {
-            $"--isbn=($isbn)"
-          } else if ($comic_metadata | get --optional isbn | is-not-empty) {
-            $"--isbn=($comic_metadata.isbn)"
-          }
-        )
-        | append (
-          if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-            [$"--series=($comic_metadata.series | use_unicode_in_title)" $"--index=($comic_metadata.issue)"]
-          }
-        )
-        | append (
-          # Prefer publisher over imprint
-          # todo Not sure if Kavita supports multiple publishers in the PDF metadata.
-          if ($publishers | is-not-empty) {
-            $"--publisher=($publishers | str join ',')"
-          } else if ($comic_metadata | get --optional publishers | is-not-empty) {
-            $"--publisher=($comic_metadata.publishers | str join ',')"
-          } else if ($imprints | is-not-empty) {
-            $"--publisher=($imprints | str join ',')"
-          } else if ($comic_metadata | get --optional imprints | is-not-empty) {
-            $"--publisher=($comic_metadata.imprints | str join ',')"
-          }
-        )
-        | append (
-          if ($comic_metadata | get --optional language | is-not-empty) {
-            $"--language=($comic_metadata.language | into_language_code ietf_bcp_47)"
-          } else {
-            $"--language=($default_language | into_language_code ietf_bcp_47)"
-          }
-        )
-        | append (
-          if ($comic_metadata | get --optional description | is-not-empty) {
-            $"--comments=($comic_metadata.description)"
-          }
-        )
-        | append (
-          if ($comic_metadata | get --optional genres | is-not-empty) {
-            $"--tags=($comic_metadata.genres | str join ',')"
-          }
-        )
-        | append (
-          if ($bookbrainz_edition_id | is-not-empty) {
-            $"--identifier=bookbrainz-edition:($bookbrainz_edition_id)"
-          }
-        )
-        | append (
-          if ($hardcover_edition_id | is-not-empty) {
-            $"--identifier=hardcover-edition:($hardcover_edition_id)"
-          }
-        )
-        | append (
-          if ($hardcover_book_slug | is-not-empty) {
-            $"--identifier=hardcover:($hardcover_book_slug)"
-          }
-        )
-        | append (
-          if ($wikidata_edition_id | is-not-empty) {
-            $"--identifier=wikidata-edition:($wikidata_edition_id)"
-          }
-        )
-        | append (
-          if ($wikidata_work_id | is-not-empty) {
-            $"--identifier=wikidata-work:($wikidata_work_id)"
-          }
-        )
-        | append (
-          let year = (
-            if ($comic_metadata | get --optional year | is-not-empty) {
-              $comic_metadata.year
-            }
-          );
-          let month = (
-            if ($comic_metadata | get --optional month | is-not-empty) {
-              $comic_metadata.month
-            }
-          );
-          let day = (
-            if ($comic_metadata | get --optional day | is-not-empty) {
-              $comic_metadata.day
-            }
-          );
-          if ($comic_metadata | get --optional publication_date | is-not-empty) {
-            $"--date=($comic_metadata.publication_date | format date "%Y-%m-%d")"
-          } else if ($year | is-not-empty) and ($month | is-not-empty) and ($day | is-not-empty) {
-            $"--date=($year)-($month)-($day)"
-          } else if ($year | is-not-empty) {
-            $"--date=($year)"
-          }
-        )
-      );
-      log debug $"Running (ansi yellow)^ebook-meta ($formats.pdf) ($args | str join ' ') --authors ($authors | str join "&") --identifier 'comicvine:($comic_vine_id)' --identifier 'comicvine-volume:($comic_metadata.series_id)'(ansi reset)";
-      (
-        ^ebook-meta
-          $formats.pdf
-          ...$args
-          # Keep the title in PDFs for now, since Kavita doesn't really change it's behavior whether one is included or not.
-          --title ($title | standardize_title)
-          # Remove the title sort field.
-          # --title-sort ""
-          --authors ($authors | str join "&")
-          --identifier $"comicvine:($comic_vine_id)"
-          --identifier $"comicvine-volume:($comic_metadata.series_id)"
-      );
-      # Now, delete the title so Kavita doesn't think it is a chapter title.
-      # ebook-meta isn't capable of deleting the title...
-      # ^exiftool -Title="" $input.book
-      # Obtain a cover image which will be saved alongside the PDF
-      # Since ComicVine has low limits on image file size, it's not the place to get high quality covers.
-      # Prefer using the cover from the PDF and then fallback to using the one from ComicVine if that fails.
-      # Eventually, Hardcover should be used for covers instead of ComicVine.
-      let cover = (
-        # Attempt to extract the existing cover from the PDF
-        let cover = (
-          {
-            parent: $temporary_directory
-            stem: "cover"
-          } | path join
-        );
-        let result = (^ebook-meta --get-cover $cover $formats.pdf | complete);
-        if $result.exit_code == 0 {
-          $cover | rename_image_with_extension
-        } else {
-          # Get cover from Hardcover, which supports much better resolution than Comic Vine.
-          let hardcover_cover_url = (
-            if ($hardcover_edition_id | is-not-empty) {
-              $hardcover_edition_id | hardcover_cover_art_url
-            } else {
-              null
-            }
-          )
-          let cover = (
-            {
-              parent: $temporary_directory
-              stem: "cover"
-              extension: ($hardcover_cover_url | path parse | get extension)
-            } | path join
-          );
-          if ($hardcover_cover_url | is-not-empty) {
-            log debug $"Downloading Hardcover cover image: ($hardcover_cover_url)";
-            try {
-              http get --headers [User-Agent $user_agent] --raw $hardcover_cover_url | save --force $cover;
-              log debug $"Downloaded cover (ansi yellow)($cover)(ansi reset)";
-              $cover
-            } catch {|error|
-              log error $"Failed to downloaded cover from (ansi yellow)($hardcover_cover_url)(ansi reset): ($error)";
-              null
-            }
-          } else {
-            # Get cover from Comic Vine
-            log debug $"Comic Vine cover image: ($comic_metadata._cover_image | to nuon)";
-            let cover_url = $comic_metadata._cover_image | last;
-            try {
-              http get --headers [User-Agent $user_agent] --raw $cover_url | save --force $cover;
-              log debug $"Downloaded cover (ansi yellow)($cover)(ansi reset)";
-              $cover
-            } catch {|error|
-              log error $"Failed to downloaded cover from (ansi yellow)($cover_url)(ansi reset): ($error)";
-              null
-            }
-          }
-        }
-      );
-      if ($cover | is-not-empty) and not $skip_optimization {
-        $cover | optimize_image;
-      }
-      $formats
-      # | update pdf $formats.pdf
-      # | insert comic_info $comic_info
-      # | insert metron_info $metron_info
-      | upsert_if_value cover $cover
-    } else {
-      $formats
+  log info "Embedding the metadata"
+  $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
+
+  # Replace the cover in the PDF file.
+
+  # This is the code to extract the cover from an ebook with ebook-meta.
+  # let cover = (
+  #   # Attempt to extract the existing cover from the PDF
+  #   let cover = (
+  #     {
+  #       parent: $temporary_directory
+  #       stem: "cover"
+  #     } | path join
+  #   );
+  #   let result = (^ebook-meta --get-cover $cover $formats.pdf | complete);
+  #   if $result.exit_code == 0 {
+  #     $cover | rename_image_with_extension
+  #   }
+  # );
+
+  if $replace_cover and $output_format == "pdf" {
+    let cover_image_url = $comic_metadata | get --optional _cover_image.2
+    if not ($cover_image_url) {
+      log error $"Unable to replace cover as there is no cover art set for the Hardcover edition ($hardcover_edition_id)."
+      exit 1
     }
-  )
-  log debug "Finished renaming files";
+    let cover_image = $cover_image_url | download_file $cover_art_directory
+    if not $skip_optimization {
+      $cover_image | optimize_image
+    }
+    # todo Embed cover image in EPUB manually and only use ebook-meta for PDFs.
+    # todo Compare quality of existing cover and downloaded cover and warn or abort as necessary.
+    log info "Replacing cover image in the ebook"
+    log debug $"Running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'"
+    let result = do {^ebook-meta --cover $cover_image ($formats | get $output_format)} | complete
+    if $result.exit_code != 0 {
+      log error $"Error running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      exit 1
+    }
+    log info "Replaced the cover image in the ebook"
+  }
 
   let updated_optimized_file_hashes = (
     if ($skip_optimization) {
@@ -1909,39 +1886,6 @@ def main [
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
 
-  # todo How to handle nested series and subseries?
-  let series_subdirectory = (
-    # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
-    # Kavita dislikes multiple formats in the same directory.
-    # if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-    if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
-      # Kavita doesn't like multiple formats being in the same directory.
-      (
-        $comic_metadata.series
-        | use_unicode_in_title
-        | sanitize_file_name
-        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
-      )
-    # Kavita needs series to be in their own directories.
-    # So, if this is a oneshot, put it in its own directory.
-    } else {
-      (
-        $formats
-        | get $output_format
-        | path parse
-        | get stem
-        | use_unicode_in_title
-        | sanitize_file_name
-        | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
-      )
-    }
-  )
-  let target_directory = (
-    [$destination $form_subdirectory]
-    | append $series_subdirectory
-    | path join
-  )
-  log debug $"Target directory: ($target_directory)"
   let target_destination = (
     let components = ($formats | get $output_format | path parse);
     {

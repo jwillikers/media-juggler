@@ -10,6 +10,48 @@
     "language": "English"
   },
   "release_date": "2024-03-30",
+  "contributions": [
+    {
+      "author": {
+        "name": "Kei Azumi",
+        "canonical_id": null,
+        "id": 1221140
+      },
+      "contribution": null
+    },
+    {
+      "author": {
+        "name": "Mitsuaki Matsumoto",
+        "canonical_id": null,
+        "id": 1221151
+      },
+      "contribution": "Illustrator"
+    },
+    {
+      "author": {
+        "name": "Mitsuaki Matsumoto",
+        "canonical_id": null,
+        "id": 1221151
+      },
+      "contribution": "Cover Artist"
+    },
+    {
+      "author": {
+        "name": "Mittt Liu",
+        "canonical_id": null,
+        "id": 724696
+      },
+      "contribution": "Translator"
+    },
+    {
+      "author": {
+        "name": "Jasmine Thone",
+        "canonical_id": null,
+        "id": 1251809
+      },
+      "contribution": "Editor"
+    }
+  ],
   "image": {
     "id": 7294342,
     "height": 2061,
@@ -51,138 +93,58 @@
   },
   "book": {
     "book_characters": [],
-    "contributions": [
-      {
-        "author": {
-          "name": "Kei Azumi",
-          "canonical_id": null,
-          "id": 1221140
-        },
-        "contribution": null
-      },
-      {
-        "author": {
-          "name": "Mitsuaki Matsumoto",
-          "canonical_id": null,
-          "id": 1221151
-        },
-        "contribution": "Illustrator"
-      },
-      {
-        "author": {
-          "name": "Mitsuaki Matsumoto",
-          "canonical_id": null,
-          "id": 1221151
-        },
-        "contribution": "Cover Artist"
-      },
-      {
-        "author": {
-          "name": "Mittt Liu",
-          "canonical_id": null,
-          "id": 724696
-        },
-        "contribution": "Translator"
-      },
-      {
-        "author": {
-          "name": "Jasmine Thone",
-          "canonical_id": null,
-          "id": 1251809
-        },
-        "contribution": "Editor"
-      }
-    ],
     "description": "Makoto Misumi...",
     "literary_type_id": 1,
     "book_category_id": 10,
     "slug": "tsukimichi-moonlit-fantasy-light-novel-vol-1",
-    "taggings": [
-      {
-        "id": 2713497,
-        "tag": {
-          "id": 3451,
+    "cached_tags": {
+      "Tag": [],
+      "Mood": [],
+      "Genre": [
+        {
+          "tag": "Isekai",
+          "count": 2,
+          "tagSlug": "isekai-285101a4-3939-4b44-b5a5-89e1017a0731",
+          "category": "Genre",
+          "categorySlug": "genre",
+          "spoilerRatio": 0.0
+        },
+        {
+          "tag": "Fantasy",
+          "count": 2,
+          "tagSlug": "fantasy",
+          "category": "Genre",
+          "categorySlug": "genre",
+          "spoilerRatio": 0.0
+        },
+        {
           "tag": "Young Adult Fiction",
-          "tag_category": {
-            "id": 1
-          },
-          "tag_category_id": 1,
-          "slug": "young-adult-fiction"
-        }
-      },
-      {
-        "id": 2713498,
-        "tag": {
-          "id": 2,
-          "tag": "Fantasy",
-          "tag_category": {
-            "id": 1
-          },
-          "tag_category_id": 1,
-          "slug": "fantasy"
-        }
-      },
-      {
-        "id": 2713499,
-        "tag": {
-          "id": 20,
+          "count": 1,
+          "tagSlug": "young-adult-fiction",
+          "category": "Genre",
+          "categorySlug": "genre",
+          "spoilerRatio": 0.0
+        },
+        {
           "tag": "Comics",
-          "tag_category": {
-            "id": 1
-          },
-          "tag_category_id": 1,
-          "slug": "comics"
-        }
-      },
-      {
-        "id": 2713500,
-        "tag": {
-          "id": 4,
+          "count": 1,
+          "tagSlug": "comics",
+          "category": "Genre",
+          "categorySlug": "genre",
+          "spoilerRatio": 0.0
+        },
+        {
           "tag": "Adventure",
-          "tag_category": {
-            "id": 1
-          },
-          "tag_category_id": 1,
-          "slug": "adventure"
+          "count": 1,
+          "tagSlug": "adventure",
+          "category": "Genre",
+          "categorySlug": "genre",
+          "spoilerRatio": 0.0
         }
-      },
-      {
-        "id": 2723814,
-        "tag": {
-          "id": 2,
-          "tag": "Fantasy",
-          "tag_category": {
-            "id": 1
-          },
-          "tag_category_id": 1,
-          "slug": "fantasy"
-        }
-      },
-      {
-        "id": 2723815,
-        "tag": {
-          "id": 2196,
-          "tag": "Isekai",
-          "tag_category": {
-            "id": 1
-          },
-          "tag_category_id": 1,
-          "slug": "isekai-285101a4-3939-4b44-b5a5-89e1017a0731"
-        }
-      },
-      {
-        "id": 4330691,
-        "tag": {
-          "id": 2196,
-          "tag": "Isekai",
-          "tag_category": {
-            "id": 1
-          },
-          "tag_category_id": 1,
-          "slug": "isekai-285101a4-3939-4b44-b5a5-89e1017a0731"
-        }
-      }
-    ],
+      ],
+      "Content Warning": []
+    },
+    "release_year": 2013,
     "featured_book_series": {
       "id": 857644,
       "featured": true,
@@ -190,8 +152,13 @@
       "position": 1,
       "series_id": 202585,
       "series": {
+        "id": 202585,
         "canonical_id": null,
         "name": "Tsukimichi: Moonlit Fantasy (Light Novel)",
+        "author": {
+          "id": 1221140,
+          "name": "Kei Azumi"
+        },
         "books_count": 21,
         "book_series": [
           {

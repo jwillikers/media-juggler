@@ -5,7 +5,7 @@ use media-juggler-lib *
 
 # Import my EBooks to my collection.
 #
-# Input files can be in the ACSM, EPUB, and PDF formats.
+# Input files can be in the ACSM, LCPL, EPUB, and PDF formats.
 #
 # This script performs several steps to process the ebook file.
 #
@@ -26,15 +26,19 @@ use media-juggler-lib *
 def main [
   ...files: string # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. SSH style paths are supported.
   --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I also have a light-novels subdirectory dedicated to light novels.
+  --confirm-series-year # Confirm that the series year is correct in the case of multiple series subdirectories with different years.
   --isbn: string # ISBN of the book
   # --identifiers: string # asin:XXXX
   --keep # Keep the original file
   # --ereader: string # Create a copy of the comic book optimized for this specific e-reader, i.e. "Kobo Elipsa 2E"
   # --ereader-subdirectory: string = ".books" # The subdirectory on the e-reader in-which to copy
   --keep-tmp # Don't delete the temporary directory when there's an error
-  --keep-acsm # Keep the ACSM file after conversion. These stop working for me before long, so no point keeping them around.
   --no-copy-to-ereader # Don't copy the E-Reader specific format to a mounted e-reader
+  --replace-cover # Replace the cover image in an ebook with the image from Hardcover.
+  --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
+  --skip-epubcheck # Don't lint an EPUB with epubcheck
+  --skip-cover-quality-check # Don't lint an EPUB with epubcheck
   --title: string # The title of the book
   --use-rsync
   --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
@@ -100,6 +104,8 @@ def main [
   let cache_directory = [($nu.cache-dir | path dirname) "media-juggler" "import-ebooks"] | path join
   let optimized_files_cache_file = [$cache_directory optimized.json] | path join
   mkdir $cache_directory
+  let cover_art_directory = [$cache_directory "covers"] | path join
+  mkdir $cover_art_directory
 
   let config_file = [($nu.default-config-dir | path dirname) "media-juggler" "import-ebooks-config.json"] | path join
   let config: record = (
@@ -319,37 +325,40 @@ def main [
   let original_book_files = [($original_file | split_ssh_path | get path)] | append $original_cover | append $original_opf
   log debug $"The original files for the book are (ansi yellow)($original_book_files)(ansi reset)"
 
-  let input_format = (
-    if $original_input_format == "acsm" {
-      "epub"
+  let formats = (
+    if $original_input_format in ["acsm" "epub" "lcpl" "lcpdf"] {
+      log debug "Importing the ACSM, EPUB, LCPL, or LCPDF file"
+      let output_file = $file | acsm_lcp_to_ebook (pwd)
+      if ($output_file | path parse | get extension) == "epub" {
+        {epub: $output_file }
+      } else if ($output_file | path parse | get extension) == "pdf" {
+        {pdf: $output_file }
+      }
+    } else if $original_input_format == "pdf" {
+      { pdf: $file }
     } else {
-      $original_input_format
+      rm --force --recursive $temporary_directory
+      return {
+        file: $original_file
+        error: $"Unsupported input file type (ansi red_bold)($original_input_format)(ansi reset)"
+      }
     }
   )
 
   let output_format = (
-    if $input_format == "pdf" {
+    if ($formats | get --optional pdf | is-not-empty) {
       "pdf"
     } else {
       "epub"
     }
   )
 
-  let formats = (
-    if $input_format == "acsm" {
-      let epub = ($file | acsm_to_epub (pwd))
-      { book: $epub }
-    } else if $input_format == "epub" {
-      log debug "Importing the EPUB file"
-      { epub: ($file | acsm_to_epub (pwd)) }
-    } else if $input_format == "pdf" {
-      { book: $file }
-    } else {
-      rm --force --recursive $temporary_directory
-      return {
-        file: $original_file
-        error: $"Unsupported input file type (ansi red_bold)($input_format)(ansi reset)"
-      }
+  # The input format after initial conversion in Calibre.
+  let input_format = (
+    if ($formats | get --optional epub | is-not-empty) {
+      "epub"
+    } else if ($formats | get --optional pdf | is-not-empty) {
+      "pdf"
     }
   )
 
@@ -419,7 +428,7 @@ def main [
 
   # First, try to locate the release based on its hash if no Wikidata id is specified.
   let wikidata_edition_id = (
-    if $original_input_format != "acsm" and ($wikidata_edition_id | is-empty) {
+    if $original_input_format not-in ["acsm" "lcpl" "lcpdf"] and ($wikidata_edition_id | is-empty) {
       # BLAKE3 and SHA3-512 checksums are currently supported.
       ["blake3" "sha3-512"] | reduce --fold "" {|checksum_type acc|
         if ($acc | is-empty) {
@@ -1022,10 +1031,45 @@ def main [
   # Edition series preferred over Work Series
 
   let comic_metadata = (
-    $hardcover_edition_id
-    | fetch_and_parse_hardcover_edition id $cache_function
+    $hardcover_edition_id | fetch_and_parse_hardcover_edition id $cache_function
   )
   log debug $"The metadata from Hardcover is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
+
+  # Check for missing or invalid metadata from Hardcover
+  let validation_check = $comic_metadata | validate_book_metadata hardcover book
+  if not $validation_check.valid {
+    log error $"Invalid metadata from Hardcover"
+    log debug $"Deleting cached API response for edition"
+    rm ([$cache_directory "hardcover-edition" $"id-($hardcover_edition_id).json"] | path join)
+    $validation_check.errors | each {|error_message|
+      log error $error_message
+    }
+    if not $keep_tmp {
+      rm --force --recursive $temporary_directory
+    }
+    return {
+      file: $original_file
+      # todo Support multiple error messages.
+      error: ($validation_check.errors | str join "\n")
+    }
+  }
+  if $comic_metadata._cover_image.3 < 1000 or $comic_metadata._cover_image.4 < 1000 {
+    if not $skip_cover_quality_check {
+      if $replace_cover {
+        log error $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Aborting to avoid using a low quality cover in the ebook as the --replace-cover was passed. Upload a high quality cover for the edition, remove the cached response, and retry."
+        if not $keep_tmp {
+          rm --force --recursive $temporary_directory
+        }
+        return {
+          file: $original_file
+          error: $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Upload a high quality cover for the edition, remove the cached response, and retry."
+        }
+      } else {
+        log warning $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Upload a high quality cover for the edition, remove the cached response, and retry."
+        sleep 30sec
+      }
+    }
+  }
 
   # Get the genres from Wikidata
   let wikidata_metadata = (
@@ -1069,19 +1113,14 @@ def main [
     )
   )
 
-  if ($comic_metadata | get --optional forms_of_creative_work | is-empty) or ($comic_metadata.forms_of_creative_work | first) == "unknown" {
-    log error $"Book category is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the book category for the book, remove the cached response, and retry.."
-    exit 1
-  }
-  if ($comic_metadata | get --optional literary_type | is-empty) or ($comic_metadata.literary_type | first) == "unknown" {
-    log error $"Literary type is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type for the book, remove the cached response, and retry."
-    exit 1
-  }
-
   # Use genres from Wikidata.
-  let comic_metadata = $comic_metadata | merge {
-    genres: ($wikidata_metadata | get --optional genres)
-  } | merge (
+  let comic_metadata = $comic_metadata | merge (
+    if ($wikidata_metadata | get --optional genres | is-empty) {
+      {}
+    } else {
+      {genres: ($wikidata_metadata | get --optional genres)}
+    }
+  ) | merge (
     if ($comic_metadata | get --optional forms_of_creative_work | is-empty) {
       {
         forms_of_creative_work: ($wikidata_metadata | get --optional forms_of_creative_work)
@@ -1129,6 +1168,7 @@ def main [
   )
   log debug $"The merged metadata is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
 
+
   let form_subdirectory = (
     if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
       "light-novels"
@@ -1138,11 +1178,11 @@ def main [
     }
   )
 
-  # Embed the updated metadata in the ebook.
-  log info "Embedding the metadata in the ebook"
-  $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
-
-  # todo Embed cover in PDFs when the quality appears better?
+  # Get the original OPF file for debugging purposes.
+  # let opf_file = $formats | get $output_format | find_opf_in_epub
+  # let opf_file = $formats | get $output_format | extract_file_from_archive $opf_file $temporary_directory
+  # log debug $"epub_opf:\n\n($opf_file | open | from xml | to json)"
+  # exit 1
 
   log debug "Renaming the file according to its metadata"
   let formats = (
@@ -1194,6 +1234,126 @@ def main [
   }
   log debug $"The authors are (ansi purple)'($authors)'(ansi reset)"
 
+  # Kavita ignores the folder structure for book libraries.
+  # At least, I think it does...
+  # So as far as Kavita is concerned, everything can be in a flat folder structure.
+  # However, this isn't practical because books with the same name will conflict and be overwritten.
+  # Since Kavita does fallback to the filename for some information, including a bunch of disambiguation cruft is probably a bad idea.
+  # General books often don't belong to any series, so using a top-level series directory as is done for comics isn't going to cut it.
+  # Instead, we'll use author subdirectories and nest series within those directories along with any standalone books.
+  let series_subdirectory = (
+    if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
+      # Kavita doesn't like multiple formats being in the same directory.
+      (
+        $comic_metadata.series
+        | use_unicode_in_title
+        | sanitize_file_name
+        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
+      )
+    } else {
+      # Kavita can't have files outside of directories at the top-level.
+      # So, if this is a one-shot light novel, put it in its own directory.
+      if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
+        (
+          $formats
+          | get $output_format
+          | path parse
+          | get stem
+          | use_unicode_in_title
+          | sanitize_file_name
+          | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
+        )
+      }
+    }
+  )
+
+  let authors_subdirectory = (
+    if ($comic_metadata | get --optional primary_series_author | is-empty) {
+      $authors | str join ", "
+    } else {
+      $comic_metadata.primary_series_author
+    }
+  )
+  let target_subdirectory = (
+    if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
+      # Light novels are only rarely one-offs, so we organize them just like comics.
+      # That is, under a series subdirectory at the top-level.
+      $series_subdirectory
+    } else {
+      # Regular books are stored under Author and Author / Series
+      if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
+        [$authors_subdirectory $series_subdirectory] | path join
+      } else {
+        $authors_subdirectory
+      }
+    }
+  )
+  let target_directory = [$destination $form_subdirectory $target_subdirectory] | path join
+  log debug $"Target directory: ($target_directory)"
+
+  # Check that if there is an existing series directory with a different year.
+  # This is to catch variations in the year occurring for the same series.
+  if (
+    "light novel" in ($comic_metadata | get --optional forms_of_creative_work)
+    or (
+      ($comic_metadata | get --optional series | is-not-empty)
+      and ($comic_metadata | get --optional issue_count | is-not-empty)
+    )
+  ) {
+    let matching_series_subdirectories = (
+      if ($target_directory | is_ssh_path) {
+        let server = $target_directory | split_ssh_path | get server
+        (
+          (
+            $target_directory
+            | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') ' ('
+            | escape_special_glob_characters
+            | (
+              $in + '*' + ((') [' + $output_format + ']') | escape_special_glob_characters)
+            )
+            | str replace '[:]' ':'
+          )
+          | ssh glob "--no-symlink"
+          | each {|series_subdirectory|
+            $"($server):($series_subdirectory)"
+          }
+        )
+      } else {
+        glob (
+          (
+            $target_directory
+            | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') ' ('
+            | escape_special_glob_characters
+            | (
+              $in + '*' + ((') [' + $output_format + ']') | escape_special_glob_characters)
+            )
+          )
+        )
+      }
+    )
+    if (
+      (
+        ($matching_series_subdirectories | length) == 1
+        and ($matching_series_subdirectories | first) != $target_directory
+      )
+      or ($matching_series_subdirectories | length) > 1
+    ) {
+      if $confirm_series_year {
+        log warning $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+      } else {
+        log error $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+        if not $keep_tmp {
+          rm --force --recursive $temporary_directory
+        }
+        return {
+          file: $original_file
+          error: $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+        }
+      }
+    }
+  }
+
+  # We have to optimize the files before embedding the metadata since PDF optimization will remove the metadata.
   let optimized_file_hashes = (
     try {
       open $optimized_files_cache_file
@@ -1203,37 +1363,41 @@ def main [
   )
 
   let updated_optimized_file_hashes = (
-    $optimized_file_hashes | update sha256 (
-      $optimized_file_hashes.sha256 | append (
-        if $output_format == "epub" {
-          # todo I might need to fix this to work with larger files
-          let hash = $formats | get $output_format | open --raw | hash sha256
-          if $hash not-in $optimized_file_hashes.sha256 {
-            log debug "Optimizing the EPUB"
-            $formats | get $output_format | polish_epub | optimize_zip | open --raw | hash sha256
-          }
-        }
-      ) | append (
-        if $output_format == "pdf" {
-          let hash = $formats | get $output_format | open --raw | hash sha256
-          if $hash not-in $optimized_file_hashes.sha256 {
-            log debug "Optimizing the PDF"
-            let pdf_optimization_directory = [$temporary_directory "pdf_optimization"] | path join
-            let optimized_pdf = (
-              $formats | get $output_format
-              | optimize_pdf $pdf_optimization_directory
-            )
-            if ($optimized_pdf | is-not-empty) {
-              mv --force $optimized_pdf ($formats | get $output_format)
-              if not ($keep_tmp) {
-                rm --force --recursive $pdf_optimization_directory
-              }
-              open --raw ($formats | get $output_format) | hash sha256
+    if $skip_optimization {
+      $optimized_file_hashes
+    } else {
+      $optimized_file_hashes | update sha256 (
+        $optimized_file_hashes.sha256 | append (
+          if $output_format == "epub" {
+            # todo I might need to fix this to work with larger files
+            let hash = $formats | get $output_format | open --raw | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              log debug "Optimizing the EPUB"
+              $formats | get $output_format | polish_epub | optimize_zip | open --raw | hash sha256
             }
           }
-        }
-      ) | uniq | sort
-    )
+        ) | append (
+          if $output_format == "pdf" {
+            let hash = $formats | get $output_format | open --raw | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              log debug "Optimizing the PDF"
+              let pdf_optimization_directory = [$temporary_directory "pdf_optimization"] | path join
+              let optimized_pdf = (
+                $formats | get $output_format
+                | optimize_pdf $pdf_optimization_directory
+              )
+              if ($optimized_pdf | is-not-empty) {
+                mv --force $optimized_pdf ($formats | get $output_format)
+                if not ($keep_tmp) {
+                  rm --force --recursive $pdf_optimization_directory
+                }
+                open --raw ($formats | get $output_format) | hash sha256
+              }
+            }
+          }
+        ) | uniq | sort
+      )
+    }
   )
 
   if $updated_optimized_file_hashes != $optimized_file_hashes {
@@ -1241,52 +1405,65 @@ def main [
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
 
+  # Embed the updated metadata in the ebook.
+  log info "Embedding the metadata in the ebook"
+  $comic_metadata | embed_ebook_metadata ($formats | get $output_format) $temporary_directory
+
+  if $replace_cover {
+    let cover_image_url = $comic_metadata | get --optional _cover_image.2
+    if not ($cover_image_url) {
+      log error $"Unable to replace cover as there is no cover art set for the Hardcover edition ($hardcover_edition_id)."
+      exit 1
+    }
+    let cover_image = $cover_image_url | download_file $cover_art_directory
+    # todo Embed cover image in EPUB manually and only use ebook-meta for PDFs.
+    # todo Compare quality of existing cover and downloaded cover and warn or abort as necessary.
+    log info "Replacing cover image in the ebook"
+    log debug $"Running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'"
+    let result = do {^ebook-meta --cover $cover_image ($formats | get $output_format)} | complete
+    if $result.exit_code != 0 {
+      log error $"Error running '^ebook-meta --cover ($cover_image) ($formats | get $output_format)'\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
+      exit 1
+    }
+    log info "Replaced the cover image in the ebook"
+  }
+
+  # Update the optimized file hashes for the files with updated metadata.
+  let updated_optimized_file_hashes = (
+    if ($skip_optimization) {
+      $optimized_file_hashes
+    } else {
+      $optimized_file_hashes | update sha256 (
+        $optimized_file_hashes.sha256 | append (
+          if "epub" in $formats {
+            let hash = open --raw $formats.epub | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              $hash
+            }
+          }
+        ) | append (
+          if "pdf" in $formats {
+            # Just update the hash of the file with the updated metadata here.
+            let hash = open --raw $formats.pdf | hash sha256
+            if $hash not-in $optimized_file_hashes.sha256 {
+              $hash
+            }
+          }
+        ) | uniq | sort
+      )
+    }
+  )
+  if $updated_optimized_file_hashes != $optimized_file_hashes {
+    $updated_optimized_file_hashes | save --force $optimized_files_cache_file
+  }
+  let optimized_file_hashes = $updated_optimized_file_hashes
+
   # Verify the EPUB file with epubcheck
-  if $output_format == "epub" and not ($formats | get $output_format | epubcheck) {
+  if not $skip_epubcheck and $output_format == "epub" and not ($formats | get $output_format | epubcheck) {
     log error $"Error running epubcheck on the EPUB file (ansi yellow)($formats | get $output_format)(ansi reset)"
     exit 1
   }
 
-  # todo How to handle nested series and subseries?
-  let series_subdirectory = (
-    # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
-    # Kavita dislikes multiple formats in the same directory.
-    # if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-    if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
-      # Kavita doesn't like multiple formats being in the same directory.
-      (
-        $comic_metadata.series
-        | use_unicode_in_title
-        | sanitize_file_name
-        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
-      )
-    # Kavita needs series to be in their own directories.
-    # So, if this is a oneshot, put it in its own directory.
-    } else {
-      (
-        $formats
-        | get $output_format
-        | path parse
-        | get stem
-        | use_unicode_in_title
-        | sanitize_file_name
-        | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
-      )
-    }
-  )
-
-    let authors_subdirectory = $authors | str join ", "
-    let target_subdirectory = (
-      # If it is a oneshot, put it in its own subdirectory inside a directory for the author.
-      # todo Maybe I should just put these at the top-level as I do for comics?
-      if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
-        $series_subdirectory
-      } else {
-        [$authors_subdirectory $series_subdirectory] | path join
-      }
-    )
-    let target_directory = [$destination $form_subdirectory $target_subdirectory] | path join
-    log debug $"Target directory: ($target_directory)"
     let target_destination = (
       let components = $formats | get $output_format | path parse;
       {

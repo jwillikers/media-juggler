@@ -5183,7 +5183,7 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
     language: "english"
     forms_of_creative_work: ["light novel"]
     literary_type: "fiction"
-    genres: []
+    genres: ["adventure" "fantasy" "isekai"]
     tags: []
     publication_date: "2024-03-30"
     publishers: ["Hanashi Media"]
@@ -5192,17 +5192,21 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
       ["Kei Azumi", "1221140", Writer, false, ""]
       ["Mitsuaki Matsumoto", "1221151", Artist, false, ""]
       ["Mitsuaki Matsumoto", "1221151", "Cover Artist", false, ""]
+      ["Mitsuaki Matsumoto", "1221151", Cover, false, ""]
       ["Mittt Liu", "724696", Translator, false, ""]
       ["Jasmine Thone", "1251809", Editor, false, ""]
     ]
     series_id: 202585
+    primary_series_author: "Kei Azumi"
     _cover_image: [
       0
       ""
       "https://assets.hardcover.app/edition/32336811/0b805f28-8f88-411b-ae96-3ab83e5b9d69.jpg"
+      1400
+      2061
     ]
   }
-  log debug $"parsed hardcover edition: ($input | parse_hardcover_edition | to nuon)"
+  # log debug $"parsed hardcover edition: ($input | parse_hardcover_edition | to nuon)"
   assert equal ($input | parse_hardcover_edition) $expected
 }
 
