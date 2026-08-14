@@ -1173,6 +1173,19 @@ def main [
       error: $"There is no publisher set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the publisher for the edition, remove the cached response, and retry."
     }
   }
+  if (
+    ($comic_metadata | get --optional series | is-not-empty)
+    and ($comic_metadata | get --optional primary_series_author | is-empty)
+  ) {
+    log error $"There is no series author set for the featured series (ansi yellow)($comic_metadata.series)(ansi reset). Set the author of the series on Hardcover."
+    if not $keep_tmp {
+      rm --force --recursive $temporary_directory
+    }
+    return {
+      file: $original_file
+      error: $"There is no series author set for the featured series (ansi yellow)($comic_metadata.series)(ansi reset). Set the author of the series on Hardcover."
+    }
+  }
 
   # Get the genres from Wikidata
   let wikidata_metadata = (

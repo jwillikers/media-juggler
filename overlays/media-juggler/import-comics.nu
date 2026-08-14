@@ -1491,6 +1491,18 @@ def main [
         }
       )}
     ]
+    [
+      {||
+        (
+          $primary_metadata_source == "hardcover"
+          and ($comic_metadata | get --optional series | is-not-empty)
+          and ($comic_metadata | get --optional primary_series_author | is-empty)
+        )
+      }
+      {|| (
+        $"There is no series author set for the featured series (ansi yellow)($comic_metadata.series)(ansi reset). Set the author of the series on Hardcover."
+      )}
+    ]
   ]
   let error_message = (
     $checks | reduce --fold "" {|check acc|
