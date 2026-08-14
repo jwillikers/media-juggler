@@ -26,6 +26,7 @@ use media-juggler-lib *
 def main [
   ...files: string # The paths to ACSM, EPUB, and PDF files to convert, tag, and upload. SSH style paths are supported.
   --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I also have a light-novels subdirectory dedicated to light novels.
+  --confirm-series-year # Confirm that the series year is correct in the case of multiple series subdirectories with different years.
   --isbn: string # ISBN of the book
   # --identifiers: string # asin:XXXX
   --keep # Keep the original file
@@ -1233,6 +1234,113 @@ def main [
   }
   log debug $"The authors are (ansi purple)'($authors)'(ansi reset)"
 
+  # Kavita ignores the folder structure for book libraries.
+  # At least, I think it does...
+  # So as far as Kavita is concerned, everything can be in a flat folder structure.
+  # However, this isn't practical because books with the same name will conflict and be overwritten.
+  # Since Kavita does fallback to the filename for some information, including a bunch of disambiguation cruft is probably a bad idea.
+  # General books often don't belong to any series, so using a top-level series directory as is done for comics isn't going to cut it.
+  # Instead, we'll use author subdirectories and nest series within those directories along with any standalone books.
+  let series_subdirectory = (
+    if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
+      # Kavita doesn't like multiple formats being in the same directory.
+      (
+        $comic_metadata.series
+        | use_unicode_in_title
+        | sanitize_file_name
+        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
+      )
+    } else {
+      # Kavita can't have files outside of directories at the top-level.
+      # So, if this is a one-shot light novel, put it in its own directory.
+      if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
+        (
+          $formats
+          | get $output_format
+          | path parse
+          | get stem
+          | use_unicode_in_title
+          | sanitize_file_name
+          | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
+        )
+      }
+    }
+  )
+
+  let authors_subdirectory = (
+    if ($comic_metadata | get --optional primary_series_author | is-empty) {
+      $authors | str join ", "
+    } else {
+      $comic_metadata.primary_series_author
+    }
+  )
+  let target_subdirectory = (
+    if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
+      # Light novels are only rarely one-offs, so we organize them just like comics.
+      # That is, under a series subdirectory at the top-level.
+      $series_subdirectory
+    } else {
+      # Regular books are stored under Author and Author / Series
+      if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
+        [$authors_subdirectory $series_subdirectory] | path join
+      } else {
+        $authors_subdirectory
+      }
+    }
+  )
+  let target_directory = [$destination $form_subdirectory $target_subdirectory] | path join
+  log debug $"Target directory: ($target_directory)"
+
+  # Check that if there is an existing series directory with a different year.
+  # This is to catch variations in the year occurring for the same series.
+  if (
+    "light novel" in ($comic_metadata | get --optional forms_of_creative_work)
+    or (
+      ($comic_metadata | get --optional series | is-not-empty)
+      and ($comic_metadata | get --optional issue_count | is-not-empty)
+    )
+  ) {
+    let matching_series_subdirectories = (
+      if ($target_directory | is_ssh_path) {
+        let server = $target_directory | split_ssh_path | get server
+        (
+          (
+            $target_directory
+            | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') $" \(.*\) [($output_format)]"
+            | escape_special_glob_characters
+            | str replace '[:]' ':'
+          )
+          | ssh glob "--no-symlink"
+          | each {|series_subdirectory|
+            $"($server):($series_subdirectory)"
+          }
+        )
+      } else {
+        let covers = (
+          glob (
+            $target_directory
+            | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') $" \(.*\) [($output_format)]"
+            | escape_special_glob_characters
+          )
+        )
+      }
+    )
+    if ($matching_series_subdirectories | length) > 1 {
+      if $confirm_series_year {
+        log warning $"Found multiple series subdirectories: ($matching_series_subdirectories)"
+      } else {
+        log error $"Found multiple series subdirectories: ($matching_series_subdirectories)"
+        if not $keep_tmp {
+          rm --force --recursive $temporary_directory
+        }
+        return {
+          file: $original_file
+          error: $"Found multiple series subdirectories: ($matching_series_subdirectories)"
+        }
+      }
+    }
+  }
+
   # We have to optimize the files before embedding the metadata since PDF optimization will remove the metadata.
   let optimized_file_hashes = (
     try {
@@ -1344,61 +1452,6 @@ def main [
     exit 1
   }
 
-  # Kavita ignores the folder structure for book libraries?.
-  # So as far as Kavita is concerned, everything can be in a flat folder structure.
-  # However, this isn't practical because books with the same name will conflict and be overwritten.
-  # Since Kavita does fallback to the filename for some information, including a bunch of disambiguation cruft is probably a bad idea.
-  # General books often don't belong to any series, so using a top-level series directory as is done for comics isn't going to cut it.
-  # Instead, we'll use author subdirectories and nest series within those directories along with any standalone books.
-  let series_subdirectory = (
-    if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
-      # Kavita doesn't like multiple formats being in the same directory.
-      (
-        $comic_metadata.series
-        | use_unicode_in_title
-        | sanitize_file_name
-        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
-      )
-    } else {
-      # Kavita can't have files outside of directories at the top-level.
-      # So, if this is a one-shot light novel, put it in its own directory.
-      if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
-        (
-          $formats
-          | get $output_format
-          | path parse
-          | get stem
-          | use_unicode_in_title
-          | sanitize_file_name
-          | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
-        )
-      }
-    }
-  )
-
-    let authors_subdirectory = (
-      if ($comic_metadata | get --optional primary_series_author | is-empty) {
-        $authors | str join ", "
-      } else {
-        $comic_metadata.primary_series_author
-      }
-    )
-    let target_subdirectory = (
-      if ("light novel" in ($comic_metadata | get --optional forms_of_creative_work)) {
-        # Light novels are only rarely one-offs, so we organize them just like comics.
-        # That is, under a series subdirectory at the top-level.
-        $series_subdirectory
-      } else {
-        # Regular books are stored under Author and Author / Series
-        if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
-          [$authors_subdirectory $series_subdirectory] | path join
-        } else {
-          $authors_subdirectory
-        }
-      }
-    )
-    let target_directory = [$destination $form_subdirectory $target_subdirectory] | path join
-    log debug $"Target directory: ($target_directory)"
     let target_destination = (
       let components = $formats | get $output_format | path parse;
       {

@@ -28,6 +28,7 @@ use media-juggler-lib *
 def main [
   ...files: string # The paths to ACSM, LCPL, EPUB, and CBZ files to convert, tag, and upload. Supports SSH paths.
   --comic-vine-issue-id: string # The Comic Vine issue id. Useful when nothing else works, but not recommended as it doesn't seem to verify the cover image.
+  --confirm-series-year # Confirm that the series year is correct in the case of multiple series subdirectories with different years.
   --default-language: string = "american english"
   # --ignore-epub-title # Don't use the EPUB title for the Comic Vine lookup
   --ignore-mismatched-isbn-in-pages
@@ -44,7 +45,6 @@ def main [
   --skip-ocr # Don't attempt to parse the ISBN from images using OCR
   --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
   --skip-upload # Don't upload files to the server
-  --title: string # The title of the comic or manga issue
   --use-rsync # Use rsync instead of scp to retrieve and copy files from a remote machine.
   --bookbrainz-edition-id: string # The BookBrainz Edition ID (only embedded in the metadata right now)
   --hardcover-edition-id: string # The Hardcover Edition ID (only embedded in the metadata right now)
@@ -1604,7 +1604,83 @@ def main [
       $new_file_name
     )
   )
-  log debug "Renamed the file according to the metadata from Comic Vine"
+  log debug "Renamed the file according to the metadata"
+
+  # todo How to handle nested series and subseries?
+  let series_subdirectory = (
+    # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
+    # Kavita dislikes multiple formats in the same directory.
+    # if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
+    if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
+      # Kavita doesn't like multiple formats being in the same directory.
+      (
+        $comic_metadata.series
+        | use_unicode_in_title
+        | sanitize_file_name
+        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
+      )
+    # Kavita needs series to be in their own directories.
+    # So, if this is a oneshot, put it in its own directory.
+    } else {
+      (
+        $formats
+        | get $output_format
+        | path parse
+        | get stem
+        | use_unicode_in_title
+        | sanitize_file_name
+        | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
+      )
+    }
+  )
+  let target_directory = (
+    [$destination $form_subdirectory]
+    | append $series_subdirectory
+    | path join
+  )
+  log debug $"Target directory: ($target_directory)"
+
+  # Check that if there is an existing series directory with a different year.
+  # This is to catch variations in the year occurring for the same series.
+  let matching_series_subdirectories = (
+    if ($target_directory | is_ssh_path) {
+      let server = $target_directory | split_ssh_path | get server
+      (
+        (
+          $target_directory
+          | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') $" \(.*\) [($output_format)]"
+          | escape_special_glob_characters
+          | str replace '[:]' ':'
+        )
+        | ssh glob "--no-symlink"
+        | each {|series_subdirectory|
+          $"($server):($series_subdirectory)"
+        }
+      )
+    } else {
+      let covers = (
+        glob (
+          $target_directory
+          | str replace --regex (' \(-?[1-9]+[0-9]*\) \[' + $output_format + '\]$') $" \(.*\) [($output_format)]"
+          | escape_special_glob_characters
+        )
+      )
+    }
+  )
+  if ($matching_series_subdirectories | length) > 1 {
+    if $confirm_series_year {
+      log warning $"Found multiple series subdirectories: ($matching_series_subdirectories)"
+    } else {
+      log error $"Found multiple series subdirectories: ($matching_series_subdirectories)"
+      if not $keep_tmp {
+        rm --force --recursive $temporary_directory
+      }
+      return {
+        file: $original_file
+        error: $"Found multiple series subdirectories: ($matching_series_subdirectories)"
+      }
+    }
+  }
 
   # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
   let authors = (
@@ -1633,49 +1709,6 @@ def main [
   }
   log debug $"The authors are (ansi purple)'($authors)'(ansi reset)"
 
-  # We keep the name of the series in the title to keep things organized.
-  # Displaying only "Vol. 4" as the title can be confusing.
-  log debug "Including the series as part of the title and make it consistent"
-  let title = $comic_metadata | get --optional title
-  let title = (
-    if ($title | is-empty) {
-      if ($comic_metadata | get --optional series | is-not-empty) and ($comic_metadata | get --optional issue_count | is-not-empty) {
-        if ($comic_metadata.issue_count == 1) {
-          $comic_metadata.series | use_unicode_in_title
-        } else {
-          (($comic_metadata.series | use_unicode_in_title) + " - Volume " + $comic_metadata.issue) | standardize_title
-        }
-      } else {
-        # No title provided and can't determine the title!
-        if not $keep_tmp {
-          rm --force --recursive $temporary_directory
-        }
-        return {
-          file: $original_file
-          error: "No title provided and unable to determine appropriate title from the series metadata"
-        }
-      }
-    } else {
-      if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: " {
-        # Volume followed by subtitle
-        let subtitle = $comic_metadata.title | parse --regex "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) .+: (?<subtitle>.*)"
-        if ($subtitle | is-not-empty) {
-          # todo What if we get multiple regex matches?
-          $"($comic_metadata.series) - Volume ($comic_metadata.issue): ($subtitle.subtitle | first)" | standardize_title | use_unicode_in_title
-        } else {
-          $"($comic_metadata.series) - Volume ($comic_metadata.issue)" | standardize_title | use_unicode_in_title
-        }
-      } else if $comic_metadata.title =~ "(?:(?:Vol.)|(?:Volume)|(?:Book\)\) " {
-        # No subtitle
-        $"($comic_metadata.series) - Volume ($comic_metadata.issue)" | standardize_title | use_unicode_in_title
-      } else {
-        # Subtitle is the tile
-        $"($comic_metadata.series) - Volume ($comic_metadata.issue): ($comic_metadata.title)" | standardize_title | use_unicode_in_title
-      }
-    }
-  )
-  log info $"The title is now (ansi yellow)($title)(ansi reset)"
-
   # PDFs must be optimized before embedding metadata, as the embedded metadata will be scrubbed.
   let updated_optimized_file_hashes = (
     if ($skip_optimization) {
@@ -1702,7 +1735,7 @@ def main [
                 if ($residual_optimization_files | is-empty) {
                   rm --force --recursive $pdf_optimization_directory
                 } else {
-                  let saved_optimization_directory = mktemp --directory --tmpdir-path (pwd) (($title | use_unicode_in_title | sanitize_file_name) + "_pdf_optimization_files.XXXXXXXXXX")
+                  let saved_optimization_directory = mktemp --directory --tmpdir-path (pwd) (($comic_metadata.title | use_unicode_in_title | sanitize_file_name) + "_pdf_optimization_files.XXXXXXXXXX")
                   cp --recursive $pdf_optimization_directory $saved_optimization_directory
                   log info $"Saved failed PDF optimization attempts in (ansi yellow)($saved_optimization_directory)(ansi reset)"
                 }
@@ -1839,39 +1872,6 @@ def main [
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
 
-  # todo How to handle nested series and subseries?
-  let series_subdirectory = (
-    # We still use a series subdirectory even if the series is only one issue long, in order to support multiple formats.
-    # Kavita dislikes multiple formats in the same directory.
-    # if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) and $comic_metadata.issue_count > 1 {
-    if "series" in $comic_metadata and ($comic_metadata.series | is-not-empty) and "issue_count" in $comic_metadata and ($comic_metadata.issue_count | is-not-empty) {
-      # Kavita doesn't like multiple formats being in the same directory.
-      (
-        $comic_metadata.series
-        | use_unicode_in_title
-        | sanitize_file_name
-        | $in + $" \(($comic_metadata.volume)\) [($output_format)]"
-      )
-    # Kavita needs series to be in their own directories.
-    # So, if this is a oneshot, put it in its own directory.
-    } else {
-      (
-        $formats
-        | get $output_format
-        | path parse
-        | get stem
-        | use_unicode_in_title
-        | sanitize_file_name
-        | $in + $" \(($comic_metadata.publication_date | format date '%Y')\) [($output_format)]"
-      )
-    }
-  )
-  let target_directory = (
-    [$destination $form_subdirectory]
-    | append $series_subdirectory
-    | path join
-  )
-  log debug $"Target directory: ($target_directory)"
   let target_destination = (
     let components = ($formats | get $output_format | path parse);
     {
