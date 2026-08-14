@@ -3250,6 +3250,217 @@ export def fetch_and_parse_hardcover_edition [
   $edition_response | parse_hardcover_edition
 }
 
+# Check book metadata for errors
+export def validate_book_metadata [
+  metadata_source: string # Source of the metadata, either "hardcover", "comic vine"
+  type: string # Type of work of the associated metadata, either "comic" or "book"
+]: [
+  record -> record<valid: bool, errors: list>
+] {
+  let book_metadata = $in
+  if $metadata_source not-in ["comic vine" "hardcover"] {
+    error make {
+      msg: "validate_book_metadata: invalid metadata_source is not 'comic vine' or 'hardcover'"
+      labels: [
+        {text: "metadata_source" span: (metadata $metadata_source).span}
+      ]
+      help: "pass either 'comic vine' or 'hardcover' as the metadata_source argument to validate_book_metadata"
+    }
+  }
+  if $metadata_source not-in ["comic" "book"] {
+    error make {
+      msg: "validate_book_metadata: invalid type is not 'comic' or 'book'"
+      labels: [
+        {text: "type" span: (metadata $type).span}
+      ]
+      help: "pass either 'comic' or 'book' as the type argument to validate_book_metadata"
+    }
+  }
+  let edition_id = (
+    if $metadata_source == "comic vine" {
+      let comic_vine_issue_ids = $book_metadata.ids | where type == "comic_vine_issue_id"
+      if ($comic_vine_issue_ids | is-empty) {
+        error make {
+          msg: "validate_book_metadata: missing Comic Vine issue id when metadata source is Comic Vine"
+          labels: [
+            {text: "book_metadata.ids" span: (metadata $book_metadata.ids).span}
+          ]
+          help: "populate the book_metadata.ids table with the Comic Vine issue id"
+        }
+      } else if ($comic_vine_issue_ids | length) > 1 {
+        error make {
+          msg: "validate_book_metadata: multiple Comic Vine issue ids when metadata source is Comic Vine"
+          labels: [
+            {text: "book_metadata.ids" span: (metadata $book_metadata.ids).span}
+          ]
+          help: "remove the duplicate Comic Vine issue id from the book_metadata.ids table"
+        }
+      } else {
+        $comic_vine_issue_ids | first
+      }
+    } else if $metadata_source == "hardcover" {
+      let hardcover_edition_ids = $book_metadata.ids | where type == "hardcover_edition_id"
+      if ($hardcover_edition_ids | is-empty) {
+        error make {
+          msg: "validate_book_metadata: missing Hardcover edition id when metadata source is Hardcover"
+          labels: [
+            {text: "book_metadata.ids" span: (metadata $book_metadata.ids).span}
+          ]
+          help: "populate the book_metadata.ids table with the Hardcover edition id"
+        }
+      } else if ($hardcover_edition_ids | length) > 1 {
+        error make {
+          msg: "validate_book_metadata: multiple Hardcover edition ids when metadata source is Hardcover"
+          labels: [
+            {text: "book_metadata.ids" span: (metadata $book_metadata.ids).span}
+          ]
+          help: "remove the duplicate Hardcover edition id from the book_metadata.ids table"
+        }
+      } else {
+        $hardcover_edition_ids | first
+      }
+    }
+  )
+  let hardcover_book_slug = (
+    if $metadata_source == "hardcover" {
+      let hardcover_book_slugs = $book_metadata.ids | where type == "hardcover_book_slug"
+      if ($hardcover_book_slugs | is-empty) {
+        error make {
+          msg: "validate_book_metadata: missing Hardcover book slug when metadata source is Hardcover"
+          labels: [
+            {text: "book_metadata.ids" span: (metadata $book_metadata.ids).span}
+          ]
+          help: "populate the book_metadata.ids table with the Hardcover book slug"
+        }
+      } else if ($hardcover_book_slugs | length) > 1 {
+        error make {
+          msg: "validate_book_metadata: multiple Hardcover book slug when metadata source is Hardcover"
+          labels: [
+            {text: "book_metadata.ids" span: (metadata $book_metadata.ids).span}
+          ]
+          help: "remove the duplicate Hardcover book slug from the book_metadata.ids table"
+        }
+      } else {
+        $hardcover_book_slugs | first
+      }
+    }
+  )
+  let edition_id_link = (
+    if $metadata_source == "comic vine" {
+      ('https://comicvine.gamespot.com/issue/4000-' + $edition_id) | ansi link --text $edition_id
+    } else if $metadata_source == "hardcover" {
+      ('https://hardcover.app/editions/' + $edition_id) | ansi link --text $edition_id
+    }
+  )
+  let edition_type_string = (
+    if $metadata_source == "comic vine" {
+      "Comic Vine issue"
+    } else if $metadata_source == "hardcover" {
+      "Hardcover edition"
+    }
+  )
+  let checks = [
+    [condition message];
+    [
+      {|| $book_metadata | get --optional credits | is-empty}
+      {||
+        $"There are no contributors for the ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the contributors for the edition and retry."
+      }
+    ]
+    [
+      {|| ($book_metadata | get --optional credits | is-not-empty) and ($book_metadata.credits | all {|credit| $credit.role != "Writer"})}
+      {|| (
+        $"There are no authors set for the ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the authors for the edition and retry."
+      )}
+    ]
+    [
+      {|| $metadata_source == "hardcover" and ($book_metadata | get --optional forms_of_creative_work | is-empty) or ($book_metadata.forms_of_creative_work | first) == "unknown"}
+      {|| $"Book category is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the book category for the book and retry."}
+    ]
+    [
+      {|| $type == "comic" and $metadata_source == "hardcover" and ($book_metadata | get --optional forms_of_creative_work | is-not-empty) and ($book_metadata | get --optional forms_of_creative_work.0) not-in ["graphic novel" "manga volume" "manhwa volume"]}
+      {|| $"Book category is set not set to 'Graphic Novel' for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Correct the book category for the book or move the edition to the correct book and retry."}
+    ]
+    [
+      {|| $type == "comic" and $metadata_source == "hardcover" and ($book_metadata | get --optional credits | is-not-empty) and ($book_metadata | get --optional credits | is-not-empty) and ($book_metadata.credits | all {|credit| $credit.role != "Artist"})}
+      {|| $"There is no illustrator set for the graphic novel ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the illustrator for the edition and retry."}
+    ]
+    [
+      {|| $type == "book" and $metadata_source == "hardcover" and ($book_metadata | get --optional forms_of_creative_work | is-not-empty) and ($book_metadata.forms_of_creative_work | first) == "light novel" and ($book_metadata | get --optional credits | is-not-empty) and ($book_metadata.credits | all {|credit| $credit.role != "Artist"})}
+      {|| $"There is no illustrator set for the light novel ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the illustrator for the edition and retry."}
+    ]
+    [
+      {|| $type == "comic" and $metadata_source == "comic_vine" and ($book_metadata | get --optional credits | is-not-empty) and ($book_metadata.credits | all {|credit| $credit.role not-in ["Artist" "Colorist" "Inker" "Penciller"]})}
+      {|| $"There is no 'Artist', 'Colorist', 'Inker', or 'Penciller' set for the ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the illustrator for the edition and retry."}
+    ]
+    # todo Should Comic Vine issue metadata also be required to have a cover artist?
+    [
+      {|| $type == "comic" and $metadata_source == "hardcover" and ($book_metadata | get --optional credits | is-not-empty) and ($book_metadata.credits | all {|credit| $credit.role != "Cover Artist"})}
+      {|| $"There is no cover artist set for the graphic novel ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the cover artist for the edition and retry."}
+    ]
+    [
+      {|| $type == "book" and $metadata_source == "hardcover" and ($book_metadata | get --optional forms_of_creative_work | is-not-empty) and ($book_metadata.forms_of_creative_work | first) == "light novel" and ($book_metadata | get --optional credits | is-not-empty) and ($book_metadata.credits | all {|credit| $credit.role != "Cover Artist"})}
+      {|| $"There is no cover artist set for the light novel ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the illustrator for the edition and retry."}
+    ]
+    [
+      {|| $metadata_source == "hardcover" and ($book_metadata | get --optional literary_type | is-empty) or $book_metadata.literary_type == "unknown"}
+      {|| $"Literary type is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type for the book and retry."}
+    ]
+    [
+      {|| $type == "comic" and $metadata_source == "hardcover" and ($book_metadata | get --optional literary_type | is-not-empty) and $book_metadata.literary_type != "fiction"}
+      {|| $"Literary type is not set to 'fiction' for the graphic novel Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type to 'fiction' for the book and retry."}
+    ]
+    [
+      {|| $type == "book" and $metadata_source == "hardcover" and ($book_metadata | get --optional forms_of_creative_work | is-not-empty) and ($book_metadata.forms_of_creative_work | first) == "light novel" and ($book_metadata | get --optional literary_type | is-not-empty) and $book_metadata.literary_type != "fiction"}
+      {|| $"Literary type is not set to 'fiction' for the light novel Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type to 'fiction' for the book and retry."}
+    ]
+    [
+      {|| $metadata_source == "hardcover" and ($book_metadata | get --optional _cover_image.2 | is-empty)}
+      {|| $"There is no cover image set for the ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the cover for the edition and retry."}
+    ]
+    [
+      {|| $metadata_source == "hardcover" and ($book_metadata | get --optional publication_date | is-empty)}
+      {|| $"There is no release date set for the ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the release date for the edition and retry."}
+    ]
+    [
+      {|| $metadata_source == "hardcover" and ($book_metadata | get --optional language | is-empty)}
+      {|| $"There is no language set for the ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the language for the edition and retry."}
+    ]
+    [
+      {|| ($book_metadata | get --optional publishers | is-empty)}
+      {||
+        # I'm not sure if it is actually possible to not have a publisher set in Comic Vine.
+        $"There is no publisher set for the ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the publisher for the edition and retry."
+      }
+    ]
+    [
+      {||
+        (
+          $metadata_source == "hardcover"
+          and ($book_metadata | get --optional series | is-not-empty)
+          and ($book_metadata | get --optional primary_series_author | is-empty)
+        )
+      }
+      {||
+        $"There is no series author set for the featured series (ansi yellow)($book_metadata.series)(ansi reset). Set the author of the series on Hardcover."
+      }
+    ]
+  ]
+  let error_messages = (
+    $checks | reduce --fold [] {|check acc|
+      if (do $check.condition) {
+        $acc | append (do $check.message)
+      } else {
+        $acc
+      }
+    }
+  )
+  {
+    valid: ($error_messages | is-empty)
+    errors: $error_messages
+  }
+}
+
 # Hyphenate an ISBN with the isbn_mask program from isbntools
 export def hyphenate_isbn []: [string -> string] {
   let isbn = $in

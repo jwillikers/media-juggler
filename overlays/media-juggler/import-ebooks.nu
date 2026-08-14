@@ -1035,95 +1035,21 @@ def main [
   log debug $"The metadata from Hardcover is:\n(ansi green)($comic_metadata | to nuon)(ansi reset)\n"
 
   # Check for missing or invalid metadata from Hardcover
-  if ($comic_metadata | get --optional credits | is-empty) {
-    log error $"There are no contributors for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the contributors for the edition, remove the cached response, and retry."
+  let validation_check = $comic_metadata | validate_book_metadata hardcover book
+  if not $validation_check.valid {
+    log error $"Invalid metadata from Hardcover"
+    log debug $"Deleting cached API response for edition"
+    rm ([$cache_directory "hardcover-edition" $"id-($hardcover_edition_id).json"] | path join)
+    $validation_check.errors | each {|error_message|
+      log error $error_message
+    }
     if not $keep_tmp {
       rm --force --recursive $temporary_directory
     }
     return {
       file: $original_file
-      error: $"There are no contributors for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the contributors for the edition, remove the cached response, and retry."
-    }
-  }
-  if ($comic_metadata.credits | all {|credit| $credit.role != "Writer"}) {
-    log error $"There are no authors set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the authors for the edition, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"There are no authors set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the authors for the edition, remove the cached response, and retry."
-    }
-  }
-  if ($comic_metadata | get --optional forms_of_creative_work | is-empty) or ($comic_metadata.forms_of_creative_work | first) == "unknown" {
-    log error $"Book category is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the book category for the book, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"Book category is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the book category for the book, remove the cached response, and retry."
-    }
-  } else if ($comic_metadata.forms_of_creative_work | first) == "graphic novel" {
-    log error $"Book category is set to the invalid type 'Graphic Novel' for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Correct the book category for the book or move the edition to the correct book, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"Book category is set to 'Graphic Novel' for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Correct the book category for the book or move the edition to the correct book, remove the cached response, and retry."
-    }
-  }
-  if ($comic_metadata.forms_of_creative_work | first) == "light novel" and ($comic_metadata.credits | all {|credit| $credit.role != "Artist"}) {
-    # There should always be an illustrator set for light novels.
-    log error $"There is no illustrator set for the light novel Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the illustrator for the edition, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"There is no illustrator set for the light novel Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the illustrator for the edition, remove the cached response, and retry."
-    }
-  }
-  if ($comic_metadata.forms_of_creative_work | first) == "light novel" and ($comic_metadata.credits | all {|credit| $credit.role != "Cover Artist"}) {
-    # There should almost always be a Cover Artist set, too.
-    log error $"There is no cover artist set for the light novel Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the cover artist for the edition, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"There is no cover artist set for the light novel Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the cover artist for the edition, remove the cached response, and retry."
-    }
-  }
-  if ($comic_metadata | get --optional literary_type | is-empty) or $comic_metadata.literary_type == "unknown" {
-    log error $"Literary type is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type for the book, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"Literary type is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type for the book, remove the cached response, and retry."
-    }
-  }
-  if ($comic_metadata.forms_of_creative_work | first) == "light novel" and $comic_metadata.literary_type == "nonfiction" {
-    log error $"Literary type is not set to fiction for the light novel Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type to fiction for the book, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"Literary type is not set to fiction for the light novel Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type to fiction for the book, remove the cached response, and retry."
-    }
-  }
-  if ($comic_metadata | get --optional _cover_image.2 | is-empty) {
-    log error $"There is no cover image set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the cover for the edition, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"There is no cover image set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the cover for the edition, remove the cached response, and retry."
+      # todo Support multiple error messages.
+      error: ($validation_check.errors | str join "\n")
     }
   }
   if $comic_metadata._cover_image.3 < 1000 or $comic_metadata._cover_image.4 < 1000 {
@@ -1141,49 +1067,6 @@ def main [
         log warning $"The cover appears to be low quality for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Upload a high quality cover for the edition, remove the cached response, and retry."
         sleep 30sec
       }
-    }
-  }
-  if ($comic_metadata | get --optional publication_date | is-empty) {
-    log error $"There is no release date set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the release date for the edition, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"There is no release date set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the release date for the edition, remove the cached response, and retry."
-    }
-  }
-  if ($comic_metadata | get --optional language | is-empty) {
-    log error $"There is no language set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the language for the edition, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"There is no language set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the language for the edition, remove the cached response, and retry."
-    }
-  }
-  if ($comic_metadata | get --optional publishers | is-empty) {
-    log error $"There is no publisher set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the publisher for the edition, remove the cached response, and retry."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"There is no publisher set for the Hardcover edition (ansi yellow)(('https://hardcover.app/editions/' + $hardcover_edition_id) | ansi link --text $hardcover_edition_id)(ansi reset). Set the publisher for the edition, remove the cached response, and retry."
-    }
-  }
-  if (
-    ($comic_metadata | get --optional series | is-not-empty)
-    and ($comic_metadata | get --optional primary_series_author | is-empty)
-  ) {
-    log error $"There is no series author set for the featured series (ansi yellow)($comic_metadata.series)(ansi reset). Set the author of the series on Hardcover."
-    if not $keep_tmp {
-      rm --force --recursive $temporary_directory
-    }
-    return {
-      file: $original_file
-      error: $"There is no series author set for the featured series (ansi yellow)($comic_metadata.series)(ansi reset). Set the author of the series on Hardcover."
     }
   }
 
