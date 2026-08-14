@@ -4895,28 +4895,33 @@ export def from_opf_xml [
           )
         )
       }
-        # <dc:identifier id="pub-identifier">urn:isbn:9781506704197</dc:identifier>
-        # <meta property="identifier-type" refines="#pub-identifier" scheme="onix:codelist5">15</meta>
-        # log debug $"ids.content: ($ids.content | to json)"
+      # <dc:identifier id="pub-identifier">urn:isbn:9781506704197</dc:identifier>
+      # <meta property="identifier-type" refines="#pub-identifier" scheme="onix:codelist5">15</meta>
+      log debug $"ids.content: ($ids.content | to json)"
+      log debug $"isbns: ($isbns)"
       let isbns = (
-        $isbns
-        | get content
-        | first
-        | get content
-        | flatten
-        | uniq
-        | str replace --all "-" ""
-        | each {|isbn|
-          if ($isbn =~ '^urn:isbn:[0-9]{13}$') {
-            $isbn | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$' | get isbn | first
-          } else if (
-            ($isbn | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | str length) == 13
-            and ($isbn | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | validate_isbn)
-          ) {
-            $isbn | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" ""
-          } else {
-            $isbn
-          }
+        if ($isbns | is-not-empty) {
+          (
+            $isbns
+            | get content
+            | first
+            | get content
+            | flatten
+            | uniq
+            | str replace --all "-" ""
+            | each {|isbn|
+              if ($isbn =~ '^urn:isbn:[0-9]{13}$') {
+                $isbn | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$' | get isbn | first
+              } else if (
+                ($isbn | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | str length) == 13
+                and ($isbn | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" "" | validate_isbn)
+              ) {
+                $isbn | str replace "urn:isbn:" "" | str replace "isbn:" "" | str replace "ISBN:" "" | str replace --all "-" ""
+              } else {
+                $isbn
+              }
+            }
+          )
         }
       )
       # todo Make sure that isbns isn't empty?
