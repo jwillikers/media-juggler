@@ -4101,6 +4101,8 @@ export def from_pdf_metadata []: [
 #
 # Note that currently, namespace information is dropped by Nushell.
 # https://github.com/nushell/nushell/issues/11523
+#
+# todo Fallback to getting publisher from creator role.
 export def from_opf_xml [
   identifier_schemes: table = $opf_identifier_schemes
   roles_map: table = [
