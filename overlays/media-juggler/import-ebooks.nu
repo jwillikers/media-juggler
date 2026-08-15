@@ -1339,15 +1339,15 @@ def main [
       or ($matching_series_subdirectories | length) > 1
     ) {
       if $confirm_series_year {
-        log warning $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+        log warning $"There are or will be multiple series subdirectories: ($matching_series_subdirectories | append $target_directory)"
       } else {
-        log error $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+        log error $"There are or will be multiple series subdirectories: ($matching_series_subdirectories | append $target_directory)"
         if not $keep_tmp {
           rm --force --recursive $temporary_directory
         }
         return {
           file: $original_file
-          error: $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+          error: $"There are or will be multiple series subdirectories: ($matching_series_subdirectories | append $target_directory)"
         }
       }
     }
