@@ -1673,6 +1673,7 @@ def main [
       )
     }
   )
+  # log debug $"matching_series_subdirectories: ($matching_series_subdirectories | first)"
   if (
     (
       ($matching_series_subdirectories | length) == 1
@@ -1681,20 +1682,18 @@ def main [
     or ($matching_series_subdirectories | length) > 1
   ) {
     if $confirm_series_year {
-      log warning $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+      log warning $"There are or will be multiple series subdirectories: ($matching_series_subdirectories | append $target_directory)"
     } else {
-      log error $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+      log error $"There are or will be multiple series subdirectories: ($matching_series_subdirectories | append $target_directory)"
       if not $keep_tmp {
         rm --force --recursive $temporary_directory
       }
       return {
         file: $original_file
-        error: $"There are or will be multiple series subdirectories: ($matching_series_subdirectories)"
+        error: $"There are or will be multiple series subdirectories: ($matching_series_subdirectories | append $target_directory)"
       }
     }
   }
-  # todo rm
-  exit 1
 
   # Authors are considered to be creators with the role of "Writer" in the ComicVine metadata
   let authors = (
