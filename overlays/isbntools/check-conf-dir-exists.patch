@@ -1,0 +1,13 @@
+diff --git a/isbntools/_initapp.py b/isbntools/_initapp.py
+index 828d38e..42fb800 100644
+--- a/isbntools/_initapp.py
++++ b/isbntools/_initapp.py
+@@ -157,7 +157,7 @@ else:
+ 
+ # set logger
+ fmt = '%(asctime)s;%(levelname)s;%(message)s'
+-if CONF_PATH:
++if CONF_PATH and os.path.isdir(os.path.dirname(CONF_PATH)):
+     log_path = os.path.join(CONF_PATH, 'isbntools.log')
+     debug = config.options.get('DEBUG', 'False')
+     level = logging.DEBUG if debug == 'True' else logging.CRITICAL

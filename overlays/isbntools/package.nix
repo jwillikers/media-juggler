@@ -19,6 +19,10 @@ python3Packages.buildPythonApplication rec {
     hash = "sha256-s47y14YHL/ihAUCnneDcTlyVQj3rUgUnBLD2dPBGD/Y=";
   };
 
+  patches = [
+    ./check-conf-dir-exists.patch
+  ];
+
   # Support isbnlib2
   postPatch = ''
     substituteInPlace setup.py --replace-fail "isbnlib>=3.10.9,<3.11.0" "isbnlib>=3.11.0"

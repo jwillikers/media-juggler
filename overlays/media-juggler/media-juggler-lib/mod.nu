@@ -4908,7 +4908,14 @@ export def from_opf_xml [
             | get content
             | flatten
             | uniq
-            | str replace --all "-" ""
+            | (
+              let input = $in;
+              if ($input | is-empty) {
+
+              } else {
+                $input | str replace --all "-" ""
+              }
+            )
             | each {|isbn|
               if ($isbn =~ '^urn:isbn:[0-9]{13}$') {
                 $isbn | parse --regex '^urn:isbn:(?P<isbn>[0-9]{13})$' | get isbn | first
