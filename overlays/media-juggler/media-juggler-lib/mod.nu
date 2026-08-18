@@ -3308,14 +3308,14 @@ export def parse_comic_vine_issue_and_volume []: [
         # if ($issue.issue_id | str starts-with "4000-") {
         #   $issue.issue_id
         # } else {
-          "4000-" + $issue.issue_id
+          "4000-" + ($issue.id | into string)
         # }
       )]
       [comic_vine_volume_id (
         # if ($issue.volume.id | into string | str starts-with "4050-") {
         #   $issue.volume.id
         # } else {
-          "4050-" + $issue.volume.id
+          "4050-" + ($issue.volume.id | into string)
         # }
       )]
     ]
