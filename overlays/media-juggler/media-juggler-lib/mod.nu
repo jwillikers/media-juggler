@@ -10490,8 +10490,8 @@ export def parse_musicbrainz_release []: [
     | par-each {|media|
       $media.tracks | par-each {|track|
         let length = (
-          if "length" in $track.recording {
-            $track.recording.length | into duration --unit ms
+          if "length" in $track {
+            $track.length | into duration --unit ms
           }
         );
 
@@ -11692,15 +11692,14 @@ export def parse_chapters_from_musicbrainz_release []: record -> table<index: in
   let metadata = $in
   let chapters = (
     $metadata
-    | get media
-    | get tracks
+    | get media.tracks
     | flatten
     | enumerate
-    | each {|recording|
+    | each {|track|
       {
-          index: $recording.index
-          title: $recording.item.title
-          duration: ($recording.item.length | into duration --unit ms)
+        index: $track.index
+        title: $track.item.title
+        duration: ($track.item.length | into duration --unit ms)
       }
     }
   )
