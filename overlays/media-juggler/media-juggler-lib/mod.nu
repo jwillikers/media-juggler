@@ -116,6 +116,7 @@ export const genre_allowlist = [
   ["science fantasy" [] [Q930383 Q137198951]]
   ["science fiction" [sci-fi] [Q24925 Q5366020 Q103925653]]
   ["slice of life" [] [Q2561438 Q15428604]]
+  ["space opera" ["space drama"] [Q468478]]
   ["speculative fiction" [] [Q9326077]]
   ["sports" [spokon] [Q139794801 Q2281511]]
   ["steampunk" [] [Q223685 Q139558719]]
