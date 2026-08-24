@@ -95,6 +95,7 @@ export const genre_allowlist = [
   ["magical girl" [] [Q752321]]
   ["martial arts" [] [Q136806262]]
   [mecha [] [Q4292083]]
+  [metafiction ["meta fiction"] [Q531067]]
   [military [] [Q21803247 Q136913640]]
   ["military science fiction" [] [Q904447]]
   [mystery [] [Q6585139 Q15637305]]
