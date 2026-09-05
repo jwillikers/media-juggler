@@ -2965,7 +2965,7 @@ export def parse_hardcover_edition [
   let credits = (
     $hardcover_edition.contributions | reduce --fold [] {|contribution acc|
       let role = (
-        if ($contribution | get --optional contribution | is-empty) {
+        if ($contribution | get --optional contribution | is-empty) or ($contribution | get --optional contribution) == "Author" {
           "Writer"
         } else if $contribution.contribution == "Illustrator" {
           "Artist"
