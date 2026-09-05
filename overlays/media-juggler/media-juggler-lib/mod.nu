@@ -114,7 +114,7 @@ export const genre_allowlist = [
   # todo Should school and school life be separate genres?
   ["school" [] [Q5366097 Q104536849]]
   ["school life" [] [Q10670466]]
-  ["science fantasy" [] [Q930383 Q137198951]]
+  ["science fantasy" [] [Q930383 Q137198951 Q1080374]]
   ["science fiction" [sci-fi] [Q24925 Q5366020 Q103925653]]
   ["slice of life" [] [Q2561438 Q15428604]]
   ["space opera" ["space drama"] [Q468478]]
