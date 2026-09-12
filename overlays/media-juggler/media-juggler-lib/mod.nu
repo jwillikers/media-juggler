@@ -700,9 +700,9 @@ export def "rsync" [
   # ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
   # ^ssh $ssh_path.server nu --commands $"\'chmod 2770 \"($ssh_path.path)\"\'"
   if $source_path_type == "dir" {
-    ^rsync --recursive ...$args $source $destination
+    ^rsync --no-perms --no-owner --no-group --omit-dir-times --recursive ...$args $source $destination
   } else {
-    ^rsync ...$args $source $destination
+    ^rsync --no-perms --no-owner --no-group --omit-dir-times ...$args $source $destination
   }
   [$destination ($source | path basename)] | path join
 }
