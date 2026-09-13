@@ -98,6 +98,7 @@ export const genre_allowlist = [
   [metafiction ["meta fiction"] [Q531067]]
   [military [] [Q21803247 Q136913640]]
   ["military science fiction" [] [Q904447]]
+  ["musical drama" ["music drama"] [Q123777276 Q141446184 Q141446165]]
   [mystery [] [Q6585139 Q15637305]]
   [neo-noir [] [Q2421031]]
   [non-fiction [nonfiction] [Q213051]]
