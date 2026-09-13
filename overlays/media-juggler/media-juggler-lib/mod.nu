@@ -126,6 +126,7 @@ export const genre_allowlist = [
   ["superhero" [] [Q7643432 Q139794817]]
   ["sword and sorcery" ["sword & sorcery" "S&S" "heroic fantasy"] [Q1999690 Q139071253]]
   [thriller [suspense] [Q182015 Q101240755]]
+  ["urban fantasy" [] [Q1188977 Q141447645]]
   ["vampire" [] [Q111019576 Q111019582]]
   ["villainess" [] []]
   ["western" [] [Q367591 Q139270219]]
