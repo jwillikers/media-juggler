@@ -73,6 +73,7 @@ export const genre_allowlist = [
   ["coming-of-age" ["coming of age" "coming of age story"] [Q2975633 Q135684998]]
   ["contemporary fantasy" ["modern fantasy" "indigenous fantasy"] [Q1128592]]
   [cooking [] [Q139412567 Q139412557 Q11080558]]
+  ["danmei" [] [Q18461548]]
   ["dark fantasy" ["fantasy horror"] [Q794912 Q111254005]]
   ["drama" [] [Q21010853 Q15637299 Q104536999]]
   ["ecchi" [] [Q219559]]
