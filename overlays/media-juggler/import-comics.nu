@@ -39,8 +39,8 @@ def main [
   --keep-tmp # Don't delete the temporary directory when there's an error
   --manga: string = "YesAndRightToLeft" # Whether the file is manga "Yes", right-to-left manga "YesAndRightToLeft", or not manga "No". Refer to https://anansi-project.github.io/docs/comicinfo/documentation#manga
   --metron-issue-id: string # The issue id on Metron.
-  --form-subdirectory: directory # Directory below the destination in which to copy files. I have subdirectories for comics, manga, and manhwa. Wikidata is used to infer this where possible. Defaults to manga.
-  --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I have comics, manga, and manhwa subdirectories.
+  --form-subdirectory: directory # Directory below the destination in which to copy files. I have subdirectories for comics, manga, manhua, and manhwa. Wikidata is used to infer this where possible. Defaults to manga.
+  --destination: directory = "meerkat:/var/media" # The directory under which to copy files. I have comics, manga, manhua, and manhwa subdirectories.
   --replace-cover # Replace the cover image of a PDF.
   --skip-ocr # Don't attempt to parse the ISBN from images using OCR
   --skip-optimization # Don't attempt to perform expensive optimizations. This only skips PDF optimization at the moment, as it is the most expensive optimization.
@@ -1510,6 +1510,8 @@ def main [
       # todo manfra?
       if (["manga" "manga volume" "manga chapter" "yonkoma"] | any {|form| $form in ($comic_metadata | get --optional forms_of_creative_work)}) {
         "manga"
+      } else if (["manhua" "manhua volume" "manhua chapter"] | any {|form| $form in ($comic_metadata | get --optional forms_of_creative_work)}) {
+        "manhua"
       } else if (["manhwa" "manhwa volume" "manhwa chapter"] | any {|form| $form in ($comic_metadata | get --optional forms_of_creative_work)}) {
         "manhwa"
       # "graphic novel" is a bit ambiguous, but we try to determine whether it is manga or manhwa as best as possible.

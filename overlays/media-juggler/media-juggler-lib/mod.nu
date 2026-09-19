@@ -46,7 +46,8 @@ export const tag_allowlist = [
   [josei []]
   ["light novel" []]
   [manga []]
-  [manhwa [manhua]]
+  [manhua []]
+  [manhwa []]
   [novel []]
   [novelette []]
   [novella []]
@@ -155,6 +156,8 @@ export const form_of_creative_work_wikidata = [
   [manga Q8274]
   ["manga chapter" Q53460949]
   ["manga volume" Q125632018]
+  [manhua Q754669]
+  ["manhua volume" Q137923898]
   [manhwa Q562214]
   ["manhwa volume" Q137923899]
   [novel Q8261]
@@ -556,9 +559,9 @@ export def standardize_title []: string -> string {
   }
 }
 
-# Remove the light novel, manga, and manhwa disambiguation from the title and standardize the title
+# Remove the light novel, manga, manhua, and manhwa disambiguation from the title and standardize the title
 #
-# This removes the (Light Novel), (Manga), and (Manhwa) disambiguation comments since these are kept in separate libraries on Kavita.
+# This removes the (Light Novel), (Manga), (Manhua), and (Manhwa) disambiguation comments since these are kept in separate libraries on Kavita.
 # This basically ends up following the MusicBrainz style guidelines.
 #
 # todo Add test cases for this function.
@@ -569,6 +572,13 @@ export def standardize_hardcover_title []: string -> string {
   let components = (
     if ($components | length) == 1 {
       $title | split row --number 2 " (Manga), "
+    } else {
+      $components
+    }
+  )
+  let components = (
+    if ($components | length) == 1 {
+      $title | split row --number 2 " (Manhua), "
     } else {
       $components
     }
@@ -3150,6 +3160,20 @@ export def parse_hardcover_edition [
       if $manga {
         "manga volume"
       } else if (
+          "manhua" in $unfiltered_genres
+          or "manhua" in $tags
+          or " (Manhua), " in $hardcover_edition.title
+          or (
+            $hardcover_edition
+            | get --optional book.featured_book_series.series.name
+            | (
+              let input = $in;
+              ($input | is-not-empty) and ($input | str ends-with " (Manhua)")
+            )
+          )
+        ) {
+        "manhua volume"
+      } else if (
           "manhwa" in $unfiltered_genres
           or "manhwa" in $tags
           or " (Manhwa), " in $hardcover_edition.title
@@ -3184,6 +3208,7 @@ export def parse_hardcover_edition [
               $input
               | str replace " (Light Novel)" ""
               | str replace " (Manga)" ""
+              | str replace " (Manhua)" ""
               | str replace " (Manhwa)" ""
               | use_unicode_in_title
             )
@@ -3483,7 +3508,7 @@ export def validate_book_metadata [
       {|| $"Book category is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the book category for the book and retry."}
     ]
     [
-      {|| $type == "comic" and $metadata_source == "hardcover" and ($book_metadata | get --optional forms_of_creative_work | is-not-empty) and ($book_metadata | get --optional forms_of_creative_work.0) not-in ["graphic novel" "manga volume" "manhwa volume"]}
+      {|| $type == "comic" and $metadata_source == "hardcover" and ($book_metadata | get --optional forms_of_creative_work | is-not-empty) and ($book_metadata | get --optional forms_of_creative_work.0) not-in ["graphic novel" "manga volume" "manhua volume" "manhwa volume"]}
       {|| $"Book category is set not set to 'Graphic Novel' for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Correct the book category for the book or move the edition to the correct book and retry."}
     ]
     [
@@ -6866,7 +6891,7 @@ export def parse_wikidata_edition_and_works_metadata [
   let manga = (
     if ($forms_of_creative_work | any {|form| $form in ["manga" "manga volume" "manga chapter"]}) {
       "YesAndRightToLeft"
-    } else if  ($forms_of_creative_work | any {|form| $form in ["manhwa" "manhwa volume"]}) {
+    } else if  ($forms_of_creative_work | any {|form| $form in ["manhua" "manhua volume" "manhwa" "manhwa volume"]}) {
       # Not technically true, but this implies that the volume should be treated in the same manner as it is for manga in the ComicInfo.xml.
       "Yes"
     } else {
@@ -6909,6 +6934,8 @@ export def parse_wikidata_edition_and_works_metadata [
         # Don't include manga/manhwa volume/chapter tags for brevity.
         if "manga volume" in $forms_of_creative_work or "manga chapter" in $forms_of_creative_work {
           "manga"
+        } else if "manhua volume" in $forms_of_creative_work or "manhua chapter" in $forms_of_creative_work {
+          "manhua"
         } else if "manhwa volume" in $forms_of_creative_work or "manhwa chapter" in $forms_of_creative_work {
           "manhwa"
         } else {
