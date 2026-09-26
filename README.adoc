@@ -403,6 +403,44 @@ It provides the Wikidata edition ID for each comic.
 ls | get name | sort --natural | zip [Q139382000 Q139398001 Q139398002] | each {|| overlays/media-juggler/import-comics.nu --use-rsync $in.0 --wikidata-edition-id $in.1}
 ----
 
+Here's another example that uses ISBNs.
+
+[,nushell]
+----
+for i in (ls | get name | sort --natural | zip [
+  97xxxxxxxxxxx
+  97xxxxxxxxxxx
+]) {
+  use std log
+  log info $"Importing import '($i.0)' with ISBN '($i.1)'"
+  try {
+    let result = do {
+      (
+        ~/Projects/media-juggler/overlays/media-juggler/import-comics.nu
+        --ignore-mismatched-isbn-in-pages
+        --isbn $i.1
+        --use-rsync
+        $i.0
+      )
+    } | complete
+    let import_txt = try {
+      open import.txt
+    } catch {||
+      ""
+    }
+    let import_txt = $"($import_txt)\nImporting import '($i.0)' with ISBN '($i.1)'\nstdout:\n($result.stdout)\nstderr:($result.stderr)\n\n\n"
+    $import_txt | save --force import.txt
+    if ($result.exit_code != 0) {
+      log error $"Import failed with exit code '($result.exit_code)'"
+    } else {
+      log debug $"Import completed successfully"
+    }
+  } catch {||
+    log error $"Exception importing '($i.0)' with ISBN '($i.1)'"
+  }
+}
+----
+
 == Develop
 
 The `nix develop` command can be used to enter or run commands in an environment with all of the necessary dependencies.
