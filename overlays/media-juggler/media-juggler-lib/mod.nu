@@ -79,6 +79,7 @@ export const genre_allowlist = [
   ["detective" ["detective fiction"] [Q186424]]
   ["drama" [] [Q21010853 Q15637299 Q104536999]]
   ["ecchi" [] [Q219559]]
+  ["economic history" [] [Q47398]]
   ["epic" [] [Q121368788 Q136913634]]
   ["erotic" [erotica] [Q181001 Q110293051 Q14831027]]
   [fantasy [] [Q132311 Q15637301 Q104536908]]
