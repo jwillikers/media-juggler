@@ -725,7 +725,7 @@ export def "rsync" [
     }
   } | complete
   if $result.exit_code == 23 {
-    log error $"rsync exited with code (ansi purple)23(ansi reset) which usually indicates that some file attributes may not have been transferred. Assuming the file was transferred successfully.\nstdout: ($result.stdout)\nstderr: ($result.stderr)"
+    log warning $"rsync exited with code (ansi purple)23(ansi reset) which usually indicates that some file attributes may not have been transferred. Assuming the file was transferred successfully.\nstdout: ($result.stdout)\nstderr: ($result.stderr)"
   } else if $result.exit_code != 0 {
     log error $"rsync failed with exit code (ansi purple)($result.exit_code)(ansi reset).\nstdout: ($result.stdout)\nstderr: ($result.stderr)"
     return null
