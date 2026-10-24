@@ -55,6 +55,7 @@ def main [
   --wikidata-edition-id: string # The Wikidata edition ID (only embedded in the metadata right now)
   --imprints: list<string> # Set the publisher/imprint. This is embedded in the ComicInfo.xml file and used for the publisher in EPUB and PDF metadata.
   --publishers: list<string> # Set the publisher in the metadata. Note that the imprint is preferred over this for EPUB and PDF metadata.
+  --verbose = false # Log verbose output
 ] {
   if ($files | is-empty) {
     log error "No files provided"
@@ -1526,6 +1527,9 @@ def main [
     }
   )
 
+  let original_size = du ($formats | get $input_format) | get physical | first
+  let start = date now
+
   # If the input format is EPUB, optimize the images before generating the CBZ.
   # This avoids optimizing the same images twice.
   let optimized_file_hashes = (
@@ -1547,13 +1551,21 @@ def main [
             if $hash not-in $optimized_file_hashes.sha256 {
               log debug "Optimizing the EPUB"
               # | polish_epub
-              open --raw ($formats.epub | optimize_images_in_zip) | hash sha256
+              open --raw (
+                  $formats.epub
+                  | measure_optimization_performance {|the_file|
+                    $the_file | optimize_images_in_zip --log-optimization-performance $verbose
+                  }
+                  | log_optimization_performance --silence (not $verbose)
+                  | get_smallest_from_optimization_result
+              ) | hash sha256
             }
           }
         ) | uniq | sort
       )
     }
   )
+  let first_pass_optimization_duration = (date now) - $start
   if $updated_optimized_file_hashes != $optimized_file_hashes {
     $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
@@ -1809,6 +1821,7 @@ def main [
     log info "Replaced the cover image in the ebook"
   }
 
+  let start = date now
   let updated_optimized_file_hashes = (
     if ($skip_optimization) {
       $optimized_file_hashes
@@ -1867,13 +1880,27 @@ def main [
                 let hash = open --raw $formats.cbz | hash sha256
                 if $hash not-in $optimized_file_hashes.sha256 {
                   log debug "Optimizing the CBZ archive's ZIP compression"
-                  open --raw ($formats.cbz | optimize_zip_ect) | hash sha256
+                  open --raw (
+                    $formats.cbz
+                    | measure_optimization_performance {|the_file|
+                      $the_file | optimize_zip_ect
+                    }
+                    | log_optimization_performance --silence (not $verbose)
+                    | get_smallest_from_optimization_result
+                  ) | hash sha256
                 }
               } else {
                 let hash = open --raw $formats.cbz | hash sha256
                 if $hash not-in $optimized_file_hashes.sha256 {
                   log debug "Optimizing the CBZ"
-                  open --raw ($formats.cbz | optimize_zip) | hash sha256
+                  open --raw (
+                    $formats.cbz
+                    | measure_optimization_performance {|the_file|
+                      $the_file | optimize_zip --log-optimization-performance $verbose
+                    }
+                    | log_optimization_performance --silence (not $verbose)
+                    | get_smallest_from_optimization_result
+                  ) | hash sha256
                 }
               }
             # }
@@ -1882,10 +1909,21 @@ def main [
       )
     }
   )
+  let second_pass_optimization_duration = (date now) - $start
   if $updated_optimized_file_hashes != $optimized_file_hashes {
     $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
+
+  let current_size = du ($formats | get $output_format) | get physical | first
+  if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
+    let duration = $first_pass_optimization_duration + $second_pass_optimization_duration
+    log info $"Input file (ansi yellow)($formats | get $input_format)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset) in the output file (ansi yellow)($formats | get $output_format)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+  } else {
+    log debug $"No space saving achieved when converting and optimizing the input file (ansi yellow)($formats | get $input_format)(ansi reset) to the output file (ansi yellow)($formats | get $output_format)(ansi reset)."
+  }
 
   let target_destination = (
     let components = ($formats | get $output_format | path parse);
