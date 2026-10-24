@@ -1412,7 +1412,7 @@ export def optimize_images_ect []: list<path> -> record<bytes: filesize, differe
 # Not truly lossless.
 export def optimize_jpeg []: path -> path {
   let jpeg = $in
-  let original_size = ls $jpeg | get size | first
+  let original_size = du $jpeg | get physical | first
   let temporary_png = mktemp --suffix .png --tmpdir
   let result = do {^djpegli $jpeg $temporary_png} | complete
   if ($result.exit_code != 0) {
@@ -1426,7 +1426,7 @@ export def optimize_jpeg []: path -> path {
     log error $"Exit code ($result.exit_code) from command: (ansi yellow)^djpegli --quality 100 ($temporary_png) ($temporary_jpeg)(ansi reset)\n($result.stderr)\n"
     return $jpeg
   }
-  let current_size = ls $temporary_jpeg | get size | first
+  let current_size = du $temporary_jpeg | get physical | first
   if $current_size < $original_size {
     let average = (($original_size + $current_size) / 2)
     let percent_difference = ((($original_size - $current_size) / $average) * 100)
@@ -1525,10 +1525,12 @@ export def optimize_images []: list<path> -> list<path> {
   }
   # Optimize all JPEG files at once to take advantage of image_optim's parallelization.
   let jpeg_files = $image_files | where {|image| ($image | path parse | get extension | str downcase) in ["jpg" "jpeg"] }
+  let start = date now
   $jpeg_files | image_optim
   $image_files | where {|image| ($image | path parse | get extension | str downcase) not-in ["jpg" "jpeg"] } | each {|image|
     $image | optimize_image
   }
+  let duration = (date now) - $start
   let current_size = $image_files | reduce --fold 0b {|it acc|
     $acc + (du $it | get physical | first)
   }
@@ -1536,7 +1538,7 @@ export def optimize_images []: list<path> -> list<path> {
   if $current_size < $original_size {
     let average = (($original_size + $current_size) / 2)
     let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log debug $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    log debug $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
   } else {
     log debug $"No space saving achieved attempting to optimize the images"
   }
@@ -1554,6 +1556,7 @@ export def optimize_images_in_zip []: path -> path {
   log debug $"Extracting zip archive to (ansi yellow)($extraction_path)(ansi reset)"
   ^unzip -q $archive -d $extraction_path
   ^chmod --recursive +rw $extraction_path
+  let start = date now
   [$extraction_path] | optimize_images
   log debug "Image optimization complete"
   log debug $"Compressing directory (ansi yellow)($extraction_path)(ansi reset) as (ansi yellow)($archive)(ansi reset)"
@@ -1567,6 +1570,7 @@ export def optimize_images_in_zip []: path -> path {
   }
   log debug $"Running (ansi yellow)^zip --quiet --recurse-paths ($temporary_archive) .(ansi reset)"
   ^zip --quiet --recurse-paths $temporary_archive .
+  let duration = (date now) - $start
   cd -
   mv --force $temporary_archive $archive
   rm --force --recursive $temporary_directory
@@ -1575,7 +1579,7 @@ export def optimize_images_in_zip []: path -> path {
   if $current_size < $original_size {
     let average = (($original_size + $current_size) / 2)
     let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log debug $"ZIP archive with images (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    log debug $"ZIP archive with images (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
   } else {
     log debug $"No space saving achieved attempting to optimize the images in the ZIP archive (ansi yellow)($archive)(ansi reset)"
   }
@@ -1606,18 +1610,20 @@ export def optimize_zip_ect [
   ...args: string # Extra arguments to pass to advzip
 ]: path -> path {
   let archive = $in
-  let original_size = ls $archive | get size | first
+  let original_size = du $archive | get physical | first
   log debug $"Running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)"
+  let start = date now
   let result = do {^ect $"-($optimization_level)" -strip -zip --mt-deflate ...$args $archive} | complete
+  let duration = (date now) - $start
   if $result.exit_code != 0 {
     log error $"Error running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
   }
-  let current_size = ls $archive | get size | first
+  let current_size = du $archive | get physical | first
   if $current_size < $original_size {
     let average = (($original_size + $current_size) / 2)
     let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log info $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    log debug $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized with ect down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
   } else {
     log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
   }
@@ -1632,17 +1638,19 @@ export def optimize_zip [
 ]: path -> path {
   let $archive = $in
   log debug $"Optimizing ZIP archive (ansi yellow)($archive)(ansi reset)"
-  let original_size = ls $archive | get size | first
+  let original_size = du $archive | get physical | first
+  let start = date now
   let output = $archive | optimize_images_in_zip
   if ($output | is-empty) {
     return null
   }
   let archive = $output | optimize_zip_ect $optimization_level
-  let current_size = ls $archive | get size | first
+  let duration = (date now) - $start
+  let current_size = du $archive | get physical | first
   if $current_size < $original_size {
     let average = (($original_size + $current_size) / 2)
     let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log info $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    log info $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
   } else {
     log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
   }
@@ -1753,7 +1761,7 @@ export def optimize_pdf_pdfsizeopt [
   let tmp_dir = mktemp --directory --tmpdir-path $working_directory "pdfsizeopt_tmp_dir.XXXXXXXXXX"
 
   let input_pdf = $original_pdf
-  let input_size = ls $input_pdf | get size | first
+  let input_size = du $input_pdf | get physical | first
   let output_pdf = mktemp --suffix ".pso-streams.pdf" --tmpdir-path $working_directory
 
   # Optimize streams
@@ -1772,7 +1780,7 @@ export def optimize_pdf_pdfsizeopt [
   }
   let input_pdf = (
     if ($original_pdf | compare_pdf $output_pdf) {
-      let current_size = ls $output_pdf | get size | first
+      let current_size = du $output_pdf | get physical | first
       let average = (($input_size + $current_size) / 2)
       let percent_difference = ((($input_size - $current_size) / $average) * 100)
       if $current_size < $input_size {
@@ -1796,7 +1804,7 @@ export def optimize_pdf_pdfsizeopt [
       $input_pdf
     }
   )
-  let input_size = ls $input_pdf | get size | first
+  let input_size = du $input_pdf | get physical | first
 
   # Optimize fonts
   let output_pdf = mktemp --suffix ".pso-fonts.pdf" --tmpdir-path $working_directory
@@ -1815,7 +1823,7 @@ export def optimize_pdf_pdfsizeopt [
   }
   let input_pdf = (
     if ($original_pdf | compare_pdf $output_pdf) {
-      let current_size = ls $output_pdf | get size | first
+      let current_size = du $output_pdf | get physical | first
       let average = (($input_size + $current_size) / 2)
       let percent_difference = ((($input_size - $current_size) / $average) * 100)
       if $current_size < $input_size {
@@ -1855,7 +1863,7 @@ export def optimize_pdf_pdfsizeopt [
         return null
       }
       if ($original_pdf | compare_pdf $output_pdf) {
-        let current_size = ls $output_pdf | get size | first
+        let current_size = du $output_pdf | get physical | first
         let average = (($input_size + $current_size) / 2)
         let percent_difference = ((($input_size - $current_size) / $average) * 100)
         if $current_size < $input_size {
@@ -1883,7 +1891,7 @@ export def optimize_pdf_pdfsizeopt [
       }
     }
   )
-  let input_size = ls $input_pdf | get size | first
+  let input_size = du $input_pdf | get physical | first
 
   # Optimize images
   let output_pdf = mktemp --suffix ".pso-images.pdf" --tmpdir-path $working_directory
@@ -1902,7 +1910,7 @@ export def optimize_pdf_pdfsizeopt [
   }
   let input_pdf = (
     if ($original_pdf | compare_pdf $output_pdf) {
-      let current_size = ls $output_pdf | get size | first
+      let current_size = du $output_pdf | get physical | first
       let average = (($input_size + $current_size) / 2)
       let percent_difference = ((($input_size - $current_size) / $average) * 100)
       if $current_size < $input_size {
@@ -1930,7 +1938,7 @@ export def optimize_pdf_pdfsizeopt [
       $input_pdf
     }
   )
-  let input_size = ls $input_pdf | get size | first
+  let input_size = du $input_pdf | get physical | first
 
   # Linearize with QPDF
   let output_pdf = (
@@ -1949,7 +1957,7 @@ export def optimize_pdf_pdfsizeopt [
         cd -
         return null
       }
-      let current_size = ls $output_pdf | get size | first
+      let current_size = du $output_pdf | get physical | first
       let average = (($input_size + $current_size) / 2)
       let percent_difference = ((($input_size - $current_size) / $average) * 100)
       # It's okay if the linearized PDF is larger.
@@ -1982,13 +1990,13 @@ export def optimize_pdf [
 ]: path -> path {
   let $original_pdf = $in
   let $input_pdf = $original_pdf
-  let original_size = ls $original_pdf | get size | first
+  let original_size = du $original_pdf | get physical | first
 
   mkdir $working_directory
   let working_directory = $working_directory | path expand
   cd $working_directory
 
-  let input_size = ls $input_pdf | get size | first
+  let input_size = du $input_pdf | get physical | first
   let output_pdf = mktemp --suffix ".minuimus.pdf" --tmpdir-path $working_directory
 
   # First, we run minuimus.
@@ -2012,7 +2020,7 @@ export def optimize_pdf [
   log debug $"minuimus.pl stderr: ($result.stderr)"
   log debug $"minuimus.pl stdout: ($result.stdout)"
 
-  let current_size = ls $output_pdf | get size | first
+  let current_size = du $output_pdf | get physical | first
   let average = (($input_size + $current_size) / 2)
   let percent_difference = ((($input_size - $current_size) / $average) * 100)
   if $current_size < $input_size {
@@ -2028,7 +2036,7 @@ export def optimize_pdf [
 
   # QPDF_ZOPFLI=force ^qpdf input.pdf --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flat --linearize output.pdf
   let input_pdf = $output_pdf
-  let input_size = ls $input_pdf | get size | first
+  let input_size = du $input_pdf | get physical | first
   let output_pdf = mktemp --suffix ".qpdf-zopfli.pdf" --tmpdir-path $working_directory
   log info $"Running the command '^systemd-inhibit --what=sleep:shutdown --who='Media Juggler' qpdf ($input_pdf) --compress-streams=y --compression-level=9 --stream-data=compress --decode-level=generalized --object-streams=generate --recompress-flate --linearize ($output_pdf)'"
   let start = date now
@@ -2046,7 +2054,7 @@ export def optimize_pdf [
   }
   let input_pdf = (
     if ($original_pdf | compare_pdf $output_pdf) {
-      let current_size = ls $output_pdf | get size | first
+      let current_size = du $output_pdf | get physical | first
       let average = (($input_size + $current_size) / 2)
       let percent_difference = ((($input_size - $current_size) / $average) * 100)
       if $current_size < $input_size {
@@ -2074,7 +2082,7 @@ export def optimize_pdf [
       $input_pdf
     }
   )
-  let input_size = ls $input_pdf | get size | first
+  let input_size = du $input_pdf | get physical | first
 
   let start = date now
   let output_pdf = $input_pdf | optimize_pdf_pdfsizeopt $working_directory
@@ -2085,7 +2093,7 @@ export def optimize_pdf [
       log error "Failed to optimize the PDF with pdfsizeopt"
       $input_pdf
     } else {
-      let current_size = ls $output_pdf | get size | first
+      let current_size = du $output_pdf | get physical | first
       let average = (($input_size + $current_size) / 2)
       let percent_difference = ((($input_size - $current_size) / $average) * 100)
       if $current_size < $input_size {
@@ -2098,7 +2106,7 @@ export def optimize_pdf [
     }
   )
 
-  let final_size = ls $output_pdf | get size | first
+  let final_size = du $output_pdf | get physical | first
   let average = (($original_size + $final_size) / 2)
   let percent_difference = ((($original_size - $final_size) / $average) * 100)
   if $final_size < $original_size {
