@@ -2236,6 +2236,7 @@ export def same_image [
 
   # ImagickMagick is normalizing the PHASH, causing images to appear the similar when they are actually quite different.
   # https://github.com/ImageMagick/ImageMagick/issues/8759
+  # Note: The phash difference increased dramatically and may no longer have this issue.
   # todo Switch to perceptualdiff CLI?
   # todo Or if they are the same dimensions use NCC?
   # When things were working, 1.0 worked well here.
