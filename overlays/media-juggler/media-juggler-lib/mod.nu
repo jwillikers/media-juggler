@@ -1455,7 +1455,7 @@ export def image_optim [
   --threads: int = 0
 ]: list<path> -> list<path> {
   let paths = $in
-  log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" ($paths | str join ' ')(ansi reset)"
+  log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" ($paths | first)...(ansi reset)"
   let result = do {
     if $threads > 0 {
       ^image_optim --config-paths "" --threads $threads ...$paths
@@ -1513,7 +1513,9 @@ export def optimize_image [
 }
 
 # Losslessly optimize images
-export def optimize_images []: list<path> -> list<path> {
+export def optimize_images [
+  --log-optimization-performance = false
+]: list<path> -> list<path> {
   let paths = $in
 
   let image_files = $paths | each {|path|
@@ -1539,33 +1541,35 @@ export def optimize_images []: list<path> -> list<path> {
     $image | optimize_image
   }
   let duration = (date now) - $start
-  let current_size = $image_files | reduce --fold 0b {|it acc|
-    $acc + (du $it | get physical | first)
-  }
 
-  if $current_size < $original_size {
-    let average = (($original_size + $current_size) / 2)
-    let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log debug $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
-  } else {
-    log debug $"No space saving achieved attempting to optimize the images"
+  if $log_optimization_performance {
+    let current_size = $image_files | reduce --fold 0b {|it acc|
+      $acc + (du $it | get physical | first)
+    }
+    if $current_size < $original_size {
+      let average = (($original_size + $current_size) / 2)
+      let percent_difference = ((($original_size - $current_size) / $average) * 100)
+      log debug $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+    } else {
+      log debug $"No space saving achieved attempting to optimize the images"
+    }
   }
 
   $image_files
 }
 
 # Losslessly optimize the images in a ZIP archive such as an EPUB or CBZ
-export def optimize_images_in_zip []: path -> path {
+export def optimize_images_in_zip [
+  --log-optimization-performance = false
+]: path -> path {
   let archive = ($in | path expand)
-  let original_size = du $archive | get physical | first
   log debug $"Optimizing images in (ansi yellow)($archive)(ansi reset)"
   let temporary_directory = (mktemp --directory)
   let extraction_path = ($temporary_directory | path join "extracted")
   log debug $"Extracting zip archive to (ansi yellow)($extraction_path)(ansi reset)"
   ^unzip -q $archive -d $extraction_path
   ^chmod --recursive +rw $extraction_path
-  let start = date now
-  [$extraction_path] | optimize_images
+  [$extraction_path] | optimize_images --log-optimization-performance $log_optimization_performance
   log debug "Image optimization complete"
   log debug $"Compressing directory (ansi yellow)($extraction_path)(ansi reset) as (ansi yellow)($archive)(ansi reset)"
   let temporary_archive = $archive | path parse | update parent $temporary_directory | path join
@@ -1578,19 +1582,10 @@ export def optimize_images_in_zip []: path -> path {
   }
   log debug $"Running (ansi yellow)^zip --quiet --recurse-paths ($temporary_archive) .(ansi reset)"
   ^zip --quiet --recurse-paths $temporary_archive .
-  let duration = (date now) - $start
   cd -
   mv --force $temporary_archive $archive
   rm --force --recursive $temporary_directory
   log debug $"Finished compressing (ansi yellow)($archive)(ansi reset)"
-  let current_size = du $archive | get physical | first
-  if $current_size < $original_size {
-    let average = (($original_size + $current_size) / 2)
-    let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log debug $"ZIP archive with images (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
-  } else {
-    log debug $"No space saving achieved attempting to optimize the images in the ZIP archive (ansi yellow)($archive)(ansi reset)"
-  }
   $archive
 }
 
@@ -1611,29 +1606,98 @@ export def advzip_recompress [
   $archive
 }
 
+export def measure_optimization_performance [
+  optimization_function: closure # Takes a path and returns a path
+  # todo I feel like passing args to a closure like this won't work
+  # ...args: string # Extra arguments to pass to optimization_function
+]: [
+  path
+  ->
+  record<original_file: path, optimized_file: path, original_size: filesize, optimized_size: filesize, percent_difference: float, duration: duration>
+] {
+  let original_file = $in
+  let original_size = du $original_file | get physical | first
+  let start = date now
+  # let optimized = do $optimization_function $input ...$args
+  let optimized_file = do $optimization_function $original_file
+  if ($optimized_file | is-empty) {
+    log error $"Optimization function ($optimization_function) errored attempting to optimize the file (ansi yellow)($original_file)(ansi reset)"
+    {
+      original_file: $original_file
+      optimized_file: ""
+      original_size: -1MiB
+      optimized_size: -1MiB
+      percent_difference: 0.0
+      duration: 0sec
+    }
+  }
+  let duration = (date now) - $start
+  let current_size = du $optimized_file | get physical | first
+  let average = (($original_size + $current_size) / 2)
+  let percent_difference = ((($original_size - $current_size) / $average) * 100)
+  {
+    original_file: $original_file
+    optimized_file: $optimized_file
+    original_size: $original_size
+    optimized_size: $current_size
+    percent_difference: $percent_difference
+    duration: $duration
+  }
+}
+
+# Prints out optimization performance of for the given file with the given optimization function.
+export def log_optimization_performance [
+  --silence = false # Skip logging output
+]: [
+  record<original_file: path, optimized_file: path, original_size: filesize, optimized_size: filesize, percent_difference: float, duration: duration>
+  ->
+  record<original_file: path, optimized_file: path, original_size: filesize, optimized_size: filesize, percent_difference: float, duration: duration>
+] {
+  let input = $in
+  if not $silence {
+    if ($input.optimized_file | is-empty) {
+      log error $"Optimization function errored attempting to optimize the file (ansi yellow)($input.original_file)(ansi reset)"
+      return $input
+    }
+    if $input.optimized_size < $input.original_size {
+      log debug $"Optimized down from a size of (ansi purple)($input.original_size)(ansi reset) to (ansi purple)($input.optimized_size)(ansi reset), a (ansi green)($input.percent_difference)%(ansi reset) decrease in size in (ansi green)($input.duration)(ansi reset)."
+    } else {
+      log debug $"No space saving achieved attempting to optimize the file"
+    }
+  }
+  $input
+}
+
+export def get_smallest_from_optimization_result []: [
+  record<original_file: path, optimized_file: path, original_size: filesize, optimized_size: filesize, percent_difference: float, duration: duration>
+  ->
+  path
+] {
+  let input = $in
+  if ($input.optimized_file | is-empty) {
+    log error $"Optimization function errored attempting to optimize the file (ansi yellow)($input.original_file)(ansi reset)"
+    return null
+  }
+  if $input.optimized_size < $input.original_size {
+    $input.optimized_file
+  } else {
+    $input.original_file
+  }
+}
+
 # Optimize a ZIP archive using efficient-compression-tool
 # todo Use a temporary file to avoid corruption
+# todo I should just create a function that logs optimization performance given a closure.
 export def optimize_zip_ect [
   optimization_level: int = 9 # The degree to which to optimize the zip archive from 1 to 9, with 9 being the best compression possible
   ...args: string # Extra arguments to pass to advzip
 ]: path -> path {
   let archive = $in
-  let original_size = du $archive | get physical | first
   log debug $"Running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)"
-  let start = date now
   let result = do {^ect $"-($optimization_level)" -strip -zip --mt-deflate ...$args $archive} | complete
-  let duration = (date now) - $start
   if $result.exit_code != 0 {
     log error $"Error running (ansi yellow)^ect -($optimization_level) -strip -zip --mt-deflate ($args | str join ' ') ($archive)(ansi reset)\nstderr: ($result.stderr)\nstdout: ($result.stdout)"
     return null
-  }
-  let current_size = du $archive | get physical | first
-  if $current_size < $original_size {
-    let average = (($original_size + $current_size) / 2)
-    let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log debug $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized with ect down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
-  } else {
-    log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
   }
   $archive
 }
@@ -1643,26 +1707,14 @@ export def optimize_zip_ect [
 # Uses image_optim to optimize image files.
 export def optimize_zip [
   optimization_level: int = 9 # The degree to which to optimize the zip archive from 1 to 9, with 9 being the best compression possible
+  --log-optimization-performance = false
 ]: path -> path {
   let $archive = $in
-  log debug $"Optimizing ZIP archive (ansi yellow)($archive)(ansi reset)"
-  let original_size = du $archive | get physical | first
-  let start = date now
-  let output = $archive | optimize_images_in_zip
+  let output = $archive | optimize_images_in_zip --log-optimization-performance $log_optimization_performance
   if ($output | is-empty) {
     return null
   }
   let archive = $output | optimize_zip_ect $optimization_level
-  let duration = (date now) - $start
-  let current_size = du $archive | get physical | first
-  if $current_size < $original_size {
-    let average = (($original_size + $current_size) / 2)
-    let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log debug $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
-  } else {
-    log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
-  }
-  log debug $"Finished Optimizing ZIP archive (ansi yellow)($archive)(ansi reset)"
   $archive
 }
 

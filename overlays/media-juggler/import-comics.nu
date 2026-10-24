@@ -55,6 +55,7 @@ def main [
   --wikidata-edition-id: string # The Wikidata edition ID (only embedded in the metadata right now)
   --imprints: list<string> # Set the publisher/imprint. This is embedded in the ComicInfo.xml file and used for the publisher in EPUB and PDF metadata.
   --publishers: list<string> # Set the publisher in the metadata. Note that the imprint is preferred over this for EPUB and PDF metadata.
+  --verbose = false # Log verbose output
 ] {
   if ($files | is-empty) {
     log error "No files provided"
@@ -1550,7 +1551,14 @@ def main [
             if $hash not-in $optimized_file_hashes.sha256 {
               log debug "Optimizing the EPUB"
               # | polish_epub
-              open --raw ($formats.epub | optimize_images_in_zip) | hash sha256
+              open --raw (
+                  $formats.epub
+                  | measure_optimization_performance {|the_file|
+                    $the_file | optimize_images_in_zip --log-optimization-performance $verbose
+                  }
+                  | log_optimization_performance --silence (not $verbose)
+                  | get_smallest_from_optimization_result
+              ) | hash sha256
             }
           }
         ) | uniq | sort
@@ -1872,13 +1880,27 @@ def main [
                 let hash = open --raw $formats.cbz | hash sha256
                 if $hash not-in $optimized_file_hashes.sha256 {
                   log debug "Optimizing the CBZ archive's ZIP compression"
-                  open --raw ($formats.cbz | optimize_zip_ect) | hash sha256
+                  open --raw (
+                    $formats.cbz
+                    | measure_optimization_performance {|the_file|
+                      $the_file | optimize_zip_ect
+                    }
+                    | log_optimization_performance --silence (not $verbose)
+                    | get_smallest_from_optimization_result
+                  ) | hash sha256
                 }
               } else {
                 let hash = open --raw $formats.cbz | hash sha256
                 if $hash not-in $optimized_file_hashes.sha256 {
                   log debug "Optimizing the CBZ"
-                  open --raw ($formats.cbz | optimize_zip) | hash sha256
+                  open --raw (
+                    $formats.cbz
+                    | measure_optimization_performance {|the_file|
+                      $the_file | optimize_zip --log-optimization-performance $verbose
+                    }
+                    | log_optimization_performance --silence (not $verbose)
+                    | get_smallest_from_optimization_result
+                  ) | hash sha256
                 }
               }
             # }
