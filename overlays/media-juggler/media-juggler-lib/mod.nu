@@ -1439,18 +1439,27 @@ export def optimize_jpeg []: path -> path {
   $jpeg
 }
 
-# Losslessly optimize an image with image_optim
-export def image_optim []: path -> path {
-  let path = $in
-  log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)"
+# Losslessly optimize images with image_optim
+#
+# You may want to avoid using all threads on a multithreaded system when optimizing PNGs.
+# ((^nproc | into int) / 2)
+export def image_optim [
+  --threads: int = 0
+]: list<path> -> list<path> {
+  let paths = $in
+  log debug $"Running command: (ansi yellow)image_optim --config-paths \"\" ($paths | str join ' ')(ansi reset)"
   let result = do {
-    ^image_optim --config-paths "" --threads ((^nproc | into int) / 2) $path
+    if $threads > 0 {
+      ^image_optim --config-paths "" --threads $threads ...$paths
+    } else {
+      ^image_optim --config-paths "" ...$paths
+    }
   } | complete
   if ($result.exit_code != 0) {
-    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" ($path)(ansi reset)\nstdout:\n($result.stdout)\nstderr:\n($result.stderr)\n"
+    log error $"Exit code ($result.exit_code) from command: (ansi yellow)image_optim --config-paths \"\" ($paths | str join ' ')(ansi reset)\nstdout:\n($result.stdout)\nstderr:\n($result.stderr)\n"
     return null
   }
-  $path
+  $paths
 }
 
 # Optimize a PNG image
@@ -1485,11 +1494,11 @@ export def optimize_image [
     let extension = $path | path parse | get extension | str downcase
     if $extension in ["jpg" "jpeg"] {
       # I haven't seen ECT achieve better optimization than image_optim for JPEG's.
-      $path | image_optim
+      [$path] | image_optim
     } else if $extension == "png" {
       $path | optimize_png
     } else {
-      $path | image_optim | optimize_image_ect
+      [$path] | image_optim | first | optimize_image_ect
     }
   }
   $path
@@ -1514,7 +1523,10 @@ export def optimize_images []: list<path> -> list<path> {
   let original_size = $image_files | reduce --fold 0b {|it acc|
     $acc + (du $it | get physical | first)
   }
-  $image_files | each {|image|
+  # Optimize all JPEG files at once to take advantage of image_optim's parallelization.
+  let jpeg_files = $image_files | where {|image| ($image | path parse | get extension | str downcase) in ["jpg" "jpeg"] }
+  $jpeg_files | image_optim
+  $image_files | where {|image| ($image | path parse | get extension | str downcase) not-in ["jpg" "jpeg"] } | each {|image|
     $image | optimize_image
   }
   let current_size = $image_files | reduce --fold 0b {|it acc|
