@@ -2255,6 +2255,7 @@ export def same_image [
   ## Comment below
   if $phash_difference.difference < 1.0 {
     log debug $"Considering images (ansi yellow)($image1)(ansi reset) and (ansi yellow)($image2)(ansi reset) as the same since their phash difference (ansi purple)($phash_difference.difference)(ansi reset) is less than (ansi purple)1.0(ansi reset)"
+    # todo This bug might be fixed now. Verify.
     log error "Aborting due to bug in phash. Remove similar cover manually or disable this check to avoid deleting incorrectly deleting a page."
     exit
     return true
