@@ -1536,7 +1536,7 @@ export def optimize_images []: list<path> -> list<path> {
   if $current_size < $original_size {
     let average = (($original_size + $current_size) / 2)
     let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log info $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
+    log debug $"Images optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size."
   } else {
     log debug $"No space saving achieved attempting to optimize the images"
   }
