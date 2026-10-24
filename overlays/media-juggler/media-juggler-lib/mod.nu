@@ -717,10 +717,18 @@ export def "rsync" [
   # let ssh_path = $destination | path dirname | split_ssh_path
   # ^ssh $ssh_path.server nu --commands $"\'mkdir \"($ssh_path.path)\"\'"
   # ^ssh $ssh_path.server nu --commands $"\'chmod 2770 \"($ssh_path.path)\"\'"
-  if $source_path_type == "dir" {
-    ^rsync --no-perms --no-owner --no-group --omit-dir-times --recursive ...$args $source $destination
-  } else {
-    ^rsync --no-perms --no-owner --no-group --omit-dir-times ...$args $source $destination
+  let result = do {
+    if $source_path_type == "dir" {
+      ^rsync --no-perms --no-owner --no-group --omit-dir-times --recursive ...$args $source $destination
+    } else {
+      ^rsync --no-perms --no-owner --no-group --omit-dir-times ...$args $source $destination
+    }
+  } | complete
+  if $result.exit_code == 23 {
+    log error $"rsync exited with code (ansi purple)23(ansi reset) which usually indicates that some file attributes may not have been transferred. Assuming the file was transferred successfully.\nstdout: ($result.stdout)\nstderr: ($result.stderr)"
+  } else if $result.exit_code != 0 {
+    log error $"rsync failed with exit code (ansi purple)($result.exit_code)(ansi reset).\nstdout: ($result.stdout)\nstderr: ($result.stderr)"
+    return null
   }
   [$destination ($source | path basename)] | path join
 }
