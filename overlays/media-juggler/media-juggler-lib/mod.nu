@@ -1658,7 +1658,7 @@ export def optimize_zip [
   if $current_size < $original_size {
     let average = (($original_size + $current_size) / 2)
     let percent_difference = ((($original_size - $current_size) / $average) * 100)
-    log info $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+    log debug $"ZIP archive (ansi yellow)($archive)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
   } else {
     log debug $"No space saving achieved attempting to optimize the zip archive (ansi yellow)($archive)(ansi reset)"
   }

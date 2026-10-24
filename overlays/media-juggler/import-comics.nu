@@ -1526,6 +1526,9 @@ def main [
     }
   )
 
+  let original_size = du ($formats | get $input_format) | get physical | first
+  let start = date now
+
   # If the input format is EPUB, optimize the images before generating the CBZ.
   # This avoids optimizing the same images twice.
   let optimized_file_hashes = (
@@ -1554,6 +1557,7 @@ def main [
       )
     }
   )
+  let first_pass_optimization_duration = (date now) - $start
   if $updated_optimized_file_hashes != $optimized_file_hashes {
     $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
@@ -1809,6 +1813,7 @@ def main [
     log info "Replaced the cover image in the ebook"
   }
 
+  let start = date now
   let updated_optimized_file_hashes = (
     if ($skip_optimization) {
       $optimized_file_hashes
@@ -1882,10 +1887,21 @@ def main [
       )
     }
   )
+  let second_pass_optimization_duration = (date now) - $start
   if $updated_optimized_file_hashes != $optimized_file_hashes {
     $updated_optimized_file_hashes | save --force $optimized_files_cache_file
   }
   let optimized_file_hashes = $updated_optimized_file_hashes
+
+  let current_size = du ($formats | get $output_format) | get physical | first
+  if $current_size < $original_size {
+    let average = (($original_size + $current_size) / 2)
+    let percent_difference = ((($original_size - $current_size) / $average) * 100)
+    let duration = $first_pass_optimization_duration + $second_pass_optimization_duration
+    log info $"Input file (ansi yellow)($formats | get $input_format)(ansi reset) optimized down from a size of (ansi purple)($original_size)(ansi reset) to (ansi purple)($current_size)(ansi reset) in the output file (ansi yellow)($formats | get $output_format)(ansi reset), a (ansi green)($percent_difference)%(ansi reset) decrease in size in (ansi green)($duration)(ansi reset)."
+  } else {
+    log debug $"No space saving achieved when converting and optimizing the input file (ansi yellow)($formats | get $input_format)(ansi reset) to the output file (ansi yellow)($formats | get $output_format)(ansi reset)."
+  }
 
   let target_destination = (
     let components = ($formats | get $output_format | path parse);
