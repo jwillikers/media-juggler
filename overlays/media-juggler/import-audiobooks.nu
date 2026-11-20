@@ -36,7 +36,7 @@ def main [
   # --isbn: string
   # --ignore-embedded-acoustid-fingerprints
   --acoustid-client-key: string # The application API key for the AcoustID server
-  --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
+  --acoustid-user-key: string # The user API key for the AcoustID server. Required to look up fingerprints starting January 1, 2027. AcoustID fingerprints are only submitted when this is provided. Generate one at https://acoustid.org/api-key
   --combine-chapter-parts # Combine chapters split into multiple parts into individual chapters
   --lossy-to-lossy # Allow transcoding lossy formats to other lossy formats. This is irreversible and has the potential to introduce artifacts and degrade quality. It's recommended to keep the original lossy files for archival purposes when doing this.
   --musicbrainz-release-id: string
@@ -158,6 +158,9 @@ def main [
       null
     }
   )
+  if ($acoustid_user_key | is-empty) {
+    log warning "No AcoustID user API key provided. Starting January 1, 2027, AcoustID lookups require a user API key. Generate one at https://acoustid.org/api-key and provide it with --acoustid-user-key, the MEDIA_JUGGLER_ACOUSTID_USER_KEY environment variable, or acoustid_user_key in the config file."
+  }
 
   let keep = (
     if ($keep | is-not-empty) {

@@ -9918,8 +9918,11 @@ export def musicbrainz_get [
 # Find release and recording ids linked to an AcoustID fingerprint
 #
 # Requires an AcoustID application API key.
+# Starting January 1, 2027, lookups also require an AcoustID user API key.
+# See https://blog.acoustid.org/posts/2026-11-19-user-api-keys-required-for-lookups/
 export def fetch_release_ids_by_acoustid_fingerprint [
   client_key: string # The application API key for the AcoustID server. Stored in the environment variable MEDIA_JUGGLER_ACOUSTID_CLIENT_KEY
+  --user-key: string # The user API key for the AcoustID server. Stored in the environment variable MEDIA_JUGGLER_ACOUSTID_USER_KEY
   --retries: int = 3 # The number of retries to perform when a request fails
   --retry-delay: duration = 1sec # The interval between successive attempts when there is a failure
 ]: record<file: path, duration: duration, fingerprint: string> -> record<file: path, http_response: table, result: table<id: string, recordings: table<id: string, releases: table<id: string>>, score: float>> {
@@ -9937,7 +9940,10 @@ export def fetch_release_ids_by_acoustid_fingerprint [
 
   let duration_seconds = ($input.duration / 1sec) | math round
 
-  let payload = $"format=json&meta=recordingids+releaseids&client=($client_key)&fingerprint=($input.fingerprint)&duration=($duration_seconds)"
+  let payload = (
+    $"format=json&meta=recordingids+releaseids&client=($client_key)&fingerprint=($input.fingerprint)&duration=($duration_seconds)"
+    + (if ($user_key | is-not-empty) { $"&user=($user_key)" } else { "" })
+  )
   let request = {||
     $payload
     | ^gzip --stdout
@@ -9948,7 +9954,8 @@ export def fetch_release_ids_by_acoustid_fingerprint [
     try {
       retry_http $request $retries $retry_delay
     } catch {|error|
-      log error $"Error looking up AcoustID fingerprint at ($url) with payload ($payload): ($error.debug.msg)"
+      # Don't log the payload since it contains the API keys
+      log error $"Error looking up the AcoustID fingerprint for (ansi yellow)($input.file)(ansi reset) at ($url): ($error.msg)"
       return null
     }
   )
@@ -9970,6 +9977,7 @@ export def fetch_release_ids_by_acoustid_fingerprint [
 # retries: int = 3 # The number of retries to attempt for a failed lookup request
 export def fetch_release_ids_by_acoustid_fingerprints [
   client_key: string # The application API key for the AcoustID server
+  --user-key: string # The user API key for the AcoustID server. Required for lookups starting January 1, 2027.
   threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
   api_requests_per_second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
@@ -9979,7 +9987,7 @@ export def fetch_release_ids_by_acoustid_fingerprints [
   $in | chunks $api_requests_per_second | each {|chunk|
     let matches = (
       $chunk | par-each {|fingerprint|
-        let result = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key --retries $retries --retry-delay $retry_delay
+        let result = $fingerprint | fetch_release_ids_by_acoustid_fingerprint $client_key --user-key $user_key --retries $retries --retry-delay $retry_delay
         # log info $"result: ($result)"
         if $result == null {
           log error $"Failed to lookup AcoustID fingerprint on the AcoustID server."
@@ -9987,7 +9995,7 @@ export def fetch_release_ids_by_acoustid_fingerprints [
         }
         if $result.http_response.status != 200 {
           if $result.http_response.status in [401 403] {
-            log error $"Failed to lookup AcoustID fingerprint on the AcoustID server. HTTP status code ($result.http_response.status). Check the client API key is correct."
+            log error $"Failed to lookup AcoustID fingerprint on the AcoustID server. HTTP status code ($result.http_response.status). Check that the client and user API keys are correct."
             return null
           }
           log error $"Failed to lookup AcoustID fingerprint on the AcoustID server. HTTP status code ($result.http_response.status)."
@@ -11220,6 +11228,7 @@ export def get_acoustid_fingerprint_tracks [
 # Determine the MusicBrainz Recording IDs and the MusicBrainz Release ID of the given files using their AcoustID fingerprints
 export def get_musicbrainz_ids_by_acoustid [
   client_key: string # The application API key for the AcoustID server
+  --user-key: string # The user API key for the AcoustID server. Required for lookups starting January 1, 2027.
   ignore_embedded_acoustid_fingerprints # Recalculate AcoustID fingerprints for all files
   fail_fast = true # Immediately return null when a fingerprint has no matches that meet the threshold score
   --threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match
@@ -11239,7 +11248,7 @@ export def get_musicbrainz_ids_by_acoustid [
     $tracks
     | select file duration acoustid_fingerprint
     | rename file duration fingerprint
-    | fetch_release_ids_by_acoustid_fingerprints $client_key $threshold $fail_fast $api_requests_per_second --retries $retries --retry-delay $retry_delay
+    | fetch_release_ids_by_acoustid_fingerprints $client_key $threshold $fail_fast $api_requests_per_second --user-key $user_key --retries $retries --retry-delay $retry_delay
   )
   if ($acoustid_responses | is-empty) {
     log error "AcoustID responses missing"
@@ -11490,7 +11499,7 @@ export def tag_audiobook [
   --max-track-duration-difference: duration = 3sec # The maximum allowable difference between track durations
   --acoustid-score-threshold: float = 1.0 # A float value between zero and one, the minimum score required to be considered a match when searching AcoustID fingerprints
   --acoustid-client-key: string # The application API key for the AcoustID server
-  --acoustid-user-key: string # Submit AcoustID fingerprints to the AcoustID server using the given user API key
+  --acoustid-user-key: string # The user API key for the AcoustID server. Required to look up fingerprints starting January 1, 2027. AcoustID fingerprints are only submitted when this is provided.
   --musicbrainz-release-id: string = "" # The MusicBrainz Release ID associated with the release
   --api-requests-per-second: int = 3 # The number of API requests to make per second. AcoustID only permits up to three requests per second.
   --retries: int = 3 # The number of retries to perform when a request fails
@@ -11546,6 +11555,7 @@ export def tag_audiobook [
           $acoustid_client_key
           $ignore_embedded_acoustid_fingerprints
           $fail_fast
+          --user-key $acoustid_user_key
           --threshold $acoustid_score_threshold
           --api-requests-per-second $api_requests_per_second
           --retries $retries
