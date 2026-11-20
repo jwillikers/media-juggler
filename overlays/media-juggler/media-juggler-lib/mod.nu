@@ -9341,7 +9341,7 @@ export def fetch_musicbrainz_release_group_for_release []: string -> table {
   let release_id = $in
   let url = "https://musicbrainz.org/ws/2/release-group/"
   let query = $"reid:($release_id)" | url encode
-  http get --headers [User-Agent $user_agent Accept "application/json"] $"($url)/?query=($query)"
+  (musicbrainz_get $"($url)/?query=($query)").body
 }
 
 # Attempt to download a file, retrying up to the given number of retries
@@ -9451,7 +9451,7 @@ export def fetch_musicbrainz_release_group [
 ]: string -> record {
   let release_group_id = $in
   let url = "https://musicbrainz.org/ws/2/release-group"
-  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_group_id)/?inc=series-rels"}
+  let request = {musicbrainz_get $"($url)/($release_group_id)/?inc=series-rels"}
   retry_http $request $retries $retry_delay
 }
 
@@ -9485,7 +9485,7 @@ export def fetch_musicbrainz_release [
 ] {
   let release_id = $in
   let url = "https://musicbrainz.org/ws/2/release"
-  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($release_id)/?inc=($includes | str join '+')"}
+  let request = {musicbrainz_get $"($url)/($release_id)/?inc=($includes | str join '+')"}
   let response = (
     try {
       retry_http $request $retries $retry_delay
@@ -9512,7 +9512,7 @@ export def fetch_musicbrainz_work [
 ] {
   let work_id = $in
   let url = "https://musicbrainz.org/ws/2/work"
-  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($work_id)/?inc=($includes | str join '+')"}
+  let request = {musicbrainz_get $"($url)/($work_id)/?inc=($includes | str join '+')"}
   let response = (
     try {
       retry_http $request $retries $retry_delay
@@ -9556,9 +9556,6 @@ export def fetch_and_parse_musicbrainz_work [
       $id | fetch_musicbrainz_work --retries $retries --retry-delay $retry_delay
     )
 
-    # Avoid rate-limiting when called repeatedly from a loop.
-    sleep 0.1sec
-
     if ($work | is-not-empty) {
       $work | parse_musicbrainz_work
     }
@@ -9577,7 +9574,7 @@ export def fetch_musicbrainz_series [
 ] {
   let series_id = $in
   let url = "https://musicbrainz.org/ws/2/series"
-  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)/($series_id)/?inc=($includes | str join '+')"}
+  let request = {musicbrainz_get $"($url)/($series_id)/?inc=($includes | str join '+')"}
   let response = (
     try {
       retry_http $request $retries $retry_delay
@@ -9860,23 +9857,28 @@ export def retry [
   delay: duration # The amount of time to wait between successive executions of the request closure
   ignore_exceptions: bool # Whether to ignore exceptions thrown by the request closure and retry
 ]: nothing -> any {
-  for attempt in 1..($retries - 1) {
-    let response = (
+  # Note that ranges in Nushell count downwards when the end is less than the start, i.e. 1..0 is [1, 0].
+  mut attempt = 1
+  while $attempt < $retries {
+    let current_attempt = $attempt
+    let result = (
       try {
-        do $request
+        {response: (do $request)}
       } catch {|error|
         if $ignore_exceptions {
-          log warning $"Error during request attempt ($attempt): ($error.debug)"
-          continue
+          log warning $"Error during request attempt ($current_attempt): ($error.debug)"
+          null
         } else {
           throw $error
         }
       }
     )
-    if not (do $should_retry $response) {
-      return $response
+    if ($result != null) and not (do $should_retry $result.response) {
+      return $result.response
     }
+    # Always wait before retrying, including after an exception, to avoid hammering rate-limited servers
     sleep $delay
+    $attempt += 1
   }
   do $request
 }
@@ -9893,6 +9895,24 @@ export def retry_http [
     $result.status in $http_status_codes_to_retry
   }
   retry $request $should_retry $retries $delay $ignore_exceptions
+}
+
+# The minimum interval between successive requests to the MusicBrainz API.
+#
+# MusicBrainz allows an average of one request per second per IP address and responds with 503 errors when this is exceeded.
+# See https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
+# To stay within the limit, requests to the MusicBrainz API must be made sequentially, i.e. with each instead of par-each.
+export const musicbrainz_request_interval = 1sec
+
+# Make a GET request to the MusicBrainz API, respecting the rate limit.
+#
+# Waits for the rate limit interval before each request, so successive sequential calls are spaced out appropriately.
+# Returns the full response, as with http get --full.
+export def musicbrainz_get [
+  url: string # The full URL of the request
+]: nothing -> record {
+  sleep $musicbrainz_request_interval
+  http get --full --headers [User-Agent $user_agent Accept "application/json"] $url
 }
 
 # Find release and recording ids linked to an AcoustID fingerprint
@@ -11975,7 +11995,7 @@ export def look_up_chapters_from_similar_musicbrainz_release [
 
   # log info $"query: ($query)"
   let query = $query | url encode
-  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)?query=($query)"}
+  let request = {musicbrainz_get $"($url)?query=($query)"}
   let response = (
     try {
       retry_http $request $retries $retry_delay
@@ -12884,9 +12904,9 @@ export def search_for_musicbrainz_release [
 
   let query = $query | url encode
 
-  log debug $"request: http get --full --headers [User-Agent ($user_agent) Accept \"application/json\"] ($url)?query=($query)"
+  log debug $"request: ($url)?query=($query)"
 
-  let request = {http get --full --headers [User-Agent $user_agent Accept "application/json"] $"($url)?query=($query)"}
+  let request = {musicbrainz_get $"($url)?query=($query)"}
   let response = (
     try {
       retry_http $request $retries $retry_delay
