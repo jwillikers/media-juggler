@@ -30,6 +30,7 @@
   tesseract,
   tone,
   udisks,
+  unzip,
   util-linux,
   zip,
 }:
@@ -49,23 +50,28 @@ else
     buildInputs = [
       beets
       advancecomp
+      b3sum
       calibre
       efficient-compression-tool
       ffmpeg
       file
       image_optim
+      imagemagick
       isbntools
       # kcc
       keyfinder-cli
       m4b-tool
       media-juggler-png-optimizer
       minuimus
+      mupdf-headless
       nushell
       odiff
       picard
+      rhash
       rsync
       tesseract
       udisks
+      unzip
       util-linux
       zip
     ];
@@ -94,6 +100,7 @@ else
             odiff
             qpdf
             udisks
+            unzip
             util-linux
             zip
           ]
@@ -116,6 +123,7 @@ else
             rhash
             rsync
             tone
+            unzip
             zip
           ]
         }
@@ -140,6 +148,7 @@ else
             rsync
             tesseract
             udisks
+            unzip
             util-linux
             zip
           ]
@@ -163,6 +172,7 @@ else
             rsync
             tesseract
             udisks
+            unzip
             util-linux
             zip
           ]

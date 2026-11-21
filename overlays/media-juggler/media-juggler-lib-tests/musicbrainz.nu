@@ -4,10 +4,11 @@ use std assert
 use std log
 
 use ../media-juggler-lib *
+use helpers/assertions.nu *
 
 const test_data_dir = path self ../test-data
 
-def test_parse_works_from_musicbrainz_relations_bakemonogatari_part_01 [] {
+export def test_parse_works_from_musicbrainz_relations_bakemonogatari_part_01 [] {
   let input = (
     open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
     | get media
@@ -21,11 +22,7 @@ def test_parse_works_from_musicbrainz_relations_bakemonogatari_part_01 [] {
   assert equal ($input | parse_works_from_musicbrainz_relations) $expected
 }
 
-def test_parse_works_from_musicbrainz_relations [] {
-  test_parse_works_from_musicbrainz_relations_bakemonogatari_part_01
-}
-
-def test_parse_contributor_by_type_from_musicbrainz_relations_bakemonogatari_part_01_narrators [] {
+export def test_parse_contributor_by_type_from_musicbrainz_relations_bakemonogatari_part_01_narrators [] {
   let input = (
     open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
     | get media
@@ -46,11 +43,7 @@ def test_parse_contributor_by_type_from_musicbrainz_relations_bakemonogatari_par
   assert equal ($input | parse_contributor_by_type_from_musicbrainz_relations artist vocal "spoken vocals" | sort-by name) $expected
 }
 
-def test_parse_contributor_by_type_from_musicbrainz_relations [] {
-  test_parse_contributor_by_type_from_musicbrainz_relations_bakemonogatari_part_01_narrators
-}
-
-def test_parse_contributors_from_work_relations_bakemonogatari_part_01 [] {
+export def test_parse_contributors_from_work_relations_bakemonogatari_part_01 [] {
   let input = [{end: null, ended: false, target-credit: "", begin: null, type: translator, attributes: [], attribute-ids: {}, target-type: artist, artist: {country: null, name: "Ko Ransom", id: "3192a6d6-bf15-434e-bfea-827865a3cc0a", disambiguation: translator, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", sort-name: "Ransom, Ko", type: Person}, type-id: "da6c5d8a-ce13-474d-9375-61feb29039a5", direction: backward, source-credit: "", attribute-values: {}}, {target-credit: NISIOISIN, begin: null, type: writer, end: null, ended: false, attribute-values: {}, direction: backward, source-credit: "", attributes: [], attribute-ids: {}, type-id: "a255bca1-b157-4518-9108-7b147dc3fc68", artist: {country: JP, name: 西尾維新, disambiguation: "Japanese novelist", id: "2c7b9427-6776-4969-8028-5de988724659", type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", sort-name: NISIOISIN, type: Person}, target-type: artist}, {ended: false, end: null, type: "part of", target-credit: "", begin: null, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", target-type: series, attributes: [number], ordering-key: 1, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, attribute-values: {number: "1"}, direction: backward, source-credit: "", series: {disambiguation: "light novel, English", id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322", name: Bakemonogatari, type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series"}}, {series: {type: "Work series", type-id: "b689f694-6305-3d78-954d-df6759a1877b", name: Monogatari, id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3", disambiguation: "light novel, English"}, source-credit: "", direction: backward, attribute-values: {number: "1"}, ordering-key: 1, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, attributes: [number], target-type: series, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", target-credit: "", begin: null, type: "part of", end: null, ended: false}, {ordering-key: 2, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, attributes: [number], target-type: series, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", series: {disambiguation: "light novel, English", id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef", name: "Monogatari Series: First Season", type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series"}, source-credit: "", direction: backward, attribute-values: {number: "1"}, end: null, ended: false, begin: null, target-credit: "", type: "part of"}, {end: null, ended: false, begin: null, target-credit: "", type: BookBrainz, attributes: [], attribute-ids: {}, url: {id: "817e90a9-f58e-48ce-8ea8-e3aed01ed308", resource: "https://bookbrainz.org/work/ae3d4e16-7524-456d-a72f-318a1700b2ad"}, type-id: "0ea7cf4e-93dd-4bc4-b748-0f1073cf951c", target-type: url, attribute-values: {}, direction: backward, source-credit: ""}, {target-type: url, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", url: {resource: "https://openlibrary.org/works/OL19749568W", id: "da650123-1830-464d-ae2d-3063278a5430"}, attribute-ids: {}, attributes: [], source-credit: "", direction: backward, attribute-values: {}, ended: false, end: null, type: "other databases", begin: null, target-credit: ""}, {direction: backward, source-credit: "", attribute-values: {}, target-type: url, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", url: {resource: "https://www.librarything.com/work/18801353", id: "08766fc9-4f13-4a68-8070-1f8c76d8530b"}, attributes: [], attribute-ids: {}, type: "other databases", target-credit: "", begin: null, ended: false, end: null}, {ended: false, end: null, type: "other version", target-credit: "", work: {title: 化物語（上）, type-id: "78a8e727-edc2-35b9-8829-a46111ef6df9", language: null, attributes: [], disambiguation: "light novel", id: "35d328d1-7d5d-4c2c-a1e1-47dda806de3e", type: Prose, iswcs: [], languages: []}, begin: null, target-type: work, type-id: "7440b539-19ab-4243-8c03-4f5942ca2218", attribute-ids: {translated: "ed11fcb1-5a18-4e1d-b12c-633ed19c8ee1"}, attributes: [translated], source-credit: "", direction: backward, attribute-values: {}}]
   let expected = [
     [name id entity role];
@@ -60,11 +53,7 @@ def test_parse_contributors_from_work_relations_bakemonogatari_part_01 [] {
   assert equal ($input | parse_contributors | sort-by name) $expected
 }
 
-def test_parse_contributors [] {
-  test_parse_contributors_from_work_relations_bakemonogatari_part_01
-}
-
-def test_parse_musicbrainz_artist_credit_bakemonogatari_part_01 [] {
+export def test_parse_musicbrainz_artist_credit_bakemonogatari_part_01 [] {
   let input = [{name: NISIOISIN, artist: {disambiguation: "Japanese novelist", id: "2c7b9427-6776-4969-8028-5de988724659", name: 西尾維新, country: JP, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", type: Person, sort-name: NISIOISIN}, joinphrase: " read by "}, {name: "Erik Kimerer", joinphrase: "", artist: {sort-name: "Kimerer, Erik", type: Person, name: "Erik Kimerer", country: US, disambiguation: "voice actor", id: "ac830008-5b9c-4f98-ae2b-cac499c40ad8", type-id: "b6e035f4-3ce9-331c-97df-83397230b0df"}}]
   let expected = [
     [index name id];
@@ -74,11 +63,7 @@ def test_parse_musicbrainz_artist_credit_bakemonogatari_part_01 [] {
   assert equal ($input | parse_musicbrainz_artist_credit) $expected
 }
 
-def test_parse_musicbrainz_artist_credit [] {
-  test_parse_musicbrainz_artist_credit_bakemonogatari_part_01
-}
-
-def test_parse_series_from_musicbrainz_relations_bakemonogatari_part_01_work_relations [] {
+export def test_parse_series_from_musicbrainz_relations_bakemonogatari_part_01_work_relations [] {
   let input = [{attribute-ids: {}, begin: null, target-credit: "", target-type: artist, artist: {name: "Ko Ransom", sort-name: "Ransom, Ko", id: "3192a6d6-bf15-434e-bfea-827865a3cc0a", country: null, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", disambiguation: translator, type: Person}, ended: false, type-id: "da6c5d8a-ce13-474d-9375-61feb29039a5", source-credit: "", direction: backward, type: translator, end: null, attributes: [], attribute-values: {}}, {target-credit: NISIOISIN, begin: null, target-type: artist, artist: {name: 西尾維新, id: "2c7b9427-6776-4969-8028-5de988724659", sort-name: NISIOISIN, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", disambiguation: "Japanese novelist", type: Person, country: JP}, type-id: "a255bca1-b157-4518-9108-7b147dc3fc68", ended: false, attribute-ids: {}, end: null, type: writer, attributes: [], attribute-values: {}, source-credit: "", direction: backward}, {target-type: s, target-credit: "", begin: null, ended: false, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, attributes: [number], attribute-values: {number: "1"}, ordering-key: 1, end: null, type: "part of", source-credit: "", series: {disambiguation: "light novel, English", type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series", name: Bakemonogatari, id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"}, direction: backward}, {direction: backward, source-credit: "", series: {disambiguation: "light novel, English", type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series", name: Monogatari, id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"}, ordering-key: 1, attribute-values: {number: "1"}, attributes: [number], type: "part of", end: null, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", ended: false, target-type: series, begin: null, target-credit: ""}, {source-credit: "", series: {id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef", name: "Monogatari Series: First Season", type: "Work series", type-id: "b689f694-6305-3d78-954d-df6759a1877b", disambiguation: "light novel, English"}, direction: backward, ordering-key: 2, attribute-values: {number: "1"}, attributes: [number], type: "part of", end: null, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, target-type: series, begin: null, target-credit: "", type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", ended: false}, {attribute-values: {}, attributes: [], end: null, type: BookBrainz, url: {resource: "https://bookbrainz.org/work/ae3d4e16-7524-456d-a72f-318a1700b2ad", id: "817e90a9-f58e-48ce-8ea8-e3aed01ed308"}, direction: backward, source-credit: "", ended: false, type-id: "0ea7cf4e-93dd-4bc4-b748-0f1073cf951c", target-type: url, begin: null, target-credit: "", attribute-ids: {}}, {attribute-ids: {}, ended: false, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", target-credit: "", begin: null, target-type: url, direction: backward, source-credit: "", type: "other databases", end: null, attributes: [], attribute-values: {}, url: {resource: "https://openlibrary.org/works/OL19749568W", id: "da650123-1830-464d-ae2d-3063278a5430"}}, {direction: backward, source-credit: "", end: null, type: "other databases", attributes: [], attribute-values: {}, url: {id: "08766fc9-4f13-4a68-8070-1f8c76d8530b", resource: "https://www.librarything.com/work/18801353"}, attribute-ids: {}, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", ended: false, target-credit: "", begin: null, target-type: url}, {target-type: work, target-credit: "", begin: null, ended: false, type-id: "7440b539-19ab-4243-8c03-4f5942ca2218", attribute-ids: {translated: "ed11fcb1-5a18-4e1d-b12c-633ed19c8ee1"}, work: {title: 化物語（上）, language: null, iswcs: [], id: "35d328d1-7d5d-4c2c-a1e1-47dda806de3e", type-id: "78a8e727-edc2-35b9-8829-a46111ef6df9", attributes: [], disambiguation: "light novel", languages: [], type: Prose}, attributes: [translated], attribute-values: {}, type: "other version", end: null, source-credit: "", direction: backward}, {source-credit: "", direction: backward, attributes: [], attribute-values: {}, end: null, type: translator, attribute-ids: {}, target-type: artist, target-credit: "", begin: null, type-id: "da6c5d8a-ce13-474d-9375-61feb29039a5", ended: false, artist: {country: null, disambiguation: translator, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", type: Person, name: "Ko Ransom", id: "3192a6d6-bf15-434e-bfea-827865a3cc0a", sort-name: "Ransom, Ko"}}, {direction: backward, source-credit: "", end: null, type: writer, attribute-values: {}, attributes: [], attribute-ids: {}, artist: {sort-name: NISIOISIN, id: "2c7b9427-6776-4969-8028-5de988724659", name: 西尾維新, type: Person, type-id: "b6e035f4-3ce9-331c-97df-83397230b0df", disambiguation: "Japanese novelist", country: JP}, ended: false, type-id: "a255bca1-b157-4518-9108-7b147dc3fc68", begin: null, target-credit: NISIOISIN, target-type: artist}, {series: {disambiguation: "light novel, English", type-id: "b689f694-6305-3d78-954d-df6759a1877b", type: "Work series", name: Bakemonogatari, id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"}, source-credit: "", direction: backward, type: "part of", end: null, attributes: [number], attribute-values: {number: "1"}, ordering-key: 1, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, begin: null, target-credit: "", target-type: series, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", ended: false}, {ended: false, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", target-type: series, target-credit: "", begin: null, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}, attribute-values: {number: "1"}, ordering-key: 1, attributes: [number], end: null, type: "part of", direction: backward, source-credit: "", series: {id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3", name: Monogatari, type: "Work series", type-id: "b689f694-6305-3d78-954d-df6759a1877b", disambiguation: "light novel, English"}}, {type: "part of", end: null, attributes: [number], ordering-key: 2, attribute-values: {number: "1"}, series: {type-id: "b689f694-6305-3d78-954d-df6759a1877b", disambiguation: "light novel, English", type: "Work series", name: "Monogatari Series: First Season", id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"}, source-credit: "", direction: backward, begin: null, target-credit: "", target-type: series, type-id: "b0d44366-cdf0-3acb-bee6-0f65a77a6ef0", ended: false, attribute-ids: {number: "a59c5830-5ec7-38fe-9a21-c7ea54f6650a"}}, {source-credit: "", direction: backward, url: {resource: "https://bookbrainz.org/work/ae3d4e16-7524-456d-a72f-318a1700b2ad", id: "817e90a9-f58e-48ce-8ea8-e3aed01ed308"}, attribute-values: {}, attributes: [], type: BookBrainz, end: null, attribute-ids: {}, target-type: url, begin: null, target-credit: "", type-id: "0ea7cf4e-93dd-4bc4-b748-0f1073cf951c", ended: false}, {attribute-ids: {}, target-type: url, begin: null, target-credit: "", type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", ended: false, source-credit: "", direction: backward, url: {resource: "https://openlibrary.org/works/OL19749568W", id: "da650123-1830-464d-ae2d-3063278a5430"}, attribute-values: {}, attributes: [], type: "other databases", end: null}, {ended: false, type-id: "190ea031-4355-405d-a43e-53eb4c5c4ada", begin: null, target-credit: "", target-type: url, attribute-ids: {}, end: null, type: "other databases", attribute-values: {}, attributes: [], url: {id: "08766fc9-4f13-4a68-8070-1f8c76d8530b", resource: "https://www.librarything.com/work/18801353"}, direction: backward, source-credit: ""}, {work: {languages: [], type: Prose, type-id: "78a8e727-edc2-35b9-8829-a46111ef6df9", disambiguation: "light novel", attributes: [], iswcs: [], id: "35d328d1-7d5d-4c2c-a1e1-47dda806de3e", language: null, title: 化物語（上）}, attribute-values: {}, attributes: [translated], type: "other version", end: null, source-credit: "", direction: backward, target-type: work, begin: null, target-credit: "", ended: false, type-id: "7440b539-19ab-4243-8c03-4f5942ca2218", attribute-ids: {translated: "ed11fcb1-5a18-4e1d-b12c-633ed19c8ee1"}}]
   let expected = [
     [name id index];
@@ -89,11 +74,7 @@ def test_parse_series_from_musicbrainz_relations_bakemonogatari_part_01_work_rel
   assert equal ($input | parse_series_from_musicbrainz_relations | sort-by name) $expected
 }
 
-def test_parse_series_from_musicbrainz_relations [] {
-  test_parse_series_from_musicbrainz_relations_bakemonogatari_part_01_work_relations
-}
-
-def test_parse_series_from_musicbrainz_release_bakemonogatari_part_01 [] {
+export def test_parse_series_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = [
     [name id index scope];
@@ -109,27 +90,18 @@ def test_parse_series_from_musicbrainz_release_bakemonogatari_part_01 [] {
   assert equal ($actual | skip 2) ($expected | skip 2)
 }
 
-def test_parse_series_from_musicbrainz_release [] {
-  test_parse_series_from_musicbrainz_release_bakemonogatari_part_01
-}
-
-def test_parse_audible_asin_from_musicbrainz_release_bakemonogatari_part_01 [] {
+export def test_parse_audible_asin_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   assert equal ($input | parse_audible_asin_from_musicbrainz_release) []
 }
 
-def test_parse_audible_asin_from_musicbrainz_release_baccano_vol_1 [] {
+export def test_parse_audible_asin_from_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = ["B0CRSPBW6X"]
   assert equal ($input | parse_audible_asin_from_musicbrainz_release) $expected
 }
 
-def test_parse_audible_asin_from_musicbrainz_release [] {
-  test_parse_audible_asin_from_musicbrainz_release_baccano_vol_1
-  test_parse_audible_asin_from_musicbrainz_release_bakemonogatari_part_01
-}
-
-def test_parse_genres_and_tags_from_musicbrainz_release_baccano_vol_1 [] {
+export def test_parse_genres_and_tags_from_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = {
     genres: []
@@ -143,7 +115,7 @@ def test_parse_genres_and_tags_from_musicbrainz_release_baccano_vol_1 [] {
   assert equal ($input | parse_genres_and_tags_from_musicbrainz_release) $expected
 }
 
-def test_parse_genres_and_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
+export def test_parse_genres_and_tags_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = {
     genres: []
@@ -157,12 +129,8 @@ def test_parse_genres_and_tags_from_musicbrainz_release_bakemonogatari_part_01 [
   assert equal ($input | parse_genres_and_tags_from_musicbrainz_release) $expected
 }
 
-def test_parse_genres_and_tags_from_musicbrainz_release [] {
-  test_parse_genres_and_tags_from_musicbrainz_release_baccano_vol_1
-  test_parse_genres_and_tags_from_musicbrainz_release_bakemonogatari_part_01
-}
-
-def test_parse_musicbrainz_release_baccano_vol_1 [] {
+# todo Add tests for Baccano! Vol. 1 for parsing things.
+export def test_parse_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = {
     book: {
@@ -264,22 +232,10 @@ def test_parse_musicbrainz_release_baccano_vol_1 [] {
     ]
   }
   let actual = ($input | parse_musicbrainz_release)
-  assert equal ($actual | get book | columns) ($expected | get book | columns)
-  assert equal ($actual | get book | get artist_credit) ($expected | get book | get artist_credit)
-  assert equal ($actual | get book | get series) ($expected | get book | get series)
-  assert equal ($actual | get book | get tags) ($expected | get book | get tags)
-  assert equal ($actual | get book | get contributors) ($expected | get book | get contributors)
-  assert equal ($actual | get book) ($expected | get book)
-  assert equal ($actual | get tracks | first | columns) ($expected | get tracks | first | columns)
-  assert equal ($actual | get tracks | first | get artist_credit) ($expected | get tracks | first | get artist_credit)
-  assert equal ($actual | get tracks | first | get contributors) ($expected | get tracks | first | get contributors)
-  assert equal ($actual | get tracks | first | get musicbrainz_works) ($expected | get tracks | first | get musicbrainz_works)
-  assert equal ($actual | get tracks | first) ($expected | get tracks | first)
-  assert equal ($actual | get tracks) ($expected | get tracks)
-  assert equal $actual $expected
+  assert_equal_deep $actual $expected
 }
 
-def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
+export def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = {
     book: {
@@ -369,25 +325,10 @@ def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
     ]
   }
   let actual = ($input | parse_musicbrainz_release)
-  assert equal ($actual | get book | columns) ($expected | get book | columns)
-  assert equal ($actual | get book | get artist_credit) ($expected | get book | get artist_credit)
-  assert equal ($actual | get book | get tags) ($expected | get book | get tags)
-  assert equal ($actual | get book | get chapters) ($expected | get book | get chapters)
-  assert equal ($actual | get book | get series) ($expected | get book | get series)
-  assert equal ($actual | get book | get contributors) ($expected | get book | get contributors)
-  assert equal ($actual | get book | get publishers) ($expected | get book | get publishers)
-  assert equal ($actual | get book) ($expected | get book)
-  # log info $"($actual | get tracks | to nuon)"
-  assert equal ($actual | get tracks) ($expected | get tracks)
-  assert equal $actual $expected
+  assert_equal_deep $actual $expected
 }
 
-def test_parse_musicbrainz_release [] {
-  test_parse_musicbrainz_release_baccano_vol_1
-  test_parse_musicbrainz_release_bakemonogatari_part_01
-}
-
-def test_parse_musicbrainz_series_monogatari_work [] {
+export def test_parse_musicbrainz_series_monogatari_work [] {
   let input = open ([$test_data_dir "monogatari_work_series.json"] | path join)
   let expected = {
     id: "05ef20c8-9286-4b53-950f-eac8cbb32dc3"
@@ -418,7 +359,7 @@ def test_parse_musicbrainz_series_monogatari_work [] {
   assert equal ($input | parse_musicbrainz_series) $expected
 }
 
-def test_parse_musicbrainz_series_monogatari_first_season_work [] {
+export def test_parse_musicbrainz_series_monogatari_first_season_work [] {
   let input = open ([$test_data_dir "monogatari_first_season_work_series.json"] | path join)
   let expected = {
     id: "6660f123-24a0-46c7-99bf-7ff5dc11ceef"
@@ -450,7 +391,7 @@ def test_parse_musicbrainz_series_monogatari_first_season_work [] {
   assert equal ($input | parse_musicbrainz_series) $expected
 }
 
-def test_parse_musicbrainz_series_bakemonogatari_work [] {
+export def test_parse_musicbrainz_series_bakemonogatari_work [] {
   let input = open ([$test_data_dir "bakemonogatari_work_series.json"] | path join)
   let expected = {
     id: "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322"
@@ -479,13 +420,7 @@ def test_parse_musicbrainz_series_bakemonogatari_work [] {
   assert equal ($input | parse_musicbrainz_series) $expected
 }
 
-def test_parse_musicbrainz_series [] {
-  test_parse_musicbrainz_series_monogatari_work
-  test_parse_musicbrainz_series_monogatari_first_season_work
-  test_parse_musicbrainz_series_bakemonogatari_work
-}
-
-def test_fetch_and_parse_musicbrainz_series_cached [] {
+export def test_fetch_and_parse_musicbrainz_series_cached [] {
   let cache = {|type, series_id, update|
     if ($series_id == "0ee55526-d9a0-4d3d-9f6a-f46dc19c8322") {
       {
@@ -537,11 +472,7 @@ def test_fetch_and_parse_musicbrainz_series_cached [] {
   assert equal ("0ee55526-d9a0-4d3d-9f6a-f46dc19c8322" | fetch_and_parse_musicbrainz_series $cache) $expected
 }
 
-def test_fetch_and_parse_musicbrainz_series [] {
-  test_fetch_and_parse_musicbrainz_series_cached
-}
-
-def test_build_series_tree_up_three_levels [] {
+export def test_build_series_tree_up_three_levels [] {
   let monogatari_series_cache = {|type series_id, update|
     if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
       {
@@ -713,7 +644,7 @@ def test_build_series_tree_up_three_levels [] {
   assert equal ($input | build_series_tree_up 5 $monogatari_series_cache) $expected
 }
 
-def test_build_series_tree_up_three_levels_2 [] {
+export def test_build_series_tree_up_three_levels_2 [] {
   let monogatari_series_cache = {|type series_id, update|
     log info $"$series_id: ($series_id)"
     if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
@@ -983,12 +914,8 @@ def test_build_series_tree_up_three_levels_2 [] {
 #   assert equal ($input | build_series_tree_up 4 $monogatari_series_cache) $expected
 # }
 
-def test_build_series_tree_up [] {
-  test_build_series_tree_up_three_levels
-  # test_build_series_tree_up_three_levels_2
-  # test_build_series_tree_up_max_depth
-}
-
+# Not exported, so the test runner skips it.
+# organize_subseries is recursive and triggers a Nushell bug with recursive functions.
 def test_organize_subseries_two_subseries [] {
   let input = [
     [id name parent_series subseries genres tags];
@@ -1141,13 +1068,7 @@ def test_organize_subseries_two_subseries [] {
   assert equal ($input | organize_subseries) $expected
 }
 
-def test_organize_subseries [] {
-  # test_organize_subseries_one_series
-  # test_organize_subseries_one_subseries
-  test_organize_subseries_two_subseries
-}
-
-def test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802 [] {
+export def test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802 [] {
   let input = open ([$test_data_dir "work_c7a83643-33a3-48ab-b54e-f56554359802.json"] | path join)
   let expected = {
     id: "c7a83643-33a3-48ab-b54e-f56554359802"
@@ -1168,35 +1089,25 @@ def test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802 [] {
   assert equal ($input | parse_musicbrainz_work) $expected
 }
 
-def test_parse_musicbrainz_work [] {
-  test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802
-}
-
-def test_escape_special_lucene_characters_empty_input [] {
+export def test_escape_special_lucene_characters_empty_input [] {
   let input = ""
   let expected = ""
   assert equal ($input | escape_special_lucene_characters) $expected
 }
 
-def test_escape_special_lucene_characters_escape_backslash [] {
+export def test_escape_special_lucene_characters_escape_backslash [] {
   let input = 'The \Backslash'
   let expected = 'The \\Backslash'
   assert equal ($input | escape_special_lucene_characters) $expected
 }
 
-def test_escape_special_lucene_characters_escape_all_special_characters [] {
+export def test_escape_special_lucene_characters_escape_all_special_characters [] {
   let input = 'Whoa, there is/are a lot of special-characters to escape like ^, ~, ", *, +, \, am I right!? {[(&&Yikes:||)]}'
   let expected = 'Whoa, there is\/are a lot of special\-characters to escape like \^, \~, \", \*, \+, \\, am I right\!\? \{\[\(\&&Yikes\:\||\)\]\}'
   assert equal ($input | escape_special_lucene_characters) $expected
 }
 
-def test_escape_special_lucene_characters [] {
-  test_escape_special_lucene_characters_empty_input
-  test_escape_special_lucene_characters_escape_backslash
-  test_escape_special_lucene_characters_escape_all_special_characters
-}
-
-def test_append_to_musicbrainz_query_empty_input [] {
+export def test_append_to_musicbrainz_query_empty_input [] {
   let input = ""
   let metadata = {
     musicbrainz_release_country: "WX"
@@ -1205,14 +1116,14 @@ def test_append_to_musicbrainz_query_empty_input [] {
   assert equal ($input | append_to_musicbrainz_query $metadata musicbrainz_release_country country) $expected
 }
 
-def test_append_to_musicbrainz_query_empty_metadata [] {
+export def test_append_to_musicbrainz_query_empty_metadata [] {
   let input = ""
   let metadata = {}
   let expected = ""
   assert equal ($input | append_to_musicbrainz_query $metadata musicbrainz_release_country country) $expected
 }
 
-def test_append_to_musicbrainz_query_existing_input [] {
+export def test_append_to_musicbrainz_query_existing_input [] {
   let input = 'country:"WX"'
   let metadata = {
     musicbrainz_release_country: "WX"
@@ -1222,7 +1133,7 @@ def test_append_to_musicbrainz_query_existing_input [] {
   assert equal ($input | append_to_musicbrainz_query $metadata language lang) $expected
 }
 
-def test_append_to_musicbrainz_query_existing_input_with_transform [] {
+export def test_append_to_musicbrainz_query_existing_input_with_transform [] {
   let input = 'country:"WX"'
   let metadata = {
     musicbrainz_release_country: "WX"
@@ -1233,14 +1144,7 @@ def test_append_to_musicbrainz_query_existing_input_with_transform [] {
   assert equal ($input | append_to_musicbrainz_query $metadata language lang --transform $transform) $expected
 }
 
-def test_append_to_musicbrainz_query [] {
-  test_append_to_musicbrainz_query_empty_input
-  test_append_to_musicbrainz_query_empty_metadata
-  test_append_to_musicbrainz_query_existing_input
-  test_append_to_musicbrainz_query_existing_input_with_transform
-}
-
-def test_artist_credit_to_string_bakemonogatari_part_01 [] {
+export def test_artist_credit_to_string_bakemonogatari_part_01 [] {
   let input = [
     {
       "joinphrase": " illustration by ",
@@ -1435,7 +1339,7 @@ def test_artist_credit_to_string_bakemonogatari_part_01 [] {
   assert equal ($input | artist_credit_to_string) $expected
 }
 
-def test_artist_credit_to_string_baccano_vol_1 [] {
+export def test_artist_credit_to_string_baccano_vol_1 [] {
   let input = [
     {
       "joinphrase": " read by "
@@ -1506,31 +1410,4 @@ def test_artist_credit_to_string_baccano_vol_1 [] {
   ]
   let expected = "Ryohgo Narita read by Michael Butler Murray"
   assert equal ($input | artist_credit_to_string) $expected
-}
-
-def test_artist_credit_to_string [] {
-  test_artist_credit_to_string_baccano_vol_1
-  test_artist_credit_to_string_bakemonogatari_part_01
-}
-
-# Run the tests in this module
-export def run_tests [] {
-  test_artist_credit_to_string
-  test_parse_works_from_musicbrainz_relations
-  test_parse_contributor_by_type_from_musicbrainz_relations
-  test_parse_contributors
-  test_parse_musicbrainz_artist_credit
-  test_parse_series_from_musicbrainz_relations
-  test_parse_series_from_musicbrainz_release
-  test_parse_audible_asin_from_musicbrainz_release
-  test_parse_genres_and_tags_from_musicbrainz_release
-  # todo Add tests for Baccano! Vol. 1 for parsing things.
-  test_parse_musicbrainz_release
-  test_parse_musicbrainz_work
-  test_parse_musicbrainz_series
-  test_fetch_and_parse_musicbrainz_series
-  test_build_series_tree_up
-  # test_organize_subseries
-  test_escape_special_lucene_characters
-  test_append_to_musicbrainz_query
 }

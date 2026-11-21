@@ -7,7 +7,7 @@ use ../media-juggler-lib *
 
 const test_data_dir = path self ../test-data
 
-def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
+export def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
   let input = (
     open ([$test_data_dir "tsukimichi-volume-1-ebook-edition-hardcover.json"] | path join)
   )
@@ -56,11 +56,26 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
   assert equal ($input | parse_hardcover_edition) $expected
 }
 
-def test_parse_hardcover_edition [] {
-  test_parse_hardcover_edition_tsukimichi_volume_1
+export def test_standardize_hardcover_title_no_volume [] {
+  assert equal ("Spice and Wolf" | standardize_hardcover_title) "Spice and Wolf"
 }
 
-# Run the tests in this module
-export def run_tests [] {
-  test_parse_hardcover_edition
+export def test_standardize_hardcover_title_light_novel [] {
+  assert equal ("Spice and Wolf (Light Novel), Vol. 1" | standardize_hardcover_title) "Spice and Wolf, Vol. 1"
+}
+
+export def test_standardize_hardcover_title_manga [] {
+  assert equal ("Witch Hat Atelier (Manga), Vol. 2" | standardize_hardcover_title) "Witch Hat Atelier, Vol. 2"
+}
+
+export def test_standardize_hardcover_title_manhua [] {
+  assert equal ("Heaven Official's Blessing (Manhua), Vol. 1" | standardize_hardcover_title) "Heaven Official's Blessing, Vol. 1"
+}
+
+export def test_standardize_hardcover_title_manhwa [] {
+  assert equal ("Solo Leveling (Manhwa), Vol. 1" | standardize_hardcover_title) "Solo Leveling, Vol. 1"
+}
+
+export def test_standardize_hardcover_title_after_punctuation [] {
+  assert equal ("Kaguya-sama: Love Is War! (Manga), Vol. 2" | standardize_hardcover_title) "Kaguya-sama: Love Is War! Vol. 2"
 }

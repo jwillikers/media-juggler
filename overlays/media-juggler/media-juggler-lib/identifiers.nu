@@ -96,17 +96,25 @@ export def hyphenate_isbn []: [string -> string] {
     log error $"Error hyphenating ISBN (ansi yellow)($isbn)(ansi reset): ($result.stderr)"
     return null
   }
-  if ($result.stdout | is-empty) {
+  let hyphenated_isbn = $result.stdout | str trim
+  if ($hyphenated_isbn | is-empty) {
     log error $"No ISBN output from isbn_mask for ISBN (ansi yellow)($isbn)(ansi reset)"
     return null
   }
-  $result.stdout | str trim
+  # For an invalid ISBN, isbn_mask prints its usage message to stdout and exits successfully.
+  if $hyphenated_isbn !~ '^[0-9]+(?:-[0-9]+)*-[0-9Xx]$' {
+    log error $"Invalid ISBN (ansi yellow)($isbn)(ansi reset): ($hyphenated_isbn)"
+    return null
+  }
+  $hyphenated_isbn
 }
 
 # Validate an ISBN with the isbn_validate program from isbntools
 export def validate_isbn []: [string -> bool] {
   let isbn = $in
-  let result = do { ^isbn_validate $isbn } | complete
+  # When stdin isn't a terminal, isbn_validate ignores its argument and validates the ISBNs read from stdin instead.
+  # Always pass the ISBN through stdin so that it behaves the same everywhere, and doesn't wait on an open stdin.
+  let result = $isbn | ^isbn_validate | complete
   if ($result.exit_code != 0) {
     log error $"Error validating ISBN (ansi yellow)($isbn)(ansi reset): ($result.stderr)"
     return null

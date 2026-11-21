@@ -14,7 +14,7 @@ export def escape_unzip_path []: path -> path {
 # Extract files from a zip archive
 export def unzip [
   destination: directory
-]: path -> path {
+]: path -> list<path> {
   let archive = $in
   let files = $archive | list_files_in_archive
   ^unzip -q $archive -d $destination
@@ -55,14 +55,10 @@ export def add_file_to_archive [
 # List the files in a zip archive
 export def list_files_in_archive []: path -> list<path> {
   let archive = $in
+  # List only the file names, one per line, to avoid parsing the header and footer of the full listing
   (
-    ^unzip -l $archive
+    ^unzip -Z1 $archive
     | lines
-    | drop nth 0 1
-    | drop 2
-    | str trim
-    | parse "{length}  {date} {time}   {name}"
-    | get name
     | uniq
     | sort
   )

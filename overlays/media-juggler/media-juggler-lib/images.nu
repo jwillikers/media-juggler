@@ -191,18 +191,18 @@ export def get_image_dimensions []: path -> record<width: int, height: int> {
     log error $"The command (ansi yellow)^magick identify -format '%wx%h' '($image_file)'(ansi reset) failed with the exit code (ansi red)($result.exit_code)(ansi reset): ($result.stderr)"
     return null
   }
-  $result.stdout | parse '{width}x{height}' | first
+  $result.stdout | parse '{width}x{height}' | first | into int width height
 }
 
 # Get the dimensions of multiple images with ImageMagick
 export def get_images_dimensions []: list<path> -> table<width: int, height: int> {
   let image_files = $in
-  let result = do { ^magick identify -format '%wx%h\n' $image_files } | complete
+  let result = do { ^magick identify -format '%wx%h\n' ...$image_files } | complete
   if $result.exit_code != 0 {
     log error $"The command (ansi yellow)^magick identify -format '%wx%h\\n' ($image_files | str join ' ')(ansi reset) failed with the exit code (ansi red)($result.exit_code)(ansi reset): ($result.stderr)"
     return null
   }
-  $result.stdout | parse '{width}x{height}'
+  $result.stdout | lines | parse '{width}x{height}' | into int width height
 }
 
 # Get the image dimensions used by the majority of the images in a ZIP archive

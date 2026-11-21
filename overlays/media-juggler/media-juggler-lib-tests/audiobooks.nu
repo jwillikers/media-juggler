@@ -5,7 +5,7 @@ use std log
 
 use ../media-juggler-lib *
 
-def test_equivalent_track_durations_one_track_different [] {
+export def test_equivalent_track_durations_one_track_different [] {
   let left = [
     [index duration];
     [1 3.9sec]
@@ -17,7 +17,7 @@ def test_equivalent_track_durations_one_track_different [] {
   assert equal ($left | equivalent_track_durations $right) false
 }
 
-def test_equivalent_track_durations_one_track_equivalent [] {
+export def test_equivalent_track_durations_one_track_equivalent [] {
   let left = [
     [index duration];
     [0 3sec]
@@ -29,7 +29,7 @@ def test_equivalent_track_durations_one_track_equivalent [] {
   assert equal ($left | equivalent_track_durations $right) true
 }
 
-def test_equivalent_track_durations_two_tracks_equivalent [] {
+export def test_equivalent_track_durations_two_tracks_equivalent [] {
   let left = [
     [index duration];
     [0 3sec]
@@ -43,7 +43,7 @@ def test_equivalent_track_durations_two_tracks_equivalent [] {
   assert equal ($left | equivalent_track_durations $right) true
 }
 
-def test_equivalent_track_durations_one_empty [] {
+export def test_equivalent_track_durations_one_empty [] {
   let left = []
   let right = [
     [index duration];
@@ -53,7 +53,7 @@ def test_equivalent_track_durations_one_empty [] {
   assert equal ($left | equivalent_track_durations $right) false
 }
 
-def test_equivalent_track_durations_inconsistent_number_of_tracks [] {
+export def test_equivalent_track_durations_inconsistent_number_of_tracks [] {
   let left = [
     [index duration];
     [0 1sec]
@@ -68,7 +68,7 @@ def test_equivalent_track_durations_inconsistent_number_of_tracks [] {
   assert equal ($left | equivalent_track_durations $right) false
 }
 
-def test_equivalent_track_durations_inconsistent_indices [] {
+export def test_equivalent_track_durations_inconsistent_indices [] {
   let left = [
     [index duration];
     [0 1sec]
@@ -84,7 +84,7 @@ def test_equivalent_track_durations_inconsistent_indices [] {
   assert equal ($left | equivalent_track_durations $right) false
 }
 
-def test_equivalent_track_durations_several_tracks_within_threshold [] {
+export def test_equivalent_track_durations_several_tracks_within_threshold [] {
   let left = [
     [index duration];
     [0 1sec]
@@ -108,7 +108,7 @@ def test_equivalent_track_durations_several_tracks_within_threshold [] {
   assert equal ($left | equivalent_track_durations $right) true
 }
 
-def test_equivalent_track_durations_several_tracks_one_outside_threshold [] {
+export def test_equivalent_track_durations_several_tracks_one_outside_threshold [] {
   let left = [
     [index duration];
     [0 1sec]
@@ -132,7 +132,7 @@ def test_equivalent_track_durations_several_tracks_one_outside_threshold [] {
   assert equal ($left | equivalent_track_durations $right) false
 }
 
-def test_equivalent_track_durations_duplicate_indices [] {
+export def test_equivalent_track_durations_duplicate_indices [] {
   let left = [
     [index duration];
     [0 1sec]
@@ -152,7 +152,7 @@ def test_equivalent_track_durations_duplicate_indices [] {
   assert equal ($left | equivalent_track_durations $right) false
 }
 
-def test_equivalent_track_durations_duplicate_indices_left [] {
+export def test_equivalent_track_durations_duplicate_indices_left [] {
   let left = [
     [index duration];
     [0 1sec]
@@ -172,26 +172,13 @@ def test_equivalent_track_durations_duplicate_indices_left [] {
   assert equal ($left | equivalent_track_durations $right) false
 }
 
-def test_equivalent_track_durations [] {
-  test_equivalent_track_durations_one_track_different
-  test_equivalent_track_durations_one_track_equivalent
-  test_equivalent_track_durations_one_empty
-  test_equivalent_track_durations_two_tracks_equivalent
-  test_equivalent_track_durations_inconsistent_number_of_tracks
-  test_equivalent_track_durations_inconsistent_indices
-  test_equivalent_track_durations_several_tracks_within_threshold
-  test_equivalent_track_durations_several_tracks_one_outside_threshold
-  test_equivalent_track_durations_duplicate_indices
-  test_equivalent_track_durations_duplicate_indices_left
-}
-
-def test_has_distributor_in_common_both_empty [] {
+export def test_has_distributor_in_common_both_empty [] {
   let left = []
   let right = []
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_right_empty [] {
+export def test_has_distributor_in_common_right_empty [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -202,7 +189,7 @@ def test_has_distributor_in_common_right_empty [] {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_left_empty [] {
+export def test_has_distributor_in_common_left_empty [] {
   let left = []
   let right = [
     [id name entity role];
@@ -213,7 +200,7 @@ def test_has_distributor_in_common_left_empty [] {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_none [] {
+export def test_has_distributor_in_common_none [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -229,7 +216,7 @@ def test_has_distributor_in_common_none [] {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_same_name_different_id [] {
+export def test_has_distributor_in_common_same_name_different_id [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -245,7 +232,7 @@ def test_has_distributor_in_common_same_name_different_id [] {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_same_id_different_entity [] {
+export def test_has_distributor_in_common_same_id_different_entity [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -261,7 +248,7 @@ def test_has_distributor_in_common_same_id_different_entity [] {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_one [] {
+export def test_has_distributor_in_common_one [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -277,7 +264,7 @@ def test_has_distributor_in_common_one [] {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_name_only_left [] {
+export def test_has_distributor_in_common_name_only_left [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -293,7 +280,7 @@ def test_has_distributor_in_common_name_only_left [] {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_name_only_right [] {
+export def test_has_distributor_in_common_name_only_right [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -309,7 +296,7 @@ def test_has_distributor_in_common_name_only_right [] {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common_no_distributor_left [] {
+export def test_has_distributor_in_common_no_distributor_left [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -326,7 +313,7 @@ def test_has_distributor_in_common_no_distributor_left [] {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_no_distributor_right [] {
+export def test_has_distributor_in_common_no_distributor_right [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -343,7 +330,7 @@ def test_has_distributor_in_common_no_distributor_right [] {
   assert equal ($left | has_distributor_in_common $right) false
 }
 
-def test_has_distributor_in_common_no_distributor_both [] {
+export def test_has_distributor_in_common_no_distributor_both [] {
   let left = [
     [id name entity role];
     ["3e61c686-61a6-459e-a178-b709ebb9eb10" "Syougo Kinugasa" artist "primary author"]
@@ -359,22 +346,7 @@ def test_has_distributor_in_common_no_distributor_both [] {
   assert equal ($left | has_distributor_in_common $right) true
 }
 
-def test_has_distributor_in_common [] {
-  test_has_distributor_in_common_left_empty
-  test_has_distributor_in_common_right_empty
-  test_has_distributor_in_common_both_empty
-  test_has_distributor_in_common_none
-  test_has_distributor_in_common_one
-  test_has_distributor_in_common_same_name_different_id
-  test_has_distributor_in_common_same_id_different_entity
-  test_has_distributor_in_common_name_only_left
-  test_has_distributor_in_common_name_only_right
-  test_has_distributor_in_common_no_distributor_left
-  test_has_distributor_in_common_no_distributor_right
-  test_has_distributor_in_common_no_distributor_both
-}
-
-def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags [] {
+export def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags [] {
   let input = [
     [id tags];
     ["x" []]
@@ -384,7 +356,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags [] {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag [] {
+export def test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag [] {
   let input = [
     [id tags];
     ["x" [[name count]; [chapter 1]]]
@@ -395,7 +367,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag [] {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_one [] {
+export def test_audiobooks_with_the_highest_voted_chapters_tag_one [] {
   let input = [
     [id tags];
     ["x" [[name count]; [chapters 1]]]
@@ -404,7 +376,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_one [] {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest [] {
+export def test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest [] {
   let input = [
     [id tags];
     ["x" [[name count]; [chapters 1] [unabridged 1]]]
@@ -415,7 +387,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest [] {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest [] {
+export def test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest [] {
   let input = [
     [id tags];
     ["u" [[name count]; [chapters 1]]]
@@ -427,15 +399,7 @@ def test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest [] {
   assert equal ($input | audiobooks_with_the_highest_voted_chapters_tag) $expected
 }
 
-def test_audiobooks_with_the_highest_voted_chapters_tag [] {
-  test_audiobooks_with_the_highest_voted_chapters_tag_empty_tags
-  test_audiobooks_with_the_highest_voted_chapters_tag_no_chapters_tag
-  test_audiobooks_with_the_highest_voted_chapters_tag_one
-  test_audiobooks_with_the_highest_voted_chapters_tag_one_with_highest
-  test_audiobooks_with_the_highest_voted_chapters_tag_two_with_highest
-}
-
-def test_filter_musicbrainz_chapters_releases_bad_length [] {
+export def test_filter_musicbrainz_chapters_releases_bad_length [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -517,7 +481,7 @@ def test_filter_musicbrainz_chapters_releases_bad_length [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) null
 }
 
-def test_filter_musicbrainz_chapters_releases_one_match [] {
+export def test_filter_musicbrainz_chapters_releases_one_match [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -600,7 +564,7 @@ def test_filter_musicbrainz_chapters_releases_one_match [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_one_track [] {
+export def test_filter_musicbrainz_chapters_releases_one_track [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -665,7 +629,7 @@ def test_filter_musicbrainz_chapters_releases_one_track [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_audible_asin [] {
+export def test_filter_musicbrainz_chapters_releases_audible_asin [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -761,7 +725,7 @@ def test_filter_musicbrainz_chapters_releases_audible_asin [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_chapter_tags [] {
+export def test_filter_musicbrainz_chapters_releases_chapter_tags [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -865,7 +829,7 @@ def test_filter_musicbrainz_chapters_releases_chapter_tags [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_distributor [] {
+export def test_filter_musicbrainz_chapters_releases_distributor [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -961,7 +925,7 @@ def test_filter_musicbrainz_chapters_releases_distributor [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_duration [] {
+export def test_filter_musicbrainz_chapters_releases_duration [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -1057,7 +1021,7 @@ def test_filter_musicbrainz_chapters_releases_duration [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_two_match [] {
+export def test_filter_musicbrainz_chapters_releases_two_match [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -1153,7 +1117,7 @@ def test_filter_musicbrainz_chapters_releases_two_match [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks [] {
+export def test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
@@ -1263,18 +1227,7 @@ def test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases [] {
-  test_filter_musicbrainz_chapters_releases_bad_length
-  test_filter_musicbrainz_chapters_releases_one_match
-  test_filter_musicbrainz_chapters_releases_one_track
-  test_filter_musicbrainz_chapters_releases_audible_asin
-  test_filter_musicbrainz_chapters_releases_chapter_tags
-  test_filter_musicbrainz_chapters_releases_distributor
-  test_filter_musicbrainz_chapters_releases_duration
-  test_filter_musicbrainz_chapters_releases_one_match_multiple_tracks
-}
-
-def test_filter_musicbrainz_releases_audible_asin [] {
+export def test_filter_musicbrainz_releases_audible_asin [] {
   let candidates = [
     [book, tracks];
     [
@@ -1346,7 +1299,7 @@ def test_filter_musicbrainz_releases_audible_asin [] {
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases_distributor [] {
+export def test_filter_musicbrainz_releases_distributor [] {
   let candidates = [
     [book, tracks];
     [
@@ -1428,7 +1381,7 @@ def test_filter_musicbrainz_releases_distributor [] {
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases_track_duration [] {
+export def test_filter_musicbrainz_releases_track_duration [] {
   let candidates = [
     [book, tracks];
     [
@@ -1497,7 +1450,7 @@ def test_filter_musicbrainz_releases_track_duration [] {
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
 }
 
-def test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations [] {
+export def test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations [] {
   let candidates = [
     [book, tracks];
     [
@@ -1578,20 +1531,4 @@ def test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_duratio
   }
   let expected = ["2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7"]
   assert equal ($candidates | filter_musicbrainz_releases $metadata) $expected
-}
-
-def test_filter_musicbrainz_releases [] {
-  test_filter_musicbrainz_releases_distributor
-  test_filter_musicbrainz_releases_audible_asin
-  test_filter_musicbrainz_releases_track_duration
-  test_filter_musicbrainz_releases_multiple_tracks_one_match_with_near_durations
-}
-
-# Run the tests in this module
-export def run_tests [] {
-  test_equivalent_track_durations
-  test_has_distributor_in_common
-  test_audiobooks_with_the_highest_voted_chapters_tag
-  test_filter_musicbrainz_chapters_releases
-  test_filter_musicbrainz_releases
 }
