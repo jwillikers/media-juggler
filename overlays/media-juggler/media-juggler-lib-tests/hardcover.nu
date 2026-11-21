@@ -55,3 +55,27 @@ export def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
   # log debug $"parsed hardcover edition: ($input | parse_hardcover_edition | to nuon)"
   assert equal ($input | parse_hardcover_edition) $expected
 }
+
+export def test_standardize_hardcover_title_no_volume [] {
+  assert equal ("Spice and Wolf" | standardize_hardcover_title) "Spice and Wolf"
+}
+
+export def test_standardize_hardcover_title_light_novel [] {
+  assert equal ("Spice and Wolf (Light Novel), Vol. 1" | standardize_hardcover_title) "Spice and Wolf, Vol. 1"
+}
+
+export def test_standardize_hardcover_title_manga [] {
+  assert equal ("Witch Hat Atelier (Manga), Vol. 2" | standardize_hardcover_title) "Witch Hat Atelier, Vol. 2"
+}
+
+export def test_standardize_hardcover_title_manhua [] {
+  assert equal ("Heaven Official's Blessing (Manhua), Vol. 1" | standardize_hardcover_title) "Heaven Official's Blessing, Vol. 1"
+}
+
+export def test_standardize_hardcover_title_manhwa [] {
+  assert equal ("Solo Leveling (Manhwa), Vol. 1" | standardize_hardcover_title) "Solo Leveling, Vol. 1"
+}
+
+export def test_standardize_hardcover_title_after_punctuation [] {
+  assert equal ("Kaguya-sama: Love Is War! (Manga), Vol. 2" | standardize_hardcover_title) "Kaguya-sama: Love Is War! Vol. 2"
+}

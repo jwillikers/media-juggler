@@ -811,3 +811,22 @@ export def test_parse_chapter_title_chapter_word_part [] {
   assert equal ("Part 3: The Return" | parse_chapter_title) (chapter_title "Part 3" --chapter-title "The Return")
   assert equal ("Part 1, Part 2" | parse_chapter_title) (chapter_title "Part 1" --chapter-part "Part 2")
 }
+
+export def test_chapters_into_chapters_txt_format [] {
+  let input = [
+    [index start length title];
+    [0 0sec 41sec "Opening Credits"]
+    [1 41sec 3hr "Prologue"]
+    [2 (3hr + 1min + 2sec + 345ms) 10sec "End Credits"]
+  ]
+  let expected = [
+    "00:00:00.000 Opening Credits"
+    "00:00:41.000 Prologue"
+    "03:01:02.345 End Credits"
+  ]
+  assert equal ($input | chapters_into_chapters_txt_format) $expected
+}
+
+export def test_chapters_into_chapters_txt_format_empty [] {
+  assert equal ([] | chapters_into_chapters_txt_format) []
+}

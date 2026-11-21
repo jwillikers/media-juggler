@@ -685,3 +685,83 @@ export def test_identifier_into_url_wikidata_item_id_invalid [] {
   let input = "139580959"
   assert error {|| ($input | identifier_into_url "wikidata_item_id")}
 }
+
+export def test_hyphenate_isbn_13 [] {
+  assert equal ("9798905680892" | hyphenate_isbn) "979-8-90568-089-2"
+}
+
+export def test_hyphenate_isbn_10 [] {
+  assert equal ("0306406152" | hyphenate_isbn) "0-306-40615-2"
+}
+
+export def test_hyphenate_isbn_invalid [] {
+  assert equal ("123" | hyphenate_isbn) null
+}
+
+export def test_parse_isbn_no_isbn [] {
+  assert equal (["No numbers here" "Copyright 2024"] | parse_isbn) []
+}
+
+export def test_parse_isbn_bare [] {
+  assert equal (["Printed in the USA" "978-1-250-16947-1"] | parse_isbn) ["9781250169471"]
+}
+
+export def test_parse_isbn_without_hyphens [] {
+  assert equal (["ISBN 9781250169471"] | parse_isbn) ["9781250169471"]
+}
+
+export def test_parse_isbn_prefers_ebook_isbn_13 [] {
+  let input = [
+    "ISBN-13: 978-1-7185-0185-0 (paperback)"
+    "ISBN-13: 978-1-7185-0186-7 (ebook)"
+  ]
+  assert equal ($input | parse_isbn) ["9781718501867"]
+}
+
+export def test_parse_isbn_prefers_ebook_isbn_label [] {
+  let input = [
+    "ISBN: 978-1-250-16946-4"
+    "ebook ISBN: 978-1-250-16947-1"
+  ]
+  assert equal ($input | parse_isbn) ["9781250169471"]
+}
+
+export def test_parse_isbn_prefers_isbn_marked_ebook [] {
+  let input = [
+    "ISBN 978-1-250-16946-4 (hardcover)"
+    "ISBN 978-1-250-16947-1 (ebook)"
+  ]
+  assert equal ($input | parse_isbn) ["9781250169471"]
+}
+
+export def test_parse_isbn_prefers_eisbn [] {
+  let input = [
+    "ISBN: 978-1-6374-1066-0"
+    "eISBN 978-1-6374-1067-7"
+  ]
+  assert equal ($input | parse_isbn) ["9781637410677"]
+}
+
+export def test_parse_isbn_prefers_isbn_label_over_bare_numbers [] {
+  let input = [
+    "Order number 978-0-0000-0000-2"
+    "ISBN: 978-1-250-16946-4"
+  ]
+  assert equal ($input | parse_isbn) ["9781250169464"]
+}
+
+export def test_parse_isbn_ignores_tor_hardcover_preview [] {
+  let input = [
+    "A Tor Hardcover ISBN    978-0-3128-51408"
+    "978-1-250-16947-1"
+  ]
+  assert equal ($input | parse_isbn) ["9781250169471"]
+}
+
+export def test_parse_isbn_removes_duplicates [] {
+  let input = [
+    "978-1-250-16947-1"
+    "9781250169471"
+  ]
+  assert equal ($input | parse_isbn) ["9781250169471"]
+}
