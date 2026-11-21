@@ -235,7 +235,7 @@ export def parse_multi_value_tag [
   if ($input | is-empty) {
     return null
   }
-  $in | split row ";" | str trim
+  $input | split row $separator | str trim
 }
 
 export def join_multi_value []: any -> string {

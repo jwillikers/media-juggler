@@ -123,3 +123,129 @@ export def test_parse_parallel_multi_value_tag_round_trip [] {
   let input = [null "b" null "d"]
   assert equal ($input | join_parallel_multi_value | parse_parallel_multi_value_tag) $input
 }
+
+export def test_sanitize_file_name_plain [] {
+  assert equal ("My Book" | sanitize_file_name) "My Book"
+}
+
+export def test_sanitize_file_name_slash [] {
+  assert equal ("Fate/Zero" | sanitize_file_name) "Fate⧸Zero"
+}
+
+export def test_sanitize_file_name_dot [] {
+  assert equal ("." | sanitize_file_name) "․"
+}
+
+export def test_sanitize_file_name_dot_dot [] {
+  assert equal (".." | sanitize_file_name) "‥"
+}
+
+export def test_use_unicode_in_title_apostrophe_hyphen_ellipsis [] {
+  assert equal ("Don't Re-read This..." | use_unicode_in_title) "Don’t Re‐read This…"
+}
+
+export def test_use_unicode_in_title_half [] {
+  assert equal ("Ranma 1/2" | use_unicode_in_title) "Ranma ½"
+  assert equal ("Ranma 1⧸2" | use_unicode_in_title) "Ranma ½"
+}
+
+export def test_use_unicode_in_title_quotes [] {
+  assert equal ('The "Best" and "Worst"' | use_unicode_in_title) "The “Best” and “Worst”"
+}
+
+export def test_use_unicode_in_title_keeps_hyphen_before_volume [] {
+  assert equal ("Spice-and-Wolf - Volume 1" | use_unicode_in_title) "Spice‐and‐Wolf - Volume 1"
+}
+
+export def test_standardize_title_no_volume [] {
+  assert equal ("Spice and Wolf" | standardize_title) "Spice and Wolf"
+}
+
+export def test_standardize_title_volume [] {
+  assert equal ("Spice and Wolf - Volume 1" | standardize_title) "Spice and Wolf, Volume 1"
+}
+
+export def test_standardize_title_volume_after_punctuation [] {
+  assert equal ("Kaguya-sama: Love Is War! - Volume 2" | standardize_title) "Kaguya-sama: Love Is War! Volume 2"
+}
+
+export def test_merge_or_input_both [] {
+  assert equal ({a: 1 b: 2} | merge_or_input {b: 3 c: 4}) {a: 1 b: 3 c: 4}
+}
+
+export def test_merge_or_input_empty_input [] {
+  assert equal ({} | merge_or_input {b: 3}) {b: 3}
+}
+
+export def test_merge_or_input_empty_argument [] {
+  assert equal ({a: 1} | merge_or_input null) {a: 1}
+}
+
+export def test_merge_or_input_both_empty [] {
+  assert equal (null | merge_or_input {}) null
+}
+
+export def test_parse_multi_value_tag_empty [] {
+  assert equal ("" | parse_multi_value_tag) null
+}
+
+export def test_parse_multi_value_tag_values [] {
+  assert equal ("a; b ;c" | parse_multi_value_tag) [a b c]
+}
+
+export def test_parse_multi_value_tag_separator [] {
+  assert equal ("a, b;c" | parse_multi_value_tag ",") [a "b;c"]
+}
+
+export def test_join_multi_value_empty [] {
+  assert equal ([] | join_multi_value) null
+}
+
+export def test_join_multi_value_values [] {
+  assert equal ([a b c] | join_multi_value) "a;b;c"
+}
+
+export def test_retry_succeeds_first_attempt [] {
+  let calls = mktemp --tmpdir
+  let result = retry {|| "x" | save --append $calls; "done" } {|response| false } 3 0sec false
+  assert equal $result "done"
+  assert equal (open --raw $calls | str length) 1
+  rm $calls
+}
+
+export def test_retry_until_success [] {
+  let calls = mktemp --tmpdir
+  let result = retry {||
+    "x" | save --append $calls
+    open --raw $calls | str length
+  } {|response| $response < 2 } 3 0sec false
+  assert equal $result 2
+  rm $calls
+}
+
+export def test_retry_makes_at_most_retries_attempts [] {
+  let calls = mktemp --tmpdir
+  let result = retry {|| "x" | save --append $calls; "failure" } {|response| true } 3 0sec false
+  # The result of the final attempt is returned even when it should be retried
+  assert equal $result "failure"
+  assert equal (open --raw $calls | str length) 3
+  rm $calls
+}
+
+export def test_retry_ignores_exceptions [] {
+  let calls = mktemp --tmpdir
+  let result = retry {||
+    "x" | save --append $calls
+    if (open --raw $calls | str length) < 2 {
+      error make {msg: "transient failure"}
+    }
+    "done"
+  } {|response| false } 3 0sec true
+  assert equal $result "done"
+  assert equal (open --raw $calls | str length) 2
+  rm $calls
+}
+
+export def test_retry_rethrows_exceptions [] {
+  assert error {|| retry {|| error make {msg: "failure"} } {|response| false } 3 0sec false }
+}
