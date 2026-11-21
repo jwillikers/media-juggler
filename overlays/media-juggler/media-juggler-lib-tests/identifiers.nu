@@ -52,6 +52,30 @@ export def test_is_identifier_valid_bookbrainz_edition_id_invalid_additional_num
   assert equal ($input | is_identifier_valid "bookbrainz_edition_id") false
 }
 
+export def test_validate_isbn_valid_isbn_13 [] {
+  assert equal ("9798905680892" | validate_isbn) true
+}
+
+export def test_validate_isbn_valid_isbn_10 [] {
+  assert equal ("0306406152" | validate_isbn) true
+}
+
+export def test_validate_isbn_hyphenated [] {
+  assert equal ("979-8-9056-8089-2" | validate_isbn) true
+}
+
+export def test_validate_isbn_invalid_check_digit [] {
+  assert equal ("9798905680893" | validate_isbn) false
+}
+
+export def test_validate_isbn_too_short [] {
+  assert equal ("979890568089" | validate_isbn) false
+}
+
+export def test_validate_isbn_empty [] {
+  assert equal ("" | validate_isbn) false
+}
+
 export def test_is_identifier_valid_bookbrainz_work_id_valid [] {
   let input = "1eddc6be-03b9-45eb-841c-ab8d9d589c94"
   assert equal ($input | is_identifier_valid "bookbrainz_work_id") true
