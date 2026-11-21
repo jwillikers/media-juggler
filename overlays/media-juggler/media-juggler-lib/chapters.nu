@@ -72,13 +72,17 @@ export def parse_chapters_from_musicbrainz_release []: record -> table<index: in
 }
 
 # Get a list of start offsets from a list of durations
-export def lengths_to_start_offsets []: list<duration> -> list<duration> {
-  let lengths = $in | enumerate
-  $lengths | each {|i|
-    $lengths | where index < $i.index | reduce --fold 0ms {|it,acc|
-      $it.item + $acc
+export def lengths_to_start_offsets []: [
+  list<duration> -> list<duration>
+] {
+  $in
+  | reduce --fold {total: 0ms offsets: []} {|length, acc|
+    {
+      total: ($acc.total + $length)
+      offsets: ($acc.offsets | append $acc.total)
     }
   }
+  | get offsets
 }
 
 # Format the duration of a chapter in format used for audiobook chapters
@@ -136,20 +140,22 @@ export def round_to_second_using_cumulative_offset []: list<duration> -> list<du
     } | get durations
 }
 
-# Parse chapters out of MusicBrainz recordings data.
+# Parse chapters out of MusicBrainz recordings data in the chapters.txt format.
 # $release | get media
 export def chapters_from_musicbrainz_release_media []: table -> string {
-  (
-    $in
-    | get tracks
-    | flatten
-    | each {|recording|
-      # Unfortunately, lengths are in seconds and not milliseconds.
-      let time = ($recording.length | into duration --unit ms | collect | lengths_to_start_offsets | each {|t| $t | format_chapter_duration})
-      $"($time) ($recording.title)"
-    }
-    | str join "\n"
+  let tracks = $in | get tracks | flatten
+  let start_offsets = (
+    $tracks
+    | get length
+    | each {|length| $length | into duration --unit ms }
+    | lengths_to_start_offsets
   )
+  $tracks
+  | enumerate
+  | each {|t|
+    $"($start_offsets | get $t.index | format_chapter_duration) ($t.item.title)"
+  }
+  | str join "\n"
 }
 
 # Determine if the chapters are named according to standard defaults.
@@ -182,94 +188,121 @@ export def has_default_chapters []: table<index: int, title: string, duration: d
 # Note that the indices most be 1-based and not 0-based.
 #
 export def rename_chapters [
-    --chapter-word: string = "Chapter" # The string to use for the name of each chapter. This is usually "Chapter".
-    --offset: int # The difference between the track indices and the chapter numbers, i.e. the chapter number is the track index minus this value
-    --prefix: string # A prefix to add before the name of each chapter
-    --suffix: string # A suffix to add after the name of each chapter
+  --chapter-word: string = "Chapter" # The string to use for the name of each chapter. This is usually "Chapter".
+  --offset: int # The difference between the track indices and the chapter numbers, i.e. the chapter number is the track index minus this value
+  --prefix: string # A prefix to add before the name of each chapter
+  --suffix: string # A suffix to add after the name of each chapter
 ]: table<index: int, title: string, duration: duration> -> table<index: int, title: string, duration: duration> {
-    let chapters = $in
-    if ($chapters | length) <= 1 {
-        return $chapters
+  let chapters = $in
+  if ($chapters | length) <= 1 {
+    return $chapters
+  }
+  let chapters = $chapters | sort-by index
+  # todo Handle indexing automatically when it isn't 1-based.
+  if ($chapters | first | get index) != 1 {
+    error make {msg: "rename_chapters requires 1-based indices"}
+  }
+  let offset = (
+    if $offset == null {
+      let c = $chapters | first;
+      if $c.duration < 1min {
+        1
+      } else {
+        0
+      }
+    } else {
+      $offset
     }
-    let chapters = $chapters | sort-by index
-    # todo Handle indexing automatically when it isn't 1-based.
-    if ($chapters | first | get index) != 1 {
-      error make {msg: "rename_chapters requires 1-based indices"}
-    }
-    let offset = (
-        if $offset == null {
-            let c = $chapters | first;
-            if $c.duration < 1min {
-                1
-            } else {
-                0
-            }
+  )
+  $chapters | each {|c|
+    if $c.index == 1 {
+      if $c.duration < 1min {
+        $c | update title "Opening Credits"
+      } else {
+        if $c.index - $offset == 0 {
+          $c | update title "Opening Credits / Prologue"
         } else {
-            $offset
+          $c | update title $"Opening Credits / ($prefix)($chapter_word) ($c.index - $offset)($suffix)"
         }
-    )
-    $chapters | each {|c|
-        if $c.index == 1 {
-            if $c.duration < 1min {
-                $c | update title "Opening Credits"
-            } else {
-                if $c.index - $offset == 0 {
-                    $c | update title "Opening Credits / Prologue"
-                } else {
-                    $c | update title $"Opening Credits / ($prefix)($chapter_word) ($c.index - $offset)($suffix)"
-                }
-            }
-        } else if $c.index == ($chapters | length) {
-            if $c.duration < 3min {
-                $c | update title "End Credits"
-            } else {
-                $c | update title $"($prefix)($chapter_word) ($c.index - $offset)($suffix) / End Credits"
-            }
+      }
+    } else if $c.index == ($chapters | length) {
+      if $c.duration < 3min {
+        $c | update title "Closing Credits"
+      } else {
+        $c | update title $"($prefix)($chapter_word) ($c.index - $offset)($suffix) / Closing Credits"
+      }
+    } else {
+      if $c.index - $offset == 0 {
+        if $c.duration < 1min {
+          $c | update title "Epigraph"
         } else {
-            if $c.index - $offset == 0 {
-                if $c.duration < 1min {
-                    $c | update title "Epigraph"
-                } else {
-                    $c | update title "Prologue"
-                }
-            } else {
-                $c | update title $"($prefix)($chapter_word) ($c.index - $offset)($suffix)"
-            }
+          $c | update title "Prologue"
         }
+      } else {
+        $c | update title $"($prefix)($chapter_word) ($c.index - $offset)($suffix)"
+      }
     }
+  }
+}
+
+# # Find all unquoted forward slashes in a string
+# export def indices_of_unquoted_forward_slashes []: string -> list<int> {
+#     let input = $in
+#     # todo Handle nested quotes
+#     for quote in ["'", '"'] {
+#         let first_single_quote $input | str index-of $quote --range 0
+#     }
+#     []
+# }
+
+# Remove a matching pair of quotes surrounding a string.
+export def unquote []: string -> string {
+  $in | str trim | str replace --regex '^"(.*)"$|^“(.*)”$|^\x27(.*)\x27$' '$1$2$3'
 }
 
 # Parse the Part, Chapter, and Title portions of a chapter.
-export def parse_chapter_title []: string -> record<part: string, part_title: string, chapter: string, chapter_title: string, chapter_part: string> {
-    let input = $in
-    let split = str index-of "/"
-    (
-        $input
-        # todo Split into multiple rows if there's a '/'.
-        | parse --regex '(?<part>Part \w+)?(?<part_title>: \"[\w\s]+\")?(?:,\s)?(?<chapter>[\w\s/]+(?:\s\d+)?)(?<chapter_title>: \"[\w\s]+\")?(?:,\s)?(?<chapter_part>Part \d+)?'
-        | each {|c|
-            {
-                part: $c.part
-                part_title: (
-                    $c.part_title
-                    | str trim --char ':' --left
-                    | str trim --left
-                    | str trim --char '"'
-                    | str trim --char "'"
-                )
-                chapter: $c.chapter
-                chapter_title: (
-                    $c.chapter_title
-                    | str trim --char ':' --left
-                    | str trim --left
-                    | str trim --char '"'
-                    | str trim --char "'"
-                )
-                chapter_part: $c.chapter_part
-            }
-        }
-        | first
-    )
+#
+# Handles titles following the MusicBrainz Audiobook style guideline, with or without quotes around the titles.
+#
+# Part One: "The Part Title", Chapter 1: "The Chapter Title", Part 1
+# Part One, Chapter 1: The Chapter Title
+# Chapter 1: The Chapter Title, Part 1
+# Epigraph / Chapter 1: The Chapter Title
+#
+# Tracks combined with " / " are split into their labels and titles, which are each joined with " / ".
+# Quote a part title that contains a comma so that it isn't mistaken for the end of the part.
+export def parse_chapter_title []: string -> record<part: any, part_title: string, chapter: string, chapter_title: string, chapter_part: any> {
+  let input = $in | str trim
+
+  # A trailing ", Part <n>" indicates that this is one part of a chapter split across multiple tracks.
+  let chapter_part_regex = ',\s+(Part \d+)(?=\s+/\s|$)'
+  let chapter_part = $input | parse --regex $chapter_part_regex | get capture0?.0?
+  let rest = $input | str replace --regex $chapter_part_regex ''
+
+  # A leading "Part <x>", optionally with a title, followed by a comma and the chapter.
+  let part = $rest | parse --regex '^(?<part>Part \w+)(?::\s*(?<part_title>"[^"]*"|“[^”]*”|[^,]*))?,\s+(?<rest>.+)$' | get 0?
+  let rest = if $part == null { $rest } else { $part.rest }
+
+  # Split combined tracks on " / " outside of double quotes.
+  let segments = (
+    $rest
+    | split row --regex '\s+/\s+(?=(?:[^"]*"[^"]*")*[^"]*$)'
+    | each {|segment|
+      let parsed = $segment | parse --regex '^(?<label>[^:]+?)(?::\s*(?<title>.*))?$' | first
+      {
+        label: ($parsed.label | str trim)
+        title: ($parsed.title | default "" | unquote)
+      }
+    }
+  )
+
+  {
+    part: $part.part?
+    part_title: ($part.part_title? | default "" | unquote)
+    chapter: ($segments.label | str join " / ")
+    chapter_title: ($segments.title | where {|t| $t | is-not-empty } | str join " / ")
+    chapter_part: $chapter_part
+  }
 }
 
 # Combine chapters split into multiple parts into complete chapters
