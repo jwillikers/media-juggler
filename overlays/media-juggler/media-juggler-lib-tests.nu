@@ -19,8 +19,8 @@ const result_marker = "MEDIA_JUGGLER_TEST_RESULT "
 def discover_tests []: path -> record<exported: list<string>, skipped: list<string>> {
   let source = open --raw $in
   {
-    exported: ($source | parse --regex '(?m)^export def (?<name>test_\w+) ' | get name)
-    skipped: ($source | parse --regex '(?m)^def (?<name>test_\w+) ' | get name)
+    exported: ($source | parse --regex '(?m)^export def (?<name>test_[^\s\[]+) ' | get name)
+    skipped: ($source | parse --regex '(?m)^def (?<name>test_[^\s\[]+) ' | get name)
   }
 }
 
