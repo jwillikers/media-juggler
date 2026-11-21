@@ -1110,10 +1110,6 @@ export def test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802 [] {
   assert equal ($input | parse_musicbrainz_work) $expected
 }
 
-export def test_parse_musicbrainz_work [] {
-  test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802
-}
-
 export def test_escape_special_lucene_characters_empty_input [] {
   let input = ""
   let expected = ""
