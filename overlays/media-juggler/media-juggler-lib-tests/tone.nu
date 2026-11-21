@@ -4,6 +4,7 @@ use std assert
 use std log
 
 use ../media-juggler-lib *
+use helpers/assertions.nu *
 
 export def test_parse_series_from_group_one_without_index [] {
   let expected = [[name index]; ["The Stormlight Archive" null]]
@@ -225,20 +226,7 @@ export def test_parse_audiobook_metadata_from_tone_picard [] {
     }
   }
   let actual = $input | parse_audiobook_metadata_from_tone
-
-  # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
-  # assert equal $actual.book $expected.book
-  # for column in ($expected.track | columns) {
-  #   assert equal ($actual.track | get $column) ($expected.track | get $column)
-  # }
-  # for column in ($actual.track | columns) {
-  #   assert equal ($actual.track | get $column) ($expected.track | get $column)
-  # }
-  # assert equal $actual.track $expected.track
-  assert equal $actual $expected
+  assert_equal_deep $actual $expected
 }
 
 export def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
@@ -334,21 +322,7 @@ export def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
     }
   }
   let actual = $input | parse_audiobook_metadata_from_tone
-
-  # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
-  # for column in ($actual.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
-  # assert equal $actual.book.chapters $expected.book.chapters
-  # assert equal $actual.book $expected.book
-  # for column in ($expected.track | columns) {
-  #   assert equal ($actual.track | get $column) ($expected.track | get $column)
-  # }
-  # assert equal $actual.track $expected.track
-  assert equal $actual $expected
+  assert_equal_deep $actual $expected
 }
 
 export def test_parse_audiobook_metadata_from_tone_works [] {
@@ -447,19 +421,7 @@ export def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
     }]
   }
   let actual = $input | parse_audiobook_metadata_from_tracks_metadata
-
-  # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
-  # assert equal $actual.book $expected.book
-  # for expected_track in $expected.tracks {
-  #   for column in ($expected_track | columns) {
-  #     assert equal (($actual.tracks | where index == $expected_track.index | first) | get $column) ($expected_track | get $column)
-  #   }
-  # }
-  # assert equal $actual.tracks $expected.tracks
-  assert equal $actual $expected
+  assert_equal_deep $actual $expected
 }
 
 export def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
@@ -574,22 +536,7 @@ export def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
     }]
   }
   let actual = $input | parse_audiobook_metadata_from_tracks_metadata
-
-  # todo Make a better comparison function for tests and use it here.
-  # for column in ($expected.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
-  # for column in ($expected.book | columns) {
-  #   assert equal ($actual.book | get $column) ($expected.book | get $column)
-  # }
-  # assert equal $actual.book $expected.book
-  # for expected_track in $expected.tracks {
-  #   for column in ($expected_track | columns) {
-  #     assert equal (($actual.tracks | where index == $expected_track.index | first) | get $column) ($expected_track | get $column)
-  #   }
-  # }
-  # assert equal $actual.tracks $expected.tracks
-  assert equal $actual $expected
+  assert_equal_deep $actual $expected
 }
 
 export def test_convert_series_for_group_tag_one_with_index [] {

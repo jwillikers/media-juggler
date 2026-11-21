@@ -4,6 +4,7 @@ use std assert
 use std log
 
 use ../media-juggler-lib *
+use helpers/assertions.nu *
 
 const test_data_dir = path self ../test-data
 
@@ -56,13 +57,7 @@ export def test_from_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
     ],
     page_count: "187"
   }
-  let output = $input | from_comic_info_xml
-  # log debug $"\n($output | to nuon)\n"
-  assert equal ($output | columns | sort) ($expected | columns | sort)
-  $output | columns | sort | each {|key|
-    assert equal ($output | get $key) ($expected | get $key)
-  }
-  # assert equal $output $expected
+  assert_equal_deep ($input | from_comic_info_xml) $expected
 }
 
 # Not exported, so the test runner skips it.

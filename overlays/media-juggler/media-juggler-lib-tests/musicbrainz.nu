@@ -4,6 +4,7 @@ use std assert
 use std log
 
 use ../media-juggler-lib *
+use helpers/assertions.nu *
 
 const test_data_dir = path self ../test-data
 
@@ -231,19 +232,7 @@ export def test_parse_musicbrainz_release_baccano_vol_1 [] {
     ]
   }
   let actual = ($input | parse_musicbrainz_release)
-  assert equal ($actual | get book | columns) ($expected | get book | columns)
-  assert equal ($actual | get book | get artist_credit) ($expected | get book | get artist_credit)
-  assert equal ($actual | get book | get series) ($expected | get book | get series)
-  assert equal ($actual | get book | get tags) ($expected | get book | get tags)
-  assert equal ($actual | get book | get contributors) ($expected | get book | get contributors)
-  assert equal ($actual | get book) ($expected | get book)
-  assert equal ($actual | get tracks | first | columns) ($expected | get tracks | first | columns)
-  assert equal ($actual | get tracks | first | get artist_credit) ($expected | get tracks | first | get artist_credit)
-  assert equal ($actual | get tracks | first | get contributors) ($expected | get tracks | first | get contributors)
-  assert equal ($actual | get tracks | first | get musicbrainz_works) ($expected | get tracks | first | get musicbrainz_works)
-  assert equal ($actual | get tracks | first) ($expected | get tracks | first)
-  assert equal ($actual | get tracks) ($expected | get tracks)
-  assert equal $actual $expected
+  assert_equal_deep $actual $expected
 }
 
 export def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
@@ -336,17 +325,7 @@ export def test_parse_musicbrainz_release_bakemonogatari_part_01 [] {
     ]
   }
   let actual = ($input | parse_musicbrainz_release)
-  assert equal ($actual | get book | columns) ($expected | get book | columns)
-  assert equal ($actual | get book | get artist_credit) ($expected | get book | get artist_credit)
-  assert equal ($actual | get book | get tags) ($expected | get book | get tags)
-  assert equal ($actual | get book | get chapters) ($expected | get book | get chapters)
-  assert equal ($actual | get book | get series) ($expected | get book | get series)
-  assert equal ($actual | get book | get contributors) ($expected | get book | get contributors)
-  assert equal ($actual | get book | get publishers) ($expected | get book | get publishers)
-  assert equal ($actual | get book) ($expected | get book)
-  # log info $"($actual | get tracks | to nuon)"
-  assert equal ($actual | get tracks) ($expected | get tracks)
-  assert equal $actual $expected
+  assert_equal_deep $actual $expected
 }
 
 export def test_parse_musicbrainz_series_monogatari_work [] {
