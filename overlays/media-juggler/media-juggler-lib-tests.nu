@@ -73,7 +73,8 @@ def run_test_module [
   let output = (
     do {
       cd ($tests_directory | path dirname)
-      ^$nu.current-exe --no-config-file --commands (build_test_script $file $module $tests) | complete
+      # Pass empty input so that a test can't wait on the runner's stdin
+      "" | ^$nu.current-exe --no-config-file --commands (build_test_script $file $module $tests) | complete
     }
   )
   let results = (
