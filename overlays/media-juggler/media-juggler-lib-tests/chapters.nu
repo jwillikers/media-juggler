@@ -7,6 +7,30 @@ use ../media-juggler-lib *
 
 const test_data_dir = path self ../test-data
 
+def test_chapters_from_musicbrainz_release_media [] {
+  let media = [
+    {
+      tracks: [
+        {title: "Opening Credits" length: 30069}
+        {title: "Chapter 1" length: 1144834}
+      ]
+    }
+    {
+      tracks: [
+        {title: "Chapter 2" length: 1148453}
+        {title: "Closing Credits" length: 7191}
+      ]
+    }
+  ]
+  let expected = [
+    "00:00:00.000 Opening Credits"
+    "00:00:30.069 Chapter 1"
+    "00:19:34.903 Chapter 2"
+    "00:38:43.356 Closing Credits"
+  ] | str join "\n"
+  assert equal ($media | chapters_from_musicbrainz_release_media) $expected
+}
+
 def test_round_to_second_using_cumulative_offset [] {
   let durations = [
     30069ms
@@ -220,6 +244,7 @@ def test_chapters_into_tone_format [] {
 
 # Run the tests in this module
 export def run_tests [] {
+  test_chapters_from_musicbrainz_release_media
   test_round_to_second_using_cumulative_offset
   test_combine_chapter_parts
   test_parse_chapters_from_tone
