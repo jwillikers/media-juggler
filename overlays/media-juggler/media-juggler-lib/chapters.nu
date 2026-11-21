@@ -72,13 +72,17 @@ export def parse_chapters_from_musicbrainz_release []: record -> table<index: in
 }
 
 # Get a list of start offsets from a list of durations
-export def lengths_to_start_offsets []: list<duration> -> list<duration> {
-  let lengths = $in | enumerate
-  $lengths | each {|i|
-    $lengths | where index < $i.index | reduce --fold 0ms {|it,acc|
-      $it.item + $acc
+export def lengths_to_start_offsets []: [
+  list<duration> -> list<duration>
+] {
+  $in
+  | reduce --fold {total: 0ms offsets: []} {|length, acc|
+    {
+      total: ($acc.total + $length)
+      offsets: ($acc.offsets | append $acc.total)
     }
   }
+  | get offsets
 }
 
 # Format the duration of a chapter in format used for audiobook chapters
