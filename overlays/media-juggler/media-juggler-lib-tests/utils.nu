@@ -249,3 +249,23 @@ export def test_retry_ignores_exceptions [] {
 export def test_retry_rethrows_exceptions [] {
   assert error {|| retry {|| error make {msg: "failure"} } {|response| false } 3 0sec false }
 }
+
+export def test_hash_sha3_512 [] {
+  let file = mktemp --tmpdir
+  "abc" | save --force $file
+  let expected = "b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0"
+  assert equal ($file | hash_sha3_512) $expected
+  rm $file
+}
+
+export def test_hash_blake3 [] {
+  let file = mktemp --tmpdir
+  "abc" | save --force $file
+  let expected = "6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85"
+  assert equal ($file | hash_blake3) $expected
+  rm $file
+}
+
+export def test_hash_sha3_512_missing_file [] {
+  assert error {|| "missing-file" | hash_sha3_512 }
+}
