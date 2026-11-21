@@ -242,10 +242,188 @@ def test_chapters_into_tone_format [] {
   test_chapters_into_tone_format_baccano_vol_1
 }
 
+def chapter_title [
+  chapter: string
+  --part: any = null
+  --part-title: string = ""
+  --chapter-title: string = ""
+  --chapter-part: any = null
+] {
+  {
+    part: $part
+    part_title: $part_title
+    chapter: $chapter
+    chapter_title: $chapter_title
+    chapter_part: $chapter_part
+  }
+}
+
+def test_unquote [] {
+  assert equal ('"Quoted"' | unquote) "Quoted"
+  assert equal ("'Quoted'" | unquote) "Quoted"
+  assert equal ('“Quoted”' | unquote) "Quoted"
+  assert equal ('  "Quoted"  ' | unquote) "Quoted"
+  assert equal ("Unquoted" | unquote) "Unquoted"
+  assert equal ("What's Next?" | unquote) "What's Next?"
+  assert equal ('"Mismatched' | unquote) '"Mismatched'
+  assert equal ('""' | unquote) ""
+  assert equal ("" | unquote) ""
+}
+
+def test_parse_chapter_title_all_parts [] {
+  let chapter = 'Part One: "The First Part", Chapter 1: "The First Chapter", Part 1'
+  let expected = {
+    part: "Part One"
+    part_title: "The First Part"
+    chapter: "Chapter 1"
+    chapter_title: "The First Chapter"
+    chapter_part: "Part 1"
+  }
+  assert equal ($chapter | parse_chapter_title) $expected
+}
+
+def test_parse_chapter_title_chapter_only [] {
+  let chapter = 'Chapter 1'
+  let expected = {
+    part: null
+    part_title: ""
+    chapter: "Chapter 1"
+    chapter_title: ""
+    chapter_part: null
+  }
+  assert equal ($chapter | parse_chapter_title) $expected
+}
+
+def test_parse_chapter_title_chapter_with_name [] {
+  let chapter = 'Chapter 1: "First Chapter"'
+  let expected = {
+    part: null
+    part_title: ""
+    chapter: "Chapter 1"
+    chapter_title: "First Chapter"
+    chapter_part: null
+  }
+  assert equal ($chapter | parse_chapter_title) $expected
+}
+
+def test_parse_chapter_title_chapter_part [] {
+  let chapter = 'Chapter 1, Part 1'
+  let expected = {
+    part: null
+    part_title: ""
+    chapter: "Chapter 1"
+    chapter_title: ""
+    chapter_part: "Part 1"
+  }
+  assert equal ($chapter | parse_chapter_title) $expected
+}
+
+def test_parse_chapter_title_part_chapter [] {
+  let chapter = 'Part One, Chapter 1'
+  let expected = {
+    part: "Part One"
+    part_title: ""
+    chapter: "Chapter 1"
+    chapter_title: ""
+    chapter_part: null
+  }
+  assert equal ($chapter | parse_chapter_title) $expected
+}
+
+def test_parse_chapter_title_opening_credits [] {
+  let chapter = 'Opening Credits'
+  let expected = {
+    part: null
+    part_title: ""
+    chapter: "Opening Credits"
+    chapter_title: ""
+    chapter_part: null
+  }
+  assert equal ($chapter | parse_chapter_title) $expected
+}
+
+def test_parse_chapter_title_opening_credits_chapter_one [] {
+  let chapter = 'Opening Credits / Chapter 1'
+  let expected = {
+    part: null
+    part_title: ""
+    chapter: "Opening Credits / Chapter 1"
+    chapter_title: ""
+    chapter_part: null
+  }
+  assert equal ($chapter | parse_chapter_title) $expected
+}
+
+def test_parse_chapter_title_unquoted_title [] {
+  assert equal ("Chapter 1: Piranesi" | parse_chapter_title) (chapter_title "Chapter 1" --chapter-title "Piranesi")
+  assert equal ("Chapter 7: Matthew Rose Sorensen" | parse_chapter_title) (chapter_title "Chapter 7" --chapter-title "Matthew Rose Sorensen")
+  assert equal ("Chapter 4: 16" | parse_chapter_title) (chapter_title "Chapter 4" --chapter-title "16")
+}
+
+def test_parse_chapter_title_punctuation [] {
+  assert equal ("Chapter 3: What's Next?" | parse_chapter_title) (chapter_title "Chapter 3" --chapter-title "What's Next?")
+  assert equal ("Chapter 3: \"What's Next?\"" | parse_chapter_title) (chapter_title "Chapter 3" --chapter-title "What's Next?")
+  assert equal ("Chapter 1: Foo: Bar" | parse_chapter_title) (chapter_title "Chapter 1" --chapter-title "Foo: Bar")
+  assert equal ("Chapter 1: Mr. Norrell, Esq." | parse_chapter_title) (chapter_title "Chapter 1" --chapter-title "Mr. Norrell, Esq.")
+  assert equal ("Chapter 1: AC/DC" | parse_chapter_title) (chapter_title "Chapter 1" --chapter-title "AC/DC")
+  assert equal ('Chapter 1: “Curly Quotes”' | parse_chapter_title) (chapter_title "Chapter 1" --chapter-title "Curly Quotes")
+}
+
+def test_parse_chapter_title_chapter_part_with_title [] {
+  assert equal ("Chapter 2: The Other, Part 1" | parse_chapter_title) (chapter_title "Chapter 2" --chapter-title "The Other" --chapter-part "Part 1")
+  assert equal ('Chapter 2: "The Other", Part 12' | parse_chapter_title) (chapter_title "Chapter 2" --chapter-title "The Other" --chapter-part "Part 12")
+  assert equal ("Chapter 4: 16, Part 2" | parse_chapter_title) (chapter_title "Chapter 4" --chapter-title "16" --chapter-part "Part 2")
+}
+
+def test_parse_chapter_title_unquoted_part_title [] {
+  assert equal ("Part One: Beginnings, Chapter 1: The Start" | parse_chapter_title) (
+    chapter_title "Chapter 1" --part "Part One" --part-title "Beginnings" --chapter-title "The Start"
+  )
+}
+
+def test_parse_chapter_title_quoted_commas_and_slashes [] {
+  assert equal ('Part One: "Beginnings, Endings", Chapter 1: "Either / Or", Part 2' | parse_chapter_title) (
+    chapter_title "Chapter 1" --part "Part One" --part-title "Beginnings, Endings" --chapter-title "Either / Or" --chapter-part "Part 2"
+  )
+}
+
+def test_parse_chapter_title_combined_tracks [] {
+  assert equal ("Epigraph / Chapter 1: Piranesi" | parse_chapter_title) (chapter_title "Epigraph / Chapter 1" --chapter-title "Piranesi")
+  assert equal ('Chapter 5: "The End" / Closing Credits' | parse_chapter_title) (chapter_title "Chapter 5 / Closing Credits" --chapter-title "The End")
+  assert equal ("Chapter 5, Part 2 / Closing Credits" | parse_chapter_title) (chapter_title "Chapter 5 / Closing Credits" --chapter-part "Part 2")
+  assert equal ("Chapter 1: One / Chapter 2: Two" | parse_chapter_title) (chapter_title "Chapter 1 / Chapter 2" --chapter-title "One / Two")
+}
+
+def test_parse_chapter_title_chapter_word_part [] {
+  # Chapters may themselves be named "Part".
+  assert equal ("Part 3" | parse_chapter_title) (chapter_title "Part 3")
+  assert equal ("Part 3: The Return" | parse_chapter_title) (chapter_title "Part 3" --chapter-title "The Return")
+  assert equal ("Part 1, Part 2" | parse_chapter_title) (chapter_title "Part 1" --chapter-part "Part 2")
+}
+
+def test_parse_chapter_title [] {
+  test_parse_chapter_title_unquoted_title
+  test_parse_chapter_title_punctuation
+  test_parse_chapter_title_chapter_part_with_title
+  test_parse_chapter_title_unquoted_part_title
+  test_parse_chapter_title_quoted_commas_and_slashes
+  test_parse_chapter_title_combined_tracks
+  test_parse_chapter_title_chapter_word_part
+  test_parse_chapter_title_all_parts
+  test_parse_chapter_title_chapter_only
+  test_parse_chapter_title_chapter_with_name
+  test_parse_chapter_title_chapter_part
+  test_parse_chapter_title_part_chapter
+  test_parse_chapter_title_opening_credits
+  test_parse_chapter_title_opening_credits_chapter_one
+}
+
 # Run the tests in this module
 export def run_tests [] {
   test_chapters_from_musicbrainz_release_media
   test_round_to_second_using_cumulative_offset
+  test_unquote
+  test_parse_chapter_title
   test_combine_chapter_parts
   test_parse_chapters_from_tone
   test_chapters_into_tone_format
