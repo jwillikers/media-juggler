@@ -162,7 +162,7 @@ export def test_identifier_from_url_bookbrainz_edition_id_valid_edition [] {
   assert equal ($input | identifier_from_url "bookbrainz_edition_id") $expected
 }
 
-def test_identifier_from_url_bookbrainz_edition_id_invalid_edition [] {
+export def test_identifier_from_url_bookbrainz_edition_id_invalid_edition [] {
   let input = "https://bookbrainz.org/edition/594a8ec2-6301-4c20-ae22-2c43840416b22"
   let expected = {}
   assert equal ($input | identifier_from_url "bookbrainz_edition_id") $expected
@@ -236,7 +236,7 @@ export def test_identifier_from_url_comic_vine_issue_id_valid_issue [] {
   assert equal ($input | identifier_from_url "comic_vine_issue_id") $expected
 }
 
-def test_identifier_from_url_comic_vine_issue_id_invalid_edition [] {
+export def test_identifier_from_url_comic_vine_issue_id_invalid_edition [] {
   let input = "https://comicvine.gamespot.com/march-comes-in-like-a-lion-1-volume-1/4050-987377/"
   let expected = {}
   assert equal ($input | identifier_from_url "comic_vine_issue_id") $expected
@@ -292,7 +292,7 @@ export def test_identifier_from_url_hardcover_book_slug_valid_book_http [] {
   assert equal ($input | identifier_from_url "hardcover_book_slug") $expected
 }
 
-def test_identifier_from_url_hardcover_book_slug_valid_book_with_edition_id [] {
+export def test_identifier_from_url_hardcover_book_slug_valid_book_with_edition_id [] {
   let input = "http://hardcover.app/books/march-comes-in-like-a-lion-vol-1/editions/123456"
   let expected = {
     hardcover_book_slug: "march-comes-in-like-a-lion-vol-1"

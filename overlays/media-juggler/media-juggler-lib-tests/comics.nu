@@ -65,7 +65,7 @@ export def test_from_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
   # assert equal $output $expected
 }
 
-def test_from_metron_info_xml_march_comes_in_like_a_lion_vol_1 [] {
+export def test_from_metron_info_xml_march_comes_in_like_a_lion_vol_1 [] {
   let input = open ([$test_data_dir "March Comes in Like a Lion v001_MetronInfo.xml"] | path join)
   let $expected = {
 

@@ -665,7 +665,7 @@ export def test_build_series_tree_up_three_levels [] {
   assert equal ($input | build_series_tree_up 5 $monogatari_series_cache) $expected
 }
 
-def test_build_series_tree_up_three_levels_2 [] {
+export def test_build_series_tree_up_three_levels_2 [] {
   let monogatari_series_cache = {|type series_id, update|
     log info $"$series_id: ($series_id)"
     if $series_id == "05ef20c8-9286-4b53-950f-eac8cbb32dc3" {
@@ -1089,7 +1089,7 @@ def test_organize_subseries_two_subseries [] {
   assert equal ($input | organize_subseries) $expected
 }
 
-def test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802 [] {
+export def test_parse_musicbrainz_work_c7a83643-33a3-48ab-b54e-f56554359802 [] {
   let input = open ([$test_data_dir "work_c7a83643-33a3-48ab-b54e-f56554359802.json"] | path join)
   let expected = {
     id: "c7a83643-33a3-48ab-b54e-f56554359802"

@@ -1021,7 +1021,7 @@ export def test_filter_musicbrainz_chapters_releases_duration [] {
   assert equal ($candidates | filter_musicbrainz_chapters_releases $target) $expected
 }
 
-def test_filter_musicbrainz_chapters_releases_two_match [] {
+export def test_filter_musicbrainz_chapters_releases_two_match [] {
   let target = {
     book: {
       musicbrainz_release_id: "2eae5bdf-6c19-4ade-b7fa-e0672b0d59a7",
