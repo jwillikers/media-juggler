@@ -188,62 +188,72 @@ export def has_default_chapters []: table<index: int, title: string, duration: d
 # Note that the indices most be 1-based and not 0-based.
 #
 export def rename_chapters [
-    --chapter-word: string = "Chapter" # The string to use for the name of each chapter. This is usually "Chapter".
-    --offset: int # The difference between the track indices and the chapter numbers, i.e. the chapter number is the track index minus this value
-    --prefix: string # A prefix to add before the name of each chapter
-    --suffix: string # A suffix to add after the name of each chapter
+  --chapter-word: string = "Chapter" # The string to use for the name of each chapter. This is usually "Chapter".
+  --offset: int # The difference between the track indices and the chapter numbers, i.e. the chapter number is the track index minus this value
+  --prefix: string # A prefix to add before the name of each chapter
+  --suffix: string # A suffix to add after the name of each chapter
 ]: table<index: int, title: string, duration: duration> -> table<index: int, title: string, duration: duration> {
-    let chapters = $in
-    if ($chapters | length) <= 1 {
-        return $chapters
+  let chapters = $in
+  if ($chapters | length) <= 1 {
+    return $chapters
+  }
+  let chapters = $chapters | sort-by index
+  # todo Handle indexing automatically when it isn't 1-based.
+  if ($chapters | first | get index) != 1 {
+    error make {msg: "rename_chapters requires 1-based indices"}
+  }
+  let offset = (
+    if $offset == null {
+      let c = $chapters | first;
+      if $c.duration < 1min {
+        1
+      } else {
+        0
+      }
+    } else {
+      $offset
     }
-    let chapters = $chapters | sort-by index
-    # todo Handle indexing automatically when it isn't 1-based.
-    if ($chapters | first | get index) != 1 {
-      error make {msg: "rename_chapters requires 1-based indices"}
-    }
-    let offset = (
-        if $offset == null {
-            let c = $chapters | first;
-            if $c.duration < 1min {
-                1
-            } else {
-                0
-            }
+  )
+  $chapters | each {|c|
+    if $c.index == 1 {
+      if $c.duration < 1min {
+        $c | update title "Opening Credits"
+      } else {
+        if $c.index - $offset == 0 {
+          $c | update title "Opening Credits / Prologue"
         } else {
-            $offset
+          $c | update title $"Opening Credits / ($prefix)($chapter_word) ($c.index - $offset)($suffix)"
         }
-    )
-    $chapters | each {|c|
-        if $c.index == 1 {
-            if $c.duration < 1min {
-                $c | update title "Opening Credits"
-            } else {
-                if $c.index - $offset == 0 {
-                    $c | update title "Opening Credits / Prologue"
-                } else {
-                    $c | update title $"Opening Credits / ($prefix)($chapter_word) ($c.index - $offset)($suffix)"
-                }
-            }
-        } else if $c.index == ($chapters | length) {
-            if $c.duration < 3min {
-                $c | update title "End Credits"
-            } else {
-                $c | update title $"($prefix)($chapter_word) ($c.index - $offset)($suffix) / End Credits"
-            }
+      }
+    } else if $c.index == ($chapters | length) {
+      if $c.duration < 3min {
+        $c | update title "Closing Credits"
+      } else {
+        $c | update title $"($prefix)($chapter_word) ($c.index - $offset)($suffix) / Closing Credits"
+      }
+    } else {
+      if $c.index - $offset == 0 {
+        if $c.duration < 1min {
+          $c | update title "Epigraph"
         } else {
-            if $c.index - $offset == 0 {
-                if $c.duration < 1min {
-                    $c | update title "Epigraph"
-                } else {
-                    $c | update title "Prologue"
-                }
-            } else {
-                $c | update title $"($prefix)($chapter_word) ($c.index - $offset)($suffix)"
-            }
+          $c | update title "Prologue"
         }
+      } else {
+        $c | update title $"($prefix)($chapter_word) ($c.index - $offset)($suffix)"
+      }
     }
+  }
 }
+
+# # Find all unquoted forward slashes in a string
+# export def indices_of_unquoted_forward_slashes []: string -> list<int> {
+#     let input = $in
+#     # todo Handle nested quotes
+#     for quote in ["'", '"'] {
+#         let first_single_quote $input | str index-of $quote --range 0
+#     }
+#     []
+# }
 
 # Remove a matching pair of quotes surrounding a string.
 export def unquote []: string -> string {
