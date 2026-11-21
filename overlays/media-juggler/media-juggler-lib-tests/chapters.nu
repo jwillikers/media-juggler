@@ -7,6 +7,21 @@ use ../media-juggler-lib *
 
 const test_data_dir = path self ../test-data
 
+def test_lengths_to_start_offsets [] {
+  assert equal ([] | lengths_to_start_offsets) []
+  assert equal ([5min] | lengths_to_start_offsets) [0ms]
+  assert equal ([30sec 5min 1hr 2ms] | lengths_to_start_offsets) [0ms 30sec 330sec 3930sec]
+}
+
+def test_format_chapter_duration [] {
+  assert equal (0ms | format_chapter_duration) "00:00:00.000"
+  assert equal (1ms | format_chapter_duration) "00:00:00.001"
+  assert equal (59999ms | format_chapter_duration) "00:00:59.999"
+  assert equal (1min | format_chapter_duration) "00:01:00.000"
+  assert equal (3723004ms | format_chapter_duration) "01:02:03.004"
+  assert equal (100hr | format_chapter_duration) "100:00:00.000"
+}
+
 def test_chapters_from_musicbrainz_release_media [] {
   let media = [
     {
@@ -29,6 +44,53 @@ def test_chapters_from_musicbrainz_release_media [] {
     "00:38:43.356 Closing Credits"
   ] | str join "\n"
   assert equal ($media | chapters_from_musicbrainz_release_media) $expected
+}
+
+# Generate a reproducible list of track durations between 1 second and 2 hours using a linear congruential generator.
+def pseudo_random_durations [count: int] {
+  1..$count | reduce --fold {seed: 42 durations: []} {|_, acc|
+    let seed = ($acc.seed * 1103515245 + 12345) mod 2147483648
+    {
+      seed: $seed
+      durations: ($acc.durations | append (($seed mod 7199000 + 1000) * 1ms))
+    }
+  } | get durations
+}
+
+def test_round_to_second_using_cumulative_offset_edge_cases [] {
+  assert equal ([] | round_to_second_using_cumulative_offset) []
+  assert equal ([10sec 20sec] | round_to_second_using_cumulative_offset) [10sec 20sec]
+  # Ties round down when there is no accumulated offset.
+  assert equal ([500ms] | round_to_second_using_cumulative_offset) [0sec]
+  # The accumulated offset is kept from drifting from the total.
+  let durations = [1400ms 1400ms 1400ms 1400ms 1400ms]
+  let rounded = $durations | round_to_second_using_cumulative_offset
+  assert equal $rounded [1sec 2sec 1sec 2sec 1sec]
+  assert equal ($rounded | math sum) 7sec
+}
+
+def test_round_to_second_using_cumulative_offset_does_not_accumulate_error [] {
+  # Rounding every track up or down on its own lets the error grow with each track.
+  # The total of the rounded durations must stay within half a second of the actual total at every track.
+  for durations in [
+    (pseudo_random_durations 500)
+    # Every track rounding up on its own.
+    (1..200 | each { 1600ms })
+    # Every track rounding down on its own.
+    (1..200 | each { 1400ms })
+    # Every track exactly between two seconds.
+    (1..200 | each { 2500ms })
+  ] {
+    let rounded = $durations | round_to_second_using_cumulative_offset
+    assert equal ($rounded | length) ($durations | length)
+    assert ($rounded | all {|d| $d mod 1sec == 0ms })
+    let actual_start_offsets = $durations | append 0ms | lengths_to_start_offsets
+    let rounded_start_offsets = $rounded | append 0ms | lengths_to_start_offsets
+    $actual_start_offsets | zip $rounded_start_offsets | enumerate | each {|it|
+      let error = ($it.item.1 - $it.item.0) | math abs
+      assert ($error <= 500ms) $"Accumulated rounding error of ($error) after ($it.index) tracks"
+    }
+  }
 }
 
 def test_round_to_second_using_cumulative_offset [] {
@@ -160,7 +222,41 @@ def test_combine_chapter_parts_combine_one_chapter_three_parts [] {
   assert equal ($input | combine_chapter_parts) $expected
 }
 
+def test_combine_chapter_parts_non_one_based_index [] {
+  let input = [
+    [index title duration];
+    [0 "Chapter 1, Part 1" 1min]
+    [1 "Chapter 1, Part 2" 2min]
+    [2 "Chapter 2" 3min]
+  ]
+  let expected = [
+    [index title duration];
+    [0 "Chapter 1" 3min]
+    [1 "Chapter 2" 3min]
+  ]
+  assert equal ($input | combine_chapter_parts) $expected
+}
+
+def test_combine_chapter_parts_non_adjacent [] {
+  # Only consecutive parts of the same chapter are combined.
+  let input = [
+    [index title duration];
+    [1 "Chapter 1, Part 1" 1min]
+    [2 "Chapter 2" 2min]
+    [3 "Chapter 1, Part 2" 3min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Chapter 1" 1min]
+    [2 "Chapter 2" 2min]
+    [3 "Chapter 1" 3min]
+  ]
+  assert equal ($input | combine_chapter_parts) $expected
+}
+
 def test_combine_chapter_parts [] {
+  test_combine_chapter_parts_non_one_based_index
+  test_combine_chapter_parts_non_adjacent
   test_combine_chapter_parts_none
   test_combine_chapter_parts_combine_one_chapter
   test_combine_chapter_parts_combine_two_chapters
@@ -240,6 +336,366 @@ def test_chapters_into_tone_format_baccano_vol_1 [] {
 
 def test_chapters_into_tone_format [] {
   test_chapters_into_tone_format_baccano_vol_1
+}
+
+def test_has_default_chapters_audible [] {
+  let chapters = [
+    [index title duration];
+    [1 "Chapter 1" 30069ms]
+    [2 "Chapter 2" 7191ms]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "Chapter 5" 340334ms]
+  ]
+  assert equal ($chapters | has_default_chapters) true
+
+  let chapters = [
+    [index title duration];
+    [1 "Chapter 1" 30069ms]
+    [2 "Chapter 2" 7191ms]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "Epilogue / Closing Credits" 340334ms]
+  ]
+  assert equal ($chapters | has_default_chapters) false
+}
+
+def test_has_default_chapters_libro_fm [] {
+  let chapters = [
+    [index title duration];
+    [1 "Hogfather - Track 001" 30069ms]
+    [2 "Hogfather - Track 002" 7191ms]
+    [3 "Hogfather - Track 003" 1144834ms]
+    [4 "Hogfather - Track 004" 1148453ms]
+    [5 "Hogfather - Track 005" 340334ms]
+  ]
+  assert equal ($chapters | has_default_chapters) true
+
+  let chapters = [
+    [index title duration];
+    [1 "Hogfather - Track 001" 30069ms]
+    [2 "Chapter 2" 7191ms]
+    [3 "Hogfather - Track 003" 1144834ms]
+    [4 "Hogfather - Track 004" 1148453ms]
+    [5 "Hogfather - Track 005" 340334ms]
+  ]
+  assert equal ($chapters | has_default_chapters) false
+}
+
+def test_has_default_chapters_empty [] {
+  assert equal ([] | has_default_chapters) false
+}
+
+def test_has_default_chapters [] {
+  test_has_default_chapters_empty
+  test_has_default_chapters_audible
+  test_has_default_chapters_libro_fm
+}
+
+def test_rename_chapters_audible [] {
+  let chapters = [
+    [index title duration];
+    [1 "Prologue" 5min]
+    [2 "Chapter 1" 15min]
+    [3 "Chapter 2" 1144834ms]
+    [4 "Chapter 3" 1148453ms]
+    [5 "Epilogue" 30min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits / Chapter 1" 5min]
+    [2 "Chapter 2" 15min]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "Chapter 5 / End Credits" 30min]
+  ]
+  assert equal ($chapters | rename_chapters) $expected
+
+  let chapters = [
+    [index title duration];
+    [1 "Chapter 1" 1155053ms]
+    [2 "Chapter 2" 418842ms]
+    [3 "Chapter 3" 1404064ms]
+    [4 "Chapter 4" 538424ms]
+    [5 "Chapter 5" 325212ms]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits / Chapter 1" 1155053ms]
+    [2 "Chapter 2" 418842ms]
+    [3 "Chapter 3" 1404064ms]
+    [4 "Chapter 4" 538424ms]
+    [5 "Chapter 5 / End Credits" 325212ms]
+  ]
+  assert equal ($chapters | rename_chapters) $expected
+}
+
+def test_rename_chapters_libro_fm [] {
+  let chapters = [
+    [index title duration];
+    [1 "Hogfather - Track 001" 5min]
+    [2 "Hogfather - Track 002" 7191ms]
+    [3 "Hogfather - Track 003" 1144834ms]
+    [4 "Hogfather - Track 004" 1148453ms]
+    [5 "Hogfather - Track 005" 30min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits / Chapter 1" 5min]
+    [2 "Chapter 2" 7191ms]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "Chapter 5 / End Credits" 30min]
+  ]
+  assert equal ($chapters | rename_chapters) $expected
+}
+
+def test_rename_chapters_separate_opening_credits [] {
+  let chapters = [
+    [index title duration];
+    [1 "Chapter 1" 44sec]
+    [2 "Chapter 2" 15min]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "Chapter 5" 30min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits" 44sec]
+    [2 "Chapter 1" 15min]
+    [3 "Chapter 2" 1144834ms]
+    [4 "Chapter 3" 1148453ms]
+    [5 "Chapter 4 / End Credits" 30min]
+  ]
+  assert equal ($chapters | rename_chapters) $expected
+}
+
+def test_rename_chapters_separate_end_credits [] {
+  let chapters = [
+    [index title duration];
+    [1 "Chapter 1" 5min]
+    [2 "Chapter 2" 15min]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "Chapter 5" 30sec]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits / Chapter 1" 5min]
+    [2 "Chapter 2" 15min]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "End Credits" 30sec]
+  ]
+  assert equal ($chapters | rename_chapters) $expected
+}
+
+def test_rename_chapters_separate_credits [] {
+  let chapters = [
+    [index title duration];
+    [1 "Chapter 1" 44sec]
+    [2 "Chapter 2" 15min]
+    [3 "Chapter 3" 1144834ms]
+    [4 "Chapter 4" 1148453ms]
+    [5 "Chapter 5" 15sec]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits" 44sec]
+    [2 "Chapter 1" 15min]
+    [3 "Chapter 2" 1144834ms]
+    [4 "Chapter 3" 1148453ms]
+    [5 "End Credits" 15sec]
+  ]
+  assert equal ($chapters | rename_chapters) $expected
+}
+
+def test_rename_chapters_offset [] {
+  let chapters = [
+    [index title duration];
+    [1 "Hogfather - Track 001" 5min]
+    [2 "Hogfather - Track 002" 7191ms]
+    [3 "Hogfather - Track 003" 1144834ms]
+    [4 "Hogfather - Track 004" 1148453ms]
+    [5 "Hogfather - Track 005" 30min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits / Prologue" 5min]
+    [2 "Chapter 1" 7191ms]
+    [3 "Chapter 2" 1144834ms]
+    [4 "Chapter 3" 1148453ms]
+    [5 "Chapter 4 / End Credits" 30min]
+  ]
+  assert equal ($chapters | rename_chapters --offset 1) $expected
+
+  let chapters = [
+    [index title duration];
+    [1 "Hogfather - Track 001" 29sec]
+    [2 "Hogfather - Track 002" 7191ms]
+    [3 "Hogfather - Track 003" 7191ms]
+    [4 "Hogfather - Track 004" 1144834ms]
+    [5 "Hogfather - Track 005" 1148453ms]
+    [6 "Hogfather - Track 006" 30min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits" 29sec]
+    [2 "Chapter -1" 7191ms]
+    [3 "Epigraph" 7191ms]
+    [4 "Chapter 1" 1144834ms]
+    [5 "Chapter 2" 1148453ms]
+    [6 "Chapter 3 / End Credits" 30min]
+  ]
+  assert equal ($chapters | rename_chapters --offset 3) $expected
+}
+
+def test_rename_chapters_prefix [] {
+  let chapters = [
+    [index title duration];
+    [1 "Hogfather - Track 001" 5min]
+    [2 "Hogfather - Track 002" 7191ms]
+    [3 "Hogfather - Track 003" 1144834ms]
+    [4 "Hogfather - Track 004" 1148453ms]
+    [5 "Hogfather - Track 005" 30min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 'Opening Credits / Part One: "ABC", Chapter 1' 5min]
+    [2 'Part One: "ABC", Chapter 2' 7191ms]
+    [3 'Part One: "ABC", Chapter 3' 1144834ms]
+    [4 'Part One: "ABC", Chapter 4' 1148453ms]
+    [5 'Part One: "ABC", Chapter 5 / End Credits' 30min]
+  ]
+  assert equal ($chapters | rename_chapters --prefix 'Part One: "ABC", ') $expected
+}
+
+def test_rename_chapters_suffix [] {
+  let chapters = [
+    [index title duration];
+    [1 "Hogfather - Track 001" 5min]
+    [2 "Hogfather - Track 002" 7191ms]
+    [3 "Hogfather - Track 003" 1144834ms]
+    [4 "Hogfather - Track 004" 1148453ms]
+    [5 "Hogfather - Track 005" 30min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 'Opening Credits / Chapter 1: ""' 5min]
+    [2 'Chapter 2: ""' 7191ms]
+    [3 'Chapter 3: ""' 1144834ms]
+    [4 'Chapter 4: ""' 1148453ms]
+    [5 'Chapter 5: "" / End Credits' 30min]
+  ]
+  assert equal ($chapters | rename_chapters --suffix ': ""') $expected
+}
+
+def test_rename_chapters_prefix_suffix [] {
+  let chapters = [
+    [index title duration];
+    [1 "Hogfather - Track 001" 5sec]
+    [2 "Hogfather - Track 002" 7191ms]
+    [3 "Hogfather - Track 003" 1144834ms]
+    [4 "Hogfather - Track 004" 1148453ms]
+    [5 "Hogfather - Track 005" 30min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits" 5sec]
+    [2 'Part One: "ABC", Chapter 1: ""' 7191ms]
+    [3 'Part One: "ABC", Chapter 2: ""' 1144834ms]
+    [4 'Part One: "ABC", Chapter 3: ""' 1148453ms]
+    [5 'Part One: "ABC", Chapter 4: "" / End Credits' 30min]
+  ]
+  assert equal ($chapters | rename_chapters --prefix 'Part One: "ABC", ' --suffix ': ""') $expected
+}
+
+def test_rename_chapters_chapter_word [] {
+  let chapters = [
+    [index title duration];
+    [1 "Hogfather - Track 001" 5min]
+    [2 "Hogfather - Track 002" 7191ms]
+    [3 "Hogfather - Track 003" 1144834ms]
+    [4 "Hogfather - Track 004" 1148453ms]
+    [5 "Hogfather - Track 005" 30min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits / Part 1" 5min]
+    [2 "Part 2" 7191ms]
+    [3 "Part 3" 1144834ms]
+    [4 "Part 4" 1148453ms]
+    [5 "Part 5 / End Credits" 30min]
+  ]
+  assert equal ($chapters | rename_chapters --chapter-word "Part") $expected
+}
+
+def test_rename_chapters_single_chapter [] {
+  let chapters = [
+    [index title duration];
+    [1 "Chapter 1" 5hr]
+  ]
+  assert equal ($chapters | rename_chapters) $chapters
+}
+
+def test_rename_chapters_unsorted [] {
+  let chapters = [
+    [index title duration];
+    [3 "Chapter 3" 15min]
+    [1 "Chapter 1" 5min]
+    [2 "Chapter 2" 15min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits / Chapter 1" 5min]
+    [2 "Chapter 2" 15min]
+    [3 "Chapter 3 / End Credits" 15min]
+  ]
+  assert equal ($chapters | rename_chapters) $expected
+}
+
+def test_rename_chapters_prologue [] {
+  let chapters = [
+    [index title duration];
+    [1 "Chapter 1" 30sec]
+    [2 "Chapter 2" 5min]
+    [3 "Chapter 3" 15min]
+    [4 "Chapter 4" 15min]
+  ]
+  let expected = [
+    [index title duration];
+    [1 "Opening Credits" 30sec]
+    [2 "Prologue" 5min]
+    [3 "Chapter 1" 15min]
+    [4 "Chapter 2 / End Credits" 15min]
+  ]
+  assert equal ($chapters | rename_chapters --offset 2) $expected
+}
+
+def test_rename_chapters_requires_one_based_indices [] {
+  let chapters = [
+    [index title duration];
+    [0 "Chapter 1" 5min]
+    [1 "Chapter 2" 15min]
+  ]
+  assert error {|| $chapters | rename_chapters }
+}
+
+def test_rename_chapters [] {
+  test_rename_chapters_single_chapter
+  test_rename_chapters_unsorted
+  test_rename_chapters_prologue
+  test_rename_chapters_requires_one_based_indices
+  test_rename_chapters_audible
+  test_rename_chapters_libro_fm
+  test_rename_chapters_separate_opening_credits
+  test_rename_chapters_separate_end_credits
+  test_rename_chapters_separate_credits
+  test_rename_chapters_offset
+  test_rename_chapters_prefix
+  test_rename_chapters_suffix
+  test_rename_chapters_prefix_suffix
+  test_rename_chapters_chapter_word
 }
 
 def chapter_title [
@@ -420,8 +876,14 @@ def test_parse_chapter_title [] {
 
 # Run the tests in this module
 export def run_tests [] {
+  test_lengths_to_start_offsets
+  test_format_chapter_duration
   test_chapters_from_musicbrainz_release_media
   test_round_to_second_using_cumulative_offset
+  test_round_to_second_using_cumulative_offset_edge_cases
+  test_round_to_second_using_cumulative_offset_does_not_accumulate_error
+  test_has_default_chapters
+  test_rename_chapters
   test_unquote
   test_parse_chapter_title
   test_combine_chapter_parts
