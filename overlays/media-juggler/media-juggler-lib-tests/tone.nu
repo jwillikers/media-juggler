@@ -372,9 +372,35 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
   assert equal $actual $expected
 }
 
+def test_parse_audiobook_metadata_from_tone_works [] {
+  let input = {
+    meta: {
+      title: "Short Story Collection"
+      artist: "Author"
+      additionalFields: {
+        "musicBrainz Work Id": "a;b;c"
+        work: "Work A;;Work C"
+        # "[]" was previously written for missing values
+        "bookBrainz Work Id": "[];bb;[]"
+        "openLibrary Work Id": "OL1W;;"
+      }
+    }
+    audio: {duration: 1500}
+    file: {name: "Short Story Collection.m4b"}
+  }
+  let expected = [
+    [id title bookbrainz_work_id open_library_work_id];
+    [a "Work A" null "OL1W"]
+    [b null bb null]
+    [c "Work C" null null]
+  ]
+  assert equal ($input | parse_audiobook_metadata_from_tone | get track.musicbrainz_works) $expected
+}
+
 def test_parse_audiobook_metadata_from_tone [] {
   test_parse_audiobook_metadata_from_tone_picard
   test_parse_audiobook_metadata_from_tone_audiobookshelf
+  test_parse_audiobook_metadata_from_tone_works
 }
 
 def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
@@ -782,9 +808,34 @@ def test_into_tone_format_complex [] {
   assert equal ($input | into_tone_format) $expected
 }
 
+def test_into_tone_format_works [] {
+  let input = {
+    book: {
+      title: "Short Story Collection"
+    }
+    track: {
+      title: "Short Story Collection"
+      index: 1
+      musicbrainz_works: [
+        [id title bookbrainz_work_id open_library_work_id wikidata_work_id];
+        ["a" "Work A" null "OL1W" null]
+        ["b" "Work B" "bb" null null]
+      ]
+    }
+  }
+  let actual = $input | into_tone_format | get meta.additionalFields
+  assert equal ($actual | get "MusicBrainz Work Id") "a;b"
+  assert equal ($actual | get "work") "Work A;Work B"
+  assert equal ($actual | get "BookBrainz Work Id") ";bb"
+  assert equal ($actual | get "OpenLibrary Work Id") "OL1W;"
+  # The tag is omitted when none of the works have a value
+  assert equal ("Wikidata Work Id" in $actual) false
+}
+
 def test_into_tone_format [] {
   test_into_tone_format_simple
   test_into_tone_format_complex
+  test_into_tone_format_works
 }
 
 def test_tracks_into_tone_format_one_track [] {

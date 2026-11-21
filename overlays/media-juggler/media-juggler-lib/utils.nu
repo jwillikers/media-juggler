@@ -246,6 +246,36 @@ export def join_multi_value []: any -> string {
   $input | str join ";"
 }
 
+# Join the values of a multi-value tag whose positions correspond to the values of another multi-value tag.
+#
+# Missing values are kept as empty strings so that the positions stay aligned.
+# When every value is missing, null is returned so that the tag can be omitted.
+export def join_parallel_multi_value []: any -> string {
+  let input = $in
+  if ($input | is-empty) or ($input | all {|value| $value | is-empty}) {
+    return null
+  }
+  $input | each --keep-empty {|value| if ($value | is-empty) { "" } else { $value }} | str join ";"
+}
+
+# Parse a multi-value tag whose positions correspond to the values of another multi-value tag.
+#
+# Empty values are returned as null so that the positions stay aligned.
+# The literal value "[]" is also treated as empty, since it was previously written for missing values.
+export def parse_parallel_multi_value_tag []: any -> list {
+  let input = $in
+  if ($input | is-empty) {
+    return null
+  }
+  $input | split row ";" | str trim | each --keep-empty {|value|
+    if ($value in ["" "[]"]) {
+      null
+    } else {
+      $value
+    }
+  }
+}
+
 # Attempt to download a file, retrying up to the given number of retries
 #
 # Sometimes, there is a "Connection reset" exception when attempting to download a file.
