@@ -33,11 +33,3 @@ export def test_parse_wikidata_edition_and_works_metadata_one_piece_volume_1 [] 
 
 # todo Should write more tests for parse_wikidata_edition_and_works_metadata
 # todo Test main_subject functionality.
-def test_parse_wikidata_edition_and_works_metadata [] {
-  test_parse_wikidata_edition_and_works_metadata_one_piece_volume_1
-}
-
-# Run the tests in this module
-export def run_tests [] {
-  test_parse_wikidata_edition_and_works_metadata
-}

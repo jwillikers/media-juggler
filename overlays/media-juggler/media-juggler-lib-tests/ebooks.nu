@@ -7,7 +7,7 @@ use ../media-juggler-lib *
 
 const test_data_dir = path self ../test-data
 
-def test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
+export def test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
   let input = open ([$test_data_dir "march-comes-in-like-a-lion-volume-1-pdf-metadata.opf"] | path join) | from xml
   let expected = {
     credits: [
@@ -58,7 +58,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
   assert equal ($input | from_opf_xml) $expected
 }
 
-def test_from_opf_xml_march_comes_in_like_a_lion_volume_1_epub_3_2_pdf [] {
+export def test_from_opf_xml_march_comes_in_like_a_lion_volume_1_epub_3_2_pdf [] {
   let input = open ([$test_data_dir "march-comes-in-like-a-lion-volume-1-pdf-metadata-epub-3.2.opf"] | path join) | from xml
   let expected = {
     credits: [
@@ -109,12 +109,7 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
   assert equal ($input | from_opf_xml) $expected
 }
 
-def test_from_opf_xml [] {
-  test_from_opf_xml_march_comes_in_like_a_lion_volume_1_pdf
-  test_from_opf_xml_march_comes_in_like_a_lion_volume_1_epub_3_2_pdf
-}
-
-def test_to_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
+export def test_to_opf_xml_march_comes_in_like_a_lion_volume_1_pdf [] {
   let input = {
     credits: [
       # todo Should I start using the ID field here and using sort-by with that?
@@ -360,14 +355,4 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
   assert equal ($output | get content | first | get content | where tag == "dc:subject") ($expected | get content | first | get content | where tag == "dc:subject")
   assert equal ($output | get content | first | get content) ($expected | get content | first | get content)
   assert equal $output $expected
-}
-
-def test_to_opf_xml [] {
-  test_to_opf_xml_march_comes_in_like_a_lion_volume_1_pdf
-}
-
-# Run the tests in this module
-export def run_tests [] {
-  test_from_opf_xml
-  test_to_opf_xml
 }

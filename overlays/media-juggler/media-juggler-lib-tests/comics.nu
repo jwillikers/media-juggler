@@ -7,7 +7,7 @@ use ../media-juggler-lib *
 
 const test_data_dir = path self ../test-data
 
-def test_from_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
+export def test_from_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
   let input = open ([$test_data_dir "March Comes in Like a Lion v001_ComicInfo.xml"] | path join)
   let $expected = {
     issue_id: "4000-987377"
@@ -65,10 +65,6 @@ def test_from_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
   # assert equal $output $expected
 }
 
-def test_from_comic_info_xml [] {
-  test_from_comic_info_xml_march_comes_in_like_a_lion_vol_1
-}
-
 def test_from_metron_info_xml_march_comes_in_like_a_lion_vol_1 [] {
   let input = open ([$test_data_dir "March Comes in Like a Lion v001_MetronInfo.xml"] | path join)
   let $expected = {
@@ -77,11 +73,7 @@ def test_from_metron_info_xml_march_comes_in_like_a_lion_vol_1 [] {
   # assert equal ($input | from_metron_info_xml) $expected
 }
 
-def test_from_metron_info_xml [] {
-  test_from_metron_info_xml_march_comes_in_like_a_lion_vol_1
-}
-
-def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
+export def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
   let $input = {
     series: "March Comes in Like a Lion"
     issue: "1"
@@ -162,16 +154,4 @@ def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
     )
   )
   assert equal $output $expected
-}
-
-def test_into_comic_info_xml [] {
-  test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1
-}
-
-# Run the tests in this module
-export def run_tests [] {
-  test_into_comic_info_xml
-  test_from_comic_info_xml
-  # test_from_metron_info_xml
-  # test_into_metron_info_xml
 }

@@ -5,101 +5,80 @@ use std log
 
 use ../media-juggler-lib *
 
-def test_parse_series_from_group_one_without_index [] {
+export def test_parse_series_from_group_one_without_index [] {
   let expected = [[name index]; ["The Stormlight Archive" null]]
   assert equal ("The Stormlight Archive" | parse_series_from_group) $expected
 }
 
-def test_parse_series_from_group_one_with_index [] {
+export def test_parse_series_from_group_one_with_index [] {
   let expected = [[name index]; ["The Stormlight Archive" "1"]]
   assert equal ("The Stormlight Archive #1" | parse_series_from_group) $expected
 }
 
-def test_parse_series_from_group_two_without_index [] {
+export def test_parse_series_from_group_two_without_index [] {
   let expected = [[name index]; ["The Stormlight Archive" null] ["Cosmere" null]]
   assert equal ("The Stormlight Archive; Cosmere" | parse_series_from_group) $expected
 }
 
-def test_parse_series_from_group_two_with_index [] {
+export def test_parse_series_from_group_two_with_index [] {
   let expected = [[name index]; ["The Stormlight Archive" "1"] ["Cosmere" "10"]]
   assert equal ("The Stormlight Archive #1; Cosmere #10" | parse_series_from_group) $expected
 }
 
-def test_parse_series_from_group_one_with_index_and_one_without_index [] {
+export def test_parse_series_from_group_one_with_index_and_one_without_index [] {
   let expected = [[name index]; ["The Stormlight Archive" "1"] ["Cosmere" null]]
   assert equal ("The Stormlight Archive #1; Cosmere" | parse_series_from_group) $expected
 }
 
-def test_parse_series_from_group [] {
-  test_parse_series_from_group_one_without_index
-  test_parse_series_from_group_one_with_index
-  test_parse_series_from_group_two_without_index
-  test_parse_series_from_group_two_with_index
-  test_parse_series_from_group_one_with_index_and_one_without_index
-}
-
-def test_parse_series_from_series_tags_empty_record [] {
+export def test_parse_series_from_series_tags_empty_record [] {
   assert equal ({} | parse_series_from_series_tags) null
 }
 
-def test_parse_series_from_series_tags_one_null_series [] {
+export def test_parse_series_from_series_tags_one_null_series [] {
   assert equal ({series: null, series-part: null} | parse_series_from_series_tags) null
 }
 
-def test_parse_series_from_series_tags_one_series_without_index [] {
+export def test_parse_series_from_series_tags_one_series_without_index [] {
   let expected = [[name index]; ["Mistborn" null]]
   assert equal ({series: "Mistborn"} | parse_series_from_series_tags) $expected
 }
 
-def test_parse_series_from_series_tags_one_series_with_index [] {
+export def test_parse_series_from_series_tags_one_series_with_index [] {
   let expected = [[name index]; ["Mistborn" "1"]]
   assert equal ({series: "Mistborn", series-part: "1"} | parse_series_from_series_tags) $expected
 }
 
-def test_parse_series_from_series_tags_one_series_with_int_index [] {
+export def test_parse_series_from_series_tags_one_series_with_int_index [] {
   let expected = [[name index]; ["Mistborn" "1"]]
   assert equal ({series: "Mistborn", series-part: 1} | parse_series_from_series_tags) $expected
 }
 
-def test_parse_series_from_series_tags_one_int_series_without_index [] {
+export def test_parse_series_from_series_tags_one_int_series_without_index [] {
   let expected = [[name index]; ["86" null]]
   assert equal ({series: 86} | parse_series_from_series_tags) $expected
 }
 
-def test_parse_series_from_series_tags_one_series_with_null_index [] {
+export def test_parse_series_from_series_tags_one_series_with_null_index [] {
   let expected = [[name index]; ["86" null]]
   assert equal ({series: "86", series-part: null} | parse_series_from_series_tags) $expected
 }
 
-def test_parse_series_from_series_tags_one_mvnm_without_index [] {
+export def test_parse_series_from_series_tags_one_mvnm_without_index [] {
   let expected = [[name index]; ["86" null]]
   assert equal ({mvnm: "86"} | parse_series_from_series_tags) $expected
 }
 
-def test_parse_series_from_series_tags_one_mvnm_with_index [] {
+export def test_parse_series_from_series_tags_one_mvnm_with_index [] {
   let expected = [[name index]; ["86" "5.1"]]
   assert equal ({mvnm: "86", mvin: 5.1} | parse_series_from_series_tags) $expected
 }
 
-def test_parse_series_from_series_tags_one_mvnm_one_series [] {
+export def test_parse_series_from_series_tags_one_mvnm_one_series [] {
   let expected = [[name index]; ["Series One" "1"] ["Series Two" "3"]]
   assert equal ({ mvnm: "Series One", series: "Series Two", series-part: 3, mvin: 1} | parse_series_from_series_tags | sort-by name) $expected
 }
 
-def test_parse_series_from_series_tags [] {
-  test_parse_series_from_series_tags_empty_record
-  test_parse_series_from_series_tags_one_null_series
-  test_parse_series_from_series_tags_one_series_without_index
-  test_parse_series_from_series_tags_one_series_with_null_index
-  test_parse_series_from_series_tags_one_series_with_index
-  test_parse_series_from_series_tags_one_series_with_int_index
-  test_parse_series_from_series_tags_one_int_series_without_index
-  test_parse_series_from_series_tags_one_mvnm_without_index
-  test_parse_series_from_series_tags_one_mvnm_with_index
-  test_parse_series_from_series_tags_one_mvnm_one_series
-}
-
-def test_parse_audiobook_metadata_from_tone_picard [] {
+export def test_parse_audiobook_metadata_from_tone_picard [] {
   let input = {
     meta: {
       album: "Dark One: Forgotten"
@@ -262,7 +241,7 @@ def test_parse_audiobook_metadata_from_tone_picard [] {
   assert equal $actual $expected
 }
 
-def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
+export def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
   let input = {
     meta: {
       album: "My Happy Marriage, Vol. 2"
@@ -372,7 +351,7 @@ def test_parse_audiobook_metadata_from_tone_audiobookshelf [] {
   assert equal $actual $expected
 }
 
-def test_parse_audiobook_metadata_from_tone_works [] {
+export def test_parse_audiobook_metadata_from_tone_works [] {
   let input = {
     meta: {
       title: "Short Story Collection"
@@ -397,13 +376,7 @@ def test_parse_audiobook_metadata_from_tone_works [] {
   assert equal ($input | parse_audiobook_metadata_from_tone | get track.musicbrainz_works) $expected
 }
 
-def test_parse_audiobook_metadata_from_tone [] {
-  test_parse_audiobook_metadata_from_tone_picard
-  test_parse_audiobook_metadata_from_tone_audiobookshelf
-  test_parse_audiobook_metadata_from_tone_works
-}
-
-def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
+export def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
   let input = [{
     book: {
       title: "My Happy Marriage, Vol. 2"
@@ -489,7 +462,7 @@ def test_parse_audiobook_metadata_from_tracks_metadata_one [] {
   assert equal $actual $expected
 }
 
-def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
+export def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
   let input = [{
     book: {
       title: "My Happy Marriage, Vol. 2"
@@ -619,33 +592,22 @@ def test_parse_audiobook_metadata_from_tracks_metadata_two [] {
   assert equal $actual $expected
 }
 
-def test_parse_audiobook_metadata_from_tracks_metadata [] {
-  test_parse_audiobook_metadata_from_tracks_metadata_one
-  test_parse_audiobook_metadata_from_tracks_metadata_two
-}
-
-def test_convert_series_for_group_tag_one_with_index [] {
+export def test_convert_series_for_group_tag_one_with_index [] {
   let expected = "Series One #1"
   assert equal ([[name index]; ["Series One" "1"]] | convert_series_for_group_tag) $expected
 }
 
-def test_convert_series_for_group_tag_two_with_index [] {
+export def test_convert_series_for_group_tag_two_with_index [] {
   let expected = "Series One #1;Mistborn #3"
   assert equal ([[name index]; ["Series One" "1"] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
 }
 
-def test_convert_series_for_group_tag_one_without_index_one_with_index [] {
+export def test_convert_series_for_group_tag_one_without_index_one_with_index [] {
   let expected = "Series One;Mistborn #3"
   assert equal ([[name index]; ["Series One" ""] ["Mistborn" "3"]] | convert_series_for_group_tag) $expected
 }
 
-def test_convert_series_for_group_tag [] {
-  test_convert_series_for_group_tag_one_with_index
-  test_convert_series_for_group_tag_two_with_index
-  test_convert_series_for_group_tag_one_without_index_one_with_index
-}
-
-def test_into_tone_format_simple [] {
+export def test_into_tone_format_simple [] {
   let input = {
     book: {
       title: "My Happy Marriage, Vol. 2"
@@ -726,7 +688,7 @@ def test_into_tone_format_simple [] {
   assert equal ($input | into_tone_format) $expected
 }
 
-def test_into_tone_format_complex [] {
+export def test_into_tone_format_complex [] {
   # todo Make this test more complex
   let input = {
     book: {
@@ -808,7 +770,7 @@ def test_into_tone_format_complex [] {
   assert equal ($input | into_tone_format) $expected
 }
 
-def test_into_tone_format_works [] {
+export def test_into_tone_format_works [] {
   let input = {
     book: {
       title: "Short Story Collection"
@@ -832,13 +794,7 @@ def test_into_tone_format_works [] {
   assert equal ("Wikidata Work Id" in $actual) false
 }
 
-def test_into_tone_format [] {
-  test_into_tone_format_simple
-  test_into_tone_format_complex
-  test_into_tone_format_works
-}
-
-def test_tracks_into_tone_format_one_track [] {
+export def test_tracks_into_tone_format_one_track [] {
   let input = {
     book: {
       title: "My Happy Marriage, Vol. 2"
@@ -922,7 +878,7 @@ def test_tracks_into_tone_format_one_track [] {
   assert equal ($input | tracks_into_tone_format) $expected
 }
 
-def test_tracks_into_tone_format_two_tracks [] {
+export def test_tracks_into_tone_format_two_tracks [] {
   let input = {
     book: {
       title: "My Happy Marriage, Vol. 2"
@@ -1051,20 +1007,4 @@ def test_tracks_into_tone_format_two_tracks [] {
     }
   }]
   assert equal ($input | tracks_into_tone_format | sort-by metadata.meta.trackNumber) $expected
-}
-
-def test_tracks_into_tone_format [] {
-  test_tracks_into_tone_format_one_track
-  test_tracks_into_tone_format_two_tracks
-}
-
-# Run the tests in this module
-export def run_tests [] {
-  test_parse_series_from_group
-  test_parse_series_from_series_tags
-  test_parse_audiobook_metadata_from_tone
-  test_parse_audiobook_metadata_from_tracks_metadata
-  test_convert_series_for_group_tag
-  test_into_tone_format
-  test_tracks_into_tone_format
 }

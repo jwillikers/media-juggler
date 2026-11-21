@@ -7,13 +7,13 @@ use ../media-juggler-lib *
 
 const test_data_dir = path self ../test-data
 
-def test_lengths_to_start_offsets [] {
+export def test_lengths_to_start_offsets [] {
   assert equal ([] | lengths_to_start_offsets) []
   assert equal ([5min] | lengths_to_start_offsets) [0ms]
   assert equal ([30sec 5min 1hr 2ms] | lengths_to_start_offsets) [0ms 30sec 330sec 3930sec]
 }
 
-def test_format_chapter_duration [] {
+export def test_format_chapter_duration [] {
   assert equal (0ms | format_chapter_duration) "00:00:00.000"
   assert equal (1ms | format_chapter_duration) "00:00:00.001"
   assert equal (59999ms | format_chapter_duration) "00:00:59.999"
@@ -22,7 +22,7 @@ def test_format_chapter_duration [] {
   assert equal (100hr | format_chapter_duration) "100:00:00.000"
 }
 
-def test_chapters_from_musicbrainz_release_media [] {
+export def test_chapters_from_musicbrainz_release_media [] {
   let media = [
     {
       tracks: [
@@ -57,7 +57,7 @@ def pseudo_random_durations [count: int] {
   } | get durations
 }
 
-def test_round_to_second_using_cumulative_offset_edge_cases [] {
+export def test_round_to_second_using_cumulative_offset_edge_cases [] {
   assert equal ([] | round_to_second_using_cumulative_offset) []
   assert equal ([10sec 20sec] | round_to_second_using_cumulative_offset) [10sec 20sec]
   # Ties round down when there is no accumulated offset.
@@ -69,7 +69,7 @@ def test_round_to_second_using_cumulative_offset_edge_cases [] {
   assert equal ($rounded | math sum) 7sec
 }
 
-def test_round_to_second_using_cumulative_offset_does_not_accumulate_error [] {
+export def test_round_to_second_using_cumulative_offset_does_not_accumulate_error [] {
   # Rounding every track up or down on its own lets the error grow with each track.
   # The total of the rounded durations must stay within half a second of the actual total at every track.
   for durations in [
@@ -93,7 +93,7 @@ def test_round_to_second_using_cumulative_offset_does_not_accumulate_error [] {
   }
 }
 
-def test_round_to_second_using_cumulative_offset [] {
+export def test_round_to_second_using_cumulative_offset [] {
   let durations = [
     30069ms
     7191ms
@@ -147,7 +147,7 @@ def test_round_to_second_using_cumulative_offset [] {
   assert equal ($durations | round_to_second_using_cumulative_offset) $expected
 }
 
-def test_combine_chapter_parts_none [] {
+export def test_combine_chapter_parts_none [] {
   let input = [
     [index title duration];
     [1 "Chapter 1" 30069ms]
@@ -167,7 +167,7 @@ def test_combine_chapter_parts_none [] {
   assert equal ($input | combine_chapter_parts) $expected
 }
 
-def test_combine_chapter_parts_combine_one_chapter [] {
+export def test_combine_chapter_parts_combine_one_chapter [] {
   let input = [
     [index title duration];
     [1 "Chapter 1" 30069ms]
@@ -186,7 +186,7 @@ def test_combine_chapter_parts_combine_one_chapter [] {
   assert equal ($input | combine_chapter_parts) $expected
 }
 
-def test_combine_chapter_parts_combine_two_chapters [] {
+export def test_combine_chapter_parts_combine_two_chapters [] {
   let input = [
     [index title duration];
     [1 "Chapter 1" 30069ms]
@@ -204,7 +204,7 @@ def test_combine_chapter_parts_combine_two_chapters [] {
   assert equal ($input | combine_chapter_parts) $expected
 }
 
-def test_combine_chapter_parts_combine_one_chapter_three_parts [] {
+export def test_combine_chapter_parts_combine_one_chapter_three_parts [] {
   let input = [
     [index title duration];
     [1 "Part 1, Part 1" 30069ms]
@@ -222,7 +222,7 @@ def test_combine_chapter_parts_combine_one_chapter_three_parts [] {
   assert equal ($input | combine_chapter_parts) $expected
 }
 
-def test_combine_chapter_parts_non_one_based_index [] {
+export def test_combine_chapter_parts_non_one_based_index [] {
   let input = [
     [index title duration];
     [0 "Chapter 1, Part 1" 1min]
@@ -237,7 +237,7 @@ def test_combine_chapter_parts_non_one_based_index [] {
   assert equal ($input | combine_chapter_parts) $expected
 }
 
-def test_combine_chapter_parts_non_adjacent [] {
+export def test_combine_chapter_parts_non_adjacent [] {
   # Only consecutive parts of the same chapter are combined.
   let input = [
     [index title duration];
@@ -254,16 +254,7 @@ def test_combine_chapter_parts_non_adjacent [] {
   assert equal ($input | combine_chapter_parts) $expected
 }
 
-def test_combine_chapter_parts [] {
-  test_combine_chapter_parts_non_one_based_index
-  test_combine_chapter_parts_non_adjacent
-  test_combine_chapter_parts_none
-  test_combine_chapter_parts_combine_one_chapter
-  test_combine_chapter_parts_combine_two_chapters
-  test_combine_chapter_parts_combine_one_chapter_three_parts
-}
-
-def test_parse_chapters_from_musicbrainz_release_baccano_vol_1 [] {
+export def test_parse_chapters_from_musicbrainz_release_baccano_vol_1 [] {
   let input = open ([$test_data_dir "baccano_vol_1.json"] | path join)
   let expected = [
     [index start length title];
@@ -272,7 +263,7 @@ def test_parse_chapters_from_musicbrainz_release_baccano_vol_1 [] {
   assert equal ($input | parse_chapters_from_musicbrainz_release) $expected
 }
 
-def test_parse_chapters_from_musicbrainz_release_bakemonogatari_part_01 [] {
+export def test_parse_chapters_from_musicbrainz_release_bakemonogatari_part_01 [] {
   let input = open ([$test_data_dir "bakemonogatari_part_01_release.json"] | path join)
   let expected = [
     [index start length title];
@@ -301,12 +292,7 @@ def test_parse_chapters_from_musicbrainz_release_bakemonogatari_part_01 [] {
   assert equal ($input | parse_chapters_from_musicbrainz_release) $expected
 }
 
-def test_parse_chapters_from_musicbrainz_release [] {
-  test_parse_chapters_from_musicbrainz_release_baccano_vol_1
-  test_parse_chapters_from_musicbrainz_release_bakemonogatari_part_01
-}
-
-def test_parse_chapters_from_tone_baccano_vol_1 [] {
+export def test_parse_chapters_from_tone_baccano_vol_1 [] {
   let input = [
     [index start length title];
     [0 0 15000 "Opening Credits"]
@@ -318,11 +304,7 @@ def test_parse_chapters_from_tone_baccano_vol_1 [] {
   assert equal ($input | parse_chapters_from_tone) $expected
 }
 
-def test_parse_chapters_from_tone [] {
-  test_parse_chapters_from_tone_baccano_vol_1
-}
-
-def test_chapters_into_tone_format_baccano_vol_1 [] {
+export def test_chapters_into_tone_format_baccano_vol_1 [] {
   let input = [
     [index start length title];
     [0 0ms 15000ms "Opening Credits"]
@@ -334,11 +316,7 @@ def test_chapters_into_tone_format_baccano_vol_1 [] {
   assert equal ($input | chapters_into_tone_format) $expected
 }
 
-def test_chapters_into_tone_format [] {
-  test_chapters_into_tone_format_baccano_vol_1
-}
-
-def test_has_default_chapters_audible [] {
+export def test_has_default_chapters_audible [] {
   let chapters = [
     [index title duration];
     [1 "Chapter 1" 30069ms]
@@ -360,7 +338,7 @@ def test_has_default_chapters_audible [] {
   assert equal ($chapters | has_default_chapters) false
 }
 
-def test_has_default_chapters_libro_fm [] {
+export def test_has_default_chapters_libro_fm [] {
   let chapters = [
     [index title duration];
     [1 "Hogfather - Track 001" 30069ms]
@@ -382,17 +360,11 @@ def test_has_default_chapters_libro_fm [] {
   assert equal ($chapters | has_default_chapters) false
 }
 
-def test_has_default_chapters_empty [] {
+export def test_has_default_chapters_empty [] {
   assert equal ([] | has_default_chapters) false
 }
 
-def test_has_default_chapters [] {
-  test_has_default_chapters_empty
-  test_has_default_chapters_audible
-  test_has_default_chapters_libro_fm
-}
-
-def test_rename_chapters_audible [] {
+export def test_rename_chapters_audible [] {
   let chapters = [
     [index title duration];
     [1 "Prologue" 5min]
@@ -430,7 +402,7 @@ def test_rename_chapters_audible [] {
   assert equal ($chapters | rename_chapters) $expected
 }
 
-def test_rename_chapters_libro_fm [] {
+export def test_rename_chapters_libro_fm [] {
   let chapters = [
     [index title duration];
     [1 "Hogfather - Track 001" 5min]
@@ -450,7 +422,7 @@ def test_rename_chapters_libro_fm [] {
   assert equal ($chapters | rename_chapters) $expected
 }
 
-def test_rename_chapters_separate_opening_credits [] {
+export def test_rename_chapters_separate_opening_credits [] {
   let chapters = [
     [index title duration];
     [1 "Chapter 1" 44sec]
@@ -470,7 +442,7 @@ def test_rename_chapters_separate_opening_credits [] {
   assert equal ($chapters | rename_chapters) $expected
 }
 
-def test_rename_chapters_separate_end_credits [] {
+export def test_rename_chapters_separate_end_credits [] {
   let chapters = [
     [index title duration];
     [1 "Chapter 1" 5min]
@@ -490,7 +462,7 @@ def test_rename_chapters_separate_end_credits [] {
   assert equal ($chapters | rename_chapters) $expected
 }
 
-def test_rename_chapters_separate_credits [] {
+export def test_rename_chapters_separate_credits [] {
   let chapters = [
     [index title duration];
     [1 "Chapter 1" 44sec]
@@ -510,7 +482,7 @@ def test_rename_chapters_separate_credits [] {
   assert equal ($chapters | rename_chapters) $expected
 }
 
-def test_rename_chapters_offset [] {
+export def test_rename_chapters_offset [] {
   let chapters = [
     [index title duration];
     [1 "Hogfather - Track 001" 5min]
@@ -550,7 +522,7 @@ def test_rename_chapters_offset [] {
   assert equal ($chapters | rename_chapters --offset 3) $expected
 }
 
-def test_rename_chapters_prefix [] {
+export def test_rename_chapters_prefix [] {
   let chapters = [
     [index title duration];
     [1 "Hogfather - Track 001" 5min]
@@ -570,7 +542,7 @@ def test_rename_chapters_prefix [] {
   assert equal ($chapters | rename_chapters --prefix 'Part One: "ABC", ') $expected
 }
 
-def test_rename_chapters_suffix [] {
+export def test_rename_chapters_suffix [] {
   let chapters = [
     [index title duration];
     [1 "Hogfather - Track 001" 5min]
@@ -590,7 +562,7 @@ def test_rename_chapters_suffix [] {
   assert equal ($chapters | rename_chapters --suffix ': ""') $expected
 }
 
-def test_rename_chapters_prefix_suffix [] {
+export def test_rename_chapters_prefix_suffix [] {
   let chapters = [
     [index title duration];
     [1 "Hogfather - Track 001" 5sec]
@@ -610,7 +582,7 @@ def test_rename_chapters_prefix_suffix [] {
   assert equal ($chapters | rename_chapters --prefix 'Part One: "ABC", ' --suffix ': ""') $expected
 }
 
-def test_rename_chapters_chapter_word [] {
+export def test_rename_chapters_chapter_word [] {
   let chapters = [
     [index title duration];
     [1 "Hogfather - Track 001" 5min]
@@ -630,7 +602,7 @@ def test_rename_chapters_chapter_word [] {
   assert equal ($chapters | rename_chapters --chapter-word "Part") $expected
 }
 
-def test_rename_chapters_single_chapter [] {
+export def test_rename_chapters_single_chapter [] {
   let chapters = [
     [index title duration];
     [1 "Chapter 1" 5hr]
@@ -638,7 +610,7 @@ def test_rename_chapters_single_chapter [] {
   assert equal ($chapters | rename_chapters) $chapters
 }
 
-def test_rename_chapters_unsorted [] {
+export def test_rename_chapters_unsorted [] {
   let chapters = [
     [index title duration];
     [3 "Chapter 3" 15min]
@@ -654,7 +626,7 @@ def test_rename_chapters_unsorted [] {
   assert equal ($chapters | rename_chapters) $expected
 }
 
-def test_rename_chapters_prologue [] {
+export def test_rename_chapters_prologue [] {
   let chapters = [
     [index title duration];
     [1 "Chapter 1" 30sec]
@@ -672,30 +644,13 @@ def test_rename_chapters_prologue [] {
   assert equal ($chapters | rename_chapters --offset 2) $expected
 }
 
-def test_rename_chapters_requires_one_based_indices [] {
+export def test_rename_chapters_requires_one_based_indices [] {
   let chapters = [
     [index title duration];
     [0 "Chapter 1" 5min]
     [1 "Chapter 2" 15min]
   ]
   assert error {|| $chapters | rename_chapters }
-}
-
-def test_rename_chapters [] {
-  test_rename_chapters_single_chapter
-  test_rename_chapters_unsorted
-  test_rename_chapters_prologue
-  test_rename_chapters_requires_one_based_indices
-  test_rename_chapters_audible
-  test_rename_chapters_libro_fm
-  test_rename_chapters_separate_opening_credits
-  test_rename_chapters_separate_end_credits
-  test_rename_chapters_separate_credits
-  test_rename_chapters_offset
-  test_rename_chapters_prefix
-  test_rename_chapters_suffix
-  test_rename_chapters_prefix_suffix
-  test_rename_chapters_chapter_word
 }
 
 def chapter_title [
@@ -714,7 +669,7 @@ def chapter_title [
   }
 }
 
-def test_unquote [] {
+export def test_unquote [] {
   assert equal ('"Quoted"' | unquote) "Quoted"
   assert equal ("'Quoted'" | unquote) "Quoted"
   assert equal ('“Quoted”' | unquote) "Quoted"
@@ -726,7 +681,7 @@ def test_unquote [] {
   assert equal ("" | unquote) ""
 }
 
-def test_parse_chapter_title_all_parts [] {
+export def test_parse_chapter_title_all_parts [] {
   let chapter = 'Part One: "The First Part", Chapter 1: "The First Chapter", Part 1'
   let expected = {
     part: "Part One"
@@ -738,7 +693,7 @@ def test_parse_chapter_title_all_parts [] {
   assert equal ($chapter | parse_chapter_title) $expected
 }
 
-def test_parse_chapter_title_chapter_only [] {
+export def test_parse_chapter_title_chapter_only [] {
   let chapter = 'Chapter 1'
   let expected = {
     part: null
@@ -750,7 +705,7 @@ def test_parse_chapter_title_chapter_only [] {
   assert equal ($chapter | parse_chapter_title) $expected
 }
 
-def test_parse_chapter_title_chapter_with_name [] {
+export def test_parse_chapter_title_chapter_with_name [] {
   let chapter = 'Chapter 1: "First Chapter"'
   let expected = {
     part: null
@@ -762,7 +717,7 @@ def test_parse_chapter_title_chapter_with_name [] {
   assert equal ($chapter | parse_chapter_title) $expected
 }
 
-def test_parse_chapter_title_chapter_part [] {
+export def test_parse_chapter_title_chapter_part [] {
   let chapter = 'Chapter 1, Part 1'
   let expected = {
     part: null
@@ -774,7 +729,7 @@ def test_parse_chapter_title_chapter_part [] {
   assert equal ($chapter | parse_chapter_title) $expected
 }
 
-def test_parse_chapter_title_part_chapter [] {
+export def test_parse_chapter_title_part_chapter [] {
   let chapter = 'Part One, Chapter 1'
   let expected = {
     part: "Part One"
@@ -786,7 +741,7 @@ def test_parse_chapter_title_part_chapter [] {
   assert equal ($chapter | parse_chapter_title) $expected
 }
 
-def test_parse_chapter_title_opening_credits [] {
+export def test_parse_chapter_title_opening_credits [] {
   let chapter = 'Opening Credits'
   let expected = {
     part: null
@@ -798,7 +753,7 @@ def test_parse_chapter_title_opening_credits [] {
   assert equal ($chapter | parse_chapter_title) $expected
 }
 
-def test_parse_chapter_title_opening_credits_chapter_one [] {
+export def test_parse_chapter_title_opening_credits_chapter_one [] {
   let chapter = 'Opening Credits / Chapter 1'
   let expected = {
     part: null
@@ -810,13 +765,13 @@ def test_parse_chapter_title_opening_credits_chapter_one [] {
   assert equal ($chapter | parse_chapter_title) $expected
 }
 
-def test_parse_chapter_title_unquoted_title [] {
+export def test_parse_chapter_title_unquoted_title [] {
   assert equal ("Chapter 1: Piranesi" | parse_chapter_title) (chapter_title "Chapter 1" --chapter-title "Piranesi")
   assert equal ("Chapter 7: Matthew Rose Sorensen" | parse_chapter_title) (chapter_title "Chapter 7" --chapter-title "Matthew Rose Sorensen")
   assert equal ("Chapter 4: 16" | parse_chapter_title) (chapter_title "Chapter 4" --chapter-title "16")
 }
 
-def test_parse_chapter_title_punctuation [] {
+export def test_parse_chapter_title_punctuation [] {
   assert equal ("Chapter 3: What's Next?" | parse_chapter_title) (chapter_title "Chapter 3" --chapter-title "What's Next?")
   assert equal ("Chapter 3: \"What's Next?\"" | parse_chapter_title) (chapter_title "Chapter 3" --chapter-title "What's Next?")
   assert equal ("Chapter 1: Foo: Bar" | parse_chapter_title) (chapter_title "Chapter 1" --chapter-title "Foo: Bar")
@@ -825,69 +780,34 @@ def test_parse_chapter_title_punctuation [] {
   assert equal ('Chapter 1: “Curly Quotes”' | parse_chapter_title) (chapter_title "Chapter 1" --chapter-title "Curly Quotes")
 }
 
-def test_parse_chapter_title_chapter_part_with_title [] {
+export def test_parse_chapter_title_chapter_part_with_title [] {
   assert equal ("Chapter 2: The Other, Part 1" | parse_chapter_title) (chapter_title "Chapter 2" --chapter-title "The Other" --chapter-part "Part 1")
   assert equal ('Chapter 2: "The Other", Part 12' | parse_chapter_title) (chapter_title "Chapter 2" --chapter-title "The Other" --chapter-part "Part 12")
   assert equal ("Chapter 4: 16, Part 2" | parse_chapter_title) (chapter_title "Chapter 4" --chapter-title "16" --chapter-part "Part 2")
 }
 
-def test_parse_chapter_title_unquoted_part_title [] {
+export def test_parse_chapter_title_unquoted_part_title [] {
   assert equal ("Part One: Beginnings, Chapter 1: The Start" | parse_chapter_title) (
     chapter_title "Chapter 1" --part "Part One" --part-title "Beginnings" --chapter-title "The Start"
   )
 }
 
-def test_parse_chapter_title_quoted_commas_and_slashes [] {
+export def test_parse_chapter_title_quoted_commas_and_slashes [] {
   assert equal ('Part One: "Beginnings, Endings", Chapter 1: "Either / Or", Part 2' | parse_chapter_title) (
     chapter_title "Chapter 1" --part "Part One" --part-title "Beginnings, Endings" --chapter-title "Either / Or" --chapter-part "Part 2"
   )
 }
 
-def test_parse_chapter_title_combined_tracks [] {
+export def test_parse_chapter_title_combined_tracks [] {
   assert equal ("Epigraph / Chapter 1: Piranesi" | parse_chapter_title) (chapter_title "Epigraph / Chapter 1" --chapter-title "Piranesi")
   assert equal ('Chapter 5: "The End" / Closing Credits' | parse_chapter_title) (chapter_title "Chapter 5 / Closing Credits" --chapter-title "The End")
   assert equal ("Chapter 5, Part 2 / Closing Credits" | parse_chapter_title) (chapter_title "Chapter 5 / Closing Credits" --chapter-part "Part 2")
   assert equal ("Chapter 1: One / Chapter 2: Two" | parse_chapter_title) (chapter_title "Chapter 1 / Chapter 2" --chapter-title "One / Two")
 }
 
-def test_parse_chapter_title_chapter_word_part [] {
+export def test_parse_chapter_title_chapter_word_part [] {
   # Chapters may themselves be named "Part".
   assert equal ("Part 3" | parse_chapter_title) (chapter_title "Part 3")
   assert equal ("Part 3: The Return" | parse_chapter_title) (chapter_title "Part 3" --chapter-title "The Return")
   assert equal ("Part 1, Part 2" | parse_chapter_title) (chapter_title "Part 1" --chapter-part "Part 2")
-}
-
-def test_parse_chapter_title [] {
-  test_parse_chapter_title_unquoted_title
-  test_parse_chapter_title_punctuation
-  test_parse_chapter_title_chapter_part_with_title
-  test_parse_chapter_title_unquoted_part_title
-  test_parse_chapter_title_quoted_commas_and_slashes
-  test_parse_chapter_title_combined_tracks
-  test_parse_chapter_title_chapter_word_part
-  test_parse_chapter_title_all_parts
-  test_parse_chapter_title_chapter_only
-  test_parse_chapter_title_chapter_with_name
-  test_parse_chapter_title_chapter_part
-  test_parse_chapter_title_part_chapter
-  test_parse_chapter_title_opening_credits
-  test_parse_chapter_title_opening_credits_chapter_one
-}
-
-# Run the tests in this module
-export def run_tests [] {
-  test_lengths_to_start_offsets
-  test_format_chapter_duration
-  test_chapters_from_musicbrainz_release_media
-  test_round_to_second_using_cumulative_offset
-  test_round_to_second_using_cumulative_offset_edge_cases
-  test_round_to_second_using_cumulative_offset_does_not_accumulate_error
-  test_has_default_chapters
-  test_rename_chapters
-  test_unquote
-  test_parse_chapter_title
-  test_combine_chapter_parts
-  test_parse_chapters_from_tone
-  test_chapters_into_tone_format
-  test_parse_chapters_from_musicbrainz_release
 }

@@ -7,7 +7,7 @@ use ../media-juggler-lib *
 
 const test_data_dir = path self ../test-data
 
-def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
+export def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
   let input = (
     open ([$test_data_dir "tsukimichi-volume-1-ebook-edition-hardcover.json"] | path join)
   )
@@ -54,13 +54,4 @@ def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
   }
   # log debug $"parsed hardcover edition: ($input | parse_hardcover_edition | to nuon)"
   assert equal ($input | parse_hardcover_edition) $expected
-}
-
-def test_parse_hardcover_edition [] {
-  test_parse_hardcover_edition_tsukimichi_volume_1
-}
-
-# Run the tests in this module
-export def run_tests [] {
-  test_parse_hardcover_edition
 }
