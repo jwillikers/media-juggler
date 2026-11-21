@@ -262,7 +262,7 @@ export def measure_optimization_performance [
   let optimized_file = do $optimization_function $original_file
   if ($optimized_file | is-empty) {
     log error $"Optimization function ($optimization_function) errored attempting to optimize the file (ansi yellow)($original_file)(ansi reset)"
-    {
+    return {
       original_file: $original_file
       optimized_file: ""
       original_size: -1MiB
