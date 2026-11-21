@@ -102,19 +102,19 @@ export def acsm_lcp_to_ebook [
 
 # Check book metadata for errors
 export def validate_book_metadata [
-  metadata_source: string # Source of the metadata, either "hardcover", "comic vine"
+  metadata_source: string # Source of the metadata, either "hardcover" or "comic_vine"
   type: string # Type of work of the associated metadata, either "comic" or "book"
 ]: [
   record -> record<valid: bool, errors: list>
 ] {
   let book_metadata = $in
-  if $metadata_source not-in ["comic vine" "hardcover"] {
+  if $metadata_source not-in ["comic_vine" "hardcover"] {
     error make {
-      msg: "validate_book_metadata: invalid metadata_source is not 'comic vine' or 'hardcover'"
+      msg: "validate_book_metadata: invalid metadata_source is not 'comic_vine' or 'hardcover'"
       labels: [
         {text: "metadata_source" span: (metadata $metadata_source).span}
       ]
-      help: "pass either 'comic vine' or 'hardcover' as the metadata_source argument to validate_book_metadata"
+      help: "pass either 'comic_vine' or 'hardcover' as the metadata_source argument to validate_book_metadata"
     }
   }
   if $type not-in ["comic" "book"] {
@@ -127,7 +127,7 @@ export def validate_book_metadata [
     }
   }
   let edition_id = (
-    if $metadata_source == "comic vine" {
+    if $metadata_source == "comic_vine" {
       let comic_vine_issue_ids = $book_metadata.ids | where type == "comic_vine_issue_id"
       if ($comic_vine_issue_ids | is-empty) {
         error make {
@@ -196,14 +196,14 @@ export def validate_book_metadata [
     }
   )
   let edition_id_link = (
-    if $metadata_source == "comic vine" {
+    if $metadata_source == "comic_vine" {
       ('https://comicvine.gamespot.com/issue/4000-' + $edition_id) | ansi link --text $edition_id
     } else if $metadata_source == "hardcover" {
       ('https://hardcover.app/editions/' + $edition_id) | ansi link --text $edition_id
     }
   )
   let edition_type_string = (
-    if $metadata_source == "comic vine" {
+    if $metadata_source == "comic_vine" {
       "Comic Vine issue"
     } else if $metadata_source == "hardcover" {
       "Hardcover edition"
@@ -224,7 +224,7 @@ export def validate_book_metadata [
       )}
     ]
     [
-      {|| $metadata_source == "hardcover" and ($book_metadata | get --optional forms_of_creative_work | is-empty) or ($book_metadata.forms_of_creative_work | first) == "unknown"}
+      {|| $metadata_source == "hardcover" and (($book_metadata | get --optional forms_of_creative_work | is-empty) or ($book_metadata.forms_of_creative_work | first) == "unknown")}
       {|| $"Book category is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the book category for the book and retry."}
     ]
     [
@@ -253,7 +253,7 @@ export def validate_book_metadata [
       {|| $"There is no cover artist set for the light novel ($edition_type_string) (ansi yellow)($edition_id_link)(ansi reset). Set the illustrator for the edition and retry."}
     ]
     [
-      {|| $metadata_source == "hardcover" and ($book_metadata | get --optional literary_type | is-empty) or $book_metadata.literary_type == "unknown"}
+      {|| $metadata_source == "hardcover" and (($book_metadata | get --optional literary_type | is-empty) or $book_metadata.literary_type == "unknown")}
       {|| $"Literary type is not set for the Hardcover book (ansi yellow)(('https://hardcover.app/books/' + $hardcover_book_slug) | ansi link --text $hardcover_book_slug)(ansi reset). Set the literary type for the book and retry."}
     ]
     [

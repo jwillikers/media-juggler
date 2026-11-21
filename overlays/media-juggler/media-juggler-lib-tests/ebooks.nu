@@ -356,3 +356,117 @@ Note: This volume was released digitally (05/03/2023) before paperback (06/06/20
   assert equal ($output | get content | first | get content) ($expected | get content | first | get content)
   assert equal $output $expected
 }
+
+# Book metadata from Hardcover that passes validation
+def valid_hardcover_book_metadata []: nothing -> record {
+  {
+    ids: [
+      [type id];
+      [hardcover_edition_id "30405060"]
+      [hardcover_book_slug "spice-and-wolf"]
+    ]
+    credits: [
+      [person role primary language];
+      ["Isuna Hasekura" Writer true ""]
+      ["Jyuu Ayakura" Artist false ""]
+      ["Jyuu Ayakura" "Cover Artist" false ""]
+    ]
+    forms_of_creative_work: ["light novel"]
+    literary_type: fiction
+    _cover_image: [0 "" "https://assets.hardcover.app/editions/30405060/cover.jpg"]
+    publication_date: ("2009-12-15" | into datetime)
+    language: english
+    publishers: ["Yen On"]
+  }
+}
+
+export def test_validate_book_metadata_valid_hardcover_book [] {
+  assert equal (valid_hardcover_book_metadata | validate_book_metadata hardcover book) {valid: true errors: []}
+}
+
+export def test_validate_book_metadata_no_contributors [] {
+  let result = valid_hardcover_book_metadata | reject credits | validate_book_metadata hardcover book
+  assert equal $result.valid false
+  assert ($result.errors | any {|error| $error =~ "There are no contributors" })
+}
+
+export def test_validate_book_metadata_no_author [] {
+  let result = valid_hardcover_book_metadata | update credits {|metadata| $metadata.credits | where role != Writer } | validate_book_metadata hardcover book
+  assert equal $result.valid false
+  assert ($result.errors | any {|error| $error =~ "There are no authors" })
+}
+
+export def test_validate_book_metadata_light_novel_without_illustrator [] {
+  let result = valid_hardcover_book_metadata | update credits {|metadata| $metadata.credits | where role != Artist } | validate_book_metadata hardcover book
+  assert equal $result.valid false
+  assert ($result.errors | any {|error| $error =~ "no illustrator set for the light novel" })
+}
+
+export def test_validate_book_metadata_unknown_category [] {
+  let result = valid_hardcover_book_metadata | update forms_of_creative_work [unknown] | validate_book_metadata hardcover book
+  assert equal $result.valid false
+  assert ($result.errors | any {|error| $error =~ "Book category is not set" })
+}
+
+export def test_validate_book_metadata_missing_hardcover_fields [] {
+  let result = (
+    valid_hardcover_book_metadata
+    | reject literary_type _cover_image publication_date language publishers
+    | validate_book_metadata hardcover book
+  )
+  assert equal $result.valid false
+  assert equal ($result.errors | length) 5
+}
+
+export def test_validate_book_metadata_series_without_author [] {
+  let result = valid_hardcover_book_metadata | insert series "Spice and Wolf" | validate_book_metadata hardcover book
+  assert equal $result.valid false
+  assert ($result.errors | any {|error| $error =~ "no series author" })
+  let result = valid_hardcover_book_metadata | insert series "Spice and Wolf" | insert primary_series_author "Isuna Hasekura" | validate_book_metadata hardcover book
+  assert equal $result.valid true
+}
+
+export def test_validate_book_metadata_hardcover_comic_requires_graphic_novel_category [] {
+  let result = valid_hardcover_book_metadata | validate_book_metadata hardcover comic
+  assert equal $result.valid false
+  assert ($result.errors | any {|error| $error =~ "not set to 'Graphic Novel'" })
+}
+
+export def test_validate_book_metadata_missing_hardcover_edition_id [] {
+  assert error {|| valid_hardcover_book_metadata | update ids [[type id]; [hardcover_book_slug "spice-and-wolf"]] | validate_book_metadata hardcover book }
+}
+
+export def test_validate_book_metadata_invalid_metadata_source [] {
+  assert error {|| valid_hardcover_book_metadata | validate_book_metadata "comic vine" book }
+}
+
+export def test_validate_book_metadata_invalid_type [] {
+  assert error {|| valid_hardcover_book_metadata | validate_book_metadata hardcover magazine }
+}
+
+# Comic metadata from Comic Vine, which doesn't include fields specific to Hardcover
+def valid_comic_vine_metadata []: nothing -> record {
+  {
+    ids: [[type id]; [comic_vine_issue_id "123456"]]
+    credits: [
+      [person role primary language];
+      ["Chica Umino" Writer false ""]
+      ["Chica Umino" Artist false ""]
+    ]
+    publishers: [Denpa]
+  }
+}
+
+export def test_validate_book_metadata_valid_comic_vine_comic [] {
+  assert equal (valid_comic_vine_metadata | validate_book_metadata comic_vine comic) {valid: true errors: []}
+}
+
+export def test_validate_book_metadata_comic_vine_comic_without_artist [] {
+  let result = valid_comic_vine_metadata | update credits {|metadata| $metadata.credits | where role != Artist } | validate_book_metadata comic_vine comic
+  assert equal $result.valid false
+  assert ($result.errors | any {|error| $error =~ "There is no 'Artist', 'Colorist', 'Inker', or 'Penciller'" })
+}
+
+export def test_validate_book_metadata_missing_comic_vine_issue_id [] {
+  assert error {|| valid_comic_vine_metadata | update ids [] | validate_book_metadata comic_vine comic }
+}
