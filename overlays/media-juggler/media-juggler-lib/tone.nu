@@ -229,22 +229,22 @@ export def parse_audiobook_metadata_from_tone []: record -> record {
       )
       let bookbrainz_work_id = (
         if "bookBrainz Work Id" in $metadata.additionalFields {
-          $metadata.additionalFields."bookBrainz Work Id" | parse_multi_value_tag | wrap bookbrainz_work_id
+          $metadata.additionalFields."bookBrainz Work Id" | parse_parallel_multi_value_tag | wrap bookbrainz_work_id
         }
       )
       let open_library_work_id = (
         if "openLibrary Work Id" in $metadata.additionalFields {
-          $metadata.additionalFields."openLibrary Work Id" | parse_multi_value_tag | wrap open_library_work_id
+          $metadata.additionalFields."openLibrary Work Id" | parse_parallel_multi_value_tag | wrap open_library_work_id
         }
       )
       let wikidata_work_id = (
         if "wikidata Work Id" in $metadata.additionalFields {
-          $metadata.additionalFields."wikidata Work Id" | parse_multi_value_tag | wrap wikidata_work_id
+          $metadata.additionalFields."wikidata Work Id" | parse_parallel_multi_value_tag | wrap wikidata_work_id
         }
       )
       let names = (
         if "work" in $metadata.additionalFields {
-          $metadata.additionalFields.work | parse_multi_value_tag | wrap name
+          $metadata.additionalFields.work | parse_parallel_multi_value_tag | wrap title
         }
       )
       (
@@ -695,11 +695,11 @@ export def into_tone_format []: record -> record {
       }
     )
     | upsert_if_value "MusicBrainz Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional id | join_multi_value)
-    | upsert_if_value "BookBrainz Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional bookbrainz_work_id | join_multi_value)
-    | upsert_if_value "OpenLibrary Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional open_library_work_id | join_multi_value)
-    | upsert_if_value "Wikidata Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional wikidata_work_id | join_multi_value)
+    | upsert_if_value "BookBrainz Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional bookbrainz_work_id | join_parallel_multi_value)
+    | upsert_if_value "OpenLibrary Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional open_library_work_id | join_parallel_multi_value)
+    | upsert_if_value "Wikidata Work Id" ($metadata.track | get --optional musicbrainz_works | get --optional wikidata_work_id | join_parallel_multi_value)
     | upsert_if_value "MusicBrainz Label Id" ($metadata.track | get --optional publishers | get --optional id | join_multi_value)
-    | upsert_if_value "work" ($metadata.track | get --optional musicbrainz_works | get --optional name | join_multi_value)
+    | upsert_if_value "work" ($metadata.track | get --optional musicbrainz_works | get --optional title | join_parallel_multi_value)
     | (
       let input = $in;
       if "contributors" in $metadata.track and ($metadata.track.contributors | is-not-empty) {

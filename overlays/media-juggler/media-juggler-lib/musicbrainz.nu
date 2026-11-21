@@ -953,7 +953,7 @@ export def parse_musicbrainz_release []: [
               $works
               | each {|work|
                 if ($work | get --optional relations | is-empty) {
-                  $work | default [] bookbrainz_work_id open_library_work_id wikidata_work_id
+                  $work | default null bookbrainz_work_id open_library_work_id wikidata_work_id
                 } else {
                   let url_relations = $work.relations | where target-type == "url";
                   let bookbrainz_work_id = (
@@ -1022,28 +1022,12 @@ export def parse_musicbrainz_release []: [
                       }
                     }
                   )
-                  let work = (
-                    if ($bookbrainz_work_id | is-empty) {
-                      $work | default [] bookbrainz_work_id
-                    } else {
-                      $work | insert bookbrainz_work_id $bookbrainz_work_id
-                    }
+                  (
+                    $work
+                    | upsert bookbrainz_work_id $bookbrainz_work_id
+                    | upsert open_library_work_id $open_library_work_id
+                    | upsert wikidata_work_id $wikidata_work_id
                   )
-                  let work = (
-                    if ($open_library_work_id | is-empty) {
-                      $work | default [] open_library_work_id
-                    } else {
-                      $work | insert open_library_work_id $open_library_work_id
-                    }
-                  )
-                  let work = (
-                    if ($wikidata_work_id | is-empty) {
-                      $work | default [] wikidata_work_id
-                    } else {
-                      $work | insert wikidata_work_id $wikidata_work_id
-                    }
-                  )
-                  $work
                 }
               }
               | select id title bookbrainz_work_id open_library_work_id wikidata_work_id
