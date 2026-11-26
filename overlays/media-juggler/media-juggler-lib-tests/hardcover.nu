@@ -212,3 +212,70 @@ export def test_parse_hardcover_edition_issue_count_completed_series [] {
   let input = open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join) | update book.featured_book_series.series.is_completed true
   assert equal ($input | parse_hardcover_edition | get issue_count) 43
 }
+
+# The Berserk, Vol. 43 edition from Hardcover, which is only identified as manga by the Manga genre
+def berserk_volume_43_edition []: nothing -> record {
+  open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join)
+}
+
+# Remove the Manga genre from an edition from Hardcover
+def remove_manga_genre []: record -> record {
+  let edition = $in
+  $edition | update book.cached_tags.Genre ($edition.book.cached_tags.Genre | where tag != Manga)
+}
+
+# Add a tag to the cached tags in a category for an edition from Hardcover
+def add_cached_tag [category: string tag: string]: record -> record {
+  let edition = $in
+  let cached_tags = $edition.book.cached_tags
+  $edition | update book.cached_tags (
+    $cached_tags | update $category (
+      $cached_tags | get $category | append {
+        tag: $tag
+        count: 1
+        tagSlug: ($tag | str downcase)
+        category: $category
+        categorySlug: ($category | str downcase)
+        spoilerRatio: 0.0
+      }
+    )
+  )
+}
+
+export def test_parse_hardcover_edition_manga_from_manga_genre [] {
+  let metadata = berserk_volume_43_edition | parse_hardcover_edition
+  assert equal $metadata.manga true
+  assert equal $metadata.forms_of_creative_work ["manga volume"]
+}
+
+export def test_parse_hardcover_edition_not_manga_without_manga_genre [] {
+  let metadata = berserk_volume_43_edition | remove_manga_genre | parse_hardcover_edition
+  assert equal $metadata.manga false
+  assert not ("manga volume" in $metadata.forms_of_creative_work)
+}
+
+export def test_parse_hardcover_edition_manga_from_lowercase_manga_genre [] {
+  let metadata = berserk_volume_43_edition | remove_manga_genre | add_cached_tag Genre manga | parse_hardcover_edition
+  assert equal $metadata.manga true
+}
+
+export def test_parse_hardcover_edition_manga_from_manga_tag [] {
+  let metadata = berserk_volume_43_edition | remove_manga_genre | add_cached_tag Tag Manga | parse_hardcover_edition
+  assert equal $metadata.manga true
+}
+
+export def test_parse_hardcover_edition_manga_from_title [] {
+  let metadata = berserk_volume_43_edition | remove_manga_genre | update title "Berserk (Manga), Vol. 43" | parse_hardcover_edition
+  assert equal $metadata.manga true
+}
+
+export def test_parse_hardcover_edition_manga_from_series_name [] {
+  let metadata = berserk_volume_43_edition | remove_manga_genre | update book.featured_book_series.series.name "Berserk (Manga)" | parse_hardcover_edition
+  assert equal $metadata.manga true
+}
+
+export def test_parse_hardcover_edition_manga_only_for_graphic_novels [] {
+  # Book category 1 is "book" instead of "graphic novel"
+  let metadata = berserk_volume_43_edition | update book.book_category_id 1 | parse_hardcover_edition
+  assert equal ($metadata | get --optional manga) null
+}
