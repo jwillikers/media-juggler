@@ -430,6 +430,8 @@ export def parse_comic_vine_issue_and_volume []: [
     description: $issue.description
     volume: $volume.start_year
     issue_count: $volume.count_of_issues
+    # Comic Vine doesn't indicate whether a volume is finished
+    total_issue_count: $volume.count_of_issues
     ids: []
     characters: ($issue.character_credits | select --optional name id)
     genres: []
@@ -919,6 +921,7 @@ export def from_comic_info_xml []: [record -> record] {
     | upsert_if_value "chapter_title" $chapter_title
     | upsert_if_value "chapter_index" $chapter_index
     | upsert_if_value "issue_count" $issue_count
+    | upsert_if_value "total_issue_count" $issue_count
     | upsert_if_value "issue_id" $issue_id
     | upsert_if_present "series" $json "Series"
     | upsert_if_value "issue" $issue
@@ -1131,7 +1134,8 @@ export def into_comic_info_xml []: [record -> record] {
       )
     }
     | upsert_comic_info {tag: "AgeRating", value: ($data | get --optional comic_info_age_rating)}
-    | upsert_comic_info {tag: "Count", value: ($data | get --optional issue_count)}
+    # Readers like Kavita treat the count as the total number of issues in a finished series, so only use the final number of issues.
+    | upsert_comic_info {tag: "Count", value: ($data | get --optional total_issue_count)}
     | upsert_comic_info {
       tag: "PageCount"
       value: (

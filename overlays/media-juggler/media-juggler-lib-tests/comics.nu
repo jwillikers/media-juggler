@@ -88,6 +88,7 @@ export def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
     publication_date: ("2023-05-01" | into datetime)
     volume: "2023"
     issue_count: "4"
+    total_issue_count: "4"
     credits: [
       [person role primary language];
       # ["Chica Umino" Inker false ""]
@@ -266,6 +267,7 @@ export def test_parse_comic_vine_issue_and_volume [] {
     description: "<p>The first volume.</p>"
     volume: "2023"
     issue_count: 16
+    total_issue_count: 16
     ids: []
     characters: [[name id]; ["Rei Kiriyama" 10]]
     genres: []

@@ -18,8 +18,9 @@ export def test_parse_hardcover_edition_tsukimichi_volume_1 [] {
     title: "Tsukimichi: Moonlit Fantasy, Vol. 1"
     description: "Makoto Misumi..."
     volume: 2013
+    issue_count: 21
     # The series isn't marked as completed, so the count isn't final.
-    issue_count: null
+    total_issue_count: null
     ids: [
       [type, id];
       [hardcover_book_slug, "tsukimichi-moonlit-fantasy-light-novel-vol-1"]
@@ -204,13 +205,17 @@ export def test_parse_hardcover_edition_berserk_volume_43_is_valid_comic [] {
 }
 
 export def test_parse_hardcover_edition_issue_count_ongoing_series [] {
-  let input = open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join)
-  assert equal ($input | parse_hardcover_edition | get issue_count) null
+  let metadata = berserk_volume_43_edition | parse_hardcover_edition
+  # The number of books so far is used to put books from a series in the same directory.
+  assert equal $metadata.issue_count 43
+  # The count isn't final for an ongoing series, so it isn't used for the Count in ComicInfo.xml.
+  assert equal $metadata.total_issue_count null
 }
 
 export def test_parse_hardcover_edition_issue_count_completed_series [] {
-  let input = open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join) | update book.featured_book_series.series.is_completed true
-  assert equal ($input | parse_hardcover_edition | get issue_count) 43
+  let metadata = berserk_volume_43_edition | update book.featured_book_series.series.is_completed true | parse_hardcover_edition
+  assert equal $metadata.issue_count 43
+  assert equal $metadata.total_issue_count 43
 }
 
 # The Berserk, Vol. 43 edition from Hardcover, which is only identified as manga by the Manga genre

@@ -787,9 +787,12 @@ export def parse_hardcover_edition [
       )
       description: $hardcover_edition.book.description
       volume: $series_begin_year
+      # The number of books in the series so far
+      issue_count: ($hardcover_edition | get --optional book.featured_book_series.series.books_count)
+      # The final number of books in the series, which is used for the Count in ComicInfo.xml.
       # Readers like Kavita treat the count as the total number of books in a finished series, marking the series as completed or ended.
       # Only set it when Hardcover marks the series as completed, since the number of books in an ongoing series isn't final.
-      issue_count: (
+      total_issue_count: (
         let series = $hardcover_edition | get --optional book.featured_book_series.series;
         if ($series | get --optional is_completed) == true {
           $series | get --optional primary_books_count | default ($series | get --optional books_count)
