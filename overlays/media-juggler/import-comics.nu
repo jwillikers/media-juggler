@@ -1359,7 +1359,7 @@ def main [
     log debug $"Deleting cached API response for edition"
     if $primary_metadata_source == "hardcover" {
       rm ([$cache_directory "hardcover-edition" $"id-($hardcover_edition_id).json"] | path join)
-    } else if $primary_metadata_source == "comic vine" {
+    } else if $primary_metadata_source == "comic_vine" {
       # todo Delete the cached Comic Vine volume response?
       rm ([$cache_directory "comic-vine-issue" $"id-($comic_vine_issue_id).json"] | path join)
     }
