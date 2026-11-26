@@ -1,0 +1,767 @@
+{
+  "id": 33323254,
+  "canonical_id": null,
+  "title": "Berserk, Vol. 43",
+  "isbn_13": "9781506757285",
+  "language": {
+    "code2": "en",
+    "code3": "eng",
+    "id": 1,
+    "language": "English"
+  },
+  "release_date": "2026-11-24",
+  "contributions": [
+    {
+      "author": {
+        "name": "Kōji Mori",
+        "canonical_id": null,
+        "id": 656937
+      },
+      "contribution": "Supervisor",
+      "primary_override": null,
+      "contributor_role": {
+        "name": "Supervisor",
+        "primary": false
+      },
+      "contributor_specialization": null
+    },
+    {
+      "author": {
+        "name": "Duane Johnson",
+        "canonical_id": null,
+        "id": 336068
+      },
+      "contribution": "Translation",
+      "primary_override": null,
+      "contributor_role": {
+        "name": "Translation",
+        "primary": false
+      },
+      "contributor_specialization": null
+    },
+    {
+      "author": {
+        "name": "Studio Cutie",
+        "canonical_id": null,
+        "id": 405193
+      },
+      "contribution": "Artist: Touch-up",
+      "primary_override": null,
+      "contributor_role": {
+        "name": "Artist",
+        "primary": false
+      },
+      "contributor_specialization": {
+        "name": "Touch-up"
+      }
+    },
+    {
+      "author": {
+        "name": "Studio Cutie",
+        "canonical_id": null,
+        "id": 405193
+      },
+      "contribution": "Lettering",
+      "primary_override": null,
+      "contributor_role": {
+        "name": "Lettering",
+        "primary": false
+      },
+      "contributor_specialization": null
+    },
+    {
+      "author": {
+        "name": "Carl Gustav Horn",
+        "canonical_id": null,
+        "id": 378276
+      },
+      "contribution": "Editor",
+      "primary_override": null,
+      "contributor_role": {
+        "name": "Editor",
+        "primary": false
+      },
+      "contributor_specialization": null
+    },
+    {
+      "author": {
+        "name": "Kentaro Miura",
+        "canonical_id": null,
+        "id": 252214
+      },
+      "contribution": "Original Story",
+      "primary_override": true,
+      "contributor_role": {
+        "name": "Original Story",
+        "primary": false
+      },
+      "contributor_specialization": null
+    },
+    {
+      "author": {
+        "name": "Studio Gaga",
+        "canonical_id": null,
+        "id": 656935
+      },
+      "contribution": "Mangaka",
+      "primary_override": null,
+      "contributor_role": {
+        "name": "Mangaka",
+        "primary": true
+      },
+      "contributor_specialization": null
+    }
+  ],
+  "image": {
+    "id": 7972390,
+    "height": 2175,
+    "width": 1538,
+    "ratio": 0.7071264367816092,
+    "url": "https://assets.hardcover.app/edition/33323254/93845887-cffe-4aab-8a84-f1f2f1f92c3e.jpg"
+  },
+  "edition_format": null,
+  "reading_format": {
+    "id": 4,
+    "format": "Ebook"
+  },
+  "pages": 220,
+  "audio_seconds": null,
+  "book_mappings": [
+    {
+      "id": 13409534,
+      "external_id": "258221120",
+      "platform_id": 1
+    }
+  ],
+  "publisher": {
+    "name": "Dark Horse Manga"
+  },
+  "book": {
+    "book_characters": [],
+    "description": "An empire prepares for war against Griffith—yet they hold his sworn adversary, Guts, prisoner in chains…and worse is that Guts is a prisoner within himself! The epic dark fantasy manga continues with Miura’s longtime assistants Studio Gaga, under the supervision of his closest friend, Kouji Mori. Having escaped the horrific devastation of Elf Island only to be boarded by unknown raiders, the crew of the Seahorse find that they have intruded into the territorial waters of the vast Kushan Empire! Sunk into his own personal darkness, Guts hardly seems to care as the Kushan lead him away in chains, even as Roderick, Farnese, Serpico, Morda, Isidro, Schierke and the other survivors are taken in as refugees. But they find no steady ground on shore either…for a grand council of the Kushan tribes is assembling to debate plans for war—against Falconia and its fearsome, matchless ruler Griffith, the Hawk of Light! The politics of the council are dangerous, but more dangerous still is that the Hawk’s power is already among them, striking through murderous sorcery. In this critical moment, Guts’ companions can’t rely on him to help…and in fact, is he to blame…? Extra content includes a double-sided, full color illustrated fold out, an afterword by Kouji Mori, and a bonus comic strip about Kentaro Miura! For mature audiences.",
+    "literary_type_id": 1,
+    "book_category_id": 4,
+    "slug": "berserk-vol-43",
+    "cached_tags": {
+      "Tag": [
+        {
+          "tag": "Seinen",
+          "count": 1,
+          "tagSlug": "seinen-9a59760f-0069-45a9-857e-2e5bb33a723a",
+          "category": "Tag",
+          "categorySlug": "tag",
+          "spoilerRatio": 0.0
+        }
+      ],
+      "Mood": [],
+      "Genre": [
+        {
+          "tag": "Sword and Sorcery",
+          "count": 2,
+          "tagSlug": "sword-and-sorcery",
+          "category": "Genre",
+          "categorySlug": "genre",
+          "spoilerRatio": 0.0
+        },
+        {
+          "tag": "Manga",
+          "count": 2,
+          "tagSlug": "manga",
+          "category": "Genre",
+          "categorySlug": "genre",
+          "spoilerRatio": 0.0
+        },
+        {
+          "tag": "Dark Fantasy",
+          "count": 2,
+          "tagSlug": "dark-fantasy",
+          "category": "Genre",
+          "categorySlug": "genre",
+          "spoilerRatio": 0.0
+        },
+        {
+          "tag": "Epic Fantasy",
+          "count": 2,
+          "tagSlug": "epic-fantasy",
+          "category": "Genre",
+          "categorySlug": "genre",
+          "spoilerRatio": 0.0
+        }
+      ],
+      "Group": [],
+      "Content Warning": []
+    },
+    "release_year": 2025,
+    "featured_book_series": {
+      "id": 704466,
+      "featured": true,
+      "details": "43",
+      "position": 43,
+      "series_id": 3408,
+      "series": {
+        "id": 3408,
+        "canonical_id": null,
+        "name": "Berserk",
+        "author": {
+          "id": 252214,
+          "name": "Kentaro Miura"
+        },
+        "books_count": 43,
+        "primary_books_count": 43,
+        "is_completed": null,
+        "book_series": [
+          {
+            "book": {
+              "release_year": 2018
+            }
+          },
+          {
+            "book": {
+              "release_year": 2000
+            }
+          },
+          {
+            "book": {
+              "release_year": 1998
+            }
+          },
+          {
+            "book": {
+              "release_year": 1997
+            }
+          },
+          {
+            "book": {
+              "release_year": 2006
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": 1996
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": 1993
+            }
+          },
+          {
+            "book": {
+              "release_year": 2005
+            }
+          },
+          {
+            "book": {
+              "release_year": 1993
+            }
+          },
+          {
+            "book": {
+              "release_year": 1991
+            }
+          },
+          {
+            "book": {
+              "release_year": 1990
+            }
+          },
+          {
+            "book": {
+              "release_year": 1998
+            }
+          },
+          {
+            "book": {
+              "release_year": 1995
+            }
+          },
+          {
+            "book": {
+              "release_year": 2000
+            }
+          },
+          {
+            "book": {
+              "release_year": 2001
+            }
+          },
+          {
+            "book": {
+              "release_year": 2002
+            }
+          },
+          {
+            "book": {
+              "release_year": 2003
+            }
+          },
+          {
+            "book": {
+              "release_year": 2021
+            }
+          },
+          {
+            "book": {
+              "release_year": 2004
+            }
+          },
+          {
+            "book": {
+              "release_year": 2006
+            }
+          },
+          {
+            "book": {
+              "release_year": 2008
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2002
+            }
+          },
+          {
+            "book": {
+              "release_year": 1999
+            }
+          },
+          {
+            "book": {
+              "release_year": 2016
+            }
+          },
+          {
+            "book": {
+              "release_year": 2023
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2017
+            }
+          },
+          {
+            "book": {
+              "release_year": 2023
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": 2007
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": 2019
+            }
+          },
+          {
+            "book": {
+              "release_year": 2021
+            }
+          },
+          {
+            "book": {
+              "release_year": 1992
+            }
+          },
+          {
+            "book": {
+              "release_year": 1994
+            }
+          },
+          {
+            "book": {
+              "release_year": 1994
+            }
+          },
+          {
+            "book": {
+              "release_year": 1991
+            }
+          },
+          {
+            "book": {
+              "release_year": 2006
+            }
+          },
+          {
+            "book": {
+              "release_year": 1995
+            }
+          },
+          {
+            "book": {
+              "release_year": 2007
+            }
+          },
+          {
+            "book": {
+              "release_year": 2018
+            }
+          },
+          {
+            "book": {
+              "release_year": 2018
+            }
+          },
+          {
+            "book": {
+              "release_year": 2007
+            }
+          },
+          {
+            "book": {
+              "release_year": 2001
+            }
+          },
+          {
+            "book": {
+              "release_year": 2003
+            }
+          },
+          {
+            "book": {
+              "release_year": 2007
+            }
+          },
+          {
+            "book": {
+              "release_year": 2009
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": 2020
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": 2013
+            }
+          },
+          {
+            "book": {
+              "release_year": 2020
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": null
+            }
+          },
+          {
+            "book": {
+              "release_year": 2024
+            }
+          },
+          {
+            "book": {
+              "release_year": 2000
+            }
+          },
+          {
+            "book": {
+              "release_year": 2023
+            }
+          },
+          {
+            "book": {
+              "release_year": 2001
+            }
+          },
+          {
+            "book": {
+              "release_year": 1999
+            }
+          },
+          {
+            "book": {
+              "release_year": 1995
+            }
+          },
+          {
+            "book": {
+              "release_year": 1997
+            }
+          },
+          {
+            "book": {
+              "release_year": 1998
+            }
+          },
+          {
+            "book": {
+              "release_year": 2000
+            }
+          },
+          {
+            "book": {
+              "release_year": 1996
+            }
+          },
+          {
+            "book": {
+              "release_year": 1994
+            }
+          },
+          {
+            "book": {
+              "release_year": 2006
+            }
+          },
+          {
+            "book": {
+              "release_year": 1995
+            }
+          },
+          {
+            "book": {
+              "release_year": 1994
+            }
+          },
+          {
+            "book": {
+              "release_year": 1993
+            }
+          },
+          {
+            "book": {
+              "release_year": 1993
+            }
+          },
+          {
+            "book": {
+              "release_year": 2000
+            }
+          },
+          {
+            "book": {
+              "release_year": 2003
+            }
+          },
+          {
+            "book": {
+              "release_year": 2001
+            }
+          },
+          {
+            "book": {
+              "release_year": 2002
+            }
+          },
+          {
+            "book": {
+              "release_year": 1996
+            }
+          },
+          {
+            "book": {
+              "release_year": 1998
+            }
+          },
+          {
+            "book": {
+              "release_year": 1991
+            }
+          },
+          {
+            "book": {
+              "release_year": 2005
+            }
+          },
+          {
+            "book": {
+              "release_year": 2010
+            }
+          },
+          {
+            "book": {
+              "release_year": 1991
+            }
+          },
+          {
+            "book": {
+              "release_year": 2023
+            }
+          },
+          {
+            "book": {
+              "release_year": 2006
+            }
+          },
+          {
+            "book": {
+              "release_year": 2019
+            }
+          },
+          {
+            "book": {
+              "release_year": 2019
+            }
+          },
+          {
+            "book": {
+              "release_year": 2020
+            }
+          },
+          {
+            "book": {
+              "release_year": 1996
+            }
+          },
+          {
+            "book": {
+              "release_year": 1996
+            }
+          },
+          {
+            "book": {
+              "release_year": 1997
+            }
+          },
+          {
+            "book": {
+              "release_year": 1997
+            }
+          },
+          {
+            "book": {
+              "release_year": 2025
+            }
+          },
+          {
+            "book": {
+              "release_year": 2005
+            }
+          },
+          {
+            "book": {
+              "release_year": 2010
+            }
+          },
+          {
+            "book": {
+              "release_year": 2016
+            }
+          },
+          {
+            "book": {
+              "release_year": 2020
+            }
+          },
+          {
+            "book": {
+              "release_year": 1997
+            }
+          },
+          {
+            "book": {
+              "release_year": 2006
+            }
+          },
+          {
+            "book": {
+              "release_year": 1999
+            }
+          },
+          {
+            "book": {
+              "release_year": 2007
+            }
+          },
+          {
+            "book": {
+              "release_year": 2011
+            }
+          },
+          {
+            "book": {
+              "release_year": 2000
+            }
+          },
+          {
+            "book": {
+              "release_year": 2013
+            }
+          },
+          {
+            "book": {
+              "release_year": 2023
+            }
+          },
+          {
+            "book": {
+              "release_year": 2008
+            }
+          },
+          {
+            "book": {
+              "release_year": 2023
+            }
+          }
+        ]
+      }
+    }
+  }
+}

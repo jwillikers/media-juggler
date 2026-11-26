@@ -138,6 +138,19 @@ export def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
     # }
   }
   let expected = open ([$test_data_dir "March Comes in Like a Lion v001_ComicInfo.xml"] | path join)
+  # Kavita splits publishers on commas, so the comma is removed from the publisher "Denpa, LLC".
+  let expected = (
+    $expected
+    | update content (
+      $expected.content | each {|field|
+        if $field.tag == Publisher {
+          $field | update content [[tag attributes content]; [null null "Denpa LLC"]]
+        } else {
+          $field
+        }
+      }
+    )
+  )
   # log debug $"output: \n($input | into_comic_info_xml | to xml)\n"
   # log debug $"output: \n($input | into_comic_info_xml | to nuon)\n"
   let output = ($input | into_comic_info_xml)
@@ -150,7 +163,7 @@ export def test_into_comic_info_xml_march_comes_in_like_a_lion_vol_1 [] {
       $output.content | where tag != Notes
     )
   )
-  assert equal $output $expected
+  assert_equal_deep $output $expected
 }
 
 # A minimal ComicInfo record as parsed from XML
@@ -292,4 +305,88 @@ export def test_parse_comic_vine_issue_and_volume_without_name_or_date [] {
   assert equal $actual.publication_date null
   assert equal $actual.year null
   assert equal $actual.credits []
+}
+
+export def test_into_comic_info_xml_credits_from_hardcover_roles [] {
+  let input = open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join) | parse_hardcover_edition
+  let creators = (
+    $input
+    | into_comic_info_xml
+    | get content
+    | where tag in [Writer Penciller Inker Colorist Letterer CoverArtist Editor Translator]
+    | each {|field| {tag: $field.tag value: $field.content.0.content} }
+    | sort-by tag
+  )
+  let expected = [
+    [tag value];
+    [Colorist "Studio Gaga"]
+    [CoverArtist "Studio Gaga"]
+    [Editor "Carl Gustav Horn"]
+    [Inker "Studio Gaga"]
+    [Letterer "Studio Cutie"]
+    [Penciller "Studio Gaga"]
+    [Translator "Duane Johnson"]
+    [Writer "Kentaro Miura,Studio Gaga"]
+  ]
+  assert_equal_deep $creators $expected
+}
+
+export def test_sanitize_comic_info_name [] {
+  assert equal ("Studio Gaga" | sanitize_comic_info_name) "Studio Gaga"
+  assert equal ("Yen Press, LLC" | sanitize_comic_info_name) "Yen Press LLC"
+  assert equal (" A ,B " | sanitize_comic_info_name) "A B"
+}
+
+export def test_comic_info_manga_value [] {
+  assert equal (true | comic_info_manga_value) "Yes"
+  assert equal (false | comic_info_manga_value) "No"
+  assert equal ("YesAndRightToLeft" | comic_info_manga_value) "YesAndRightToLeft"
+}
+
+# Get the value of each field in a ComicInfo record
+def comic_info_fields []: record -> record {
+  $in.content | reduce --fold {} {|field acc| $acc | insert $field.tag $field.content.0.content }
+}
+
+export def test_into_comic_info_xml_for_kavita_manga_volume [] {
+  let input = open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join) | parse_hardcover_edition | update manga YesAndRightToLeft
+  let fields = $input | into_comic_info_xml | comic_info_fields
+  # Kavita treats Volume as the volume number and Number as the chapter number, so a manga volume only has a Volume.
+  assert equal $fields.Volume "43"
+  assert ("Number" not-in $fields)
+  # Kavita marks a series completed when it has the volume equal to Count, so Count is only set for completed series.
+  assert ("Count" not-in $fields)
+  assert equal $fields.Manga "YesAndRightToLeft"
+  assert equal $fields.Series "Berserk"
+  assert equal $fields.GTIN "9781506757285"
+  assert equal $fields.LanguageISO "en"
+  assert equal $fields.AgeRating "Teen"
+  assert equal $fields.Publisher "Dark Horse Manga"
+  assert equal $fields.Web "https://hardcover.app/books/berserk-vol-43/editions/33323254"
+  assert equal [$fields.Year $fields.Month $fields.Day] ["2026" "11" "24"]
+}
+
+export def test_into_comic_info_xml_manga_boolean [] {
+  let input = open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join) | parse_hardcover_edition
+  assert equal ($input | into_comic_info_xml | comic_info_fields | get Manga) "Yes"
+}
+
+export def test_into_comic_info_xml_not_manga_boolean [] {
+  let input = open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join) | parse_hardcover_edition | update manga false
+  let fields = $input | into_comic_info_xml | comic_info_fields
+  assert equal $fields.Manga "No"
+  # Comics which aren't manga are numbered by issue
+  assert equal $fields.Number "43"
+}
+
+export def test_into_comic_info_xml_names_with_commas [] {
+  let input = (
+    open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join)
+    | parse_hardcover_edition
+    | update publishers ["Yen Press, LLC"]
+    | update credits {|metadata| $metadata.credits | append {person: "Doe, Jane" id: "1" role: Editor primary: false language: ""} }
+  )
+  let fields = $input | into_comic_info_xml | comic_info_fields
+  assert equal $fields.Publisher "Yen Press LLC"
+  assert equal $fields.Editor "Carl Gustav Horn,Doe Jane"
 }

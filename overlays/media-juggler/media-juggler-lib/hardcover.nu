@@ -281,6 +281,14 @@ export def get_hardcover_edition [
             id
           }
           contribution
+          primary_override
+          contributor_role {
+            name
+            primary
+          }
+          contributor_specialization {
+            name
+          }
         }
         image {
           id
@@ -331,6 +339,8 @@ export def get_hardcover_edition [
                 name
               }
               books_count
+              primary_books_count
+              is_completed
               book_series {
                 book {
                   release_year
@@ -396,6 +406,82 @@ export def get_hardcover_edition [
 }
 
 # Parse the data from the Hardcover API for a Harcover edition
+# Parse the role, specialization, and primary status of a contribution from Hardcover
+#
+# Hardcover's standardized contributor roles are used when available.
+# Otherwise, the role and specialization are parsed from the contribution string, such as "Artist: Touch-up", which is the format of older responses.
+# A contribution without a role is an author.
+export def parse_hardcover_contribution []: record -> record {
+  let contribution = $in
+  let role_name = $contribution | get --optional contributor_role.name
+  let parsed = (
+    if ($role_name | is-not-empty) {
+      {
+        role: $role_name
+        specialization: ($contribution | get --optional contributor_specialization.name)
+      }
+    } else {
+      let components = (
+        $contribution
+        | get --optional contribution
+        | default ""
+        | split row --number 2 ":"
+        | str trim
+        | where {|component| $component | is-not-empty }
+      )
+      {
+        role: ($components | get --optional 0 | default "Author")
+        specialization: ($components | get --optional 1)
+      }
+    }
+  )
+  let primary = (
+    let primary_override = $contribution | get --optional primary_override;
+    if $primary_override != null {
+      $primary_override
+    } else {
+      $contribution | get --optional contributor_role.primary | default false
+    }
+  )
+  $parsed | insert primary $primary
+}
+
+# Get the credit roles for a contribution from Hardcover
+#
+# Credit roles follow the Comic Vine roles used by ComicTagger.
+# A Hardcover role that isn't mapped to credit roles keeps its Hardcover name, including any specialization, such as "Supervisor" or "Artist • Touch-up".
+# Hardcover's "Cover Artist" role is credited as the roles "Cover Artist", "Cover", and "Artist", because the ComicInfo CoverArtist field requires both the Cover and Artist roles.
+export def hardcover_contribution_roles [
+  roles_map: record = $hardcover_roles_map
+  art_credit_roles: list<string> = $hardcover_art_credit_roles
+  unmapped_specializations: list<string> = $hardcover_unmapped_specializations
+]: record -> list<string> {
+  let contribution = $in
+  let hardcover_name = (
+    if ($contribution.specialization | is-empty) {
+      $contribution.role
+    } else {
+      $"($contribution.role) • ($contribution.specialization)"
+    }
+  )
+  let roles = $roles_map | get --optional $contribution.role
+  let roles = (
+    if ($roles | is-empty) or $contribution.specialization in $unmapped_specializations {
+      [$hardcover_name]
+    } else if $contribution.specialization == "Cover" and ($roles | any {|role| $role in $art_credit_roles }) {
+      # Artwork credited for the cover, like "Colorist • Cover", is cover art.
+      ["Cover Artist"]
+    } else {
+      $roles
+    }
+  )
+  if "Cover Artist" in $roles {
+    $roles | append [Cover Artist] | uniq
+  } else {
+    $roles
+  }
+}
+
 export def parse_hardcover_edition [
   the_genre_allowlist: table = $genre_allowlist
   the_tag_allowlist: table = $tag_allowlist
@@ -471,41 +557,23 @@ export def parse_hardcover_edition [
   # Rewrite credits to match ComicTagger's format.
   #  [[person, role, primary, language]; ["Some Person", Editor, false, ""]]
   let credits = (
-    $hardcover_edition.contributions | reduce --fold [] {|contribution acc|
-      let role = (
-        if ($contribution | get --optional contribution | is-empty) or ($contribution | get --optional contribution) == "Author" {
-          "Writer"
-        } else if $contribution.contribution == "Illustrator" {
-          "Artist"
-        # } else if $contribution.contribution == "Cover Artist" {
-        #   "Cover Artist"
-        } else {
-          $contribution.contribution
+    $hardcover_edition
+    | get --optional contributions
+    | default []
+    | each {|contribution|
+      let parsed = $contribution | parse_hardcover_contribution
+      $parsed | hardcover_contribution_roles | each {|role|
+        {
+          person: $contribution.author.name
+          id: ($contribution.author.id | into string)
+          role: $role
+          primary: $parsed.primary
+          language: ""
         }
-      )
-      $acc | append [
-        [person id role primary language];
-        [$contribution.author.name ($contribution.author.id | into string) $role false ""]
-      ] | append (
-        # todo Always just keep "Cover Artist" as one role instead of multiple Cover and Artist roles.
-        if $role == "Cover Artist" {
-          [
-            [person id role primary language];
-            [$contribution.author.name ($contribution.author.id | into string) "Cover" false ""]
-            [$contribution.author.name ($contribution.author.id | into string) "Artist" false ""]
-          ]
-        }
-      ) | uniq
-      # ] | append (
-      #   if $contribution.contribution == "Cover Artist" {
-      #     [
-      #       [person id role primary language];
-      #       [$contribution.author.name $contribution.author.id "Cover" false ""]
-      #     ]
-      #   }
-      # )
+      }
     }
-    # todo Should "Cover Artist" be separate Cover and Artist roles?
+    | flatten
+    | uniq
   )
 
   let hardcover_book_category_map = {
@@ -719,7 +787,14 @@ export def parse_hardcover_edition [
       )
       description: $hardcover_edition.book.description
       volume: $series_begin_year
-      issue_count: ($hardcover_edition | get --optional book.featured_book_series.series.books_count)
+      # Readers like Kavita treat the count as the total number of books in a finished series, marking the series as completed or ended.
+      # Only set it when Hardcover marks the series as completed, since the number of books in an ongoing series isn't final.
+      issue_count: (
+        let series = $hardcover_edition | get --optional book.featured_book_series.series;
+        if ($series | get --optional is_completed) == true {
+          $series | get --optional primary_books_count | default ($series | get --optional books_count)
+        }
+      )
       ids: $ids
       isbn: ($hardcover_edition | get --optional isbn_13)
       characters: $characters

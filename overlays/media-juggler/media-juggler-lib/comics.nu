@@ -946,6 +946,26 @@ export def from_comic_info_xml []: [record -> record] {
   )
 }
 
+# Remove commas from a name for a ComicInfo field which lists multiple names
+#
+# Kavita splits the names in these fields on commas, so a comma in a name, like "Yen Press, LLC", would split it into two names.
+export def sanitize_comic_info_name []: string -> string {
+  $in | str replace --all "," "" | str replace --all --regex '\s+' " " | str trim
+}
+
+# Convert the manga value to the values used by ComicInfo
+#
+# Booleans are converted to "Yes" and "No".
+# https://anansi-project.github.io/docs/comicinfo/documentation#manga
+export def comic_info_manga_value []: any -> string {
+  let manga = $in
+  if ($manga | describe) == "bool" {
+    if $manga { "Yes" } else { "No" }
+  } else {
+    $manga
+  }
+}
+
 # Convert the internal data structure for a comic to a ComicInfo.xml
 #
 # https://anansi-project.github.io/docs/comicinfo/documentation
@@ -961,6 +981,14 @@ export def into_comic_info_xml []: [record -> record] {
       help: $"pipe in the comic data"
     }
   }
+
+  let data = (
+    if ($data | get --optional manga) == null {
+      $data
+    } else {
+      $data | update manga ($data.manga | comic_info_manga_value)
+    }
+  )
 
   let creators = (
     $data | get --optional credits.person | uniq | reduce --fold [] {|creator creator_acc|
@@ -1113,12 +1141,12 @@ export def into_comic_info_xml []: [record -> record] {
       )
     }
     | upsert_comic_info {tag: "Title", value: ($data | get --optional chapter_title)}
-    | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publishers | str join ",")}
+    | upsert_comic_info {tag: "Publisher", value: ($data | get --optional publishers | each {|publisher| $publisher | sanitize_comic_info_name } | str join ",")}
     | upsert_comic_info {
       tag: "Imprint"
       value: (
         if ($data | get --optional imprints | is-not-empty) {
-          $data.imprints | str join ","
+          $data.imprints | each {|imprint| $imprint | sanitize_comic_info_name } | str join ","
         }
       )
     }
@@ -1130,7 +1158,7 @@ export def into_comic_info_xml []: [record -> record] {
         if ($data | get --optional characters | is-empty) {
           null
         } else {
-          $data.characters.name | sort | str join ","
+          $data.characters.name | each {|character| $character | sanitize_comic_info_name } | sort | str join ","
         }
       )
     }
@@ -1168,7 +1196,7 @@ export def into_comic_info_xml []: [record -> record] {
   # log debug $"creators: ($creators)"
   # $comic_info_xml
   let comic_info_xml = $creators | columns | reduce --fold $comic_info_xml {|role acc|
-    $acc | upsert_comic_info {tag: $role, value: ($creators | get $role | sort | str join ",")}
+    $acc | upsert_comic_info {tag: $role, value: ($creators | get $role | each {|person| $person | sanitize_comic_info_name } | uniq | sort | str join ",")}
   }
   # log debug $"Comic info: ($comic_info_xml | to nuon)"
   $comic_info_xml
