@@ -1336,7 +1336,19 @@ def main [
   )
   let comic_metadata = (
     if $primary_metadata_source == "hardcover" {
-      $hardcover_edition_id | fetch_and_parse_hardcover_edition id $cache_function
+      let hardcover_metadata = $hardcover_edition_id | fetch_and_parse_hardcover_edition id $cache_function
+      if ($hardcover_metadata | is-empty) {
+        $hardcover_metadata
+      } else {
+        # Hardcover only determines whether a graphic novel is manga or not.
+        # Use the --manga option for manga, which defaults to right-to-left manga.
+        $hardcover_metadata | upsert manga (
+          match ($hardcover_metadata | get --optional manga) {
+            false => "No"
+            _ => $manga
+          }
+        )
+      }
     } else if $primary_metadata_source == "comic_vine" {
       $comic_vine_metadata
     } else {
@@ -1602,7 +1614,7 @@ def main [
       let previous_file_name = $formats | get $output_format;
       let new_file_name = (
         $previous_file_name | path parse | update stem (
-          if $manga == "No" {
+          if ($comic_metadata | get --optional manga) == "No" {
             $"($comic_metadata.series) \(($comic_metadata.volume)\) #($comic_metadata.issue | fill --alignment right --width 3 --character '0') \(($comic_metadata.publication_date | format date '%Y')\)"
           } else {
             # Kavita will assume that the issue number is a chapter for manga libraries.

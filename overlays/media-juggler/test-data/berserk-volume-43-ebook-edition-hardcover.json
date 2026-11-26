@@ -207,6 +207,8 @@
           "name": "Kentaro Miura"
         },
         "books_count": 43,
+        "primary_books_count": 43,
+        "is_completed": null,
         "book_series": [
           {
             "book": {
