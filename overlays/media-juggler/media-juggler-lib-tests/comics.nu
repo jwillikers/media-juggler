@@ -293,3 +293,27 @@ export def test_parse_comic_vine_issue_and_volume_without_name_or_date [] {
   assert equal $actual.year null
   assert equal $actual.credits []
 }
+
+export def test_into_comic_info_xml_credits_from_hardcover_roles [] {
+  let input = open ([$test_data_dir "berserk-volume-43-ebook-edition-hardcover.json"] | path join) | parse_hardcover_edition
+  let creators = (
+    $input
+    | into_comic_info_xml
+    | get content
+    | where tag in [Writer Penciller Inker Colorist Letterer CoverArtist Editor Translator]
+    | each {|field| {tag: $field.tag value: $field.content.0.content} }
+    | sort-by tag
+  )
+  let expected = [
+    [tag value];
+    [Colorist "Studio Gaga"]
+    [CoverArtist "Studio Gaga"]
+    [Editor "Carl Gustav Horn"]
+    [Inker "Studio Gaga"]
+    [Letterer "Studio Cutie"]
+    [Penciller "Studio Gaga"]
+    [Translator "Duane Johnson"]
+    [Writer "Kentaro Miura,Studio Gaga"]
+  ]
+  assert_equal_deep $creators $expected
+}

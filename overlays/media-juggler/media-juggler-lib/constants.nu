@@ -287,6 +287,95 @@ export const comic_vine_roles_map = [
   # [[Production] []]
 ]
 
+# Map Hardcover's contributor roles to the roles used for credits, which follow the Comic Vine roles used by ComicTagger.
+#
+# Each Hardcover role maps to a list of credit roles.
+# Hardcover roles which aren't listed keep their Hardcover name, which is ignored when writing ComicInfo.xml.
+# Specializations of Hardcover roles are handled by hardcover_contribution_roles.
+#
+# https://docs.hardcover.app/librarians/standards/contributorstandards/
+# https://hardcover.app/browse/roles
+export const hardcover_roles_map = {
+  # Authorship & Writing
+  "Author": [Writer]
+  "Co-Author": [Writer]
+  "Co-Writer": [Writer]
+  "Contributing Author": [Writer]
+  "Story": [Writer]
+  "Writer": [Writer]
+  # Origins & Attribution
+  # The creator of the original story is credited as the writer, such as the author of a light novel adapted into a manga.
+  "Co-Creator": [Writer]
+  "Creator": [Writer]
+  "Original Author": [Writer]
+  "Original Creator": [Writer]
+  "Original Story": [Writer]
+  "Original Work": [Writer]
+  "Series Creator": [Writer]
+  # Adaptation & Scripts
+  "Adaptation": [Adapter]
+  "Adapter": [Adapter]
+  "Localizer": [Adapter]
+  "Scenario": [Writer]
+  "Scenarist": [Writer]
+  "Script": [Writer]
+  "Scriptwriter": [Writer]
+  # Art & Illustration
+  "Art": [Artist]
+  "Artist": [Artist]
+  "Artwork": [Artist]
+  "Cartoonist": [Writer Artist]
+  "Comic": [Artist]
+  "Cover": ["Cover Artist"]
+  "Cover Art": ["Cover Artist"]
+  "Cover Artist": ["Cover Artist"]
+  "Cover Illustrator": ["Cover Artist"]
+  "Drawings": [Artist]
+  "Illustrations": [Artist]
+  "Illustrator": [Artist]
+  "Interior Artist": [Artist]
+  "Line Art": [Artist]
+  # A mangaka writes and draws the manga, including its covers.
+  "Mangaka": [Writer Artist "Cover Artist"]
+  "Penciller": [Penciller]
+  "Pencils": [Penciller]
+  # Color, Inking & Lettering
+  "Color Artist": [Colorist]
+  "Colorist": [Colorist]
+  "Colors": [Colorist]
+  "Inker": [Inker]
+  "Inks": [Inker]
+  "Letterer": [Letterer]
+  "Lettering": [Letterer]
+  # Editing & Review
+  "Assistant Editor": [Editor]
+  "Associate Editor": [Editor]
+  "Co-Editor": [Editor]
+  "Consultant Editor": [Editor]
+  "Editing": [Editor]
+  "Editor": [Editor]
+  "Editor-in-Chief": [Editor]
+  "General Editor": [Editor]
+  "Series Editor": [Editor]
+  # Translation & Language
+  "Translation": [Translator]
+  "Translator": [Translator]
+  # Narration & Spoken Word
+  "Narration": [Narrator]
+  "Narrator": [Narrator]
+  "Reader": [Narrator]
+  "Reading": [Narrator]
+  "Voice Actor": [Narrator]
+}
+
+# Credit roles for artwork, which become cover art when a Hardcover role has the "Cover" specialization
+export const hardcover_art_credit_roles = [Artist Penciller Inker Colorist]
+
+# Hardcover specializations for which the base role's credit roles would be misleading.
+# "Original Story" credits work on the original story of an adaptation, like the illustrator of a light novel adapted into a manga, and "Touch-up" credits touching up artwork, like sound effects, rather than drawing it.
+# Contributions with these specializations keep their Hardcover name instead of being mapped to credit roles.
+export const hardcover_unmapped_specializations = ["Original Story" "Touch-up"]
+
 export const opf_identifier_schemes = [
   [schemes type];
   # [[GOODREADS] goodreads_version_id]
