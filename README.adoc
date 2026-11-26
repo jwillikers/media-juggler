@@ -311,9 +311,16 @@ set --export --universal WIKIDATA_USERNAME '<username>'
 set --export --universal MEDIA_JUGGLER_WIKIDATA_ACCESS_TOKEN '<wikidata-access-token>'
 ----
 
-. Set up an API token for {Hardcover}.
+. Set up an API key for {Hardcover}.
+media-juggler only reads catalog data from Hardcover, such as editions, contributors, and series, so the key only needs the `read:catalog:data` permission.
 .. Create a {Hardcover} account.
-.. Find your API key from https://hardcover.app/account/api[here].
+.. Open the https://hardcover.app/account/api/keys/new?scope=read:catalog:data[New API Key form], which has the `read:catalog:data` permission selected.
+.. Name the key, such as `media-juggler`.
+.. Choose when the key expires.
+.. Check that `read:catalog:data` is the only permission selected.
+Don't select the `all` permission, which grants full access to your account, including deleting it.
+.. Push the button to create the key, and copy the key.
+Hardcover only shows the key once.
 .. Set the environment variable `MEDIA_JUGGLER_HARDCOVER_API_TOKEN` to the API key from the previous step.
 +
 [,sh]
@@ -323,7 +330,9 @@ set --export --universal MEDIA_JUGGLER_HARDCOVER_API_TOKEN '<hardcover-api-key>'
 +
 [NOTE]
 ====
-The Hardcover API key will expire in one year and reset on January 1st.
+The API key stops working once it expires.
+When it does, create a new key the same way and update the environment variable.
+Revoke the key from https://hardcover.app/account/api[your Hardcover API settings] if it's ever exposed.
 ====
 
 . Enable debugging by setting the log level for Nushell.
