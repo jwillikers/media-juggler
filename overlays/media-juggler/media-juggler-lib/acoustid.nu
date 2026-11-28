@@ -189,7 +189,7 @@ export def submit_acoustid_fingerprints [
       # Issue: https://github.com/acoustid/acoustid-server/issues/43
       # PR: https://github.com/acoustid/acoustid-server/pull/179
       if ($it.item.duration > 32767sec) {
-        log error "Duration longer than what is supported on the AcoustID Server. Skipping submission"
+        log warning $"Duration ($it.item.duration) is longer than the 32767 seconds supported by the AcoustID server. Skipping submission of track ($it.item.index)"
         $acc
       } else {
         # The submission format is documented here: https://acoustid.org/webservice#submit
@@ -225,7 +225,8 @@ export def submit_acoustid_fingerprints [
     }
   )
   if ($submission_string | is-empty) {
-    return null
+    # Nothing could be submitted, which is not a failure.
+    return []
   }
 
   # todo include fileformat and bitrate?

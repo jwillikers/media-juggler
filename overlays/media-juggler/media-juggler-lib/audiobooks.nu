@@ -474,10 +474,12 @@ export def tag_audiobook [
         | submit_acoustid_fingerprints $acoustid_client_key $acoustid_user_key --retries $retries --retry-delay $retry_delay
       )
       log debug $"AcoustID submissions: ($acoustid_submissions | to nuon)"
-      if ($acoustid_submissions | is-not-empty) {
-        log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
-      } else {
+      if $acoustid_submissions == null {
         log error $"tag_audiobook: Failed to submit AcoustID fingerprints!"
+      } else if ($acoustid_submissions | is-empty) {
+        log info "tag_audiobook: No AcoustID fingerprints were eligible for submission"
+      } else {
+        log info $"Submitted AcoustID fingerprints: ($acoustid_submissions | to nuon)"
       }
     }
   }
