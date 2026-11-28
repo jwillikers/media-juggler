@@ -820,7 +820,7 @@ def main [
   $opf | to xml | save --force $opf_file
   if ($target_destination_directory | is_ssh_path) {
     if not $skip_upload {
-      log info $"Uploading (ansi yellow)($opf_file)(ansi reset) to (ansi yellow)($destination)(ansi reset)"
+      log info $"Uploading (ansi yellow)($opf_file)(ansi reset) to (ansi yellow)($target_destination_directory | path join "metadata.opf")(ansi reset)"
       if $use_rsync {
         $opf_file | rsync ($target_destination_directory | path join "metadata.opf") "--chmod=Dg+s,ug+rwx,Fug+rw,ug-x" "--mkpath"
       } else {
